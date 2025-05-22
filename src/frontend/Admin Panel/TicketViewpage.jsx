@@ -1,8 +1,12 @@
-import React from 'react'
+import React, { useState } from 'react';
+import { Link } from 'react-router-dom'
+import SupervisorAssign from './SupervisorAssign'
 
 const TicketViewPage = () => {
+    const [showModal, setShowModal] = useState(false);
+
   return (
-    <div className="min-h-screen bg-gray-100 flex items-center">
+    <div className="min-h-screen bg-gray-200 flex items-center">
        
       <div className="bg-white shadow-lg rounded-lg p-10 w-full max-w-3xl ml-105">
         <h2 className="text-2xl font-semibold mb-8 text-center">Complains</h2>
@@ -45,9 +49,8 @@ const TicketViewPage = () => {
           <button className="bg-red-600 hover:bg-red-700 text-white font-semibold px-6 py-2 rounded">
             Reject
           </button>
-          <button className="bg-green-500 hover:bg-green-600 text-white font-semibold px-6 py-2 rounded">
-            Accept
-          </button>
+          <button onClick={() => setShowModal(true)} className="bg-green-500 hover:bg-green-600 text-white font-semibold px-6 py-2 rounded">Accept</button>
+            {showModal && <SupervisorAssign onClose={() => setShowModal(false)} />}
         </div>
       </div>
     </div>
