@@ -1,5 +1,5 @@
 import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
-import UserDashboard from "./frontend/Users Panel/UserDashboard"
+import UserDashboard from "./frontend/Users Panel/UserDashboard";
 
 function App() {
   return (
