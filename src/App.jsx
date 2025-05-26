@@ -3,7 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-route
 import Register from './frontend/users_panel/Register';
 import Login from './frontend/users_panel/Login';
 import UserDashboard from './frontend/users_panel/UserDashboard';
-import DashboardPage from './frontend/admin_panel/dashbord';
+import Dashboard from './frontend/admin_panel/dashbord';
 import { useState, useEffect, createContext, useContext } from 'react';
 
 const AuthContext = createContext(null);
@@ -75,7 +75,7 @@ const AppRoutes = ({ isLoggedIn, setIsLoggedIn, userRole, setUserRole }) => {
           path='/admin-dashboard'
           element={
             <ProtectedRoute allowedRoles={['admin']}>
-              <DashboardPage />
+              <Dashboard />
             </ProtectedRoute>
           }
         />

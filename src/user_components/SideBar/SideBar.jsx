@@ -18,9 +18,9 @@ const SideBar = () => {
   return (
     <div className="flex">
       <div
-        className={`bg-gray-900 h-screen duration-300 p-5 pt-30 ${
+        className={`bg-gray-900 h-screen duration-300 p-5 pt-30 fixed top-0 left-0 z-50 ${
           open ? "w-72" : "w-20"
-        } relative`}
+        }`}
       >
         <BsChevronLeft
           className={`absolute -right-3 mr-10 top-16 cursor-pointer text-white text-base ${

@@ -1,121 +1,76 @@
-// src/pages/Dashboard.jsx
-import React, { useEffect, useState } from 'react';
-// import Navbar from './components/Navbar';
+import React from 'react';
+import { FaTicketAlt, FaExclamationCircle, FaCalendarDay, FaTasks } from 'react-icons/fa';
 
-const getStatusStyle = (status) => {
-  switch (status) {
-    case 'Open': return 'bg-red-500 text-white';
-    case 'In Progress': return 'bg-blue-500 text-white';
-    case 'Closed': return 'bg-green-500 text-white';
-    default: return 'bg-gray-300';
-  }
-};
-
-const getPriorityStyle = (priority) => {
-  switch (priority) {
-    case 'High': return 'bg-orange-400 text-white';
-    case 'Medium': return 'bg-yellow-400 text-white';
-    case 'Low': return 'bg-green-300 text-white';
-    case 'Good': return 'bg-emerald-400 text-white';
-    case 'Open': return 'bg-green-500 text-white';
-    default: return 'bg-gray-300';
-  }
-};
-
-const DashboardPage = () => {
-  const [tickets, setTickets] = useState([]);
-  const [statusFilter, setStatusFilter] = useState('');
-  const [priorityFilter, setPriorityFilter] = useState('');
-  const [searchTerm, setSearchTerm] = useState('');
-
-  useEffect(() => {
-    fetch('http://localhost:5000/api/tickets') // Update with your actual backend endpoint
-      .then(res => res.json())
-      .then(data => setTickets(data))
-      .catch(err => console.error('Error fetching tickets:', err));
-  }, []);
-
-  const filteredTickets = tickets.filter(ticket => {
-    return (
-      (statusFilter ? ticket.status === statusFilter : true) &&
-      (priorityFilter ? ticket.priority === priorityFilter : true) &&
-      (searchTerm ? ticket.client.toLowerCase().includes(searchTerm.toLowerCase()) : true)
-    );
-  });
-
+const Dashboard = () => {
   return (
-    <div>
-      <Navbar />
-      <div className="p-6">
-        <h2 className="text-2xl font-semibold text-gray-700 mb-6">Tickets</h2>
-        <div className="flex space-x-4 mb-4">
-          <select
-            className="border rounded p-2"
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-          >
-            <option value="">Status</option>
-            <option value="Open">Open</option>
-            <option value="In Progress">In Progress</option>
-            <option value="Closed">Closed</option>
-          </select>
-          <select
-            className="border rounded p-2"
-            value={priorityFilter}
-            onChange={(e) => setPriorityFilter(e.target.value)}
-          >
-            <option value="">Priority</option>
-            <option value="High">High</option>
-            <option value="Medium">Medium</option>
-            <option value="Low">Low</option>
-          </select>
-          <input
-            type="text"
-            className="border rounded p-2"
-            placeholder="Search..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+    <div className="p-6 bg-gray-100 min-h-screen">
+      <header className="flex flex-col md:flex-row justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold mb-4 md:mb-0">Dashboard</h1>
+        <input type="text" placeholder="Search..." className="border rounded px-4 py-2 w-full md:w-auto" />
+        <div className="text-2xl mt-4 md:mt-0">🔔</div>
+      </header>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div className="bg-blue-500 text-white p-4 rounded shadow text-center">
+          <FaTicketAlt className="text-3xl mb-2 mx-auto" />
+          <h2 className="text-lg font-semibold">1248</h2>
+          <p>Total Tickets</p>
         </div>
-        <div className="overflow-x-auto">
-          <table className="min-w-full bg-white rounded-md shadow-sm">
+        <div className="bg-gray-800 text-white p-4 rounded shadow text-center">
+          <FaTasks className="text-3xl mb-2 mx-auto" />
+          <h2 className="text-lg font-semibold">78</h2>
+          <p>Open Tickets</p>
+        </div>
+        <div className="bg-gray-500 text-white p-4 rounded shadow text-center">
+          <FaCalendarDay className="text-3xl mb-2 mx-auto" />
+          <h2 className="text-lg font-semibold">125</h2>
+          <p>Tickets Today</p>
+        </div>
+        <div className="bg-red-500 text-white p-4 rounded shadow text-center">
+          <FaExclamationCircle className="text-3xl mb-2 mx-auto" />
+          <h2 className="text-lg font-semibold">76</h2>
+          <p>High Priority</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+        <div className="bg-white p-4 rounded shadow">
+          <h2 className="text-lg font-semibold mb-4">Recently Activity</h2>
+          <table className="w-full border-collapse border border-gray-200 text-sm">
             <thead>
-              <tr className="bg-gray-100 text-left text-sm text-gray-600 uppercase tracking-wider">
-                <th className="py-3 px-4">ID</th>
-                <th className="py-3 px-4">Client</th>
-                <th className="py-3 px-4">System</th>
-                <th className="py-3 px-4">Category</th>
-                <th className="py-3 px-4">Status</th>
-                <th className="py-3 px-4">Priority</th>
-                <th className="py-3 px-4">Date</th>
+              <tr>
+                <th className="border border-gray-200 px-2 py-1">Tickets</th>
+                <th className="border border-gray-200 px-2 py-1">Clients</th>
+                <th className="border border-gray-200 px-2 py-1">Category</th>
+                <th className="border border-gray-200 px-2 py-1">Status</th>
+                <th className="border border-gray-200 px-2 py-1">Priority</th>
+                <th className="border border-gray-200 px-2 py-1">Assigned</th>
               </tr>
             </thead>
             <tbody>
-              {filteredTickets.map((ticket, index) => (
-                <tr key={index} className="border-t border-gray-200">
-                  <td className="py-2 px-4">{ticket.id}</td>
-                  <td className="py-2 px-4">{ticket.client}</td>
-                  <td className="py-2 px-4">{ticket.system}</td>
-                  <td className="py-2 px-4">{ticket.category}</td>
-                  <td className="py-2 px-4">
-                    <span className={`px-2 py-1 rounded text-xs ${getStatusStyle(ticket.status)}`}>
-                      {ticket.status}
-                    </span>
-                  </td>
-                  <td className="py-2 px-4">
-                    <span className={`px-2 py-1 rounded text-xs ${getPriorityStyle(ticket.priority)}`}>
-                      {ticket.priority}
-                    </span>
-                  </td>
-                  <td className="py-2 px-4">{ticket.date}</td>
-                </tr>
-              ))}
+              {/* Add dynamic rows here */}
             </tbody>
           </table>
+        </div>
+
+        <div className="bg-white p-4 rounded shadow">
+          <h2 className="text-lg font-semibold mb-4">Ticket by Status</h2>
+          <div className="text-center text-gray-500">[Pie Chart Placeholder]</div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="bg-white p-4 rounded shadow">
+          <h2 className="text-lg font-semibold mb-4">Tickets by System</h2>
+          <div className="text-center text-gray-500">[Chart]</div>
+        </div>
+        <div className="bg-white p-4 rounded shadow">
+          <h2 className="text-lg font-semibold mb-4">Active Clients</h2>
+          <div className="text-center text-gray-500">[Clients]</div>
         </div>
       </div>
     </div>
   );
 };
 
-export default DashboardPage;
+export default Dashboard;
