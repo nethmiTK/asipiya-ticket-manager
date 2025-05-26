@@ -1,5 +1,6 @@
+// src/pages/Dashboard.jsx
 import React, { useEffect, useState } from 'react';
-import Navbar from './components/Navbar';
+// import Navbar from './components/Navbar';
 
 const getStatusStyle = (status) => {
   switch (status) {
@@ -16,11 +17,12 @@ const getPriorityStyle = (priority) => {
     case 'Medium': return 'bg-yellow-400 text-white';
     case 'Low': return 'bg-green-300 text-white';
     case 'Good': return 'bg-emerald-400 text-white';
+    case 'Open': return 'bg-green-500 text-white';
     default: return 'bg-gray-300';
   }
 };
 
-const TicketsPage = () => {
+const DashboardPage = () => {
   const [tickets, setTickets] = useState([]);
   const [statusFilter, setStatusFilter] = useState('');
   const [priorityFilter, setPriorityFilter] = useState('');
@@ -116,4 +118,4 @@ const TicketsPage = () => {
   );
 };
 
-export default TicketsPage;
+export default DashboardPage;

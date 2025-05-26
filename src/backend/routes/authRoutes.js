@@ -14,9 +14,8 @@ router.post('/register', async (req, res) => {
             return res.status(409).json({message : "user already existed"})
         }
         const hashPassword = await bcrypt.hash(password, 10)
-        await db.query("INSERT INTO users (username, email, password) VALUES (?, ?, ?)", 
-            [username, email, hashPassword])
-        
+        await db.query("INSERT INTO users (username, email, password, role) VALUES (?, ?, ?, ?)",
+            [username, email, hashPassword, 'user'])
         return res.status(201).json({message: "user created successfully"})
     } catch(err) {
         return res.status(500).json(err.message)
@@ -35,9 +34,12 @@ router.post('/login', async (req, res) => {
         if(!isMatch) {
             return res.status(401).json({message : "wrong password"})
         }
-        const token = jwt.sign({id: rows[0].id}, process.env.JWT_KEY, {expiresIn: '3h'})
-        
-        return res.status(201).json({token: token})
+        const token = jwt.sign(
+            { id: rows[0].id, role: rows[0].role },
+            process.env.JWT_KEY,
+            { expiresIn: '3h' }
+        )
+        return res.status(201).json({token: token, role: rows[0].role})
     } catch(err) {
         return res.status(500).json(err.message)
     }
@@ -45,15 +47,26 @@ router.post('/login', async (req, res) => {
 
 const verifyToken = async (req, res, next) => {
     try {
-        const token = req.headers['authorization'].split(' ')[1];
+        const authHeader = req.headers['authorization'];
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+            return res.status(403).json({ message: "No Token Provided or invalid format" });
+        }
+        const token = authHeader.split(' ')[1];
         if(!token) {
             return res.status(403).json({message: "No Token Provided"})
         }
         const decoded = jwt.verify(token, process.env.JWT_KEY)
         req.userId = decoded.id;
+        req.userRole = decoded.role;
         next()
-    }  catch(err) {
-        return res.status(500).json({message: "server error"})
+    } catch(err) {
+        if (err.name === 'TokenExpiredError') {
+            return res.status(401).json({ message: 'Token expired' });
+        }
+        if (err.name === 'JsonWebTokenError') {
+            return res.status(401).json({ message: 'Invalid token' });
+        }
+        return res.status(500).json({message: "Server error during token verification"});
     }
 }
 
@@ -64,8 +77,7 @@ router.get('/home', verifyToken, async (req, res) => {
         if(rows.length === 0) {
             return res.status(404).json({message : "user not existed"})
         }
-
-        return res.status(201).json({user: rows[0]})
+        return res.status(201).json({user: rows[0], role: req.userRole})
     }catch(err) {
         return res.status(500).json({message: "server error"})
     }

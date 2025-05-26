@@ -1,6 +1,6 @@
 import React from "react";
-import UserNavBar from "../../Components/UserNavBar/UserNavBar";
-import UserSideBar from "../../Components/UserSideBar/UserSideBar"
+import UserNavBar from "../../user_components/NavBar/NavBar";
+import UserSideBar from "../../user_components/SideBar/SideBar"
 
 const UserDashboard = () => {
   return (
