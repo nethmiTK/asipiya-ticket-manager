@@ -31,7 +31,7 @@ const Login = ({ onLoginSuccess }) => {
           onLoginSuccess(token, role);
         }
 
-        // ✅ Navigate without reloading
+        // Navigate without reloading
         if (role === 'admin') {
           navigate('/admin-dashboard');
         } else if (role === 'user') {
