@@ -5,6 +5,7 @@ import AddSupervisor from './pages/AddSupervisor';
 import AddMember from './pages/AddMember';
 import Tickets from './pages/Tickets';
 import TicketManage from './pages/TicketManage';
+import TicketRequest from './pages/TicketRequest';
 
 const App = () => {
   return (
@@ -18,6 +19,7 @@ const App = () => {
             <Route path="/add-member" element={<AddMember />} />
             <Route path="/tickets" element={<Tickets />} />
             <Route path="/tickets-manage" element={<TicketManage />} />
+            <Route path="/tickets-request" element={<TicketRequest />} />
           </Routes>
         </div>
       </div>
