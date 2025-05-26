@@ -1,11 +1,36 @@
 import { FaCircleArrowLeft } from "react-icons/fa6";
 import { useNavigate } from "react-router-dom";
+import { useState } from "react";
+import axios from "axios";
 
 export default function AddMember() {
   const navigate = useNavigate();
 
+  const [formData, setFormData] = useState({
+    name: "",
+    email: "",
+    role: "developer",
+  });
+
   const handleBackClick = () => {
     navigate("/supervisors");
+  };
+
+  const handleChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    try {
+      await axios.post("http://localhost:5000/api/users", formData);
+      alert("User added successfully!");
+      navigate("/supervisors");
+    } catch (err) {
+      console.error(err);
+      alert("Error adding user.");
+    }
   };
 
   return (
@@ -26,7 +51,7 @@ export default function AddMember() {
         </h1>
 
         {/* Form */}
-        <form className="space-y-5">
+        <form onSubmit={handleSubmit} className="space-y-5">
           {/* Name */}
           <div>
             <label className="block font-semibold text-gray-700 mb-1 text-sm sm:text-base">
@@ -34,7 +59,11 @@ export default function AddMember() {
             </label>
             <input
               type="text"
+              name="name"
+              value={formData.name}
+              onChange={handleChange}
               placeholder="Enter name"
+              required
               className="w-full px-4 py-2 border rounded-lg text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-blue-300"
             />
           </div>
@@ -46,7 +75,11 @@ export default function AddMember() {
             </label>
             <input
               type="email"
+              name="email"
+              value={formData.email}
+              onChange={handleChange}
               placeholder="Enter email"
+              required
               className="w-full px-4 py-2 border rounded-lg text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-blue-300"
             />
           </div>
@@ -56,8 +89,13 @@ export default function AddMember() {
             <label className="block font-semibold text-gray-700 mb-1 text-sm sm:text-base">
               Role
             </label>
-            <select className="w-full px-4 py-2 border rounded-lg text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-blue-300">
-              <option value="user">Developer</option>
+            <select
+              name="role"
+              value={formData.role}
+              onChange={handleChange}
+              className="w-full px-4 py-2 border rounded-lg text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-blue-300"
+            >
+              <option value="developer">Developer</option>
               <option value="admin">Admin</option>
               <option value="supervisor">Supervisor</option>
             </select>

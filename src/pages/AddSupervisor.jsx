@@ -1,14 +1,22 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import axios from "axios";
 
 export default function AddSupervisor() {
   const navigate = useNavigate();
+  const [users, setUsers] = useState([]);
 
-  const [users, setUsers] = useState([
-    { id: 1, name: "John Doe", email: "john@example.com", role: "developer" },
-    { id: 2, name: "Jane Smith", email: "jane@example.com", role: "admin" },
-    { id: 3, name: "Alice Johnson", email: "alice@example.com", role: "supervisor" },
-  ]);
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const res = await axios.get("http://localhost:5000/api/users");
+        setUsers(res.data);
+      } catch (error) {
+        console.error("Error fetching users:", error);
+      }
+    };
+    fetchUsers();
+  }, []);
 
   const handleAddClick = () => {
     navigate("/add-member");
@@ -17,7 +25,6 @@ export default function AddSupervisor() {
   return (
     <div className="min-h-screen p-4 sm:p-6 bg-gradient-to-br from-blue-50 to-white">
       <div className="max-w-6xl mx-auto bg-white rounded-xl shadow-lg p-6 sm:p-8">
-        {/* Header */}
         <div className="flex flex-wrap justify-between items-center mb-6">
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">Members</h1>
           <button
@@ -28,7 +35,6 @@ export default function AddSupervisor() {
           </button>
         </div>
 
-        {/* Table */}
         <div className="overflow-x-auto">
           <table className="min-w-full bg-white rounded-lg shadow text-sm sm:text-base">
             <thead className="bg-blue-100 text-gray-700">
@@ -42,10 +48,7 @@ export default function AddSupervisor() {
             <tbody>
               {users.length > 0 ? (
                 users.map((user) => (
-                  <tr
-                    key={user.id}
-                    className="border-b hover:bg-blue-50 transition"
-                  >
+                  <tr key={user.id} className="border-b hover:bg-blue-50 transition">
                     <td className="p-3">
                       <input
                         type="text"
@@ -82,10 +85,7 @@ export default function AddSupervisor() {
                 ))
               ) : (
                 <tr>
-                  <td
-                    colSpan="4"
-                    className="text-center text-gray-500 italic py-4"
-                  >
+                  <td colSpan="4" className="text-center text-gray-500 italic py-4">
                     No users available.
                   </td>
                 </tr>
