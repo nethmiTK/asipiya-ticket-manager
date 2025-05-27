@@ -17,17 +17,17 @@ const Register = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      // CORRECTED URL: Changed port from 3000 to 5000 and added /api
+      
       const response = await axios.post('http://localhost:5000/api/auth/register', values);
       if (response.status === 201) {
         navigate('/login');
       }
     } catch (err) {
       console.error('Registration error:', err.message);
-      // You might want to add user-friendly error messages here
+      
       if (err.response) {
         // The request was made and the server responded with a status code
-        // that falls out of the range of 2xx
+       
         console.error('Server response data:', err.response.data);
         console.error('Server response status:', err.response.status);
         console.error('Server response headers:', err.response.headers);
