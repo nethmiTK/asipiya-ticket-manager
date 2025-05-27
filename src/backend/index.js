@@ -1,30 +1,61 @@
-// src/backend/index.js
+import mysql from 'mysql';
 import express from 'express';
+import bodyParser from 'body-parser';
 import cors from 'cors';
-import dotenv from 'dotenv';
-import authRouter from './routes/authRoutes.js';
-import { authenticateToken, authorizeRoles } from './middleware/authMiddleware.js';
 
-dotenv.config();
+// Create a connection to the database
+const db = mysql.createConnection({
+    host: 'localhost',
+    user: 'root',
+    password: '',
+    database: 'ticketmanager'
+});
+
+// Connect to the database
+db.connect((err) => {
+    if (err) {
+        console.error('Error connecting to the database:', err);
+        return;
+    }
+    console.log('Connected to the MySQL database.');
+});
 
 const app = express();
+app.use(bodyParser.json());
 app.use(cors());
-app.use(express.json());
 
-app.use('/api/auth', authRouter);
-
-app.get('/api/public', (req, res) => {
-    res.send('This is a public route, anyone can see it.');
+// Register endpoint
+app.post('/register', (req, res) => {
+    const { FullName, Email, Password, Role, Phone } = req.body;
+    const query = 'INSERT INTO appuser (FullName, Email, Password, Role, Phone) VALUES (?, ?, ?, ?, ?)';
+    db.query(query, [FullName, Email, Password, Role, Phone], (err, result) => {
+        if (err) {
+            console.error('Error inserting user:', err);
+            res.status(500).send('Error registering user');
+        } else {
+            res.status(200).send('User registered successfully');
+        }
+    });
 });
 
-app.get('/api/user/profile', authenticateToken, (req, res) => {
-    res.json({ message: `Welcome to your profile, user ID: ${req.userId}, Role: ${req.userRole}` });
+// Login endpoint
+app.post('/login', (req, res) => {
+    const { Email, Password } = req.body;
+    const query = 'SELECT * FROM appuser WHERE Email = ? AND Password = ?';
+    db.query(query, [Email, Password], (err, results) => {
+        if (err) {
+            console.error('Error during login:', err);
+            res.status(500).send('Error during login');
+        } else if (results.length > 0) {
+            res.status(200).send('Login successful');
+        } else {
+            res.status(401).send('Invalid credentials');
+        }
+    });
 });
 
-app.get('/api/admin/dashboard-data', authenticateToken, authorizeRoles(['admin']), (req, res) => {
-    res.json({ message: `Welcome to the ADMIN dashboard, ${req.userId}. Only admins can see this!` });
+app.listen(5000, () => {
+    console.log('Server is running on port 5000');
 });
 
-app.listen(process.env.PORT || 5000, () => {
-    console.log(`Server is Running on port ${process.env.PORT || 5000}`);
-});
+export default db;
