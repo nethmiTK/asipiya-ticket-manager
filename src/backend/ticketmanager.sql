@@ -33,9 +33,10 @@ CREATE TABLE IF NOT EXISTS `appuser` (
   `FullName` varchar(45) DEFAULT NULL,
   `Email` varchar(45) DEFAULT NULL,
   `Password` varchar(45) DEFAULT NULL,
+  `Role` varchar(45) DEFAULT NULL,
   `Phone` varchar(45) DEFAULT NULL,
   PRIMARY KEY (`UserID`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=MyISAM AUTO_INCREMENT=17 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- --------------------------------------------------------
 
