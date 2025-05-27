@@ -28,14 +28,14 @@ const Login = () => {
     };
 
     return (
-        <div className="login-container" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', backgroundColor: '#f5f5f5' }}>
-            <h2 style={{ marginBottom: '20px', color: '#333' }}>Login</h2>
-            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', width: '300px', gap: '10px' }}>
-                <input type="email" name="Email" placeholder="Email" value={credentials.Email} onChange={handleChange} required style={{ padding: '10px', borderRadius: '5px', border: '1px solid #ccc' }} />
-                <input type="password" name="Password" placeholder="Password" value={credentials.Password} onChange={handleChange} required style={{ padding: '10px', borderRadius: '5px', border: '1px solid #ccc' }} />
-                <button type="submit" style={{ padding: '10px', borderRadius: '5px', backgroundColor: '#007bff', color: '#fff', border: 'none', cursor: 'pointer' }}>Login</button>
+        <div className="login-container flex flex-col items-center justify-center min-h-screen text-gray-800">
+            <h2 className="mb-5 text-3xl font-bold">Login</h2>
+            <form onSubmit={handleSubmit} className="flex flex-col w-80 gap-4 bg-white p-6 rounded-lg shadow-lg">
+                <input type="email" name="Email" placeholder="Email" value={credentials.Email} onChange={handleChange} required className="p-3 rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                <input type="password" name="Password" placeholder="Password" value={credentials.Password} onChange={handleChange} required className="p-3 rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                <button type="submit" className="p-3 rounded-md bg-blue-600 text-white font-semibold hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500">Login</button>
             </form>
-            <p style={{ marginTop: '10px' }}>Don't have an account? <Link to="/register" style={{ color: '#007bff' }}>Register</Link></p>
+            <p className="mt-4">Don't have an account? <Link to="/register" className="text-blue-600 hover:underline">Register</Link></p>
         </div>
     );
 };

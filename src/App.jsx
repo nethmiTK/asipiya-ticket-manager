@@ -79,7 +79,7 @@ const AppRoutes = ({ isLoggedIn, setIsLoggedIn, userRole, setUserRole }) => {
           path='/admin-dashboard'
           element={
             <ProtectedRoute allowedRoles={['admin']}>
-              <Dashboard />
+              <Dashboard/>
             </ProtectedRoute>
           }
         />
