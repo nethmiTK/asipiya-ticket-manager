@@ -5,6 +5,8 @@ import { LuTicketCheck, LuTicketPlus } from "react-icons/lu";
 import { IoIosArrowBack } from "react-icons/io";
 import { AiOutlineUser } from "react-icons/ai";
 import { CiLogout } from "react-icons/ci";
+import { useAuth } from '../../App.jsx';
+import { toast } from 'react-toastify';
 
 const Menus = [
   { title: "My All Tickets", icon: <LuTicketCheck />, path: "/all-tickets" },
@@ -14,6 +16,27 @@ const Menus = [
 
 const SideBar = () => {
   const [open, setOpen] = useState(true);
+  const { handleLogout } = useAuth();
+
+  // Modal state
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+
+  // Open the logout confirmation modal
+  const handleConfirmLogout = () => {
+    setShowLogoutModal(true);
+  };
+
+  // Confirm logout and close modal
+  const confirmLogout = () => {
+    setShowLogoutModal(false);
+    handleLogout();
+    toast.success("Logged out successfully!");
+  };
+
+  // Cancel logout and close modal
+  const cancelLogout = () => {
+    setShowLogoutModal(false);
+  };
 
   return (
     <div className="flex">
@@ -59,11 +82,12 @@ const SideBar = () => {
           </ul>
 
           <div className="mt-auto">
-            <li className="text-white text-sm flex items-center justify-between gap-x-4 cursor-pointer p-2 hover:bg-gray-700 rounded-md">
-              <Link
-                to="/logout"
-                className="flex items-center gap-x-4 w-full justify-between"
-              >
+            {/* Logout Button */}
+            <li
+              className="text-white text-sm flex items-center justify-between gap-x-4 cursor-pointer p-2 hover:bg-gray-700 rounded-md"
+              onClick={handleConfirmLogout} // Show confirmation modal instead of immediate logout
+            >
+              <div className="flex items-center gap-x-4 w-full justify-between">
                 <div className="flex items-center gap-x-4">
                   <span className="text-2xl">
                     <CiLogout />
@@ -80,11 +104,34 @@ const SideBar = () => {
                     <IoIosArrowBack className="rotate-180" />
                   </span>
                 )}
-              </Link>
+              </div>
             </li>
           </div>
         </div>
       </div>
+
+      {/* Logout Confirmation Modal */}
+      {showLogoutModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg shadow-lg text-center w-[90%] max-w-sm">
+            <h2 className="text-lg font-semibold mb-4">Are you sure you want to log out?</h2>
+            <div className="flex justify-center gap-4">
+              <button
+                onClick={confirmLogout}
+                className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
+              >
+                Yes, Log Out
+              </button>
+              <button
+                onClick={cancelLogout}
+                className="bg-gray-300 text-gray-800 px-4 py-2 rounded hover:bg-gray-400"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
