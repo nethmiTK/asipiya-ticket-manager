@@ -129,7 +129,25 @@ app.delete('/supervisor/:id', (req, res) => {
   });
 });
 
+// API endpoint to fetch tickets
+app.get('/api/tickets', (req, res) => {
+  const query = `
+    SELECT t.TicketID, c.CompanyName AS Client, s.Description AS System, tc.Description AS Category, t.Status, t.Priority
+    FROM ticket t
+    LEFT JOIN client c ON t.UserId = c.ClientID
+    LEFT JOIN asipiyasystem s ON t.AsipiyaSystemID = s.AsipiyaSystemID
+    LEFT JOIN ticketcategory tc ON t.TicketCategoryID = tc.TicketCategoryID;
+  `;
 
+  db.query(query, (err, results) => {
+    if (err) {
+      console.error('Error fetching tickets:', err);
+      res.status(500).json({ error: 'Failed to fetch tickets' });
+      return;
+    }
+    res.json(results);
+  });
+});
 
 /*----------------------------------------------------------------------------------*/
 
