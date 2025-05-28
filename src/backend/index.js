@@ -37,6 +37,25 @@ app.post('/register', (req, res) => {
         }
     });
 });
+// API endpoint to fetch tickets
+app.get('/api/tickets', (req, res) => {
+  const query = `
+    SELECT t.TicketID, c.Email AS UserEmail, s.Description AS System, tc.Description AS Category, t.Status, t.Priority, t.DateTime
+    FROM ticket t
+    LEFT JOIN appuser c ON t.UserId = c.UserID
+    LEFT JOIN asipiyasystem s ON t.AsipiyaSystemID = s.AsipiyaSystemID
+    LEFT JOIN ticketcategory tc ON t.TicketCategoryID = tc.TicketCategoryID;
+  `;
+
+  db.query(query, (err, results) => {
+    if (err) {
+      console.error('Error fetching tickets:', err);
+      res.status(500).json({ error: 'Failed to fetch tickets' });
+      return;
+    }
+    res.json(results);
+  });
+});
 
 // Login endpoint
 app.post('/login', (req, res) => {
