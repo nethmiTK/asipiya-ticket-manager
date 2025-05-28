@@ -1,7 +1,6 @@
 import { FaCircleArrowLeft } from "react-icons/fa6";
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
-// import axios from "axios";
 
 export default function AddMember() {
   const navigate = useNavigate();
@@ -9,32 +8,37 @@ export default function AddMember() {
   const [formData, setFormData] = useState({
     name: "",
     email: "",
-    role: "developer",
+    role: "Developer",
   });
 
   const handleBackClick = () => {
     navigate("/supervisor");
   };
-
-  // Uncomment to use real API
-  /*
+  
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
+  e.preventDefault();
 
-    try {
-      await axios.post("http://localhost:5000/api/users", formData);
-      alert("User added successfully!");
-      navigate("/supervisors");
-    } catch (err) {
-      console.error(err);
-      alert("Error adding user.");
+  try {
+    const response = await fetch("http://localhost:5000/add-member", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(formData),
+    });
+
+    if (response.ok) {
+      alert("Member added successfully");
+      navigate("/supervisor"); // Go back to list
+    } else {
+      alert("Failed to add member");
     }
-  };
-  */
+  } catch (err) {
+    console.error("Error submitting form:", err);
+  }
+};
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-100 to-blue-50 flex items-center justify-center px-4 sm:px-6">
@@ -54,7 +58,7 @@ export default function AddMember() {
         </h1>
 
         {/* Form */}
-        <form className="space-y-6">
+        <form className="space-y-6" onSubmit={handleSubmit}>
           {/* Name */}
           <div>
             <label className="block font-semibold text-gray-700 mb-1">
@@ -64,7 +68,7 @@ export default function AddMember() {
               type="text"
               name="name"
               value={formData.name}
-              // onChange={handleChange}
+              onChange={handleChange}
               placeholder="Enter name"
               required
               className="w-full px-4 py-2 border-2 border-blue-300 text-gray-700 rounded-lg focus:outline-none focus:border-blue-500"
@@ -80,7 +84,7 @@ export default function AddMember() {
               type="email"
               name="email"
               value={formData.email}
-              // onChange={handleChange}
+              onChange={handleChange}
               placeholder="Enter email"
               required
               className="w-full px-4 py-2 border-2 border-green-300 text-gray-700 rounded-lg focus:outline-none focus:border-green-500"
@@ -95,12 +99,12 @@ export default function AddMember() {
             <select
               name="role"
               value={formData.role}
-              // onChange={handleChange}
+              onChange={handleChange}
               className="w-full px-4 py-2 border-2 border-purple-300 text-gray-700 rounded-lg focus:outline-none focus:border-purple-500"
             >
-              <option value="developer">Developer</option>
-              <option value="admin">Admin</option>
-              <option value="supervisor">Supervisor</option>
+              <option value="Developer">Developer</option>
+              <option value="Manager">Manger</option>
+              <option value="Supervisor">Supervisor</option>
             </select>
           </div>
 

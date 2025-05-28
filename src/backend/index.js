@@ -54,6 +54,81 @@ app.post('/login', (req, res) => {
     });
 });
 
+/* ------------------------- Add Members ------------------------- */
+
+// Get all members
+app.get('/supervisor', (req, res) => {
+  const query = 'SELECT id, Name AS name, Email AS email, Role AS role FROM supervisors';
+  db.query(query, (err, results) => {
+    if (err) {
+      console.error('Error fetching users:', err);
+      res.status(500).json({ message: 'Server error' });
+    } else {
+      res.status(200).json(results);
+    }
+  });
+});
+
+// Add a new member
+app.post('/add-member', (req, res) => {
+  const { name, email, role } = req.body;
+
+  if (!name || !email || !role) {
+    return res.status(400).json({ message: 'Missing fields' });
+  }
+
+  const query = 'INSERT INTO supervisors (Name, Email, Role) VALUES (?, ?, ?)';
+  db.query(query, [name, email, role], (err, result) => {
+    if (err) {
+      console.error('Error adding user:', err);
+      res.status(500).json({ message: 'Error adding user' });
+    } else {
+      res.status(201).json({ message: 'User added successfully', userId: result.insertId });
+    }
+  });
+});
+
+// Get user by member
+app.get('/supervisor/:id', (req, res) => {
+  const query = 'SELECT * FROM supervisors WHERE id = ?';
+  db.query(query, [req.params.id], (err, results) => {
+    if (err) {
+      console.error('Error fetching user:', err);
+      return res.status(500).json({ message: 'Server error' });
+    }
+    res.json(results[0]);
+  });
+});
+
+// Update member
+app.put('/supervisor/:id', (req, res) => {
+  const { name, email, role } = req.body;
+  const query = 'UPDATE supervisors SET Name = ?, Email = ?, Role = ? WHERE id = ?';
+  db.query(query, [name, email, role, req.params.id], (err, result) => {
+    if (err) {
+      console.error('Error updating user:', err);
+      return res.status(500).json({ message: 'Server error' });
+    }
+    res.sendStatus(200);
+  });
+});
+
+// Delete member
+app.delete('/supervisor/:id', (req, res) => {
+  const query = 'DELETE FROM supervisors WHERE id = ?';
+  db.query(query, [req.params.id], (err, result) => {
+    if (err) {
+      console.error('Error deleting user:', err);
+      return res.status(500).json({ message: 'Server error' });
+    }
+    res.sendStatus(200);
+  });
+});
+
+
+
+/*----------------------------------------------------------------------------------*/
+
 app.listen(5000, () => {
     console.log('Server is running on port 5000');
 });
