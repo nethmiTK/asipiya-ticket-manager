@@ -17,6 +17,7 @@ import TicketManage from './frontend/admin_panel/TicketManage';
 import EditMember from './frontend/admin_panel/EditMember';
 import Tickets from './frontend/admin_panel/tickets';
 import OpenTickets from './frontend/users_panel/openTickets';
+import SystemRegistration from './frontend/admin_panel/SystemRegistration';
 
 // Create Auth Context
 const AuthContext = createContext(null);
@@ -127,6 +128,14 @@ const AppRoutes = ({ isLoggedIn, setIsLoggedIn, userRole, setUserRole }) => {
           element={
             <ProtectedRoute allowedRoles={['admin']}>
               <EditMember />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path='/system_registration'
+          element={
+            <ProtectedRoute allowedRoles={['admin']}>
+              <SystemRegistration />
             </ProtectedRoute>
           }
         />
