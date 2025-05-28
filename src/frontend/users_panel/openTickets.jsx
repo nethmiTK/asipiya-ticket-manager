@@ -17,6 +17,27 @@ const OpenTickets = () => {
     },
   });
 
+  const handleSubmit = async (values) => {
+    try {
+      const response = await axios.post("http://localhost:8081/create-ticket", {
+        userId: 1,
+        asipiyaSystemId: 1,
+        dateTime: new Date().toISOString(),
+        ticketCategoryId: 1,
+        description: values.description,
+        status: "Open",
+        priority: values.priority,
+        userNote: "Example user note",
+      });
+
+      alert("Ticket Created Successfully!");
+      console.log("Response:", response.data);
+    } catch (error) {
+      console.error("Error submitting form:", error);
+      alert("Failed to create ticket.");
+    }
+  };
+
   return (
     <div className="flex">
       <title>Open Ticket</title>
@@ -37,43 +58,57 @@ const OpenTickets = () => {
               <h1 className="text-2xl md:text-3xl font-bold text-center mb-4">
                 Create Ticket
               </h1>
-              <div>
-                <Formik>
-                  <Form className="space-y-3">
-                    <label className="font-medium text-sm">Name</label>
+              <Formik
+                initialValues={{
+                  priority: "",
+                  description: "",
+                }}
+                onSubmit={handleSubmit}
+              >
+                {({ handleSubmit }) => (
+                  <Form className="space-y-3" onSubmit={handleSubmit}>
+                    <label className="font-medium text-sm">System Name</label>
                     <Field
-                      type="text"
-                      name="name"
-                      placeholder="Enter your name"
-                      className="w-full h-9 p-3 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-gray-400 mt-1"
-                    />
+                      as="select"
+                      name="systemName"
+                      placeholder="Select system"
+                      className="w-full h-9 p-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-gray-400 mt-1"
+                    >
+                      <option value="" disabled selected hidden>
+                        Select System
+                      </option>
+                      <option value=""></option>
+                      <option value=""></option>
+                      <option value=""></option>
+                      <option value=""></option>
+                    </Field>
 
-                    <label className="font-medium text-sm">Company Name</label>
+                    <label className="font-medium text-sm">Priority</label>
                     <Field
-                      type="text"
-                      name="companyName"
-                      placeholder="Enter your company name"
-                      className="w-full h-9 p-3 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-gray-400 mt-1"
-                    />
+                      as="select"
+                      name="priority"
+                      placeholder="Select Priority"
+                      className="w-full h-9 p-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-gray-400 mt-1"
+                    >
+                      <option value="" disabled selected hidden>
+                        Select Priority
+                      </option>
+                      <option value="Low">Low</option>
+                      <option value="Medium">Medium</option>
+                      <option value="High">High</option>
+                      <option value="Urgent">Urgent</option>
+                    </Field>
 
-                    <label className="font-medium text-sm">Issue Title</label>
-                    <Field
-                      type="text"
-                      name="issueTitle"
-                      placeholder="Enter your issue title"
-                      className="w-full h-9 p-3 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-gray-400 mt-1"
-                    />
-
-                    <label className="font-medium text-sm">Severity</label>
-                    <Field
-                      type="text"
-                      name="severity"
-                      placeholder="Enter severity"
-                      className="w-full h-9 p-3 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-gray-400 mt-1"
+                    <label className="font-medium text-sm">Description</label>
+                    <textarea
+                      name="description"
+                      placeholder="Provide details of your problem"
+                      className="w-full p-3 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-gray-400 mt-2 h-50"
+                      rows="4"
                     />
 
                     <label className="font-medium text-sm">
-                      Upload Your Documents
+                      Upload Your Documents (Optional)
                     </label>
                     <div
                       {...getRootProps()}
@@ -98,13 +133,6 @@ const OpenTickets = () => {
                       </ul>
                     )}
 
-                    <label className="font-medium text-sm">Description</label>
-                    <textarea
-                      name="description"
-                      placeholder="Provide details of your problem"
-                      className="w-full p-3 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-gray-400 mt-2 h-50"
-                      rows="4"
-                    />
                     <div className="flex justify-end">
                       <button
                         type="submit"
@@ -114,8 +142,8 @@ const OpenTickets = () => {
                       </button>
                     </div>
                   </Form>
-                </Formik>
-              </div>
+                )}
+              </Formik>
             </div>
           </div>
         </div>

@@ -8,7 +8,7 @@ import { CiLogout } from "react-icons/ci";
 
 const Menus = [
   { title: "My All Tickets", icon: <LuTicketCheck />, path: "/all-tickets" },
-  { title: "My Open Tickets", icon: <LuTicketPlus />, path: "/open-tickets" },
+  { title: "Create Tickets", icon: <LuTicketPlus />, path: "/open-tickets" },
   { title: "My Profile", icon: <AiOutlineUser />, path: "/profile" },
 ];
 

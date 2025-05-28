@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-route
 import Register from './frontend/Authenication/Register';
 import Login from './frontend/Authenication/Login';
 import UserDashboard from './frontend/users_panel/usersDashboard';
+import OpenTickets from './frontend/users_panel/openTickets';
 import Dashboard from './frontend/admin_panel/dashbord';
 import { useState, useEffect, createContext, useContext } from 'react';
 import './App.css';
@@ -67,6 +68,8 @@ const AppRoutes = ({ isLoggedIn, setIsLoggedIn, userRole, setUserRole }) => {
         <Route path='/' element={<Navigate to="/login" replace />} />
         <Route path='/register' element={<Register />} />
         <Route path='/login' element={<Login onLoginSuccess={handleLoginSuccess} />} />
+        <Route path="/all-tickets" element={<UserDashboard />} />
+        <Route path="/open-tickets" element={<OpenTickets />} />
         <Route
           path='/user-dashboard'
           element={
