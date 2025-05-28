@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 import { useNavigate, Link } from 'react-router-dom';
+import { toast } from 'react-toastify';
 
 const Login = ({ onLoginSuccess }) => {
     const [credentials, setCredentials] = useState({
@@ -19,7 +20,7 @@ const Login = ({ onLoginSuccess }) => {
         e.preventDefault();
         try {
             const response = await axios.post('http://localhost:5000/login', credentials);
-            alert('Login successful!');
+            toast.success('Login successful!');
 
             const userRole = response.data.role;
 
@@ -30,9 +31,9 @@ const Login = ({ onLoginSuccess }) => {
         } catch (error) {
             console.error('Error during login:', error);
             if (error.response && error.response.status === 401) {
-                alert('Login failed. Invalid credentials.');
+                toast.error('Login failed. Invalid credentials.');
             } else {
-                alert('Login failed. Please try again later.');
+                toast.error('Login failed. Please try again later.');
             }
         }
     };

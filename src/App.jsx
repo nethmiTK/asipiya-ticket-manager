@@ -6,6 +6,9 @@ import UserDashboard from './frontend/users_panel/usersDashboard';
 import Dashboard from './frontend/admin_panel/dashbord';
 import { useState, useEffect, createContext, useContext } from 'react';
 import './App.css';
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+
 import AdminSideBar from './user_components/SideBar/AdminSideBar';
 
 import AddSupervisor from './frontend/admin_panel/AddSupervisor';
@@ -125,6 +128,18 @@ const AppRoutes = ({ isLoggedIn, setIsLoggedIn, userRole, setUserRole }) => {
           }
         />
       </Routes>
+      <ToastContainer
+        position="top-right"
+        autoClose={3000}
+        hideProgressBar={false}
+        newestOnTop
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="colored"
+      />
     </AuthContext.Provider>
   );
 };
