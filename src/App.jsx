@@ -160,6 +160,7 @@ function App() {
   useEffect(() => {
     const role = localStorage.getItem('role');
     if (role) {
+      
       setIsLoggedIn(true);
       setUserRole(role);
     }

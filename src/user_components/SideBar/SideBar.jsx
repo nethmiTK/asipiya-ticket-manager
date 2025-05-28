@@ -18,15 +18,14 @@ const SideBar = () => {
   return (
     <div className="flex">
       <div
-        className={`bg-gray-900 h-screen duration-300 p-5 pt-30 fixed top-0 left-0 z-50 ${
-          open ? "w-72" : "w-20"
-        }`}
+        className={`bg-gray-900 h-screen duration-300 p-5 pt-30 fixed top-0 left-0 z-50 transition-all
+    ${open ? "w-72" : "w-20"}`}
       >
         <BsChevronLeft
-          className={`absolute -right-3 mr-10 top-16 cursor-pointer text-white text-base ${
-            !open && "rotate-180"
-          }`}
+          className={`absolute -right-3 top-16 cursor-pointer text-white text-base transition-transform duration-300
+      ${open ? "rotate-0" : "rotate-180"}`}
           onClick={() => setOpen(!open)}
+          aria-label="Toggle sidebar"
         />
 
         <div className="flex flex-col h-full justify-between">
@@ -43,20 +42,17 @@ const SideBar = () => {
                   <div className="flex items-center gap-x-4">
                     <span className="text-2xl">{menu.icon}</span>
                     <span
-                      className={`font-medium flex-1 overflow-hidden whitespace-nowrap duration-300 ${
-                        open ? "opacity-100" : "opacity-0 w-0"
-                      }`}
+                      className={`font-medium flex-1 overflow-hidden whitespace-nowrap duration-300
+                  ${open ? "opacity-100" : "opacity-0 w-0"}`}
                     >
                       {menu.title}
                     </span>
                   </div>
-                  <span
-                    className={`font-medium flex items-center ${
-                      !open && "hidden"
-                    }`}
-                  >
-                    <IoIosArrowBack className="rotate-180" />
-                  </span>
+                  {open && (
+                    <span className="font-medium flex items-center">
+                      <IoIosArrowBack className="rotate-180" />
+                    </span>
+                  )}
                 </Link>
               </li>
             ))}
@@ -73,20 +69,17 @@ const SideBar = () => {
                     <CiLogout />
                   </span>
                   <span
-                    className={`font-medium flex-1 overflow-hidden whitespace-nowrap duration-300 ${
-                      open ? "opacity-100" : "opacity-0 w-0"
-                    }`}
+                    className={`font-medium flex-1 overflow-hidden whitespace-nowrap duration-300
+                ${open ? "opacity-100" : "opacity-0 w-0"}`}
                   >
                     Log Out
                   </span>
                 </div>
-                <span
-                  className={`font-medium flex items-center ${
-                    !open && "hidden"
-                  }`}
-                >
-                  <IoIosArrowBack className="rotate-180" />
-                </span>
+                {open && (
+                  <span className="font-medium flex items-center">
+                    <IoIosArrowBack className="rotate-180" />
+                  </span>
+                )}
               </Link>
             </li>
           </div>

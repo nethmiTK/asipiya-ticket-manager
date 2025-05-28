@@ -7,6 +7,7 @@ import { IoIosArrowBack } from "react-icons/io";
 import { VscNotebook } from "react-icons/vsc";
 import { CiLogout } from "react-icons/ci";
 import { GrSystem } from "react-icons/gr";
+import AdminSideBar from "../../user_components/SideBar/AdminSideBar";
 
 const Menus = [
   { title: "Dashboard", icon: <FaHome />, path: "/admin-dashboard" },
@@ -211,17 +212,17 @@ const Dashboard = () => {
 };
 
 const DashboardLayout = () => {
-  const [open, setOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
   return (
     <div className="flex">
       {/* Sidebar */}
-      <Sidebar open={open} setOpen={setOpen} />
+      <AdminSideBar open={isSidebarOpen} setOpen={setIsSidebarOpen} />
 
       {/* Main Content */}
       <main
-        className={`flex-1 min-h-screen bg-gray-100 p-6 duration-300 ${
-          open ? "ml-72" : "ml-20"
+        className={`flex-1 min-h-screen bg-gray-100 p-6 transition-all duration-300 ${
+          isSidebarOpen ? "ml-72" : "ml-20"
         }`}
       >
         <Dashboard />
@@ -230,4 +231,4 @@ const DashboardLayout = () => {
   );
 };
 
-export default Dashboard;
+export default DashboardLayout;
