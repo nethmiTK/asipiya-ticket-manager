@@ -16,6 +16,7 @@ import AddMember from './frontend/admin_panel/AddMember';
 import TicketManage from './frontend/admin_panel/TicketManage';
 import EditMember from './frontend/admin_panel/EditMember';
 import Tickets from './frontend/admin_panel/tickets';
+import OpenTickets from './frontend/users_panel/openTickets';
 
 // Create Auth Context
 const AuthContext = createContext(null);
@@ -66,6 +67,8 @@ const AppRoutes = ({ isLoggedIn, setIsLoggedIn, userRole, setUserRole }) => {
         <Route path='/' element={<Navigate to="/login" replace />} />
         <Route path='/register' element={<Register />} />
         <Route path='/login' element={<Login onLoginSuccess={handleLoginSuccess} />} />
+        <Route path='/all-tickets' element={<UserDashboard />} />
+        <Route path='/open-tickets' element={<OpenTickets />} />
 
         <Route
           path='/user-dashboard'

@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useDropzone } from "react-dropzone";
 import { Formik, Form, Field } from "formik";
+import axios from "axios";
 import SideBar from "../../user_components/SideBar/SideBar";
 import NavBar from "../../user_components/NavBar/NavBar";
 
@@ -9,13 +10,123 @@ const OpenTickets = () => {
   const [files, setFiles] = useState([]);
 
   const { getRootProps, getInputProps } = useDropzone({
-    onDrop: (acceptedFiles) => setFiles(acceptedFiles),
+    onDrop: (acceptedFiles) =>
+      setFiles((prevFiles) => [
+        ...prevFiles,
+        ...acceptedFiles.map((file) =>
+          Object.assign(file, {
+            preview: URL.createObjectURL(file),
+          })
+        ),
+      ]),
     multiple: true,
     accept: {
       "image/*": [],
       "application/pdf": [],
+      "video/*": [],
     },
   });
+
+  const handleRemoveFile = (index) => {
+    setFiles((prevFiles) => prevFiles.filter((_, i) => i !== index));
+  };
+
+  const handleSubmit = async (values) => {
+    try {
+      const formData = new FormData();
+      formData.append("userId", 1);
+      formData.append("asipiyaSystemId", 1);
+      formData.append("dateTime", new Date().toISOString());
+      formData.append("ticketCategoryId", 1);
+      formData.append("description", values.description);
+      formData.append("status", "Open");
+      formData.append("priority", values.priority);
+      formData.append("userNote", "Example user note");
+
+      files.forEach((file) => {
+        formData.append("files", file);
+      });
+
+      const response = await axios.post(
+        "http://localhost:8081/create-ticket",
+        formData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
+
+      alert("Ticket Created Successfully!");
+      console.log("Response:", response.data);
+    } catch (error) {
+      console.error("Error submitting form:", error);
+      alert("Failed to create ticket.");
+    }
+  };
+
+  const renderPreview = () => {
+    return (
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 mt-4">
+        {files.map((file, index) => {
+          if (file.type.startsWith("image/")) {
+            return (
+              <div
+                key={index}
+                className="relative w-20 h-20 border rounded-md overflow-hidden"
+              >
+                <img
+                  src={file.preview}
+                  alt={file.name}
+                  className="w-full h-full object-cover"
+                />
+                <button
+                  onClick={() => handleRemoveFile(index)}
+                  className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs cursor-pointer"
+                >
+                  ✕
+                </button>
+              </div>
+            );
+          } else if (file.type.startsWith("video/")) {
+            return (
+              <div
+                key={index}
+                className="relative w-20 h-20 border rounded-md overflow-hidden"
+              >
+                <video
+                  src={file.preview}
+                  controls
+                  className="w-full h-full object-cover"
+                />
+                <button
+                  onClick={() => handleRemoveFile(index)}
+                  className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs cursor-pointer"
+                >
+                  ✕
+                </button>
+              </div>
+            );
+          } else {
+            return (
+              <div
+                key={index}
+                className="w-full text-sm text-gray-600 flex items-center justify-between"
+              >
+                <p className="truncate">{file.name}</p>
+                <button
+                  onClick={() => handleRemoveFile(index)}
+                  className="text-red-500 hover:underline text-xs"
+                >
+                  Remove
+                </button>
+              </div>
+            );
+          }
+        })}
+      </div>
+    );
+  };
 
   return (
     <div className="flex">
@@ -37,43 +148,53 @@ const OpenTickets = () => {
               <h1 className="text-2xl md:text-3xl font-bold text-center mb-4">
                 Create Ticket
               </h1>
-              <div>
-                <Formik>
-                  <Form className="space-y-3">
-                    <label className="font-medium text-sm">Name</label>
+              <Formik
+                initialValues={{
+                  priority: "",
+                  description: "",
+                }}
+                onSubmit={handleSubmit}
+              >
+                {({ handleSubmit }) => (
+                  <Form className="space-y-3" onSubmit={handleSubmit}>
+                    <label className="font-medium text-sm">System Name</label>
                     <Field
-                      type="text"
-                      name="name"
-                      placeholder="Enter your name"
-                      className="w-full h-9 p-3 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-gray-400 mt-1"
-                    />
+                      as="select"
+                      name="systemName"
+                      className="w-full h-9 p-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-gray-400 mt-1"
+                    >
+                      <option value="" disabled hidden>
+                        Select System
+                      </option>
+                      <option value="">System 1</option>
+                      <option value="">System 2</option>
+                    </Field>
 
-                    <label className="font-medium text-sm">Company Name</label>
+                    <label className="font-medium text-sm">
+                      Ticket Category
+                    </label>
                     <Field
-                      type="text"
-                      name="companyName"
-                      placeholder="Enter your company name"
-                      className="w-full h-9 p-3 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-gray-400 mt-1"
-                    />
+                      as="select"
+                      name="ticketCategory"
+                      className="w-full h-9 p-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-gray-400 mt-1"
+                    >
+                      <option value="" disabled hidden>
+                        Select Ticket Category
+                      </option>
+                      <option value="">Category 1</option>
+                      <option value="">Category 2</option>
+                    </Field>
 
-                    <label className="font-medium text-sm">Issue Title</label>
-                    <Field
-                      type="text"
-                      name="issueTitle"
-                      placeholder="Enter your issue title"
-                      className="w-full h-9 p-3 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-gray-400 mt-1"
-                    />
-
-                    <label className="font-medium text-sm">Severity</label>
-                    <Field
-                      type="text"
-                      name="severity"
-                      placeholder="Enter severity"
-                      className="w-full h-9 p-3 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-gray-400 mt-1"
+                    <label className="font-medium text-sm">Description</label>
+                    <textarea
+                      name="description"
+                      placeholder="Provide details of your problem"
+                      className="w-full p-3 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-gray-400 mt-2 h-50"
+                      rows="4"
                     />
 
                     <label className="font-medium text-sm">
-                      Upload Your Documents
+                      Upload Your Documents (Optional)
                     </label>
                     <div
                       {...getRootProps()}
@@ -84,28 +205,13 @@ const OpenTickets = () => {
                         Click to upload or drag and drop
                       </p>
                       <p className="text-gray-400 text-xs">
-                        Supported formats: PDF, Images
+                        Supported formats: PDF, Images, Videos
                       </p>
                     </div>
 
-                    {files.length > 0 && (
-                      <ul className="mt-2">
-                        {files.map((file) => (
-                          <li key={file.path} className="text-gray-600 text-sm">
-                            {file.name}
-                          </li>
-                        ))}
-                      </ul>
-                    )}
+                    {renderPreview()}
 
-                    <label className="font-medium text-sm">Description</label>
-                    <textarea
-                      name="description"
-                      placeholder="Provide details of your problem"
-                      className="w-full p-3 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-gray-400 mt-2 h-50"
-                      rows="4"
-                    />
-                    <div className="flex justify-end">
+                    <div className="flex justify-end mt-4">
                       <button
                         type="submit"
                         className="px-3 py-2 bg-green-700 text-white rounded-md text-base font-medium transition-transform transform hover:scale-105"
@@ -114,8 +220,8 @@ const OpenTickets = () => {
                       </button>
                     </div>
                   </Form>
-                </Formik>
-              </div>
+                )}
+              </Formik>
             </div>
           </div>
         </div>
