@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 import { useNavigate, Link } from 'react-router-dom';
+import { toast } from 'react-toastify';
 
 const Register = () => {
     const [formData, setFormData] = useState({
         FullName: '',
         Email: '',
         Password: '',
-        Role: '', 
+        Role: '',
         Phone: ''
     });
 
@@ -22,12 +23,12 @@ const Register = () => {
         e.preventDefault();
         try {
             await axios.post('http://localhost:5000/register', formData);
-            alert('Registration successful!');
+            toast.success('Registration successful!');
             navigate('/login');
         } catch (error) {
             console.error('Error during registration:', error);
-            
-            alert('Registration failed. Please try again.');
+
+            toast.error('Registration failed. Please try again.');
         }
     };
 

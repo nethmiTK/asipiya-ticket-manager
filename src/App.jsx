@@ -6,6 +6,8 @@ import UserDashboard from './frontend/users_panel/usersDashboard';
 import Dashboard from './frontend/admin_panel/dashbord';
 import { useState, useEffect, createContext, useContext } from 'react';
 import './App.css';
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 
 import AddSupervisor from './frontend/admin_panel/AddSupervisor';
@@ -83,13 +85,25 @@ const AppRoutes = ({ isLoggedIn, setIsLoggedIn, userRole, setUserRole }) => {
             </ProtectedRoute>
           }
         />
-           {/* <Route path="/" element={<Dashboard />} />
+        {/* <Route path="/" element={<Dashboard />} />
         <Route path="/tickets" element={<Tickets />} /> */}
         {/*<Route path="/supervisor" element={<AddSupervisor />} />
         <Route path="/add-member" element={<AddMember />} />
         <Route path="/ticket-manage" element={<TicketManage />} />
         <Route path="/edit-supervisor/:id" element={<EditMember />} />*/}
       </Routes>
+      <ToastContainer
+        position="top-right"
+        autoClose={3000}
+        hideProgressBar={false}
+        newestOnTop
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="colored"
+      />
     </AuthContext.Provider>
   );
 };
