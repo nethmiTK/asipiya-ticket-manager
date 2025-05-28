@@ -5,14 +5,16 @@ import Login from './frontend/Authenication/Login';
 import UserDashboard from './frontend/users_panel/usersDashboard';
 import Dashboard from './frontend/admin_panel/dashbord';
 import { useState, useEffect, createContext, useContext } from 'react';
+import './App.css';
 
-const AuthContext = createContext(null);
-export const useAuth = () => useContext(AuthContext);
-import './App.css'
+
 import AddSupervisor from './frontend/admin_panel/AddSupervisor';
 import AddMember from './frontend/admin_panel/AddMember';
 import TicketManage from './frontend/admin_panel/TicketManage';
 import EditMember from './frontend/admin_panel/EditMember';
+
+const AuthContext = createContext(null);
+export const useAuth = () => useContext(AuthContext);
 
 const ProtectedRoute = ({ children, allowedRoles }) => {
   const { isLoggedIn, userRole } = useAuth();
@@ -38,16 +40,14 @@ const AppRoutes = ({ isLoggedIn, setIsLoggedIn, userRole, setUserRole }) => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
     const role = localStorage.getItem('role');
-    if (token && role) {
+    if (role) {
       setIsLoggedIn(true);
       setUserRole(role);
     }
   }, [setIsLoggedIn, setUserRole]);
 
-  const handleLoginSuccess = (token, role) => {
-    localStorage.setItem('token', token);
+  const handleLoginSuccess = (role) => {
     localStorage.setItem('role', role);
     setIsLoggedIn(true);
     setUserRole(role);
@@ -55,7 +55,6 @@ const AppRoutes = ({ isLoggedIn, setIsLoggedIn, userRole, setUserRole }) => {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
     localStorage.removeItem('role');
     setIsLoggedIn(false);
     setUserRole(null);
@@ -80,11 +79,11 @@ const AppRoutes = ({ isLoggedIn, setIsLoggedIn, userRole, setUserRole }) => {
           path='/admin-dashboard'
           element={
             <ProtectedRoute allowedRoles={['admin']}>
-              <Dashboard/>
+              <Dashboard />
             </ProtectedRoute>
           }
         />
-        {/* <Route path="/" element={<Dashboard />} />
+           {/* <Route path="/" element={<Dashboard />} />
         <Route path="/tickets" element={<Tickets />} /> */}
         {/*<Route path="/supervisor" element={<AddSupervisor />} />
         <Route path="/add-member" element={<AddMember />} />
