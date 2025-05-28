@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+ import React, { useState } from 'react';
 import axios from 'axios';
 import { useNavigate, Link } from 'react-router-dom';
 import { toast } from 'react-toastify';
@@ -8,7 +8,7 @@ const Register = () => {
         FullName: '',
         Email: '',
         Password: '',
-        Role: '',
+        Role: 'User', // Default value
         Phone: ''
     });
 
@@ -64,17 +64,6 @@ const Register = () => {
                         required
                         className="p-3 rounded-lg border border-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-gray-500 text-lg"
                     />
-                    <select
-                        name="Role"
-                        value={formData.Role}
-                        onChange={handleChange}
-                        required
-                        className="p-3 rounded-lg border border-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-700 bg-white text-lg"
-                    >
-                        <option value="" disabled>Select Role</option>
-                        <option value="Admin">Admin</option>
-                        <option value="User">User</option>
-                    </select>
                     <input
                         type="text"
                         name="Phone"

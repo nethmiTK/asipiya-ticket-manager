@@ -6,8 +6,11 @@ import { IoIosArrowBack } from "react-icons/io";
 import { VscNotebook } from "react-icons/vsc";
 import { CiLogout } from "react-icons/ci";
 import { GrSystem } from "react-icons/gr";
+import { FaHome } from "react-icons/fa";
 
 const Menus = [
+  { title: "Dashboard", icon: <FaHome />, path: "/admin-dashboard" },
+  { title: "Tickets", icon: <LuTicketCheck />, path: "/tickets" },
   { title: "Ticket Manage", icon: <LuTicketCheck />, path: "/ticket-manage" },
   { title: "Supervisor Manage", icon: <VscNotebook />, path: "/supervisor-manage" },
   {
@@ -32,31 +35,28 @@ const SideBar = () => {
   return (
     <div className="flex">
       <div
-        className={`bg-gray-900 h-screen duration-300 p-5 pt-30 fixed top-0 left-0 z-50 ${
-          open ? "w-72" : "w-20"
-        }`}
+        className={`bg-gray-900 h-screen duration-300 p-5 pt-30 fixed top-0 left-0 z-50 overflow-auto
+          ${open ? "w-72" : "w-20"}`}
       >
         <BsChevronLeft
-          className={`absolute -right-3 mr-10 top-16 cursor-pointer text-white text-base ${
-            !open && "rotate-180"
-          }`}
+          className={`absolute -right-3 mr-10 top-16 cursor-pointer text-white text-base transition-transform duration-300
+            ${!open ? "rotate-180" : ""}`}
           onClick={() => setOpen(!open)}
+          aria-label="Toggle sidebar"
         />
 
         <div className="flex flex-col h-full justify-between">
           <ul className="pt-8">
             {Menus.map((menu, index) => (
               <div key={index}>
-                {/* Wrap the item in Link if it's not a submenu */}
                 {!menu.subMenu ? (
                   <Link to={menu.path}>
                     <li className="text-white text-sm flex items-center justify-between gap-x-4 mt-5 cursor-pointer p-2 hover:bg-gray-700 rounded-md">
                       <div className="flex items-center gap-x-4">
                         <span className="text-2xl">{menu.icon}</span>
                         <span
-                          className={`font-medium overflow-hidden whitespace-nowrap duration-300 ${
-                            open ? "opacity-100" : "opacity-0 w-0"
-                          }`}
+                          className={`font-medium overflow-hidden whitespace-nowrap duration-300
+                            ${open ? "opacity-100" : "opacity-0 w-0"}`}
                         >
                           {menu.title}
                         </span>
@@ -74,9 +74,8 @@ const SideBar = () => {
                         <div className="flex items-center gap-x-4">
                           <span className="text-2xl">{menu.icon}</span>
                           <span
-                            className={`font-medium flex-1 overflow-hidden whitespace-nowrap duration-300 ${
-                              open ? "opacity-100" : "opacity-0 w-0"
-                            }`}
+                            className={`font-medium flex-1 overflow-hidden whitespace-nowrap duration-300
+                              ${open ? "opacity-100" : "opacity-0 w-0"}`}
                           >
                             {menu.title}
                           </span>
@@ -111,10 +110,7 @@ const SideBar = () => {
 
           <div className="mt-auto">
             <li className="text-white text-sm flex items-center justify-between gap-x-4 cursor-pointer p-2 hover:bg-gray-700 rounded-md">
-              <Link
-                to="/logout"
-                className="flex items-center gap-x-4 w-full justify-between"
-              >
+              <Link to="/logout" className="flex items-center gap-x-4 w-full justify-between">
                 <div className="flex items-center gap-x-4">
                   <span className="text-2xl">
                     <CiLogout />

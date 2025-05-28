@@ -1,5 +1,5 @@
 // src/App.jsx
-import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import Register from './frontend/Authenication/Register';
 import Login from './frontend/Authenication/Login';
 import UserDashboard from './frontend/users_panel/usersDashboard';
@@ -9,15 +9,19 @@ import './App.css';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
+import AdminSideBar from './user_components/SideBar/AdminSideBar';
 
 import AddSupervisor from './frontend/admin_panel/AddSupervisor';
 import AddMember from './frontend/admin_panel/AddMember';
 import TicketManage from './frontend/admin_panel/TicketManage';
 import EditMember from './frontend/admin_panel/EditMember';
+import Tickets from './frontend/admin_panel/tickets';
 
+// Create Auth Context
 const AuthContext = createContext(null);
 export const useAuth = () => useContext(AuthContext);
 
+// Protected Route Component
 const ProtectedRoute = ({ children, allowedRoles }) => {
   const { isLoggedIn, userRole } = useAuth();
   const navigate = useNavigate();
@@ -38,16 +42,9 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
   return children;
 };
 
+// App Routes Component
 const AppRoutes = ({ isLoggedIn, setIsLoggedIn, userRole, setUserRole }) => {
   const navigate = useNavigate();
-
-  useEffect(() => {
-    const role = localStorage.getItem('role');
-    if (role) {
-      setIsLoggedIn(true);
-      setUserRole(role);
-    }
-  }, [setIsLoggedIn, setUserRole]);
 
   const handleLoginSuccess = (role) => {
     localStorage.setItem('role', role);
@@ -69,6 +66,7 @@ const AppRoutes = ({ isLoggedIn, setIsLoggedIn, userRole, setUserRole }) => {
         <Route path='/' element={<Navigate to="/login" replace />} />
         <Route path='/register' element={<Register />} />
         <Route path='/login' element={<Login onLoginSuccess={handleLoginSuccess} />} />
+
         <Route
           path='/user-dashboard'
           element={
@@ -77,6 +75,7 @@ const AppRoutes = ({ isLoggedIn, setIsLoggedIn, userRole, setUserRole }) => {
             </ProtectedRoute>
           }
         />
+
         <Route
           path='/admin-dashboard'
           element={
@@ -85,12 +84,49 @@ const AppRoutes = ({ isLoggedIn, setIsLoggedIn, userRole, setUserRole }) => {
             </ProtectedRoute>
           }
         />
-        {/* <Route path="/" element={<Dashboard />} />
-        <Route path="/tickets" element={<Tickets />} /> */}
-        {/*<Route path="/supervisor" element={<AddSupervisor />} />
-        <Route path="/add-member" element={<AddMember />} />
-        <Route path="/ticket-manage" element={<TicketManage />} />
-        <Route path="/edit-supervisor/:id" element={<EditMember />} />*/}
+
+        <Route
+          path="/tickets"
+          element={
+            <ProtectedRoute allowedRoles={['admin']}>
+              <Tickets />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Admin only routes */}
+        <Route
+          path="/supervisor"
+          element={
+            <ProtectedRoute allowedRoles={['admin']}>
+              <AddSupervisor />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/add-member"
+          element={
+            <ProtectedRoute allowedRoles={['admin']}>
+              <AddMember />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/ticket-manage"
+          element={
+            <ProtectedRoute allowedRoles={['admin']}>
+              <TicketManage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/edit-supervisor/:id"
+          element={
+            <ProtectedRoute allowedRoles={['admin']}>
+              <EditMember />
+            </ProtectedRoute>
+          }
+        />
       </Routes>
       <ToastContainer
         position="top-right"
@@ -108,16 +144,49 @@ const AppRoutes = ({ isLoggedIn, setIsLoggedIn, userRole, setUserRole }) => {
   );
 };
 
-function App() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [userRole, setUserRole] = useState(null);
+// Component to render sidebar conditionally based on route and role
+const RenderWithLayout = ({ isLoggedIn, userRole, setIsLoggedIn, setUserRole }) => {
+  const location = useLocation();
+
+  // Show AdminSideBar only for logged in admin and not on auth routes
+  const showAdminSidebar =
+    isLoggedIn &&
+    userRole === 'admin' &&
+    !['/login', '/register', '/'].includes(location.pathname);
 
   return (
-    <BrowserRouter>
+    <>
+      {showAdminSidebar && <AdminSideBar />}
       <AppRoutes
         isLoggedIn={isLoggedIn}
         setIsLoggedIn={setIsLoggedIn}
         userRole={userRole}
+        setUserRole={setUserRole}
+      />
+    </>
+  );
+};
+
+// Main App component
+function App() {
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [userRole, setUserRole] = useState(null);
+
+  useEffect(() => {
+    const role = localStorage.getItem('role');
+    if (role) {
+      
+      setIsLoggedIn(true);
+      setUserRole(role);
+    }
+  }, []);
+
+  return (
+    <BrowserRouter>
+      <RenderWithLayout
+        isLoggedIn={isLoggedIn}
+        userRole={userRole}
+        setIsLoggedIn={setIsLoggedIn}
         setUserRole={setUserRole}
       />
     </BrowserRouter>
