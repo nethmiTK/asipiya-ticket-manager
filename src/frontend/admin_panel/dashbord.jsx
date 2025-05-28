@@ -150,27 +150,33 @@ const Dashboard = () => {
         <div className="text-2xl mt-4 md:mt-0">🔔</div>
       </header>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <div className="bg-blue-500 text-white p-4 rounded shadow text-center">
-          <FaTicketAlt className="text-3xl mb-2 mx-auto" />
-          <h2 className="text-lg font-semibold">1248</h2>
-          <p>Total Tickets</p>
-        </div>
-        <div className="bg-gray-800 text-white p-4 rounded shadow text-center">
-          <FaTasks className="text-3xl mb-2 mx-auto" />
-          <h2 className="text-lg font-semibold">78</h2>
-          <p>Open Tickets</p>
-        </div>
-        <div className="bg-gray-500 text-white p-4 rounded shadow text-center">
-          <FaCalendarDay className="text-3xl mb-2 mx-auto" />
-          <h2 className="text-lg font-semibold">125</h2>
-          <p>Tickets Today</p>
-        </div>
-        <div className="bg-red-500 text-white p-4 rounded shadow text-center">
-          <FaExclamationCircle className="text-3xl mb-2 mx-auto" />
-          <h2 className="text-lg font-semibold">76</h2>
-          <p>High Priority</p>
-        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+  <div className="bg-blue-500 text-white p-4 rounded shadow text-center">
+    <FaTicketAlt className="text-3xl mb-2 mx-auto" />
+    <h2 className="text-lg font-semibold">1248</h2>
+    <p>Total Tickets</p>
+  </div>
+  <div className="bg-gray-800 text-white p-4 rounded shadow text-center">
+    <FaTasks className="text-3xl mb-2 mx-auto" />
+    <h2 className="text-lg font-semibold">78</h2>
+    <p>Open Tickets</p>
+  </div>
+  <div className="bg-gray-500 text-white p-4 rounded shadow text-center">
+    <FaCalendarDay className="text-3xl mb-2 mx-auto" />
+    <h2 className="text-lg font-semibold">125</h2>
+    <p>Tickets Today</p>
+  </div>
+  <div className="bg-red-500 text-white p-4 rounded shadow text-center">
+    <FaExclamationCircle className="text-3xl mb-2 mx-auto" />
+    <h2 className="text-lg font-semibold">76</h2>
+    <p>High Priority</p>
+  </div>
+  <div className="bg-green-600 text-white p-4 rounded shadow text-center cursor-pointer hover:bg-green-700">
+    <FaTicketAlt className="text-3xl mb-2 mx-auto" />
+    <h2 className="text-lg font-semibold">+</h2>
+    <p>Issue Ticket</p>
+  </div>
+ 
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
