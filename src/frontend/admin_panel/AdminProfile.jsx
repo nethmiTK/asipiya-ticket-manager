@@ -1,316 +1,349 @@
+//  AdminProfile
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { toast } from 'react-toastify';
-import { FaUser, FaEnvelope, FaPhone, FaLock } from 'react-icons/fa';
+import { useAuth } from '../../App.jsx'; 
+import { AiOutlineUser } from 'react-icons/ai';
 import AdminSideBar from "../../user_components/SideBar/AdminSideBar";
 
 const AdminProfile = () => {
-    const [profile, setProfile] = useState({
+    const { loggedInUser: user, setLoggedInUser } = useAuth();
+
+    const [profileData, setProfileData] = useState({
         FullName: '',
         Email: '',
         Phone: '',
+        Role: ''
+    });
+    const [formData, setFormData] = useState({
+        FullName: '',
+        Email: '',
+        S_Phone: '', 
+        Phone: '',
         CurrentPassword: '',
         NewPassword: '',
-        ConfirmPassword: ''
+        ConfirmNewPassword: ''
     });
     const [loading, setLoading] = useState(true);
-    const [isEditing, setIsEditing] = useState(false);
-    const [passwordError, setPasswordError] = useState('');
+    const [errors, setErrors] = useState({}); 
 
     useEffect(() => {
-        fetchProfile();
-    }, []);
-
-    const fetchProfile = async () => {
-        try {
-            const userId = localStorage.getItem('userId');
-            if (!userId) {
-                toast.error('User ID not found. Please login again.');
-                return;
+        // Fetch user data 
+        const fetchUserProfile = async () => {
+            if (user && user.UserID) { // Ensure user and UserID exist from context
+                try {
+                    setLoading(true);
+                    // This API call now targets the new general user profile endpoint in index.js
+                    const response = await axios.get(`http://localhost:5000/api/user/profile/${user.UserID}`);
+                    const fetchedData = response.data;
+                    setProfileData(fetchedData);
+                    setFormData({
+                        FullName: fetchedData.FullName,
+                        Email: fetchedData.Email,
+                        Phone: fetchedData.Phone,
+                        CurrentPassword: '',
+                        NewPassword: '',
+                        ConfirmNewPassword: ''
+                    });
+                    setLoading(false);
+                } catch (error) {
+                    console.error('Error fetching user profile:', error);
+                    toast.error('Failed to load profile data.');
+                    setLoading(false);
+                }
+            } else {
+                setLoading(false);
+                toast.info("User ID not available. Please log in.");
             }
-
-            const response = await axios.get(`http://localhost:5000/api/admin/profile/${userId}`);
-            const { FullName, Email, Phone } = response.data;
-            setProfile(prev => ({
-                ...prev,
-                FullName,
-                Email,
-                Phone,
-                CurrentPassword: '',
-                NewPassword: '',
-                ConfirmPassword: ''
-            }));
-            setLoading(false);
-        } catch (error) {
-            console.error('Error fetching profile:', error);
-            toast.error('Failed to load profile data');
-            setLoading(false);
-        }
-    };
+        };
+        fetchUserProfile();
+    }, [user]); 
 
     const handleChange = (e) => {
         const { name, value } = e.target;
-        setProfile(prev => ({
-            ...prev,
-            [name]: value
-        }));
-        if (['CurrentPassword', 'NewPassword', 'ConfirmPassword'].includes(name)) {
-            setPasswordError('');
+        setFormData({ ...formData, [name]: value });
+        setErrors(prevErrors => ({ ...prevErrors, [name]: '' }));
+    };
+
+    const validateForm = () => {
+        const newErrors = {};
+        const { FullName, Email, Phone, CurrentPassword, NewPassword, ConfirmNewPassword } = formData;
+
+        if (!FullName.trim()) {
+            newErrors.FullName = 'Full Name is required.';
         }
-    };
+        if (!Email.trim()) {
+            newErrors.Email = 'Email is required.';
+        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(Email)) {
+            newErrors.Email = 'Invalid email format (e.g., user@example.com).';
+        }
+        if (!Phone.trim()) {
+            newErrors.Phone = 'Phone number is required.';
+        } else if (!/^\d+$/.test(Phone)) {
+            newErrors.Phone = 'Phone number must contain only digits.';
+        } else if (Phone.length < 10) {
+            newErrors.Phone = 'Phone number must be at least 10 digits long.';
+        }
 
-    const validateStrongPassword = (password) => {
-        const regex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#^(){}[\]=+_<>.,;:`~\\|'"-]).{8,}$/;
-        return regex.test(password);
-    };
-
-    const validatePasswords = () => {
-        const { CurrentPassword, NewPassword, ConfirmPassword } = profile;
-        if (NewPassword || ConfirmPassword || CurrentPassword) {
+        // Validate new password only if attempting to change it
+        if (NewPassword || CurrentPassword || ConfirmNewPassword) {
             if (!CurrentPassword) {
-                setPasswordError('Current password is required');
-                return false;
+                newErrors.CurrentPassword = 'Current password is required to change password.';
             }
             if (!NewPassword) {
-                setPasswordError('New password is required');
-                return false;
+                newErrors.NewPassword = 'New password is required.';
+            } else if (NewPassword.length < 8) {
+                newErrors.NewPassword = 'New password must be at least 8 characters long.';
+            } else if (!/[A-Z]/.test(NewPassword)) {
+                newErrors.NewPassword = 'New password must contain at least one uppercase letter.';
+            } else if (!/[a-z]/.test(NewPassword)) {
+                newErrors.NewPassword = 'New password must contain at least one lowercase letter.';
+            } else if (!/[0-9]/.test(NewPassword)) {
+                newErrors.NewPassword = 'New password must contain at least one number.';
+            } else if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(NewPassword)) {
+                newErrors.NewPassword = 'New password must contain at least one special character.';
             }
-            if (!ConfirmPassword) {
-                setPasswordError('Confirm password is required');
-                return false;
-            }
-            if (NewPassword !== ConfirmPassword) {
-                setPasswordError('New passwords do not match');
-                return false;
-            }
-            if (!validateStrongPassword(NewPassword)) {
-                setPasswordError(
-                    'Password must be at least 8 characters long and include uppercase, lowercase, number, and special character'
-                );
-                return false;
+
+            if (NewPassword && ConfirmNewPassword && NewPassword !== ConfirmNewPassword) {
+                newErrors.ConfirmNewPassword = 'New password and confirm password do not match.';
             }
         }
-        return true;
+
+        setErrors(newErrors);
+        return Object.keys(newErrors).length === 0;
     };
 
-    const handleSubmit = async (e) => {
+    const handleSavePersonalInfo = async (e) => {
         e.preventDefault();
 
-        if (!validatePasswords()) {
+        const { FullName, Email, Phone } = formData;
+        if (!FullName.trim() || !Email.trim() || !Phone.trim()) {
+            toast.error('Please fill out all fields in Personal Information.');
             return;
         }
 
         try {
-            const userId = localStorage.getItem('userId');
-            if (!userId) {
-                toast.error('User ID not found. Please login again.');
-                return;
+            const updatePayload = { FullName, Email, Phone };
+            const response = await axios.put(`http://localhost:5000/api/user/profile/${user.UserID}`, updatePayload);
+            toast.success(response.data.message || 'Personal information updated successfully!');
+
+            if (setLoggedInUser) {
+                const updatedUser = { ...user, FullName, Email, Phone };
+                setLoggedInUser(updatedUser);
+                localStorage.setItem('user', JSON.stringify(updatedUser));
             }
 
-            const updateData = {
-                FullName: profile.FullName,
-                Email: profile.Email,
-                Phone: profile.Phone
-            };
-
-            if (profile.NewPassword && profile.CurrentPassword) {
-                updateData.CurrentPassword = profile.CurrentPassword;
-                updateData.NewPassword = profile.NewPassword;
-            }
-
-            await axios.put(`http://localhost:5000/api/admin/profile/${userId}`, updateData);
-            toast.success('Profile updated successfully');
-            setIsEditing(false);
-
-            setProfile(prev => ({
-                ...prev,
-                CurrentPassword: '',
-                NewPassword: '',
-                ConfirmPassword: ''
-            }));
-            setPasswordError('');
+            setProfileData(prevData => ({ ...prevData, FullName, Email, Phone }));
         } catch (error) {
-            console.error('Error updating profile:', error);
-            if (error.response?.status === 400) {
-                setPasswordError(error.response.data.message);
-                toast.error(error.response.data.message);
-            } else {
-                toast.error('Failed to update profile');
-            }
+            console.error('Error updating personal information:', error);
+            toast.error('Failed to update personal information. Please try again.');
         }
     };
 
-    const mainContent = (
-        <div className="flex-grow p-8 bg-gray-100">
-            <div className="max-w-4xl mx-auto">
-                <div className="bg-white rounded-lg shadow-lg p-8">
-                    <div className="flex items-center justify-between mb-8">
-                        <h2 className="text-3xl font-bold text-gray-800">Admin Profile</h2>
-                        {!isEditing && (
-                            <button
-                                onClick={() => setIsEditing(true)}
-                                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition duration-200 flex items-center gap-2"
-                            >
-                                <FaUser className="text-lg" />
-                                Edit Profile
-                            </button>
-                        )}
-                    </div>
+    const handleSaveSecurityInfo = async (e) => {
+        e.preventDefault();
 
-                    <form onSubmit={handleSubmit} className="space-y-6">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="space-y-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Full Name</label>
-                                    <div className="relative">
-                                        <FaUser className="absolute left-3 top-3 text-gray-400" />
-                                        <input
-                                            type="text"
-                                            name="FullName"
-                                            value={profile.FullName}
-                                            onChange={handleChange}
-                                            disabled={!isEditing}
-                                            className="pl-10 w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                        />
-                                    </div>
-                                </div>
+        const { CurrentPassword, NewPassword, ConfirmNewPassword } = formData;
+        if (!CurrentPassword || !NewPassword || !ConfirmNewPassword) {
+            toast.error('Please fill out all fields in Security Information.');
+            return;
+        }
 
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
-                                    <div className="relative">
-                                        <FaEnvelope className="absolute left-3 top-3 text-gray-400" />
-                                        <input
-                                            type="email"
-                                            name="Email"
-                                            value={profile.Email}
-                                            onChange={handleChange}
-                                            disabled={!isEditing}
-                                            className="pl-10 w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                        />
-                                    </div>
-                                </div>
+        if (NewPassword !== ConfirmNewPassword) {
+            toast.error('New password and confirm password do not match.');
+            return;
+        }
 
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Phone</label>
-                                    <div className="relative">
-                                        <FaPhone className="absolute left-3 top-3 text-gray-400" />
-                                        <input
-                                            type="tel"
-                                            name="Phone"
-                                            value={profile.Phone}
-                                            onChange={handleChange}
-                                            disabled={!isEditing}
-                                            className="pl-10 w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                        />
-                                    </div>
-                                </div>
-                            </div>
+        try {
+            const updatePayload = { CurrentPassword, NewPassword };
+            const response = await axios.put(`http://localhost:5000/api/user/profile/${user.UserID}`, updatePayload);
+            toast.success(response.data.message || 'Security information updated successfully!');
 
-                            {isEditing && (
-                                <div className="space-y-4">
-                                    <h3 className="text-lg font-medium text-gray-900 mb-4">Change Password</h3>
-                                    {passwordError && (
-                                        <div className="text-red-500 text-sm mb-4">
-                                            {passwordError}
-                                        </div>
-                                    )}
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">Current Password</label>
-                                        <div className="relative">
-                                            <FaLock className="absolute left-3 top-3 text-gray-400" />
-                                            <input
-                                                type="password"
-                                                name="CurrentPassword"
-                                                value={profile.CurrentPassword}
-                                                onChange={handleChange}
-                                                className="pl-10 w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                                placeholder="Enter your current password"
-                                                autoComplete="off"
-                                            />
-                                        </div>
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">New Password</label>
-                                        <div className="relative">
-                                            <FaLock className="absolute left-3 top-3 text-gray-400" />
-                                            <input
-                                                type="password"
-                                                name="NewPassword"
-                                                value={profile.NewPassword}
-                                                onChange={handleChange}
-                                                className="pl-10 w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                                placeholder="Enter new password"
-                                                autoComplete="new-password"
-                                            />
-                                        </div>
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">Confirm New Password</label>
-                                        <div className="relative">
-                                            <FaLock className="absolute left-3 top-3 text-gray-400" />
-                                            <input
-                                                type="password"
-                                                name="ConfirmPassword"
-                                                value={profile.ConfirmPassword}
-                                                onChange={handleChange}
-                                                className="pl-10 w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                                placeholder="Confirm new password"
-                                                autoComplete="new-password"
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-
-                        {isEditing && (
-                            <div className="flex justify-end space-x-4 mt-8">
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setIsEditing(false);
-                                        setPasswordError('');
-                                        fetchProfile();
-                                    }}
-                                    className="px-6 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition duration-200"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    type="submit"
-                                    className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition duration-200"
-                                >
-                                    Save Changes
-                                </button>
-                            </div>
-                        )}
-                    </form>
-                </div>
-            </div>
-        </div>
-    );
+            setFormData(prevData => ({
+                ...prevData,
+                CurrentPassword: '',
+                NewPassword: '',
+                ConfirmNewPassword: ''
+            }));
+        } catch (error) {
+            console.error('Error updating security information:', error);
+            toast.error('Failed to update security information. Please try again.');
+        }
+    };
 
     if (loading) {
         return (
-            <div className="flex h-screen">
-                <AdminSideBar />
-                <div className="flex-grow p-8">
-                    <div className="flex justify-center items-center h-full">
-                        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
-                    </div>
-                </div>
+            <div className="flex justify-center items-center h-screen">
+                <p className="text-xl text-gray-700">Loading profile...</p>
+            </div>
+        );
+    }
+
+    if (!user || !user.UserID) {
+        return (
+            <div className="flex justify-center items-center h-screen">
+                <p className="text-xl text-red-500">Please log in to view your profile.</p>
             </div>
         );
     }
 
     return (
-        <div className="flex h-screen">
-            <AdminSideBar />
-            {mainContent}
+  <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row">
+    {/* Sidebar */}
+    <AdminSideBar />
+
+    <div className="flex-1 p-6 md:p-12">
+      <div className="max-w-5xl mx-auto bg-white rounded-2xl shadow-xl p-8">
+        {/* Profile Header */}
+        <div className="flex flex-col md:flex-row items-center gap-6 border-b pb-6 mb-8">
+          <div className="w-28 h-28 bg-gray-200 rounded-full flex items-center justify-center text-gray-500 text-5xl overflow-hidden shadow">
+            <AiOutlineUser />
+          </div>
+
+          <div className="text-center md:text-left">
+            <h2 className="text-3xl font-bold text-gray-900">
+              {profileData.FullName || 'User Profile'}
+            </h2>
+            <p className="text-gray-600 mt-1">
+              {profileData.Email} — <span className="font-medium text-gray-800">{profileData.Role || 'User'}</span>
+            </p>
+            <div className="mt-2 flex items-center gap-2 text-blue-600 text-sm cursor-pointer hover:underline">
+              <img src="https://via.placeholder.com/20" alt="Upload Icon" className="w-4 h-4" />
+              <button onClick={() => toast.info("Image upload functionality is not implemented yet!")}>
+                Upload or drag and drop an avatar
+              </button>
+            </div>
+          </div>
         </div>
-    );
-};
+
+        {/* Form */}
+        <h3 className="text-2xl font-semibold text-gray-800 mb-6">Personal Information</h3>
+
+        <form onSubmit={handleSavePersonalInfo} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Full Name */}
+          <div className="col-span-full">
+            <label htmlFor="FullName" className="text-sm font-medium text-gray-700 block mb-1">
+              Full Name
+            </label>
+            <input
+              type="text"
+              id="FullName"
+              name="FullName"
+              value={formData.FullName}
+              onChange={handleChange}
+              required
+              className={`w-full rounded-md border ${errors.FullName ? 'border-red-500' : 'border-gray-300'} px-4 py-3 focus:ring-2 focus:ring-blue-500 outline-none`}
+            />
+            {errors.FullName && <p className="text-red-500 text-xs mt-1">{errors.FullName}</p>}
+          </div>
+
+          {/* Email */}
+          <div>
+            <label htmlFor="Email" className="text-sm font-medium text-gray-700 block mb-1">
+              Email
+            </label>
+            <input
+              type="email"
+              id="Email"
+              name="Email"
+              value={formData.Email}
+              onChange={handleChange}
+              required
+              className={`w-full rounded-md border ${errors.Email ? 'border-red-500' : 'border-gray-300'} px-4 py-3 focus:ring-2 focus:ring-blue-500 outline-none`}
+            />
+            {errors.Email && <p className="text-red-500 text-xs mt-1">{errors.Email}</p>}
+          </div>
+
+          {/* Phone */}
+          <div>
+            <label htmlFor="Phone" className="text-sm font-medium text-gray-700 block mb-1">
+              Phone
+            </label>
+            <input
+              type="text"
+              id="Phone"
+              name="Phone"
+              value={formData.Phone}
+              onChange={handleChange}
+              required
+              className={`w-full rounded-md border ${errors.Phone ? 'border-red-500' : 'border-gray-300'} px-4 py-3 focus:ring-2 focus:ring-blue-500 outline-none`}
+            />
+            {errors.Phone && <p className="text-red-500 text-xs mt-1">{errors.Phone}</p>}
+          </div>
+
+          <div className="col-span-full flex justify-end mt-6">
+            <button
+              type="submit"
+              className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition duration-200"
+            >
+              Save Personal Information
+            </button>
+          </div>
+        </form>
+
+        <h3 className="text-2xl font-semibold text-gray-800 mt-12 mb-6">Security Information</h3>
+        <form onSubmit={handleSaveSecurityInfo} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Current Password */}
+          <div>
+            <label htmlFor="CurrentPassword" className="text-sm font-medium text-gray-700 block mb-1">
+              Current Password
+            </label>
+            <input
+              type="password"
+              id="CurrentPassword"
+              name="CurrentPassword"
+              value={formData.CurrentPassword}
+              onChange={handleChange}
+              className={`w-full rounded-md border ${errors.CurrentPassword ? 'border-red-500' : 'border-gray-300'} px-4 py-3 focus:ring-2 focus:ring-blue-500 outline-none`}
+            />
+            {errors.CurrentPassword && <p className="text-red-500 text-xs mt-1">{errors.CurrentPassword}</p>}
+          </div>
+
+          {/* New Password */}
+          <div>
+            <label htmlFor="NewPassword" className="text-sm font-medium text-gray-700 block mb-1">
+              New Password
+            </label>
+            <input
+              type="password"
+              id="NewPassword"
+              name="NewPassword"
+              value={formData.NewPassword}
+              onChange={handleChange}
+              className={`w-full rounded-md border ${errors.NewPassword ? 'border-red-500' : 'border-gray-300'} px-4 py-3 focus:ring-2 focus:ring-blue-500 outline-none`}
+            />
+            {errors.NewPassword && <p className="text-red-500 text-xs mt-1">{errors.NewPassword}</p>}
+          </div>
+
+          {/* Confirm New Password */}
+          <div>
+            <label htmlFor="ConfirmNewPassword" className="text-sm font-medium text-gray-700 block mb-1">
+              Confirm New Password
+            </label>
+            <input
+              type="password"
+              id="ConfirmNewPassword"
+              name="ConfirmNewPassword"
+              value={formData.ConfirmNewPassword}
+              onChange={handleChange}
+              className={`w-full rounded-md border ${errors.ConfirmNewPassword ? 'border-red-500' : 'border-gray-300'} px-4 py-3 focus:ring-2 focus:ring-blue-500 outline-none`}
+            />
+            {errors.ConfirmNewPassword && <p className="text-red-500 text-xs mt-1">{errors.ConfirmNewPassword}</p>}
+          </div>
+
+          <div className="col-span-full flex justify-end mt-6">
+            <button
+              type="submit"
+              className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition duration-200"
+            >
+              Save Security Information
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+);
+}
 
 export default AdminProfile;

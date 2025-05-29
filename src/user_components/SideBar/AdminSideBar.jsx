@@ -65,13 +65,7 @@ const AdminSideBar = () => {
           className={`bg-gray-900 h-screen duration-300 p-5 pt-30 fixed top-0 left-0 z-50 overflow-y-auto
           ${open ? "w-72" : "w-20"}`}
         >
-          <BsChevronLeft
-            className={`absolute -right-3 mr-10 top-16 cursor-pointer text-white text-base transition-transform duration-300
-            ${!open ? "rotate-180" : ""}`}
-            onClick={() => setOpen(!open)}
-            aria-label="Toggle sidebar"
-          />
-
+           
           <div className="flex flex-col h-full justify-between">
             <ul className="pt-8">
               {Menus.map((menu, index) => (
