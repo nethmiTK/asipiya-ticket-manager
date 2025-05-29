@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
+import { useNavigate } from "react-router-dom";
 import AdminSideBar from "../../user_components/SideBar/AdminSideBar";
 
 const Tickets = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [tickets, setTickets] = useState([]);
+  const navigate = useNavigate();
 
   useEffect(() => {
-    // Fetch tickets from the backend
     axios
       .get("http://localhost:5000/api/tickets")
       .then((response) => {
@@ -55,10 +56,8 @@ const Tickets = () => {
 
   return (
     <div className="flex">
-      {/* Sidebar */}
       <AdminSideBar open={isSidebarOpen} setOpen={setIsSidebarOpen} />
 
-      {/* Main Content */}
       <main
         className={`flex-1 min-h-screen bg-gray-100 p-6 transition-all duration-300 ${
           isSidebarOpen ? "ml-72" : "ml-20"
@@ -82,7 +81,11 @@ const Tickets = () => {
           </thead>
           <tbody>
             {tickets.map((ticket) => (
-              <tr key={ticket.TicketID}>
+              <tr
+                key={ticket.TicketID}
+                className="cursor-pointer hover:bg-gray-100"
+                onClick={() => navigate(`/ticket_view_page/${ticket.TicketID}`)}
+              >
                 <td className="border border-gray-200 px-2 py-1">
                   {ticket.TicketID}
                 </td>

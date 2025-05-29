@@ -1,5 +1,8 @@
+import dotenv from 'dotenv';
+dotenv.config();
 import mysql from 'mysql2';
 import express from 'express';
+import nodemailer from 'nodemailer';
 import bodyParser from 'body-parser';
 import cors from 'cors';
 
@@ -152,76 +155,117 @@ app.put('/api/user/profile/:id', (req, res) => {
  
 /* ------------------------- Add Members ------------------------- */
 
-// Get all members
+// Get all supervisors (excluding users)
 app.get('/supervisor', (req, res) => {
-    const query = 'SELECT id, Name AS name, Email AS email, Role AS role FROM supervisors';
-    db.query(query, (err, results) => {
-        if (err) {
-            console.error('Error fetching users:', err);
-            res.status(500).json({ message: 'Server error' });
-        } else {
-            res.status(200).json(results);
-        }
-    });
+  const query = "SELECT UserID, FullName, Email, Role FROM appuser WHERE Role NOT IN ('user', 'User')";
+  db.query(query, (err, results) => {
+    if (err) {
+      console.error('Error fetching users:', err);
+      return res.status(500).json({ message: 'Server error' });
+    }
+    res.status(200).json(results);
+  });
 });
 
-// Add a new member
-app.post('/add-member', (req, res) => {
-    const { name, email, role } = req.body;
+// Get supervisor by ID
+app.get('/supervisor/:id', (req, res) => {
+  const query = "SELECT * FROM appuser WHERE UserID = ?";
+  db.query(query, [req.params.id], (err, results) => {
+    if (err) {
+      console.error('Error fetching user:', err);
+      return res.status(500).json({ message: 'Server error' });
+    }
+    res.status(200).json(results[0]);
+  });
+});
 
-    if (!name || !email || !role) {
-        return res.status(400).json({ message: 'Missing fields' });
+// Update supervisor by ID
+app.put('/supervisor/:id', (req, res) => {
+  const { FullName, Email, Role } = req.body;
+  const query = "UPDATE appuser SET FullName = ?, Email = ?, Role = ? WHERE UserID = ?";
+  db.query(query, [FullName, Email, Role, req.params.id], (err, result) => {
+    if (err) {
+      console.error('Error updating user:', err);
+      return res.status(500).json({ message: 'Server error' });
+    }
+    res.sendStatus(200);
+  });
+});
+
+
+// Delete supervisor by ID
+app.delete('/supervisor/:id', (req, res) => {
+  const query = "DELETE FROM appuser WHERE UserID = ?";
+  db.query(query, [req.params.id], (err, result) => {
+    if (err) {
+      console.error('Error deleting user:', err);
+      return res.status(500).json({ message: 'Server error' });
+    }
+    res.sendStatus(200);
+  });
+});
+
+/*---------------------- Invite User via Email ----------------------*/
+
+const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS
+    }
+});
+
+function isValidEmail(email) {
+    const re = /\S+@\S+\.\S+/;
+    return re.test(email);
+}
+
+app.post('/api/invite', (req, res) => {
+    const { email, role } = req.body;
+
+    if (!email || !role || !isValidEmail(email)) {
+        return res.status(400).json({ message: 'Valid email and role are required' });
     }
 
-    const query = 'INSERT INTO supervisors (Name, Email, Role) VALUES (?, ?, ?)';
-    db.query(query, [name, email, role], (err, result) => {
-        if (err) {
-            console.error('Error adding user:', err);
-            res.status(500).json({ message: 'Error adding user' });
-        } else {
-            res.status(201).json({ message: 'User added successfully', userId: result.insertId });
+    const checkQuery = 'SELECT * FROM appuser WHERE Email = ?';
+    db.query(checkQuery, [email], (err, results) => {
+        if (err) return res.status(500).json({ message: 'Server error' });
+        if (results.length > 0) {
+            return res.status(400).json({ message: 'User with this email already exists' });
         }
+
+        const insertQuery = 'INSERT INTO appuser (Email, Role) VALUES (?, ?)';
+        db.query(insertQuery, [email, role], async (err) => {
+            if (err) return res.status(500).json({ message: 'Error inserting user' });
+
+            const mailOptions = {
+                from: process.env.EMAIL_USER,
+                to: email,
+                subject: 'You are invited to join the App',
+                html: `
+                    <p>Hello,</p>
+                    <p>You have been invited to join our app as a <strong>${role}</strong>.</p>
+                    <p>Please set your password by clicking the link below:</p>
+                    <a href="${process.env.APP_URL}">Set your password</a>
+                `
+            };
+
+            try {
+                await transporter.sendMail(mailOptions);
+                res.json({ message: 'Invitation sent successfully' });
+            } catch (mailErr) {
+                console.error(mailErr);
+                res.status(500).json({ message: 'Failed to send email' });
+            }
+        });
     });
 });
 
-// Get user by member
-app.get('/supervisor/:id', (req, res) => {
-    const query = 'SELECT * FROM supervisors WHERE id = ?';
-    db.query(query, [req.params.id], (err, results) => {
-        if (err) {
-            console.error('Error fetching user:', err);
-            return res.status(500).json({ message: 'Server error' });
-        }
-        res.json(results[0]);
-    });
-});
 
-// Update member
-app.put('/supervisor/:id', (req, res) => {
-    const { name, email, role } = req.body;
-    const query = 'UPDATE supervisors SET Name = ?, Email = ?, Role = ? WHERE id = ?';
-    db.query(query, [name, email, role, req.params.id], (err, result) => {
-        if (err) {
-            console.error('Error updating user:', err);
-            return res.status(500).json({ message: 'Server error' });
-        }
-        res.sendStatus(200);
-    });
-});
+/*---------------------------------------------------------------------------------------*/
 
-// Delete member
-app.delete('/supervisor/:id', (req, res) => {
-    const query = 'DELETE FROM supervisors WHERE id = ?';
-    db.query(query, [req.params.id], (err, result) => {
-        if (err) {
-            console.error('Error deleting user:', err);
-            return res.status(500).json({ message: 'Server error' });
-        }
-        res.sendStatus(200);
-    });
-});
+// API endpoint to fetch tickets
 
-// API endpoint to fetch tickets (duplicate, keeping for now as it exists in original)
 app.get('/api/tickets', (req, res) => {
     const query = `
     SELECT t.TicketID, c.CompanyName AS Client, s.Description AS System, tc.Description AS Category, t.Status, t.Priority
@@ -301,6 +345,36 @@ app.get('/ticket_category', (req, res) => {
     });
 });
 
+
+//View ticket details
+app.get('/api/ticket_view/:id', (req, res) => {
+  const ticketId = req.params.id;
+  const query = `SELECT t.TicketID, u.FullName AS UserName, u.Email AS UserEmail, s.SystemName, c.CategoryName,t.Description,t.DateTime,
+  t.Status,t.Priority,t.FirstRespondedTime,t.LastRespondedTime,t.TicketDuration,t.UserNote
+  FROM 
+    ticket t
+  JOIN 
+    appuser u ON t.UserId = u.UserID
+  JOIN 
+    asipiyasystem s ON t.AsipiyaSystemID = s.AsipiyaSystemID
+  JOIN 
+    ticketcategory c ON t.TicketCategoryID = c.TicketCategoryID
+  WHERE 
+    t.TicketID = ?`;
+
+  db.query(query, [ticketId], (err, results) => {
+    if (err) {
+      console.error("Error in ticket_view query:", err);
+      return res.status(500).json({ error: "Database query failed" });
+    }
+
+    if (results.length === 0) {
+      return res.status(404).json({ error: "Ticket not found" });
+    }
+
+    res.json(results[0]);
+  });
+});
 
 /*----------------------------------------------------------------------------------*/
 

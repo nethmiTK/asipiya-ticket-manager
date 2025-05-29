@@ -21,6 +21,7 @@ export default function AddSupervisor() {
     Supervisor: "bg-purple-100 text-purple-800",
     Developer: "bg-blue-100 text-blue-800",
     Manager: "bg-green-100 text-green-800",
+    Admin: "bg-yellow-100 text-green-800",
   };
 
   return (
@@ -52,25 +53,25 @@ export default function AddSupervisor() {
               {users.length > 0 ? (
                 users.map((user) => (
                   <tr
-                    key={user.id}
+                    key={user.UserID}
                     className="border-b hover:bg-blue-50 transition"
                   >
                     <td className="p-3 text-gray-800 font-medium">
-                      {user.name}
+                      {user.FullName}
                     </td>
-                    <td className="p-3 text-gray-700">{user.email}</td>
+                    <td className="p-3 text-gray-700">{user.Email}</td>
                     <td className="p-3">
                       <span
                         className={`px-3 py-1 rounded-full text-sm font-medium ${
-                          roleColors[user.role] || "bg-gray-300 text-gray-900"
+                          roleColors[user.Role] || "bg-gray-300 text-gray-900"
                         }`}
                       >
-                        {user.role}
+                        {user.Role}
                       </span>
                     </td>
                     <td className="p-3 flex gap-2">
                       <button
-                        onClick={() => navigate(`/edit-supervisor/${user.id}`)}
+                        onClick={() => navigate(`/edit-supervisor/${user.UserID}`)}
                         className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded shadow-md font-medium transition duration-150"
                       >
                         ✏️ Edit
@@ -80,23 +81,25 @@ export default function AddSupervisor() {
                         onClick={async () => {
                           if (
                             window.confirm(
-                              "Are you sure you want to delete this member?"
+                              `Are you sure you want to delete ${user.FullName}?`
                             )
                           ) {
                             try {
                               const res = await fetch(
-                                `http://localhost:5000/supervisor/${user.id}`,
+                                `http://localhost:5000/supervisor/${user.UserID}`,
                                 {
                                   method: "DELETE",
                                 }
                               );
                               if (res.ok) {
-                                setUsers(users.filter((u) => u.id !== user.id));
+                                // ✅ Correctly filter by UserID
+                                setUsers(users.filter((u) => u.UserID !== user.UserID));
                               } else {
                                 alert("Failed to delete");
                               }
                             } catch (err) {
                               console.error("Error deleting user:", err);
+                              alert("Server error. Try again.");
                             }
                           }
                         }}

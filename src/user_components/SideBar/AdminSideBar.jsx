@@ -14,6 +14,7 @@ const Menus = [
   { title: "Dashboard", icon: <FaHome />, path: "/admin-dashboard" },
   { title: "Profile", icon: <FaUserCog />, path: "/admin-profile" },
   { title: "Tickets", icon: <LuTicketCheck />, path: "/tickets" },
+  { title: "Members", icon: <LuTicketCheck />, path: "/supervisor" },
   { title: "Ticket Manage", icon: <LuTicketCheck />, path: "/ticket-manage" },
   { title: "Supervisor Manage", icon: <VscNotebook />, path: "/supervisor-manage" },
   {
