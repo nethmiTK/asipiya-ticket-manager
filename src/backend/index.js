@@ -236,6 +236,36 @@ app.get('/ticket_category', (req, res) => {
 });
 
 
+//View ticket details
+app.get('/api/ticket_view/:id', (req, res) => {
+  const ticketId = req.params.id;
+  const query = `SELECT t.TicketID, u.FullName AS UserName, u.Email AS UserEmail, s.SystemName, c.CategoryName,t.Description,t.DateTime,
+  t.Status,t.Priority,t.FirstRespondedTime,t.LastRespondedTime,t.TicketDuration,t.UserNote
+  FROM 
+    ticket t
+  JOIN 
+    appuser u ON t.UserId = u.UserID
+  JOIN 
+    asipiyasystem s ON t.AsipiyaSystemID = s.AsipiyaSystemID
+  JOIN 
+    ticketcategory c ON t.TicketCategoryID = c.TicketCategoryID
+  WHERE 
+    t.TicketID = ?`;
+
+  db.query(query, [ticketId], (err, results) => {
+    if (err) {
+      console.error("Error in ticket_view query:", err);
+      return res.status(500).json({ error: "Database query failed" });
+    }
+
+    if (results.length === 0) {
+      return res.status(404).json({ error: "Ticket not found" });
+    }
+
+    res.json(results[0]);
+  });
+});
+
 /*----------------------------------------------------------------------------------*/
 
 // Get admin profile endpoint 
