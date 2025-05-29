@@ -132,8 +132,16 @@ const AppRoutes = ({ isLoggedIn, setIsLoggedIn, userRole, setUserRole }) => {
             </ProtectedRoute>
           }
         />
- 
 
+        <Route
+          path='/system_registration'
+          element={
+            <ProtectedRoute allowedRoles={['admin']}>
+              <SystemRegistration />
+            </ProtectedRoute>
+          }
+        />
+        
         <Route
           path="/admin-profile"
           element={
