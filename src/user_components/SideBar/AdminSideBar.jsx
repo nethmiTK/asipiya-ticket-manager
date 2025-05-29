@@ -6,12 +6,13 @@ import { IoIosArrowBack } from "react-icons/io";
 import { VscNotebook } from "react-icons/vsc";
 import { CiLogout } from "react-icons/ci";
 import { GrSystem } from "react-icons/gr";
-import { FaHome } from "react-icons/fa";
+import { FaHome, FaUserCog } from "react-icons/fa";
 import { useAuth } from '../../App.jsx';
 import { toast } from "react-toastify";
 
 const Menus = [
   { title: "Dashboard", icon: <FaHome />, path: "/admin-dashboard" },
+  { title: "Profile", icon: <FaUserCog />, path: "/admin-profile" },
   { title: "Tickets", icon: <LuTicketCheck />, path: "/tickets" },
   { title: "Ticket Manage", icon: <LuTicketCheck />, path: "/ticket-manage" },
   { title: "Supervisor Manage", icon: <VscNotebook />, path: "/supervisor-manage" },
@@ -61,7 +62,7 @@ const AdminSideBar = () => {
     <>
       <div className="flex">
         <div
-          className={`bg-gray-900 h-screen duration-300 p-5 pt-30 fixed top-0 left-0 z-50 overflow-auto
+          className={`bg-gray-900 h-screen duration-300 p-5 pt-30 fixed top-0 left-0 z-50 overflow-y-auto
           ${open ? "w-72" : "w-20"}`}
         >
           <BsChevronLeft
