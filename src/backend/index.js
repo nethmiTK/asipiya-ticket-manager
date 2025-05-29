@@ -300,6 +300,29 @@ app.put('/api/admin/profile/:id', (req, res) => {
     });
 });
 
+//Create ticket 
+app.get("/system_registration", (req, res) => {
+  const sql = "SELECT SystemName FROM asipiyasystem";
+  db.query(sql, (err, results) => {
+    if (err) {
+      console.error("Error fetching systems:", err);
+      return res.status(500).json({ error: "Database error" });
+    }
+    res.json(results);
+  });
+});
+
+app.get("/ticket_category", (req, res) => {
+  const sql = "SELECT CategoryName FROM ticketcategory";
+  db.query(sql, (err, results) => {
+    if (err) {
+      console.error("Error fetching systems:", err);
+      return res.status(500).json({ error: "Database error" });
+    }
+    res.json(results);
+  });
+});
+
 app.listen(5000, () => {
     console.log('Server is running on port 5000');
 });
