@@ -11,7 +11,7 @@ import { toast } from 'react-toastify';
 const Menus = [
   { title: "My All Tickets", icon: <LuTicketCheck />, path: "/all-tickets" },
   { title: "My Open Tickets", icon: <LuTicketPlus />, path: "/open-tickets" },
-  { title: "My Profile", icon: <AiOutlineUser />, path: "/profile" },
+   { title: "My Profile", icon: <AiOutlineUser />, path: "/user-profile" }, 
 ];
 
 const SideBar = () => {

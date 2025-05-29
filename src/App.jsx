@@ -20,213 +20,244 @@ import Tickets from './frontend/admin_panel/tickets';
 import OpenTickets from './frontend/users_panel/openTickets';
 import SystemRegistration from './frontend/admin_panel/SystemRegistration';
 import TicketCategory from './frontend/admin_panel/TicketCategory';
+import UserProfile from './frontend/users_panel/UserProfile'; 
 
-// Create Auth Context
+// Create Auth Context - loggedInUser and setLoggedInUser
 const AuthContext = createContext(null);
 export const useAuth = () => useContext(AuthContext);
 
-// Protected Route Component
+// Protected Route Component 
 const ProtectedRoute = ({ children, allowedRoles }) => {
-  const { isLoggedIn, userRole } = useAuth();
-  const navigate = useNavigate();
+    const { isLoggedIn, userRole } = useAuth(); // loggedInUser is implicitly available via context
+    const navigate = useNavigate();
 
-  useEffect(() => {
-    if (!isLoggedIn) {
-      navigate('/login', { replace: true });
-      return;
-    }
+    useEffect(() => {
+        if (!isLoggedIn) {
+            navigate('/login', { replace: true });
+            return;
+        }
 
-    if (allowedRoles && !allowedRoles.includes(userRole)) {
-      alert('Access Denied');
-      navigate(userRole === 'user' ? '/user-dashboard' : '/login', { replace: true });
-    }
-  }, [isLoggedIn, userRole, allowedRoles, navigate]);
+        if (allowedRoles && !allowedRoles.includes(userRole)) {
+            alert('Access Denied');
+            navigate(userRole === 'user' ? '/user-dashboard' : '/login', { replace: true });
+        }
+    }, [isLoggedIn, userRole, allowedRoles, navigate]);
 
-  if (!isLoggedIn || (allowedRoles && !allowedRoles.includes(userRole))) return null;
-  return children;
+    if (!isLoggedIn || (allowedRoles && !allowedRoles.includes(userRole))) return null;
+    return children;
 };
 
-// App Routes Component
-const AppRoutes = ({ isLoggedIn, setIsLoggedIn, userRole, setUserRole }) => {
-  const navigate = useNavigate();
+// App Routes Component 
+const AppRoutes = ({ isLoggedIn, setIsLoggedIn, userRole, setUserRole, loggedInUser, setLoggedInUser }) => {
+    const navigate = useNavigate();
 
-  const handleLoginSuccess = (role) => {
-    localStorage.setItem('role', role);
-    setIsLoggedIn(true);
-    setUserRole(role);
-    navigate(role === 'admin' ? '/admin-dashboard' : '/user-dashboard');
-  };
+    // handleLoginSuccess now accepts the full user object
+    const handleLoginSuccess = (user) => {
+        setIsLoggedIn(true);
+        setUserRole(user.Role); 
+        setLoggedInUser(user); // Set the full user object in state
+        localStorage.setItem('user', JSON.stringify(user)); // Store full user object in localStorage
+        localStorage.setItem('role', user.Role); 
 
-  const handleLogout = () => {
-    localStorage.removeItem('role');
-    setIsLoggedIn(false);
-    setUserRole(null);
-    navigate('/login');
-  };
+        navigate(user.Role === 'admin' ? '/admin-dashboard' : '/user-dashboard');
+    };
 
-  return (
-    <AuthContext.Provider value={{ isLoggedIn, userRole, handleLoginSuccess, handleLogout }}>
-      <Routes>
-        <Route path='/' element={<Navigate to="/login" replace />} />
-        <Route path='/register' element={<Register />} />
-        <Route path='/login' element={<Login onLoginSuccess={handleLoginSuccess} />} />
-        <Route path='/all-tickets' element={<UserDashboard />} />
-        <Route path='/open-tickets' element={<OpenTickets />} />
+    const handleLogout = () => {
+        localStorage.removeItem('user'); // Clear the full user object
+        localStorage.removeItem('role'); 
+        setIsLoggedIn(false);
+        setUserRole(null);
+        setLoggedInUser(null); // Clear loggedInUser from state
+        navigate('/login');
+    };
 
-        <Route
-          path='/user-dashboard'
-          element={
-            <ProtectedRoute allowedRoles={['user']}>
-              <UserDashboard />
-            </ProtectedRoute>
-          }
-        />
+    return (
+        <AuthContext.Provider value={{ isLoggedIn, userRole, loggedInUser, setLoggedInUser, handleLoginSuccess, handleLogout }}>
+            <Routes>
+                <Route path='/' element={<Navigate to="/login" replace />} />
+                <Route path='/register' element={<Register />} />
+                <Route path='/login' element={<Login onLoginSuccess={handleLoginSuccess} />} />
+                <Route path='/all-tickets' element={<UserDashboard />} />
+                <Route path='/open-tickets' element={<OpenTickets />} />
 
-        <Route
-          path='/admin-dashboard'
-          element={
-            <ProtectedRoute allowedRoles={['admin']}>
-              <Dashboard />
-            </ProtectedRoute>
-          }
-        />
+                <Route
+                    path='/user-dashboard'
+                    element={
+                        <ProtectedRoute allowedRoles={['user']}>
+                            <UserDashboard />
+                        </ProtectedRoute>
+                    }
+                />
+                
+                <Route
+                    path='/user-profile'
+                    element={
+                        // UserProfile can be accessed by both 'user' and 'admin' roles
+                        <ProtectedRoute allowedRoles={['user']}>
+                            <UserProfile />
+                        </ProtectedRoute>
+                    }
+                />
 
-        <Route
-          path="/tickets"
-          element={
-            <ProtectedRoute allowedRoles={['admin']}>
-              <Tickets />
-            </ProtectedRoute>
-          }
-        />
+                <Route
+                    path='/admin-dashboard'
+                    element={
+                        <ProtectedRoute allowedRoles={['admin']}>
+                            <Dashboard />
+                        </ProtectedRoute>
+                    }
+                />
 
-        {/* Admin only routes */}
-        <Route
-          path="/supervisor"
-          element={
-            <ProtectedRoute allowedRoles={['admin']}>
-              <AddSupervisor />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/add-member"
-          element={
-            <ProtectedRoute allowedRoles={['admin']}>
-              <AddMember />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/ticket-manage"
-          element={
-            <ProtectedRoute allowedRoles={['admin']}>
-              <TicketManage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/edit-supervisor/:id"
-          element={
-            <ProtectedRoute allowedRoles={['admin']}>
-              <EditMember />
-            </ProtectedRoute>
-          }
-        />
+                <Route
+                    path="/tickets"
+                    element={
+                        <ProtectedRoute allowedRoles={['admin']}>
+                            <Tickets />
+                        </ProtectedRoute>
+                    }
+                />
 
-        <Route
-          path='/system_registration'
-          element={
-            <ProtectedRoute allowedRoles={['admin']}>
-              <SystemRegistration />
-            </ProtectedRoute>
-          }
-        />
-        
-        <Route
-          path="/admin-profile"
-          element={
-            <ProtectedRoute allowedRoles={['admin']}>
-              <AdminProfile />
-             </ProtectedRoute>
-          }
-        />
+                {/* Admin only routes */}
+                <Route
+                    path="/supervisor"
+                    element={
+                        <ProtectedRoute allowedRoles={['admin']}>
+                            <AddSupervisor />
+                        </ProtectedRoute>
+                    }
+                />
+                <Route
+                    path="/add-member"
+                    element={
+                        <ProtectedRoute allowedRoles={['admin']}>
+                            <AddMember />
+                        </ProtectedRoute>
+                    }
+                />
+                <Route
+                    path="/ticket-manage"
+                    element={
+                        <ProtectedRoute allowedRoles={['admin']}>
+                            <TicketManage />
+                        </ProtectedRoute>
+                    }
+                />
+                <Route
+                    path="/edit-supervisor/:id"
+                    element={
+                        <ProtectedRoute allowedRoles={['admin']}>
+                            <EditMember />
+                        </ProtectedRoute>
+                    }
+                />
 
-        <Route
-          path='/ticket_category'
-          element={
-            <ProtectedRoute allowedRoles={['admin']}>
-              <TicketCategory />
-            </ProtectedRoute>
-          }
-        />
+                <Route
+                    path='/system_registration'
+                    element={
+                        <ProtectedRoute allowedRoles={['admin']}>
+                            <SystemRegistration />
+                        </ProtectedRoute>
+                    }
+                />
 
-      </Routes>
-      <ToastContainer
-        position="top-right"
-        autoClose={3000}
-        hideProgressBar={false}
-        newestOnTop
-        closeOnClick
-        rtl={false}
-        pauseOnFocusLoss
-        draggable
-        pauseOnHover
-        theme="colored"
-      />
-    </AuthContext.Provider>
-  );
+                <Route
+                    path="/admin-profile"
+                    element={
+                        <ProtectedRoute allowedRoles={['admin']}>
+                            <AdminProfile />
+                        </ProtectedRoute>
+                    }
+                />
+
+                <Route
+                    path='/ticket_category'
+                    element={
+                        <ProtectedRoute allowedRoles={['admin']}>
+                            <TicketCategory />
+                        </ProtectedRoute>
+                    }
+                />
+
+            </Routes>
+            <ToastContainer
+                position="top-right"
+                autoClose={3000}
+                hideProgressBar={false}
+                newestOnTop
+                closeOnClick
+                rtl={false}
+                pauseOnFocusLoss
+                draggable
+                pauseOnHover
+                theme="colored"
+            />
+        </AuthContext.Provider>
+    );
 };
 
-// Component to render sidebar conditionally based on route and role
-const RenderWithLayout = ({ isLoggedIn, userRole, setIsLoggedIn, setUserRole }) => {
-  const location = useLocation();
+// Component to render sidebar conditionally based on route and role 
+const RenderWithLayout = ({ isLoggedIn, userRole, setIsLoggedIn, setUserRole, loggedInUser, setLoggedInUser }) => {
+    const location = useLocation();
 
-  // Show AdminSideBar only for logged in admin and not on auth routes
-  const showAdminSidebar =
-    isLoggedIn &&
-    userRole === 'admin' &&
-    !['/login', '/register', '/'].includes(location.pathname);
+    // Show AdminSideBar only for logged in admin and not on auth routes
+    const showAdminSidebar =
+        isLoggedIn &&
+        userRole === 'admin' &&
+        !['/login', '/register', '/'].includes(location.pathname);
 
-  return (
-    <div className="flex min-h-screen">
-      {showAdminSidebar && <AdminSideBar />}
-      <div className="flex-1">
-        <AppRoutes
-          isLoggedIn={isLoggedIn}
-          setIsLoggedIn={setIsLoggedIn}
-          userRole={userRole}
-          setUserRole={setUserRole}
-        />
-      </div>
-    </div>
-  );
+    return (
+        <div className="flex min-h-screen">
+            {showAdminSidebar && <AdminSideBar />}
+            <div className="flex-1">
+                <AppRoutes
+                    isLoggedIn={isLoggedIn}
+                    setIsLoggedIn={setIsLoggedIn}
+                    userRole={userRole}
+                    setUserRole={setUserRole}
+                    loggedInUser={loggedInUser} 
+                    setLoggedInUser={setLoggedInUser} 
+                />
+            </div>
+        </div>
+    );
 };
 
-// Main App component
+// Main App component 
 function App() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [userRole, setUserRole] = useState(null);
+    const [isLoggedIn, setIsLoggedIn] = useState(false);
+    const [userRole, setUserRole] = useState(null);
+    const [loggedInUser, setLoggedInUser] = useState(null); 
 
-  useEffect(() => {
-    const role = localStorage.getItem('role');
-    if (role) {
-      
-      setIsLoggedIn(true);
-      setUserRole(role);
-    }
-  }, []);
+    useEffect(() => {
+        const storedUser = localStorage.getItem('user'); 
+        if (storedUser) {
+            try {
+                const user = JSON.parse(storedUser);
+                setIsLoggedIn(true);
+                setUserRole(user.Role); 
+                setLoggedInUser(user); 
+            } catch (e) {
+                console.error("Failed to parse user from localStorage", e);
+               
+                localStorage.removeItem('user');
+                localStorage.removeItem('role');
+                
+            }
+        }
+    }, []);
 
-  return (
-    <BrowserRouter>
-      <RenderWithLayout
-        isLoggedIn={isLoggedIn}
-        userRole={userRole}
-        setIsLoggedIn={setIsLoggedIn}
-        setUserRole={setUserRole}
-      />
-    </BrowserRouter>
-  );
+    return (
+        <BrowserRouter>
+            <RenderWithLayout
+                isLoggedIn={isLoggedIn}
+                userRole={userRole}
+                setIsLoggedIn={setIsLoggedIn}
+                setUserRole={setUserRole}
+                loggedInUser={loggedInUser} 
+                setLoggedInUser={setLoggedInUser}
+            />
+        </BrowserRouter>
+    );
 }
 
 export default App;
