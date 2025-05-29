@@ -19,6 +19,7 @@ import EditMember from './frontend/admin_panel/EditMember';
 import Tickets from './frontend/admin_panel/tickets';
 import OpenTickets from './frontend/users_panel/openTickets';
 import SystemRegistration from './frontend/admin_panel/SystemRegistration';
+import TicketCategory from './frontend/admin_panel/TicketCategory';
 
 // Create Auth Context
 const AuthContext = createContext(null);
@@ -150,6 +151,16 @@ const AppRoutes = ({ isLoggedIn, setIsLoggedIn, userRole, setUserRole }) => {
              </ProtectedRoute>
           }
         />
+
+        <Route
+          path='/ticket_category'
+          element={
+            <ProtectedRoute allowedRoles={['admin']}>
+              <TicketCategory />
+            </ProtectedRoute>
+          }
+        />
+
       </Routes>
       <ToastContainer
         position="top-right"

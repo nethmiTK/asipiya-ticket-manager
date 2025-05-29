@@ -199,6 +199,36 @@ app.get('/system_registration', (req, res) => {
   });
 });
 
+//Adding Category
+app.post('/ticket_category', (req, res) => {
+  const { categoryName, categoryDescription } = req.body;
+
+  if (!categoryName || !categoryDescription) {
+    return res.status(400).json({ error: 'All fields are required.' });
+  }
+
+  const sql = 'INSERT INTO ticketcategory (CategoryName, Description) VALUES (?, ?)';
+  db.query(sql, [categoryName, categoryDescription], (err) => {
+    if (err) {
+      console.error("Database error:", err);
+      return res.status(500).json({ message: "Database error" });
+    }
+    res.status(200).json({ message: 'System registered successfully' });
+  });
+});
+
+//View Categories
+app.get('/ticket_category', (req, res) => {
+  const sql = 'SELECT * FROM ticketcategory';
+  db.query(sql, (err, results) => {
+    if (err) {
+      console.error('Error fetching systems:', err);
+      return res.status(500).json({ message: 'Error fetching systems' });
+    }
+    res.status(200).json(results);
+  });
+});
+
 
 /*----------------------------------------------------------------------------------*/
 

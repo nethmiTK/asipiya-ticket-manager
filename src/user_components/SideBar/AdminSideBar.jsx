@@ -22,7 +22,7 @@ const Menus = [
     subMenu: true,
     subItems: [
       { title: "System Registration", path: "/system_registration" },
-      { title: "Ticket Category", path: "/ticket-category" },
+      { title: "Ticket Category", path: "/ticket_category" },
     ],
   },
 ];
