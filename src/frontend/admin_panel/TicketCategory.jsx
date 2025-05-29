@@ -3,7 +3,6 @@ import axios from 'axios';
 import AdminSideBar from '../../user_components/SideBar/AdminSideBar';
 
 const TicketCategory = () => {
-
   const [form, setForm] = useState({ categoryName: '', categoryDescription: '' });
   const [categories, setCategories] = useState([]);
 
@@ -14,7 +13,12 @@ const TicketCategory = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await axios.post('http://localhost:5000/ticket_category', form);
+      const res = await axios.post('http://localhost:5000/ticket_category', form);
+      const newCategory = res.data;
+
+      const current = JSON.parse(localStorage.getItem('ticketCategories')) || [];
+      localStorage.setItem('ticketCategories', JSON.stringify([...current, newCategory]));
+
       setForm({ categoryName: '', categoryDescription: '' });
       fetchCategories();
     } catch (error) {
@@ -26,13 +30,20 @@ const TicketCategory = () => {
     try {
       const res = await axios.get('http://localhost:5000/ticket_category');
       setCategories(res.data);
+
+      localStorage.setItem('ticketCategories', JSON.stringify(res.data));
     } catch (error) {
-      console.error('Error fetching systems:', error);
+      console.error('Error fetching categories:', error);
     }
   };
 
   useEffect(() => {
     fetchCategories();
+
+    const cached = localStorage.getItem('ticketCategories');
+    if (cached) {
+      setCategories(JSON.parse(cached));
+    }
   }, []);
 
   return (
@@ -77,7 +88,7 @@ const TicketCategory = () => {
           </thead>
           <tbody>
             {categories.map((category, index) => (
-              <tr key={index} className="border-t">
+              <tr key={category.id || index} className="border-t">
                 <td className="p-2">{category.CategoryName}</td>
                 <td className="p-2">{category.Description}</td>
               </tr>
@@ -86,7 +97,7 @@ const TicketCategory = () => {
         </table>
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default TicketCategory
+export default TicketCategory;

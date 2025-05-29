@@ -13,7 +13,12 @@ const SystemRegistration = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await axios.post('http://localhost:5000/system_registration', form);
+      const res = await axios.post('http://localhost:5000/system_registration', form);
+      const newSystem = res.data;
+
+      const current = JSON.parse(localStorage.getItem('registeredSystems')) || [];
+      localStorage.setItem('registeredSystems', JSON.stringify([...current, newSystem]));
+
       setForm({ systemName: '', description: '' });
       fetchSystems();
     } catch (error) {
@@ -25,6 +30,7 @@ const SystemRegistration = () => {
     try {
       const res = await axios.get('http://localhost:5000/system_registration');
       setSystems(res.data);
+      localStorage.setItem('registeredSystems', JSON.stringify(res.data));
     } catch (error) {
       console.error('Error fetching systems:', error);
     }
@@ -32,6 +38,10 @@ const SystemRegistration = () => {
 
   useEffect(() => {
     fetchSystems();
+    const cached = localStorage.getItem('registeredSystems');
+    if (cached) {
+      setSystems(JSON.parse(cached));
+    }
   }, []);
 
   return (
@@ -76,7 +86,7 @@ const SystemRegistration = () => {
           </thead>
           <tbody>
             {systems.map((system, index) => (
-              <tr key={index} className="border-t">
+              <tr key={system.id || index} className="border-t">
                 <td className="p-2">{system.SystemName}</td>
                 <td className="p-2">{system.Description}</td>
               </tr>
