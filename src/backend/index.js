@@ -37,6 +37,25 @@ app.post('/register', (req, res) => {
         }
     });
 });
+// API endpoint to fetch tickets
+app.get('/api/tickets', (req, res) => {
+  const query = `
+    SELECT t.TicketID, c.Email AS UserEmail, s.Description AS System, tc.Description AS Category, t.Status, t.Priority, t.DateTime
+    FROM ticket t
+    LEFT JOIN appuser c ON t.UserId = c.UserID
+    LEFT JOIN asipiyasystem s ON t.AsipiyaSystemID = s.AsipiyaSystemID
+    LEFT JOIN ticketcategory tc ON t.TicketCategoryID = tc.TicketCategoryID;
+  `;
+
+  db.query(query, (err, results) => {
+    if (err) {
+      console.error('Error fetching tickets:', err);
+      res.status(500).json({ error: 'Failed to fetch tickets' });
+      return;
+    }
+    res.json(results);
+  });
+});
 
 // Login endpoint
 app.post('/login', (req, res) => {
@@ -50,7 +69,8 @@ app.post('/login', (req, res) => {
             const user = results[0];
             res.status(200).json({
                 message: 'Login successful',
-                role: user.Role.toLowerCase() // <-- Send role as lowercase from backend
+                role: user.Role.toLowerCase(),
+                UserID: user.UserID
             });
         } else {
             res.status(401).json({ message: 'Invalid credentials' });
@@ -181,6 +201,74 @@ app.get('/system_registration', (req, res) => {
 
 
 /*----------------------------------------------------------------------------------*/
+
+// Get admin profile endpoint
+app.get('/api/admin/profile/:id', (req, res) => {
+    const userId = req.params.id;
+    const query = 'SELECT UserID, FullName, Email, Phone FROM appuser WHERE UserID = ? AND Role = "admin"';
+    
+    db.query(query, [userId], (err, results) => {
+        if (err) {
+            console.error('Error fetching admin profile:', err);
+            res.status(500).json({ message: 'Server error' });
+        } else if (results.length === 0) {
+            res.status(404).json({ message: 'Admin not found' });
+        } else {
+            res.status(200).json(results[0]);
+        }
+    });
+});
+
+// Update admin profile endpoint
+app.put('/api/admin/profile/:id', (req, res) => {
+    const userId = req.params.id;
+    const { FullName, Email, Phone, CurrentPassword, NewPassword } = req.body;
+
+    // First verify this is an admin
+    const verifyQuery = 'SELECT * FROM appuser WHERE UserID = ? AND Role = "admin"';
+    
+    db.query(verifyQuery, [userId], (err, results) => {
+        if (err) {
+            console.error('Error verifying admin:', err);
+            return res.status(500).json({ message: 'Server error' });
+        }
+        
+        if (results.length === 0) {
+            return res.status(404).json({ message: 'Admin not found' });
+        }
+
+        const admin = results[0];
+
+        // If password change is requested, verify current password
+        if (CurrentPassword && NewPassword) {
+            if (CurrentPassword !== admin.Password) {
+                return res.status(400).json({ message: 'Current password is incorrect' });
+            }
+
+            // Update with new password
+            const updateQuery = 'UPDATE appuser SET FullName = ?, Email = ?, Phone = ?, Password = ? WHERE UserID = ? AND Role = "admin"';
+            db.query(updateQuery, [FullName, Email, Phone, NewPassword, userId], (updateErr, updateResult) => {
+                if (updateErr) {
+                    console.error('Error updating admin profile:', updateErr);
+                    res.status(500).json({ message: 'Error updating profile' });
+                } else {
+                    res.status(200).json({ message: 'Profile updated successfully' });
+                }
+            });
+        } else {
+            // Update without password change
+            const updateQuery = 'UPDATE appuser SET FullName = ?, Email = ?, Phone = ? WHERE UserID = ? AND Role = "admin"';
+            db.query(updateQuery, [FullName, Email, Phone, userId], (updateErr, updateResult) => {
+                if (updateErr) {
+                    console.error('Error updating admin profile:', updateErr);
+                    res.status(500).json({ message: 'Error updating profile' });
+                } else {
+                    res.status(200).json({ message: 'Profile updated successfully' });
+                }
+            });
+        }
+    });
+});
 
 app.listen(5000, () => {
     console.log('Server is running on port 5000');

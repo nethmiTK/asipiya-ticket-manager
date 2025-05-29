@@ -10,6 +10,7 @@ import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
 import AdminSideBar from './user_components/SideBar/AdminSideBar';
+import AdminProfile from './frontend/admin_panel/AdminProfile';
 
 import AddSupervisor from './frontend/admin_panel/AddSupervisor';
 import AddMember from './frontend/admin_panel/AddMember';
@@ -131,12 +132,14 @@ const AppRoutes = ({ isLoggedIn, setIsLoggedIn, userRole, setUserRole }) => {
             </ProtectedRoute>
           }
         />
+ 
+
         <Route
-          path='/system_registration'
+          path="/admin-profile"
           element={
             <ProtectedRoute allowedRoles={['admin']}>
-              <SystemRegistration />
-            </ProtectedRoute>
+              <AdminProfile />
+             </ProtectedRoute>
           }
         />
       </Routes>
@@ -167,15 +170,17 @@ const RenderWithLayout = ({ isLoggedIn, userRole, setIsLoggedIn, setUserRole }) 
     !['/login', '/register', '/'].includes(location.pathname);
 
   return (
-    <>
+    <div className="flex min-h-screen">
       {showAdminSidebar && <AdminSideBar />}
-      <AppRoutes
-        isLoggedIn={isLoggedIn}
-        setIsLoggedIn={setIsLoggedIn}
-        userRole={userRole}
-        setUserRole={setUserRole}
-      />
-    </>
+      <div className="flex-1">
+        <AppRoutes
+          isLoggedIn={isLoggedIn}
+          setIsLoggedIn={setIsLoggedIn}
+          userRole={userRole}
+          setUserRole={setUserRole}
+        />
+      </div>
+    </div>
   );
 };
 

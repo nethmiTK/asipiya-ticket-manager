@@ -23,6 +23,11 @@ const Login = ({ onLoginSuccess }) => {
             toast.success('Login successful!');
 
             const userRole = response.data.role;
+            const userId = response.data.UserID;
+            
+            // Store both role and userId in localStorage
+            localStorage.setItem('role', userRole);
+            localStorage.setItem('userId', userId);
 
             if (onLoginSuccess) {
                 onLoginSuccess(userRole);

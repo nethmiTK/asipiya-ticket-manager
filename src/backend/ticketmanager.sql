@@ -108,6 +108,9 @@ CREATE TABLE IF NOT EXISTS `ticket` (
   KEY `TicketCategoryID` (`TicketCategoryID`)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
+-- ALTER TABLE ticket 
+-- MODIFY DateTime TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+
 -- --------------------------------------------------------
 
 --
@@ -183,3 +186,9 @@ COMMIT;
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
+
+INSERT INTO `ticket` (`UserId`, `AsipiyaSystemID`, `DateTime`, `TicketCategoryID`, `Description`, `Status`, `Priority`, `FirstRespondedTime`, `LastRespondedTime`, `TicketDuration`, `UserNote`)
+VALUES
+(1, 101, '2025-05-28 10:00:00', 1, 'System crash issue', 'Open', 'High', '2025-05-28 10:30:00', NULL, NULL, 'User reported system crash'),
+(2, 102, '2025-05-27 14:00:00', 2, 'Login issue', 'In Progress', 'Medium', '2025-05-27 14:15:00', '2025-05-27 15:00:00', '1 hour', 'User unable to login'),
+(3, 103, '2025-05-26 09:00:00', 3, 'Network issue', 'Closed', 'Low', '2025-05-26 09:30:00', '2025-05-26 10:00:00', '30 minutes', 'Network connectivity restored');
