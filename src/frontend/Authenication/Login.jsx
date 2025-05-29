@@ -22,15 +22,11 @@ const Login = ({ onLoginSuccess }) => {
             const response = await axios.post('http://localhost:5000/login', credentials);
             toast.success('Login successful!');
 
-            const userRole = response.data.role;
-            const userId = response.data.UserID;
+            // Pass the full user object received from the backend to onLoginSuccess
+            const loggedInUser = response.data.user; 
             
-            // Store both role and userId in localStorage
-            localStorage.setItem('role', userRole);
-            localStorage.setItem('userId', userId);
-
             if (onLoginSuccess) {
-                onLoginSuccess(userRole);
+                onLoginSuccess(loggedInUser); 
             }
 
         } catch (error) {
