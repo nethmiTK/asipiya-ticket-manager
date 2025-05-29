@@ -1,6 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useDropzone } from "react-dropzone";
 import { Formik, Form, Field } from "formik";
+import axios from "axios";
 import SideBar from "../../user_components/SideBar/SideBar";
 import NavBar from "../../user_components/NavBar/NavBar";
 
@@ -14,6 +15,8 @@ const enhanceFilesWithPreview = (acceptedFiles) =>
 const OpenTickets = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [files, setFiles] = useState([]);
+  const [systemNames, setSystemNames] = useState([]);
+  const [categoryName, setCategoryName] = useState([]);
 
   const { getRootProps, getInputProps } = useDropzone({
     onDrop: (acceptedFiles) =>
@@ -69,8 +72,35 @@ const OpenTickets = () => {
     </div>
   );
 
+  const fetchSystems = async () => {
+    try {
+      const res = await axios.get("http://localhost:5000/system_registration");
+      setSystemNames(res.data);
+    } catch (error) {
+      console.error("Error fetching systems:", error);
+    }
+  };
+
+  useEffect(() => {
+    fetchSystems();
+  }, []);
+
+  const fetchCategory = async () => {
+    try {
+      const res = await axios.get("http://localhost:5000/ticket_category");
+      setCategoryName(res.data);
+    } catch (error) {
+      console.error("Error fetching systems:", error);
+    }
+  };
+
+  useEffect(() => {
+    fetchCategory();
+  }, []);
+
   return (
     <div className="flex">
+      <title>Create Ticket</title>
       <SideBar open={isSidebarOpen} setOpen={setIsSidebarOpen} />
       <div
         className={`flex-1 flex flex-col h-screen overflow-y-auto transition-all duration-300 ${
@@ -108,8 +138,11 @@ const OpenTickets = () => {
                       <option value="" disabled hidden>
                         Select System
                       </option>
-                      <option value="System1">System 1</option>
-                      <option value="System2">System 2</option>
+                      {systemNames.map((sys, index) => (
+                        <option key={index} value={sys.SystemName}>
+                          {sys.SystemName}
+                        </option>
+                      ))}
                     </Field>
                   </div>
 
@@ -125,9 +158,11 @@ const OpenTickets = () => {
                       <option value="" disabled hidden>
                         Select Ticket Category
                       </option>
-                      <option value="suggestions">Suggestions</option>
-                      <option value="complaint">Complaint</option>
-                      <option value="bugReport">Bug Report</option>
+                      {categoryName.map((sys, index) => (
+                        <option key={index} value={sys.CategoryName}>
+                          {sys.CategoryName}
+                        </option>
+                      ))}
                     </Field>
                   </div>
 
