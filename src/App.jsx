@@ -20,7 +20,8 @@ import Tickets from './frontend/admin_panel/tickets';
 import OpenTickets from './frontend/users_panel/openTickets';
 import SystemRegistration from './frontend/admin_panel/SystemRegistration';
 import TicketCategory from './frontend/admin_panel/TicketCategory';
-import UserProfile from './frontend/users_panel/UserProfile'; 
+import UserProfile from './frontend/users_panel/UserProfile';
+import TicketViewPage from './frontend/admin_panel/TicketViewPage' 
 
 // Create Auth Context - loggedInUser and setLoggedInUser
 const AuthContext = createContext(null);
@@ -177,6 +178,8 @@ const AppRoutes = ({ isLoggedIn, setIsLoggedIn, userRole, setUserRole, loggedInU
                         </ProtectedRoute>
                     }
                 />
+
+                <Route path='/ticket_view_page/:id' element={[<TicketViewPage />]}/>
 
             </Routes>
             <ToastContainer
