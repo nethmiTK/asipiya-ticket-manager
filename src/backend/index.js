@@ -87,6 +87,72 @@ app.post('/login', (req, res) => {
     });
 });
 
+
+
+// Get admin  profile endpoint 
+app.get('/api/user/profile/:id', (req, res) => {
+    const userId = req.params.id;
+    // Select all fields that the frontend profile form expects
+    const query = 'SELECT UserID, FullName, Email, Phone, Role FROM appuser WHERE UserID = ?';
+
+    db.query(query, [userId], (err, results) => {
+        if (err) {
+            console.error('Error fetching user profile:', err);
+            res.status(500).json({ message: 'Server error' });
+        } else if (results.length === 0) {
+            res.status(404).json({ message: 'User not found' });
+        } else {
+            res.status(200).json(results[0]);
+        }
+    });
+});
+
+// Get admin profile update  endpoint 
+app.put('/api/user/profile/:id', (req, res) => {
+    const userId = req.params.id;
+    const { FullName, Email, Phone, CurrentPassword, NewPassword } = req.body;
+
+    const verifyQuery = 'SELECT Password FROM appuser WHERE UserID = ?';
+
+    db.query(verifyQuery, [userId], (err, results) => {
+        if (err) {
+            console.error('Error verifying user for profile update:', err);
+            return res.status(500).json({ message: 'Server error' });
+        }
+
+        if (results.length === 0) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        const currentUser = results[0];
+
+        let updateQuery;
+        let queryParams;
+
+        if (CurrentPassword && NewPassword) {
+            if (CurrentPassword !== currentUser.Password) {
+                return res.status(400).json({ message: 'Current password is incorrect' });
+            }
+            updateQuery = 'UPDATE appuser SET FullName = ?, Email = ?, Phone = ?, Password = ? WHERE UserID = ?';
+            queryParams = [FullName, Email, Phone, NewPassword, userId];
+        } else {
+            updateQuery = 'UPDATE appuser SET FullName = ?, Email = ?, Phone = ? WHERE UserID = ?';
+            queryParams = [FullName, Email, Phone, userId];
+        }
+
+        db.query(updateQuery, queryParams, (updateErr, updateResult) => {
+            if (updateErr) {
+                console.error('Error updating user profile:', updateErr);
+                res.status(500).json({ message: 'Error updating profile' });
+            } else if (updateResult.affectedRows === 0) {
+                res.status(404).json({ message: 'User not found or no changes made' });
+            } else {
+                res.status(200).json({ message: 'Profile updated successfully' });
+            }
+        });
+    });
+});
+ 
 /* ------------------------- Add Members ------------------------- */
 
 // Get all supervisors (excluding users)
@@ -312,70 +378,6 @@ app.get('/api/ticket_view/:id', (req, res) => {
 
 /*----------------------------------------------------------------------------------*/
 
-// Get admin profile endpoint 
-app.get('/api/admin/profile/:id', (req, res) => {
-    const userId = req.params.id;
-    const query = 'SELECT UserID, FullName, Email, Phone, Role FROM appuser WHERE UserID = ? AND Role = "admin"'; // Added Role to selection
-    
-    db.query(query, [userId], (err, results) => {
-        if (err) {
-            console.error('Error fetching admin profile:', err);
-            res.status(500).json({ message: 'Server error' });
-        } else if (results.length === 0) {
-            res.status(404).json({ message: 'Admin not found' });
-        } else {
-            res.status(200).json(results[0]);
-        }
-    });
-});
-
-// Update admin profile endpoint 
-app.put('/api/admin/profile/:id', (req, res) => {
-    const userId = req.params.id;
-    const { FullName, Email, Phone, CurrentPassword, NewPassword } = req.body;
-
-    const verifyQuery = 'SELECT Password FROM appuser WHERE UserID = ? AND Role = "admin"'; // Check for admin role
-    
-    db.query(verifyQuery, [userId], (err, results) => {
-        if (err) {
-            console.error('Error verifying admin:', err);
-            return res.status(500).json({ message: 'Server error' });
-        }
-        
-        if (results.length === 0) {
-            return res.status(404).json({ message: 'Admin not found' });
-        }
-
-        const admin = results[0];
-
-        if (CurrentPassword && NewPassword) {
-            if (CurrentPassword !== admin.Password) {
-                return res.status(400).json({ message: 'Current password is incorrect' });
-            }
-
-            const updateQuery = 'UPDATE appuser SET FullName = ?, Email = ?, Phone = ?, Password = ? WHERE UserID = ? AND Role = "admin"';
-            db.query(updateQuery, [FullName, Email, Phone, NewPassword, userId], (updateErr, updateResult) => {
-                if (updateErr) {
-                    console.error('Error updating admin profile:', updateErr);
-                    res.status(500).json({ message: 'Error updating profile' });
-                } else {
-                    res.status(200).json({ message: 'Profile updated successfully' });
-                }
-            });
-        } else {
-           // Update without password change
-            const updateQuery = 'UPDATE appuser SET FullName = ?, Email = ?, Phone = ? WHERE UserID = ? AND Role = "admin"';
-            db.query(updateQuery, [FullName, Email, Phone, userId], (updateErr, updateResult) => {
-                if (updateErr) {
-                    console.error('Error updating admin profile:', updateErr);
-                    res.status(500).json({ message: 'Error updating profile' });
-                } else {
-                    res.status(200).json({ message: 'Profile updated successfully' });
-                }
-            });
-        }
-    });
-});
 
 
 //  Get user profile endpoint (general user)
