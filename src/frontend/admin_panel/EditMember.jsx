@@ -1,22 +1,40 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { FaCircleArrowLeft } from "react-icons/fa6";
+import { toast } from "react-toastify";
 
 export default function EditMember() {
   const { id } = useParams();
   const navigate = useNavigate();
+
   const [formData, setFormData] = useState({
     name: "",
     email: "",
     role: "Developer",
   });
 
+  const [loading, setLoading] = useState(true);
+
   useEffect(() => {
     fetch(`http://localhost:5000/supervisor/${id}`)
-      .then((res) => res.json())
-      .then((data) => setFormData(data))
-      .catch((err) => console.error("Failed to fetch user:", err));
-  }, [id]);
+      .then((res) => {
+        if (!res.ok) throw new Error("Failed to fetch member");
+        return res.json();
+      })
+      .then((data) => {
+        setFormData({
+          name: data.FullName || "",
+          email: data.Email || "",
+          role: data.Role || "Developer",
+        });
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error("Failed to fetch user:", err);
+        alert("Error loading member data.");
+        navigate("/supervisor");
+      });
+  }, [id, navigate]);
 
   const handleChange = (e) =>
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -27,18 +45,32 @@ export default function EditMember() {
       const res = await fetch(`http://localhost:5000/supervisor/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          FullName: formData.name,
+          Email: formData.email,
+          Role: formData.role,
+        }),
       });
-      if (res.ok) {
-        alert("Member updated successfully");
+
+       if (res.ok) {
+        toast.success("Member updated successfully!");
         navigate("/supervisor");
       } else {
-        alert("Failed to update member");
+        toast.error("Failed to update member");
       }
     } catch (err) {
-      console.error("Error updating member:", err);
+      toast.error("Server error. Please try again.");
+      console.error("Update error:", err);
     }
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex justify-center items-center bg-gray-50 text-xl text-gray-600">
+        Loading member data...
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex justify-center items-center bg-gradient-to-br from-yellow-50 to-white px-4">
