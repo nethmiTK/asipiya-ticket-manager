@@ -169,6 +169,37 @@ app.get('/api/tickets', (req, res) => {
   });
 });
 
+//Add systems
+app.post('/system_registration', (req, res) => {
+  const { systemName, description } = req.body;
+
+  if (!systemName || !description) {
+    return res.status(400).json({ error: 'All fields are required.' });
+  }
+
+  const sql = 'INSERT INTO asipiyasystem (SystemName, Description) VALUES (?, ?)';
+  db.query(sql, [systemName, description], (err) => {
+    if (err) {
+      console.error("Database error:", err);
+      return res.status(500).json({ message: "Database error" });
+    }
+    res.status(200).json({ message: 'System registered successfully' });
+  });
+});
+
+//View systems
+app.get('/system_registration', (req, res) => {
+  const sql = 'SELECT * FROM asipiyasystem';
+  db.query(sql, (err, results) => {
+    if (err) {
+      console.error('Error fetching systems:', err);
+      return res.status(500).json({ message: 'Error fetching systems' });
+    }
+    res.status(200).json(results);
+  });
+});
+
+
 /*----------------------------------------------------------------------------------*/
 
 // Get admin profile endpoint
