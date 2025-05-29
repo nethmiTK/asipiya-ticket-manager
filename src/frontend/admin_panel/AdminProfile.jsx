@@ -194,27 +194,7 @@ const AdminProfile = () => {
 
     <div className="flex-1 p-6 md:p-12">
       <div className="max-w-5xl mx-auto bg-white rounded-2xl shadow-xl p-8">
-        {/* Profile Header */}
-        <div className="flex flex-col md:flex-row items-center gap-6 border-b pb-6 mb-8">
-          <div className="w-28 h-28 bg-gray-200 rounded-full flex items-center justify-center text-gray-500 text-5xl overflow-hidden shadow">
-            <AiOutlineUser />
-          </div>
-
-          <div className="text-center md:text-left">
-            <h2 className="text-3xl font-bold text-gray-900">
-              {profileData.FullName || 'User Profile'}
-            </h2>
-            <p className="text-gray-600 mt-1">
-              {profileData.Email} — <span className="font-medium text-gray-800">{profileData.Role || 'User'}</span>
-            </p>
-            <div className="mt-2 flex items-center gap-2 text-blue-600 text-sm cursor-pointer hover:underline">
-              <img src="https://via.placeholder.com/20" alt="Upload Icon" className="w-4 h-4" />
-              <button onClick={() => toast.info("Image upload functionality is not implemented yet!")}>
-                Upload or drag and drop an avatar
-              </button>
-            </div>
-          </div>
-        </div>
+      
 
         {/* Form */}
         <h3 className="text-2xl font-semibold text-gray-800 mb-6">Personal Information</h3>
