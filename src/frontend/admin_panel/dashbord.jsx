@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { FaTicketAlt, FaExclamationCircle, FaCalendarDay, FaTasks, FaHome } from "react-icons/fa";
 import { Link, useNavigate } from "react-router-dom";
 import { BsChevronLeft } from "react-icons/bs";
@@ -8,6 +8,7 @@ import { VscNotebook } from "react-icons/vsc";
 import { CiLogout } from "react-icons/ci";
 import { GrSystem } from "react-icons/gr";
 import AdminSideBar from "../../user_components/SideBar/AdminSideBar";
+import axios from "axios";
 
 const Menus = [
   { title: "Dashboard", icon: <FaHome />, path: "/admin-dashboard" },
@@ -139,9 +140,29 @@ const Sidebar = ({ open, setOpen }) => {
 
 const Dashboard = () => {
   const navigate = useNavigate();
+  const [counts, setCounts] = useState({
+    total: 0,
+    open: 0,
+    today: 0,
+    highPriority: 0,
+    closed: 0,
+  });
 
-  const handleNavigation = (path) => {
-    navigate(path);
+  useEffect(() => {
+    const fetchCounts = async () => {
+      try {
+        const response = await axios.get("http://localhost:5000/api/tickets/counts");
+        setCounts(response.data);
+      } catch (error) {
+        console.error("Error fetching ticket counts:", error);
+      }
+    };
+
+    fetchCounts();
+  }, []);
+
+  const handleNavigation = (type) => {
+    navigate(`/tickets?type=${type}`);
   };
 
   return (
@@ -157,27 +178,42 @@ const Dashboard = () => {
       </header>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
-        <div className="bg-blue-500 text-white p-4 rounded shadow text-center cursor-pointer hover:bg-blue-600" onClick={() => handleNavigation('/tickets?type=total')}>
+        <div
+          className="bg-blue-500 text-white p-4 rounded shadow text-center cursor-pointer hover:bg-blue-600"
+          onClick={() => handleNavigation("total")}
+        >
           <FaTicketAlt className="text-3xl mb-2 mx-auto" />
-          <h2 className="text-lg font-semibold">1248</h2>
+          <h2 className="text-lg font-semibold">{counts.total}</h2>
           <p>Total Tickets</p>
         </div>
-        <div className="bg-gray-800 text-white p-4 rounded shadow text-center cursor-pointer hover:bg-gray-700" onClick={() => handleNavigation('/tickets?type=open')}>
+        <div
+          className="bg-gray-800 text-white p-4 rounded shadow text-center cursor-pointer hover:bg-gray-700"
+          onClick={() => handleNavigation("open")}
+        >
           <FaTasks className="text-3xl mb-2 mx-auto" />
-          <h2 className="text-lg font-semibold">78</h2>
+          <h2 className="text-lg font-semibold">{counts.open}</h2>
           <p>Open Tickets</p>
         </div>
-        <div className="bg-gray-500 text-white p-4 rounded shadow text-center cursor-pointer hover:bg-gray-600" onClick={() => handleNavigation('/tickets?type=today')}>
+        <div
+          className="bg-gray-500 text-white p-4 rounded shadow text-center cursor-pointer hover:bg-gray-600"
+          onClick={() => handleNavigation("today")}
+        >
           <FaCalendarDay className="text-3xl mb-2 mx-auto" />
-          <h2 className="text-lg font-semibold">125</h2>
+          <h2 className="text-lg font-semibold">{counts.today}</h2>
           <p>Tickets Today</p>
         </div>
-        <div className="bg-red-500 text-white p-4 rounded shadow text-center cursor-pointer hover:bg-red-600" onClick={() => handleNavigation('/tickets?type=high-priority')}>
+        <div
+          className="bg-red-500 text-white p-4 rounded shadow text-center cursor-pointer hover:bg-red-600"
+          onClick={() => handleNavigation("high-priority")}
+        >
           <FaExclamationCircle className="text-3xl mb-2 mx-auto" />
-          <h2 className="text-lg font-semibold">76</h2>
+          <h2 className="text-lg font-semibold">{counts.highPriority}</h2>
           <p>High Priority</p>
         </div>
-        <div className="bg-green-600 text-white p-4 rounded shadow text-center cursor-pointer hover:bg-green-700" onClick={() => handleNavigation('/tickets?type=new')}>
+        <div
+          className="bg-green-600 text-white p-4 rounded shadow text-center cursor-pointer hover:bg-green-700"
+          onClick={() => handleNavigation("new")}
+        >
           <FaTicketAlt className="text-3xl mb-2 mx-auto" />
           <h2 className="text-lg font-semibold">+</h2>
           <p>Issue Ticket</p>

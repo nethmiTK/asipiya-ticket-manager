@@ -468,6 +468,69 @@ app.get("/ticket_category", (req, res) => {
   });
 });
 
+// API endpoint to fetch ticket counts
+app.get('/api/tickets/counts', (req, res) => {
+    const queries = {
+        total: 'SELECT COUNT(*) AS count FROM ticket',
+        open: "SELECT COUNT(*) AS count FROM ticket WHERE Status = 'open'",
+        today: "SELECT COUNT(*) AS count FROM ticket WHERE DATE(DateTime) = CURDATE()",
+        highPriority: "SELECT COUNT(*) AS count FROM ticket WHERE Priority = 'High'",
+        closed: "SELECT COUNT(*) AS count FROM ticket WHERE Status = 'close'"
+    };
+
+    const results = {};
+    let completed = 0;
+
+    Object.keys(queries).forEach((key) => {
+        db.query(queries[key], (err, result) => {
+            if (err) {
+                console.error(`Error fetching ${key} count:`, err);
+                res.status(500).json({ error: 'Failed to fetch ticket counts' });
+                return;
+            }
+
+            results[key] = result[0].count;
+            completed++;
+
+            if (completed === Object.keys(queries).length) {
+                res.json(results);
+            }
+        });
+    });
+});
+
+// API endpoint to fetch filtered tickets
+app.get('/api/tickets/filter', (req, res) => {
+    const { type } = req.query;
+
+    let query;
+    switch (type) {
+        case 'open':
+            query = "SELECT * FROM ticket WHERE Status = 'open'";
+            break;
+        case 'today':
+            query = "SELECT * FROM ticket WHERE DATE(DateTime) = CURDATE()";
+            break;
+        case 'high-priority':
+            query = "SELECT * FROM ticket WHERE Priority = 'High'";
+            break;
+        case 'closed':
+            query = "SELECT * FROM ticket WHERE Status = 'close'";
+            break;
+        default:
+            query = 'SELECT * FROM ticket';
+    }
+
+    db.query(query, (err, results) => {
+        if (err) {
+            console.error('Error fetching filtered tickets:', err);
+            res.status(500).json({ error: 'Failed to fetch tickets' });
+            return;
+        }
+        res.json(results);
+    });
+});
+
 app.listen(5000, () => {
     console.log('Server is running on port 5000');
 });
