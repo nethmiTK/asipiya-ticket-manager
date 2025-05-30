@@ -1,18 +1,22 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import AdminSideBar from "../../user_components/SideBar/AdminSideBar";
 
 const Tickets = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [searchParams] = useSearchParams();
+  const type = searchParams.get("type");
   const navigate = useNavigate();
 
   useEffect(() => {
     const fetchTickets = async () => {
       try {
-        const response = await axios.get("http://localhost:5000/api/tickets");
+        const response = await axios.get(
+          `http://localhost:5000/api/tickets/filter?type=${type}`
+        );
         setTickets(response.data);
         setLoading(false);
       } catch (error) {
@@ -22,7 +26,7 @@ const Tickets = () => {
     };
 
     fetchTickets();
-  }, []);
+  }, [type]);
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -73,7 +77,9 @@ const Tickets = () => {
         }`}
       >
         <header className="mb-6">
-          <h1 className="text-2xl font-bold mb-4">Tickets</h1>
+          <h1 className="text-2xl font-bold mb-4">
+            {type.replace("-", " ").toUpperCase()} Tickets
+          </h1>
         </header>
 
         <table className="min-w-full bg-white border border-gray-300">
