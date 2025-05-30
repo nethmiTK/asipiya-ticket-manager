@@ -531,6 +531,47 @@ app.get('/api/tickets/filter', (req, res) => {
     });
 });
 
+// API endpoint to fetch ticket status distribution
+app.get('/api/tickets/status-distribution', (req, res) => {
+    const query = `
+        SELECT 
+            SUM(CASE WHEN Priority = 'High' THEN 1 ELSE 0 END) AS high,
+            SUM(CASE WHEN Priority = 'Medium' THEN 1 ELSE 0 END) AS medium,
+            SUM(CASE WHEN Priority = 'Low' THEN 1 ELSE 0 END) AS low
+        FROM ticket;
+    `;
+
+    db.query(query, (err, results) => {
+        if (err) {
+            console.error('Error fetching ticket status distribution:', err);
+            res.status(500).json({ error: 'Failed to fetch ticket status distribution' });
+            return;
+        }
+
+        res.json(results[0]);
+    });
+});
+
+// API endpoint to fetch the last five activities
+app.get('/api/tickets/recent-activities', (req, res) => {
+    const query = `
+        SELECT TicketID, Description, Status, Priority, DateTime
+        FROM ticket
+        ORDER BY DateTime DESC
+        LIMIT 5;
+    `;
+
+    db.query(query, (err, results) => {
+        if (err) {
+            console.error('Error fetching recent activities:', err);
+            res.status(500).json({ error: 'Failed to fetch recent activities' });
+            return;
+        }
+
+        res.json(results);
+    });
+});
+
 app.listen(5000, () => {
     console.log('Server is running on port 5000');
 });

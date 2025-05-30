@@ -9,6 +9,11 @@ import { CiLogout } from "react-icons/ci";
 import { GrSystem } from "react-icons/gr";
 import AdminSideBar from "../../user_components/SideBar/AdminSideBar";
 import axios from "axios";
+import { Pie } from "react-chartjs-2";
+import { Chart as ChartJS, ArcElement, Tooltip, Legend } from "chart.js";
+import RecentlyActivity from "./RecentlyActivity"; // Import the RecentlyActivity component
+
+ChartJS.register(ArcElement, Tooltip, Legend);
 
 const Menus = [
   { title: "Dashboard", icon: <FaHome />, path: "/admin-dashboard" },
@@ -138,6 +143,58 @@ const Sidebar = ({ open, setOpen }) => {
   );
 };
 
+const TicketByStatusChart = () => {
+  const [chartData, setChartData] = useState(null);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const response = await axios.get("http://localhost:5000/api/tickets/status-distribution");
+        const data = response.data;
+
+        const chartData = {
+          labels: ["High", "Medium", "Low"],
+          datasets: [
+            {
+              data: [data.high, data.medium, data.low],
+              backgroundColor: ["#FF6384", "#FFCE56", "#36A2EB"],
+              hoverBackgroundColor: ["#FF6384", "#FFCE56", "#36A2EB"],
+            },
+          ],
+        };
+
+        setChartData(chartData);
+      } catch (error) {
+        console.error("Error fetching ticket status distribution:", error);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  if (!chartData) {
+    return <p>Loading chart...</p>;
+  }
+
+  return (
+    <div className="bg-white p-4 rounded shadow">
+      <h2 className="text-lg font-semibold mb-4">Ticket by Status</h2>
+      <Pie data={chartData} />
+      <div className="mt-4">
+        {chartData.labels.map((label, index) => (
+          <p key={index} className="text-sm">
+            <span
+              className="inline-block w-3 h-3 mr-2 rounded"
+              style={{ backgroundColor: chartData.datasets[0].backgroundColor[index] }}
+            ></span>
+            {label}: {chartData.datasets[0].data[index]}%
+          </p>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 const Dashboard = () => {
   const navigate = useNavigate();
   const [counts, setCounts] = useState({
@@ -238,10 +295,7 @@ const Dashboard = () => {
           </table>
         </div>
 
-        <div className="bg-white p-4 rounded shadow">
-          <h2 className="text-lg font-semibold mb-4">Ticket by Status</h2>
-          <div className="text-center text-gray-500">[Pie Chart Placeholder]</div>
-        </div>
+        <TicketByStatusChart />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
