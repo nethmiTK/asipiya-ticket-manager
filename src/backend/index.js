@@ -376,8 +376,8 @@ app.get('/ticket_category', (req, res) => {
 //View ticket details
 app.get('/api/ticket_view/:id', (req, res) => {
   const ticketId = req.params.id;
-  const query = `SELECT t.TicketID, u.FullName AS UserName, u.Email AS UserEmail, s.SystemName, c.CategoryName,t.Description,t.DateTime,
-  t.Status,t.Priority,t.FirstRespondedTime,t.LastRespondedTime,t.TicketDuration,t.UserNote
+  const query = `SELECT t.TicketID, u.FullName AS UserName, s.SystemName, c.CategoryName, t.Description, t.DateTime,
+  t.Status, t.Priority, t.FirstRespondedTime, t.LastRespondedTime, t.TicketDuration, t.UserNote
   FROM 
     ticket t
   JOIN 
@@ -593,23 +593,35 @@ app.get('/api/tickets/counts', (req, res) => {
 app.get('/api/tickets/filter', (req, res) => {
     const { type } = req.query;
 
-    let query;
+    let baseQuery = `
+        SELECT 
+            t.TicketID,
+            u.FullName AS UserName,
+            t.Description,
+            t.Status,
+            t.Priority,
+            t.UserNote
+        FROM ticket t
+        LEFT JOIN appuser u ON t.UserId = u.UserID
+    `;
+
+    let whereClause = '';
     switch (type) {
         case 'open':
-            query = "SELECT * FROM ticket WHERE Status = 'open'";
+            whereClause = "WHERE t.Status = 'Open'";
             break;
         case 'today':
-            query = "SELECT * FROM ticket WHERE DATE(DateTime) = CURDATE()";
+            whereClause = "WHERE DATE(t.DateTime) = CURDATE()";
             break;
         case 'high-priority':
-            query = "SELECT * FROM ticket WHERE Priority = 'High'";
+            whereClause = "WHERE t.Priority = 'High'";
             break;
         case 'closed':
-            query = "SELECT * FROM ticket WHERE Status = 'close'";
+            whereClause = "WHERE t.Status = 'Closed'";
             break;
-        default:
-            query = 'SELECT * FROM ticket';
     }
+
+    const query = baseQuery + (whereClause ? ' ' + whereClause : '');
 
     db.query(query, (err, results) => {
         if (err) {
@@ -658,6 +670,34 @@ app.get('/api/tickets/recent-activities', (req, res) => {
             return;
         }
 
+        res.json(results);
+    });
+});
+
+// API endpoint to fetch ticket  
+app.get('/api/tickets/ ', (req, res) => {
+    const query = `
+        SELECT 
+            t.TicketID, 
+            u.FullName AS UserName, 
+             t.Description, 
+            t.Status, 
+            t.Priority, 
+            t.UserNote,
+         FROM 
+            ticket t
+        LEFT JOIN 
+            appuser u 
+        ON 
+            t.UserId = u.UserID;
+    `;
+
+    db.query(query, (err, results) => {
+        if (err) {
+            console.error('Error fetching tickets  s:', err);
+            res.status(500).json({ error: 'Failed to fetch tickets ' });
+            return;
+        }
         res.json(results);
     });
 });
