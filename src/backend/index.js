@@ -5,8 +5,12 @@ import express from 'express';
 import nodemailer from 'nodemailer';
 import bodyParser from 'body-parser';
 import cors from 'cors';
+import multer from 'multer';
+import path from 'path'; 
+import { fileURLToPath } from 'url'; 
+import fs from 'fs'; 
 
-// Create a connection to the database
+// --- Database Connection ---
 const db = mysql.createConnection({
     host: 'localhost',
     user: 'root',
@@ -26,6 +30,30 @@ db.connect((err) => {
 const app = express();
 app.use(bodyParser.json());
 app.use(cors());
+
+// Get __dirname equivalent for ES Modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// --- Multer Configuration for Profile Images ---
+const profileImageStorage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        const uploadDir = path.join(__dirname, 'uploads', 'profile_images');
+        // Create the directory if it doesn't exist
+        fs.mkdirSync(uploadDir, { recursive: true });
+        cb(null, uploadDir); 
+    },
+    filename: (req, file, cb) => {
+        const userId = req.params.id; 
+        const fileExtension = file.originalname.split('.').pop();
+        cb(null, `${userId}-${Date.now()}.${fileExtension}`); 
+    }
+});
+
+const upload = multer({ storage: profileImageStorage }); 
+
 
 // Register endpoint
 app.post('/register', (req, res) => {
@@ -60,25 +88,26 @@ app.get('/api/tickets', (req, res) => {
     });
 });
 
-// Login endpoint - MODIFIED to return the full user object
+// Login endpoint
 app.post('/login', (req, res) => {
     const { Email, Password } = req.body;
-    // Select all necessary fields for the user profile
-    const query = 'SELECT UserID, FullName, Email, Phone, Role FROM appuser WHERE Email = ? AND Password = ?';
+    const query = 'SELECT UserID, FullName, Email, Phone, Role, ProfileImagePath FROM appuser WHERE Email = ? AND Password = ?';
+
     db.query(query, [Email, Password], (err, results) => {
         if (err) {
             console.error('Error during login:', err);
             res.status(500).json({ message: 'Error during login' });
         } else if (results.length > 0) {
-            const user = results[0]; // This is the full user object from the database
+            const user = results[0];
             res.status(200).json({
                 message: 'Login successful',
-                user: { 
+                user: {
                     UserID: user.UserID,
                     FullName: user.FullName,
                     Email: user.Email,
                     Phone: user.Phone,
-                    Role: user.Role.toLowerCase() // Ensure role is lowercase for consistency
+                    Role: user.Role.toLowerCase(),
+                    ProfileImagePath: user.ProfileImagePath || null
                 }
             });
         } else {
@@ -87,13 +116,11 @@ app.post('/login', (req, res) => {
     });
 });
 
-
-
 // Get admin  profile endpoint 
 app.get('/api/user/profile/:id', (req, res) => {
     const userId = req.params.id;
     // Select all fields that the frontend profile form expects
-    const query = 'SELECT UserID, FullName, Email, Phone, Role FROM appuser WHERE UserID = ?';
+     const query = 'SELECT UserID, FullName, Email, Phone, Role, ProfileImagePath FROM appuser WHERE UserID = ?';
 
     db.query(query, [userId], (err, results) => {
         if (err) {
@@ -380,11 +407,10 @@ app.get('/api/ticket_view/:id', (req, res) => {
 
 
 
-//  Get user profile endpoint (general user)
+// Get user profile endpoint (general user) 
 app.get('/api/user/profile/:id', (req, res) => {
     const userId = req.params.id;
-    // Select all fields that the frontend profile form expects
-    const query = 'SELECT UserID, FullName, Email, Phone, Role FROM appuser WHERE UserID = ?';
+    const query = 'SELECT UserID, FullName, Email, Phone, Role, ProfileImagePath FROM appuser WHERE UserID = ?'; 
 
     db.query(query, [userId], (err, results) => {
         if (err) {
@@ -410,13 +436,11 @@ app.put('/api/user/profile/:id', (req, res) => {
             console.error('Error verifying user for profile update:', err);
             return res.status(500).json({ message: 'Server error' });
         }
-
         if (results.length === 0) {
             return res.status(404).json({ message: 'User not found' });
         }
 
         const currentUser = results[0];
-
         let updateQuery;
         let queryParams;
 
@@ -444,6 +468,72 @@ app.put('/api/user/profile/:id', (req, res) => {
     });
 });
 
+// PROFILE IMAGE UPLOAD ENDPOINT
+app.post('/api/user/profile/upload/:id', upload.single('profileImage'), (req, res) => {
+    const userId = req.params.id;
+    
+    if (!req.file) {
+        return res.status(400).json({ message: 'No file uploaded.' });
+    }
+
+    // Path relative to the 'uploads' directory, to be stored in DB
+    const imagePath = `profile_images/${req.file.filename}`; 
+
+    const query = 'UPDATE appuser SET ProfileImagePath = ? WHERE UserID = ?';
+    db.query(query, [imagePath, userId], (err, result) => {
+        if (err) {
+            console.error('Error updating profile image path in DB:', err);
+            fs.unlink(req.file.path, (unlinkErr) => {
+                if (unlinkErr) console.error('Error deleting uploaded file after DB failure:', unlinkErr);
+            });
+            return res.status(500).json({ message: 'Error saving image path to database.' });
+        }
+        res.status(200).json({ 
+            message: 'Profile image uploaded successfully', 
+            imagePath: imagePath 
+        });
+    });
+});
+
+// DELETE PROFILE IMAGE ENDPOINT
+app.delete('/api/user/profile/image/:id', (req, res) => {
+    const userId = req.params.id;
+
+    const getImagePathQuery = 'SELECT ProfileImagePath FROM appuser WHERE UserID = ?';
+    db.query(getImagePathQuery, [userId], (err, results) => {
+        if (err) {
+            console.error('Error fetching image path for deletion:', err);
+            return res.status(500).json({ message: 'Server error retrieving image path.' });
+        }
+
+        if (results.length === 0 || !results[0].ProfileImagePath) {
+            return res.status(404).json({ message: 'User or existing profile image not found.' });
+        }
+
+        const oldImagePath = results[0].ProfileImagePath;
+        const fullPathToDelete = path.join(__dirname, 'uploads', oldImagePath); 
+
+        // Update DB first to clear the path
+        const updateDbQuery = 'UPDATE appuser SET ProfileImagePath = NULL WHERE UserID = ?';
+        db.query(updateDbQuery, [userId], (dbErr, dbResult) => {
+            if (dbErr) {
+                console.error('Error clearing profile image path in DB:', dbErr);
+                return res.status(500).json({ message: 'Error clearing image path in database.' });
+            }
+
+            // Attempt to delete the file from the file system
+            fs.unlink(fullPathToDelete, (unlinkErr) => {
+                if (unlinkErr) {
+                    console.warn(`Warning: Could not delete old file at ${fullPathToDelete}:`, unlinkErr);
+                    return res.status(200).json({ message: 'Profile image removed from DB, but file could not be deleted from server.', imagePath: null });
+                }
+                res.status(200).json({ message: 'Profile image removed successfully!', imagePath: null });
+            });
+        });
+    });
+});
+
+/*----------------------------------------------------------------------------------*/
 
 //Create ticket 
 app.get("/system_registration", (req, res) => {
@@ -572,6 +662,7 @@ app.get('/api/tickets/recent-activities', (req, res) => {
     });
 });
 
+// Start the server
 app.listen(5000, () => {
     console.log('Server is running on port 5000');
 });

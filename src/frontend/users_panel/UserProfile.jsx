@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { toast } from 'react-toastify';
 import { useAuth } from '../../App.jsx'; 
-import { AiOutlineUser } from 'react-icons/ai';
+import { AiOutlineUser } from 'react-icons/ai'; // For the default user icon
+import { MdClose } from 'react-icons/md'; // For the remove image icon
 
 const UserProfile = () => {
     const { loggedInUser: user, setLoggedInUser } = useAuth();
@@ -11,12 +12,12 @@ const UserProfile = () => {
         FullName: '',
         Email: '',
         Phone: '',
-        Role: ''
+        Role: '',
+        ProfileImagePath: '' // This holds the path from the DB
     });
     const [formData, setFormData] = useState({
         FullName: '',
         Email: '',
-        S_Phone: '', 
         Phone: '',
         CurrentPassword: '',
         NewPassword: '',
@@ -24,17 +25,22 @@ const UserProfile = () => {
     });
     const [loading, setLoading] = useState(true);
     const [errors, setErrors] = useState({}); 
+    const [selectedFile, setSelectedFile] = useState(null); // State for the file chosen via input
+    const [imagePreview, setImagePreview] = useState(null); // State for the URL to display (either local or server)
 
+    const fileInputRef = useRef(null); // Ref for the hidden file input
+
+    // Effect to fetch user profile data on component mount or user change
     useEffect(() => {
-        // Fetch user data 
         const fetchUserProfile = async () => {
-            if (user && user.UserID) { // Ensure user and UserID exist from context
+            if (user && user.UserID) {
                 try {
                     setLoading(true);
-                    // This API call now targets the new general user profile endpoint in index.js
                     const response = await axios.get(`http://localhost:5000/api/user/profile/${user.UserID}`);
                     const fetchedData = response.data;
-                    setProfileData(fetchedData);
+
+                    setProfileData(fetchedData); // Set the profile data including the image path
+
                     setFormData({
                         FullName: fetchedData.FullName,
                         Email: fetchedData.Email,
@@ -43,6 +49,13 @@ const UserProfile = () => {
                         NewPassword: '',
                         ConfirmNewPassword: ''
                     });
+
+                    // Set image preview if an image path exists from the backend
+                    if (fetchedData.ProfileImagePath) {
+                        setImagePreview(`http://localhost:5000/uploads/${fetchedData.ProfileImagePath}`); // Construct full URL
+                    } else {
+                        setImagePreview(null); // No image, clear preview
+                    }
                     setLoading(false);
                 } catch (error) {
                     console.error('Error fetching user profile:', error);
@@ -55,14 +68,16 @@ const UserProfile = () => {
             }
         };
         fetchUserProfile();
-    }, [user]); 
+    }, [user]); // Re-run if `user` object changes
 
+    // Handles changes in form input fields
     const handleChange = (e) => {
         const { name, value } = e.target;
         setFormData({ ...formData, [name]: value });
         setErrors(prevErrors => ({ ...prevErrors, [name]: '' }));
     };
 
+    // Validates form fields before submission
     const validateForm = () => {
         const newErrors = {};
         const { FullName, Email, Phone, CurrentPassword, NewPassword, ConfirmNewPassword } = formData;
@@ -111,6 +126,129 @@ const UserProfile = () => {
         return Object.keys(newErrors).length === 0;
     };
 
+    // Handles selection of a file for upload
+    const handleFileChange = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            setSelectedFile(file);
+            setImagePreview(URL.createObjectURL(file)); // Create a local URL for instant preview
+            toast.info("Image selected. Click 'Upload Image' to save it.");
+        } else {
+            setSelectedFile(null);
+            // Revert to current profile image if user cancels file selection
+            setImagePreview(profileData.ProfileImagePath ? `http://localhost:5000/uploads/${profileData.ProfileImagePath}` : null);
+        }
+    };
+
+    // Handles the actual image upload to the server
+    const handleImageUpload = async () => {
+        if (!selectedFile) {
+            toast.error("Please select an image first.");
+            return;
+        }
+
+        if (!user || !user.UserID) {
+            toast.error("User not logged in or UserID not available.");
+            return;
+        }
+
+        setLoading(true);
+        const formDataPayload = new FormData();
+        formDataPayload.append('profileImage', selectedFile); // 'profileImage' must match Multer's field name in backend
+
+        try {
+            const response = await axios.post(`http://localhost:5000/api/user/profile/upload/${user.UserID}`, formDataPayload, {
+                headers: {
+                    'Content-Type': 'multipart/form-data', // Important for file uploads
+                },
+            });
+            toast.success(response.data.message || "Profile image uploaded successfully!");
+            
+            // Update profileData state with the new image path returned from backend
+            setProfileData(prevData => ({
+                ...prevData,
+                ProfileImagePath: response.data.imagePath 
+            }));
+            
+            // Update loggedInUser context and localStorage
+            if (setLoggedInUser) {
+                const updatedUser = {
+                    ...user, // Keep existing user data
+                    ProfileImagePath: response.data.imagePath, // Update only the image path
+                };
+                setLoggedInUser(updatedUser);
+                localStorage.setItem('user', JSON.stringify(updatedUser));
+            }
+
+            // Clear selected file state after successful upload
+            setSelectedFile(null);
+            // Image preview is already updated by setProfileData / imagePreview
+        } catch (error) {
+            console.error('Error uploading image:', error);
+            if (error.response && error.response.data && error.response.data.message) {
+                toast.error(`Image upload failed: ${error.response.data.message}`);
+            } else {
+                toast.error('Image upload failed. Please try again.');
+            }
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Handles removal of the profile image
+    const handleImageRemove = async () => {
+        if (!user || !user.UserID) {
+            toast.error("User not logged in or UserID not available.");
+            return;
+        }
+
+        if (!profileData.ProfileImagePath && !selectedFile) {
+            toast.info("No profile image to remove.");
+            return;
+        }
+
+        // If there's a selected file that hasn't been uploaded yet, just clear it locally
+        if (selectedFile) {
+            setSelectedFile(null);
+            setImagePreview(null); // Clear local preview
+            setProfileData(prevData => ({ ...prevData, ProfileImagePath: null })); // Clear DB path
+            toast.info("Selected image cleared locally.");
+            return;
+        }
+
+        // If there's an image from the server, send delete request
+        setLoading(true);
+        try {
+            const response = await axios.delete(`http://localhost:5000/api/user/profile/image/${user.UserID}`);
+            toast.success(response.data.message || "Profile image removed successfully!");
+            
+            // Clear image states and profileData
+            setSelectedFile(null);
+            setImagePreview(null);
+            setProfileData(prevData => ({ ...prevData, ProfileImagePath: null }));
+
+            // Update loggedInUser context and localStorage
+            if (setLoggedInUser) {
+                const updatedUser = {
+                    ...user, // Keep existing user data
+                    ProfileImagePath: null, // Clear the image path
+                };
+                setLoggedInUser(updatedUser);
+                localStorage.setItem('user', JSON.stringify(updatedUser));
+            }
+        } catch (error) {
+            console.error('Error removing image:', error);
+            if (error.response && error.response.data && error.response.data.message) {
+                toast.error(`Image removal failed: ${error.response.data.message}`);
+            } else {
+                toast.error('Image removal failed. Please try again.');
+            }
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Handles saving of general profile details
     const handleSave = async (e) => {
         e.preventDefault();
 
@@ -131,16 +269,16 @@ const UserProfile = () => {
                 updatePayload.NewPassword = formData.NewPassword;
             }
 
-            // This API call now targets the new general user profile endpoint in index.js
             const response = await axios.put(`http://localhost:5000/api/user/profile/${user.UserID}`, updatePayload);
             toast.success(response.data.message || 'Profile updated successfully!');
 
             if (setLoggedInUser) {
                 const updatedUser = {
-                    ...user,
+                    ...user, // Retain existing user data, including ProfileImagePath
                     FullName: formData.FullName,
                     Email: formData.Email,
                     Phone: formData.Phone,
+                    // ProfileImagePath is already present in 'user' from context, or will be updated by handleImageUpload
                 };
                 setLoggedInUser(updatedUser); // Update context
                 localStorage.setItem('user', JSON.stringify(updatedUser)); // Update localStorage
@@ -172,6 +310,7 @@ const UserProfile = () => {
         }
     };
 
+    // --- Loading and Error States ---
     if (loading) {
         return (
             <div className="flex justify-center items-center h-screen">
@@ -188,14 +327,42 @@ const UserProfile = () => {
         );
     }
 
+    // --- Component Render ---
     return (
         <div className="profile-container p-8 md:p-12 min-h-screen bg-gray-100">
             <div className="max-w-4xl mx-auto bg-white rounded-xl shadow-lg p-8">
                 <div className="flex items-center mb-8 pb-4 border-b border-gray-200">
-                    {/* User Avatar Section (placeholder) */}
-                    <div className="w-24 h-24 bg-gray-200 rounded-full flex items-center justify-center text-gray-500 text-6xl mr-6 overflow-hidden">
-                        <AiOutlineUser />
+                    {/* User Avatar Section */}
+                    <div 
+                        className="relative w-24 h-24 bg-gray-200 rounded-full flex items-center justify-center text-gray-500 text-6xl mr-6 overflow-hidden cursor-pointer"
+                        onClick={() => fileInputRef.current.click()} // Make the entire circle clickable
+                        title="Click to change profile image"
+                    >
+                        {/* Conditional rendering for profile image */}
+                        {imagePreview ? (
+                            <>
+                                <img
+                                    src={imagePreview}
+                                    alt="Profile"
+                                    className="w-full h-full object-cover"
+                                />
+                                {/* Remove Image Button (X icon) */}
+                                <button 
+                                    onClick={(e) => { 
+                                        e.stopPropagation(); // Prevent triggering file input click
+                                        handleImageRemove(); 
+                                    }}
+                                    className="absolute top-0 right-0 bg-red-500 text-white rounded-full p-1 text-xs hover:bg-red-600 focus:outline-none"
+                                    title="Remove profile image"
+                                >
+                                    <MdClose size={16} />
+                                </button>
+                            </>
+                        ) : (
+                            <AiOutlineUser /> // Default icon if no image
+                        )}
                     </div>
+                    
                     <div>
                         <h2 className="text-3xl font-extrabold text-gray-900">
                             {profileData.FullName || 'User Profile'}
@@ -203,16 +370,25 @@ const UserProfile = () => {
                         <p className="text-lg text-gray-600">
                             {profileData.Email} - <span className="font-semibold">{profileData.Role || 'User'}</span>
                         </p>
-                        <p className="text-sm text-blue-600 mt-2">
-                            Avatar from gravatar.com Or Upload your own...
-                        </p>
-                        <button
-                            onClick={() => toast.info("Image upload functionality is not implemented yet!")}
-                            className="text-gray-500 hover:text-gray-700 text-sm mt-1"
-                        >
-                            <img src="https://via.placeholder.com/20" alt="Camera Icon" className="inline-block mr-1" /> 
-                            Drop your files here or click in this area
-                        </button>
+                        
+                        {/* Hidden file input */}
+                        <input
+                            type="file"
+                            ref={fileInputRef} // Assign the ref
+                            onChange={handleFileChange}
+                            accept="image/*" // Only accept image files
+                            style={{ display: 'none' }} // Hide the input
+                        />
+
+                        {/* Upload Button - only show if a file is selected locally */}
+                        {selectedFile && (
+                            <button
+                                onClick={handleImageUpload}
+                                className="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg text-sm mt-2 transition duration-200"
+                            >
+                                Upload Image
+                            </button>
+                        )}
                     </div>
                 </div>
 
