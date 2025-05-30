@@ -9,6 +9,7 @@ import multer from 'multer';
 import path from 'path'; 
 import { fileURLToPath } from 'url'; 
 import fs from 'fs'; 
+import bcrypt from 'bcryptjs';
 
 // --- Database Connection ---
 const db = mysql.createConnection({
@@ -54,18 +55,33 @@ const profileImageStorage = multer.diskStorage({
 
 const upload = multer({ storage: profileImageStorage }); 
 
+//  Define salt rounds for bcrypt hashing.
+const saltRounds = 10;
 
-// Register endpoint
+// -------Register endpoint------- //
 app.post('/register', (req, res) => {
     const { FullName, Email, Password, Role, Phone } = req.body;
-    const query = 'INSERT INTO appuser (FullName, Email, Password, Role, Phone) VALUES (?, ?, ?, ?, ?)';
-    db.query(query, [FullName, Email, Password, Role, Phone], (err, result) => {
+
+    bcrypt.hash(Password, saltRounds, (err, hashedPassword) => {
         if (err) {
-            console.error('Error inserting user:', err);
-            res.status(500).send('Error registering user');
-        } else {
-            res.status(200).send('User registered successfully');
+            console.error('Error hashing password:', err);
+            return res.status(500).send('Error registering user: Password hashing failed');
         }
+
+        const query = 'INSERT INTO appuser (FullName, Email, Password, Role, Phone) VALUES (?, ?, ?, ?, ?)';
+        
+        db.query(query, [FullName, Email, hashedPassword, Role, Phone], (err, result) => {
+            if (err) {
+                console.error('Error inserting user:', err);
+              
+                if (err.code === 'ER_DUP_ENTRY') { 
+                    return res.status(409).send('User with this email already exists.');
+                }
+                res.status(500).send('Error registering user');
+            } else {
+                res.status(200).send('User registered successfully');
+            }
+        });
     });
 });
 // API endpoint to fetch tickets
@@ -91,28 +107,44 @@ app.get('/api/tickets', (req, res) => {
 // Login endpoint
 app.post('/login', (req, res) => {
     const { Email, Password } = req.body;
-    const query = 'SELECT UserID, FullName, Email, Phone, Role, ProfileImagePath FROM appuser WHERE Email = ? AND Password = ?';
+    const query = 'SELECT UserID, FullName, Email, Phone, Role, ProfileImagePath, Password AS HashedPassword FROM appuser WHERE Email = ?';
 
-    db.query(query, [Email, Password], (err, results) => {
+    db.query(query, [Email], (err, results) => {
         if (err) {
             console.error('Error during login:', err);
-            res.status(500).json({ message: 'Error during login' });
-        } else if (results.length > 0) {
-            const user = results[0];
-            res.status(200).json({
-                message: 'Login successful',
-                user: {
-                    UserID: user.UserID,
-                    FullName: user.FullName,
-                    Email: user.Email,
-                    Phone: user.Phone,
-                    Role: user.Role.toLowerCase(),
-                    ProfileImagePath: user.ProfileImagePath || null
-                }
-            });
-        } else {
-            res.status(401).json({ message: 'Invalid credentials' });
+            return res.status(500).json({ message: 'Error during login' });
         }
+
+        if (results.length === 0) {
+            return res.status(401).json({ message: 'Invalid credentials' });
+        }
+
+        const user = results[0]; 
+
+        bcrypt.compare(Password, user.HashedPassword, (compareErr, isMatch) => {
+            if (compareErr) {
+                console.error('Error comparing passwords:', compareErr);
+                return res.status(500).json({ message: 'Error during login' });
+            }
+
+            if (isMatch) {
+                // Passwords match! Login successful.
+                res.status(200).json({
+                    message: 'Login successful',
+                    user: {
+                        UserID: user.UserID,
+                        FullName: user.FullName,
+                        Email: user.Email,
+                        Phone: user.Phone,
+                        Role: user.Role.toLowerCase(),
+                        ProfileImagePath: user.ProfileImagePath || null
+                    }
+                });
+            } else {
+                // Passwords do not match
+                res.status(401).json({ message: 'Invalid credentials' });
+            }
+        });
     });
 });
 
@@ -405,8 +437,6 @@ app.get('/api/ticket_view/:id', (req, res) => {
 
 /*----------------------------------------------------------------------------------*/
 
-
-
 // Get user profile endpoint (general user) 
 app.get('/api/user/profile/:id', (req, res) => {
     const userId = req.params.id;
@@ -429,7 +459,8 @@ app.put('/api/user/profile/:id', (req, res) => {
     const userId = req.params.id;
     const { FullName, Email, Phone, CurrentPassword, NewPassword } = req.body;
 
-    const verifyQuery = 'SELECT Password FROM appuser WHERE UserID = ?';
+    // Select the hashed password from the DB for comparison
+    const verifyQuery = 'SELECT Password AS HashedPassword FROM appuser WHERE UserID = ?';
 
     db.query(verifyQuery, [userId], (err, results) => {
         if (err) {
@@ -440,35 +471,49 @@ app.put('/api/user/profile/:id', (req, res) => {
             return res.status(404).json({ message: 'User not found' });
         }
 
-        const currentUser = results[0];
-        let updateQuery;
-        let queryParams;
+        const currentUser = results[0]; 
 
-        if (CurrentPassword && NewPassword) {
-            if (CurrentPassword !== currentUser.Password) {
-                return res.status(400).json({ message: 'Current password is incorrect' });
-            }
-            updateQuery = 'UPDATE appuser SET FullName = ?, Email = ?, Phone = ?, Password = ? WHERE UserID = ?';
-            queryParams = [FullName, Email, Phone, NewPassword, userId];
-        } else {
-            updateQuery = 'UPDATE appuser SET FullName = ?, Email = ?, Phone = ? WHERE UserID = ?';
-            queryParams = [FullName, Email, Phone, userId];
-        }
+        const handleProfileUpdate = async () => {
+            let updateQuery;
+            let queryParams;
 
-          db.query(updateQuery, queryParams, (updateErr, updateResult) => {
-            if (updateErr) {
-                console.error('Error updating user profile:', updateErr);
-                res.status(500).json({ message: 'Error updating profile' });
-            } else { // No database error occurred
-                if (updateResult.affectedRows === 0) {
-                    
-                    res.status(200).json({ message: 'No changes were made to the profile.' }); 
-                } else {
-                    // Actual changes occurred
-                    res.status(200).json({ message: 'Profile updated successfully' });
+            if (CurrentPassword && NewPassword) {
+                try {
+                    // Compare provided current password with the stored hashed password
+                    const isCurrentPasswordMatch = await bcrypt.compare(CurrentPassword, currentUser.HashedPassword);
+                    if (!isCurrentPasswordMatch) {
+                        return res.status(400).json({ message: 'Current password is incorrect' });
+                    }
+
+                    // Hash the new password before updating
+                    const hashedNewPassword = await bcrypt.hash(NewPassword, saltRounds);
+                    updateQuery = 'UPDATE appuser SET FullName = ?, Email = ?, Phone = ?, Password = ? WHERE UserID = ?';
+                    queryParams = [FullName, Email, Phone, hashedNewPassword, userId];
+                } catch (hashErr) {
+                    console.error('Error hashing new password:', hashErr);
+                    return res.status(500).json({ message: 'Error processing new password' });
                 }
+            } else {
+                // User is NOT changing password, just updating other details
+                updateQuery = 'UPDATE appuser SET FullName = ?, Email = ?, Phone = ? WHERE UserID = ?';
+                queryParams = [FullName, Email, Phone, userId];
             }
-        });
+
+            db.query(updateQuery, queryParams, (updateErr, updateResult) => {
+                if (updateErr) {
+                    console.error('Error updating user profile:', updateErr);
+                    res.status(500).json({ message: 'Error updating profile' });
+                } else {
+                    if (updateResult.affectedRows === 0) {
+                        res.status(200).json({ message: 'No changes were made to the profile.' });
+                    } else {
+                        res.status(200).json({ message: 'Profile updated successfully' });
+                    }
+                }
+            });
+        };
+
+        handleProfileUpdate(); 
     });
 });
 
