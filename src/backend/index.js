@@ -216,52 +216,52 @@ app.put('/api/user/profile/:id', (req, res) => {
 
 // Get all supervisors (excluding users)
 app.get('/supervisor', (req, res) => {
-  const query = "SELECT UserID, FullName, Email, Role FROM appuser WHERE Role NOT IN ('user', 'User')";
-  db.query(query, (err, results) => {
-    if (err) {
-      console.error('Error fetching users:', err);
-      return res.status(500).json({ message: 'Server error' });
-    }
-    res.status(200).json(results);
-  });
+    const query = "SELECT UserID, FullName, Email, Role FROM appuser WHERE Role NOT IN ('user', 'User')";
+    db.query(query, (err, results) => {
+        if (err) {
+            console.error('Error fetching users:', err);
+            return res.status(500).json({ message: 'Server error' });
+        }
+        res.status(200).json(results);
+    });
 });
 
 // Get supervisor by ID
 app.get('/supervisor/:id', (req, res) => {
-  const query = "SELECT * FROM appuser WHERE UserID = ?";
-  db.query(query, [req.params.id], (err, results) => {
-    if (err) {
-      console.error('Error fetching user:', err);
-      return res.status(500).json({ message: 'Server error' });
-    }
-    res.status(200).json(results[0]);
-  });
+    const query = "SELECT * FROM appuser WHERE UserID = ?";
+    db.query(query, [req.params.id], (err, results) => {
+        if (err) {
+            console.error('Error fetching user:', err);
+            return res.status(500).json({ message: 'Server error' });
+        }
+        res.status(200).json(results[0]);
+    });
 });
 
 // Update supervisor by ID
 app.put('/supervisor/:id', (req, res) => {
-  const { FullName, Email, Role } = req.body;
-  const query = "UPDATE appuser SET FullName = ?, Email = ?, Role = ? WHERE UserID = ?";
-  db.query(query, [FullName, Email, Role, req.params.id], (err, result) => {
-    if (err) {
-      console.error('Error updating user:', err);
-      return res.status(500).json({ message: 'Server error' });
-    }
-    res.sendStatus(200);
-  });
+    const { FullName, Email, Role } = req.body;
+    const query = "UPDATE appuser SET FullName = ?, Email = ?, Role = ? WHERE UserID = ?";
+    db.query(query, [FullName, Email, Role, req.params.id], (err, result) => {
+        if (err) {
+            console.error('Error updating user:', err);
+            return res.status(500).json({ message: 'Server error' });
+        }
+        res.sendStatus(200);
+    });
 });
 
 
 // Delete supervisor by ID
 app.delete('/supervisor/:id', (req, res) => {
-  const query = "DELETE FROM appuser WHERE UserID = ?";
-  db.query(query, [req.params.id], (err, result) => {
-    if (err) {
-      console.error('Error deleting user:', err);
-      return res.status(500).json({ message: 'Server error' });
-    }
-    res.sendStatus(200);
-  });
+    const query = "DELETE FROM appuser WHERE UserID = ?";
+    db.query(query, [req.params.id], (err, result) => {
+        if (err) {
+            console.error('Error deleting user:', err);
+            return res.status(500).json({ message: 'Server error' });
+        }
+        res.sendStatus(200);
+    });
 });
 
 /*---------------------- Invite User via Email ----------------------*/
@@ -285,40 +285,75 @@ app.post('/api/invite', (req, res) => {
     if (!email || !role || !isValidEmail(email)) {
         return res.status(400).json({ message: 'Valid email and role are required' });
     }
-
     const checkQuery = 'SELECT * FROM appuser WHERE Email = ?';
-    db.query(checkQuery, [email], (err, results) => {
+    db.query(checkQuery, [email], async (err, results) => {
         if (err) return res.status(500).json({ message: 'Server error' });
-        if (results.length > 0) {
-            return res.status(400).json({ message: 'User with this email already exists' });
+
+        const mailOptions = {
+            from: `"Asipiya Soft Solution (PVT) LTD" <${process.env.EMAIL_USER}>`,
+            to: email,
+            subject: `You're invited to manage user complaints - Role: ${role}`,
+            html: `
+    <div style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: auto; background-color: #ffe6f0; border: 1px solid #ddd; border-radius: 10px; padding: 20px;">
+      
+      <!-- 1. Logo and Company Name Inline -->
+      <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 20px;">
+        <img src="https://miro.medium.com/v2/resize:fit:2400/1*-okfOPV73mecuWxCZz6uJA.jpeg" alt="Asipiya Logo" style="width: 50px; height: auto;">
+        <h2 style="margin: 0; color: #005baa;">Asipiya Soft Solution (PVT) LTD</h2>
+      </div>
+
+      <!-- 2. Personalized Welcome -->
+      <h3 style="text-align: center; color: #005baa;">Welcome Aboard!</h3>
+      <p>Hello <strong>${role}</strong>,</p>
+
+      <!-- 3. Description of Role & Responsibilities -->
+      <p>You have been invited to join our internal complaint management system to help <strong>supervise, manage, or resolve user complaints</strong> for Asipiya Soft Solution systems.</p>
+
+      <!-- 4. Role-specific Responsibilities -->
+      <ul>
+        <li>🛠 Resolve reported issues from users</li>
+        <li>📊 View and track ticket status in real time</li>
+        <li>💬 Collaborate with your team to solve problems efficiently</li>
+      </ul>
+
+      <!-- 5. Onboarding Step -->
+      <p><strong>Step 1:</strong> Set your password to activate your account.</p>
+
+      <!-- 6. CTA Button -->
+      <div style="text-align: center; margin: 30px 0;">
+        <a href="${process.env.APP_URL}/register?email=${encodeURIComponent(email)}&role=${encodeURIComponent(role)}"
+           style="background: #005baa; color: #fff; text-decoration: none; padding: 14px 24px; border-radius: 6px; font-size: 16px;">
+          Activate Your Account
+        </a>
+      </div>
+
+      <!-- 7. Security Note -->
+      <p style="font-size: 12px; color: #888;">
+        🔒 This invitation is intended only for <strong>${email}</strong>. This link is unique and cannot be shared. It will expire in 24 hours.
+      </p>
+
+      <!-- 8. Support Info -->
+      <p>❓ Need help? Contact our support team at <a href="mailto:support@asipiya.lk">support@asipiya.lk</a></p>
+
+      <!-- Footer -->
+      <hr style="margin-top: 30px;">
+      <p style="font-size: 12px; text-align: center; color: #aaa;">&copy; ${new Date().getFullYear()} Asipiya Soft Solution (PVT) LTD. All rights reserved.</p>
+    </div>
+  `
+        };
+
+
+
+        try {
+            await transporter.sendMail(mailOptions);
+            res.json({ message: 'Invitation email sent successfully.' });
+        } catch (mailErr) {
+            console.error(mailErr);
+            res.status(500).json({ message: 'Failed to send email' });
         }
-
-        const insertQuery = 'INSERT INTO appuser (Email, Role) VALUES (?, ?)';
-        db.query(insertQuery, [email, role], async (err) => {
-            if (err) return res.status(500).json({ message: 'Error inserting user' });
-
-            const mailOptions = {
-                from: process.env.EMAIL_USER,
-                to: email,
-                subject: 'You are invited to join the App',
-                html: `
-                    <p>Hello,</p>
-                    <p>You have been invited to join our app as a <strong>${role}</strong>.</p>
-                    <p>Please set your password by clicking the link below:</p>
-                    <a href="${process.env.APP_URL}">Set your password</a>
-                `
-            };
-
-            try {
-                await transporter.sendMail(mailOptions);
-                res.json({ message: 'Invitation sent successfully' });
-            } catch (mailErr) {
-                console.error(mailErr);
-                res.status(500).json({ message: 'Failed to send email' });
-            }
-        });
     });
 });
+
 
 
 /*---------------------------------------------------------------------------------------*/
@@ -421,18 +456,18 @@ app.get('/api/ticket_view/:id', (req, res) => {
   WHERE 
     t.TicketID = ?`;
 
-  db.query(query, [ticketId], (err, results) => {
-    if (err) {
-      console.error("Error in ticket_view query:", err);
-      return res.status(500).json({ error: "Database query failed" });
-    }
+    db.query(query, [ticketId], (err, results) => {
+        if (err) {
+            console.error("Error in ticket_view query:", err);
+            return res.status(500).json({ error: "Database query failed" });
+        }
 
-    if (results.length === 0) {
-      return res.status(404).json({ error: "Ticket not found" });
-    }
+        if (results.length === 0) {
+            return res.status(404).json({ error: "Ticket not found" });
+        }
 
-    res.json(results[0]);
-  });
+        res.json(results[0]);
+    });
 });
 
 /*----------------------------------------------------------------------------------*/
@@ -513,7 +548,7 @@ app.put('/api/user/profile/:id', (req, res) => {
             });
         };
 
-        handleProfileUpdate(); 
+        handleProfileUpdate();
     });
 });
 
@@ -586,25 +621,25 @@ app.delete('/api/user/profile/image/:id', (req, res) => {
 
 //Create ticket 
 app.get("/system_registration", (req, res) => {
-  const sql = "SELECT SystemName FROM asipiyasystem";
-  db.query(sql, (err, results) => {
-    if (err) {
-      console.error("Error fetching systems:", err);
-      return res.status(500).json({ error: "Database error" });
-    }
-    res.json(results);
-  });
+    const sql = "SELECT SystemName FROM asipiyasystem";
+    db.query(sql, (err, results) => {
+        if (err) {
+            console.error("Error fetching systems:", err);
+            return res.status(500).json({ error: "Database error" });
+        }
+        res.json(results);
+    });
 });
 
 app.get("/ticket_category", (req, res) => {
-  const sql = "SELECT CategoryName FROM ticketcategory";
-  db.query(sql, (err, results) => {
-    if (err) {
-      console.error("Error fetching systems:", err);
-      return res.status(500).json({ error: "Database error" });
-    }
-    res.json(results);
-  });
+    const sql = "SELECT CategoryName FROM ticketcategory";
+    db.query(sql, (err, results) => {
+        if (err) {
+            console.error("Error fetching systems:", err);
+            return res.status(500).json({ error: "Database error" });
+        }
+        res.json(results);
+    });
 });
 
 // API endpoint to fetch ticket counts
