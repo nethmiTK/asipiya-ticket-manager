@@ -1,20 +1,26 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { toast } from 'react-toastify';
-import { useAuth } from '../../App.jsx'; 
-import { AiOutlineUser } from 'react-icons/ai'; // For the default user icon
-import { MdClose } from 'react-icons/md'; // For the remove image icon
+import { useAuth } from '../../App.jsx';
+import { AiOutlineUser } from 'react-icons/ai'; 
+import { MdClose } from 'react-icons/md'; 
+import { FaArrowLeft } from 'react-icons/fa'; 
+import { useNavigate } from 'react-router-dom'; 
 
 const UserProfile = () => {
     const { loggedInUser: user, setLoggedInUser } = useAuth();
+    const navigate = useNavigate();
 
+    // profileData will store the fetched state from the backend
     const [profileData, setProfileData] = useState({
         FullName: '',
         Email: '',
         Phone: '',
         Role: '',
-        ProfileImagePath: '' // This holds the path from the DB
+        ProfileImagePath: '' 
     });
+
+    // formData will store the current input values from the user
     const [formData, setFormData] = useState({
         FullName: '',
         Email: '',
@@ -23,14 +29,14 @@ const UserProfile = () => {
         NewPassword: '',
         ConfirmNewPassword: ''
     });
+
     const [loading, setLoading] = useState(true);
-    const [errors, setErrors] = useState({}); 
-    const [selectedFile, setSelectedFile] = useState(null); // State for the file chosen via input
-    const [imagePreview, setImagePreview] = useState(null); // State for the URL to display (either local or server)
+    const [errors, setErrors] = useState({});
+    const [selectedFile, setSelectedFile] = useState(null); 
+    const [imagePreview, setImagePreview] = useState(null); 
 
-    const fileInputRef = useRef(null); // Ref for the hidden file input
+    const fileInputRef = useRef(null); 
 
-    // Effect to fetch user profile data on component mount or user change
     useEffect(() => {
         const fetchUserProfile = async () => {
             if (user && user.UserID) {
@@ -39,7 +45,7 @@ const UserProfile = () => {
                     const response = await axios.get(`http://localhost:5000/api/user/profile/${user.UserID}`);
                     const fetchedData = response.data;
 
-                    setProfileData(fetchedData); // Set the profile data including the image path
+                    setProfileData(fetchedData); 
 
                     setFormData({
                         FullName: fetchedData.FullName,
@@ -68,7 +74,7 @@ const UserProfile = () => {
             }
         };
         fetchUserProfile();
-    }, [user]); // Re-run if `user` object changes
+    }, [user]); 
 
     // Handles changes in form input fields
     const handleChange = (e) => {
@@ -131,7 +137,7 @@ const UserProfile = () => {
         const file = e.target.files[0];
         if (file) {
             setSelectedFile(file);
-            setImagePreview(URL.createObjectURL(file)); // Create a local URL for instant preview
+            setImagePreview(URL.createObjectURL(file)); 
             toast.info("Image selected. Click 'Upload Image' to save it.");
         } else {
             setSelectedFile(null);
@@ -159,22 +165,22 @@ const UserProfile = () => {
         try {
             const response = await axios.post(`http://localhost:5000/api/user/profile/upload/${user.UserID}`, formDataPayload, {
                 headers: {
-                    'Content-Type': 'multipart/form-data', // Important for file uploads
+                    'Content-Type': 'multipart/form-data', 
                 },
             });
             toast.success(response.data.message || "Profile image uploaded successfully!");
+
             
-            // Update profileData state with the new image path returned from backend
             setProfileData(prevData => ({
                 ...prevData,
-                ProfileImagePath: response.data.imagePath 
+                ProfileImagePath: response.data.imagePath
             }));
-            
+
             // Update loggedInUser context and localStorage
             if (setLoggedInUser) {
                 const updatedUser = {
-                    ...user, // Keep existing user data
-                    ProfileImagePath: response.data.imagePath, // Update only the image path
+                    ...user, 
+                    ProfileImagePath: response.data.imagePath, 
                 };
                 setLoggedInUser(updatedUser);
                 localStorage.setItem('user', JSON.stringify(updatedUser));
@@ -182,7 +188,7 @@ const UserProfile = () => {
 
             // Clear selected file state after successful upload
             setSelectedFile(null);
-            // Image preview is already updated by setProfileData / imagePreview
+           
         } catch (error) {
             console.error('Error uploading image:', error);
             if (error.response && error.response.data && error.response.data.message) {
@@ -221,7 +227,7 @@ const UserProfile = () => {
         try {
             const response = await axios.delete(`http://localhost:5000/api/user/profile/image/${user.UserID}`);
             toast.success(response.data.message || "Profile image removed successfully!");
-            
+
             // Clear image states and profileData
             setSelectedFile(null);
             setImagePreview(null);
@@ -252,19 +258,52 @@ const UserProfile = () => {
     const handleSave = async (e) => {
         e.preventDefault();
 
+        // Validate form fields first
         if (!validateForm()) {
             toast.error('Please correct the errors in the form.');
             return;
         }
 
+        const currentFullName = formData.FullName.trim();
+        const currentEmail = formData.Email.trim();
+        const currentPhone = formData.Phone.trim();
+
+        const originalFullName = profileData.FullName ? profileData.FullName.trim() : '';
+        const originalEmail = profileData.Email ? profileData.Email.trim() : '';
+        const originalPhone = profileData.Phone ? profileData.Phone.trim() : '';
+
+        // Check for changes in text fields
+        const hasTextChanges =
+            currentFullName !== originalFullName ||
+            currentEmail !== originalEmail ||
+            currentPhone !== originalPhone;
+
+        // Check if the user attempted to change the password (by filling current or new password)
+        const hasPasswordChanges = formData.CurrentPassword !== '' || formData.NewPassword !== '';
+
+        // If no changes in text fields and no password change attempt, stop here
+        if (!hasTextChanges && !hasPasswordChanges) {
+            toast.info('No changes detected to save.');
+           
+            setFormData(prevData => ({
+                ...prevData,
+                CurrentPassword: '',
+                NewPassword: '',
+                ConfirmNewPassword: ''
+            }));
+            return; // Exit the function
+        }
+       
         try {
+            setLoading(true); 
+
             const updatePayload = {
-                FullName: formData.FullName,
-                Email: formData.Email,
-                Phone: formData.Phone,
+                FullName: currentFullName, 
+                Email: currentEmail,
+                Phone: currentPhone,
             };
 
-            if (formData.CurrentPassword && formData.NewPassword) {
+            if (hasPasswordChanges) { 
                 updatePayload.CurrentPassword = formData.CurrentPassword;
                 updatePayload.NewPassword = formData.NewPassword;
             }
@@ -272,32 +311,32 @@ const UserProfile = () => {
             const response = await axios.put(`http://localhost:5000/api/user/profile/${user.UserID}`, updatePayload);
             toast.success(response.data.message || 'Profile updated successfully!');
 
+            setProfileData(prevData => ({
+                ...prevData,
+                FullName: currentFullName,
+                Email: currentEmail,
+                Phone: currentPhone,
+                
+            }));
+
+            // Also update loggedInUser context and localStorage
             if (setLoggedInUser) {
                 const updatedUser = {
                     ...user, // Retain existing user data, including ProfileImagePath
-                    FullName: formData.FullName,
-                    Email: formData.Email,
-                    Phone: formData.Phone,
-                    // ProfileImagePath is already present in 'user' from context, or will be updated by handleImageUpload
+                    FullName: currentFullName,
+                    Email: currentEmail,
+                    Phone: currentPhone,
                 };
                 setLoggedInUser(updatedUser); // Update context
                 localStorage.setItem('user', JSON.stringify(updatedUser)); // Update localStorage
             }
 
-            // Clear password fields after successful update
+            // Clear password fields in formData after a successful password change
             setFormData(prevData => ({
                 ...prevData,
                 CurrentPassword: '',
                 NewPassword: '',
                 ConfirmNewPassword: ''
-            }));
-
-            // Re-fetch profile data or update state directly to reflect changes
-            setProfileData(prevData => ({
-                ...prevData,
-                FullName: formData.FullName,
-                Email: formData.Email,
-                Phone: formData.Phone,
             }));
 
         } catch (error) {
@@ -307,6 +346,8 @@ const UserProfile = () => {
             } else {
                 toast.error('Profile update failed. Please try again.');
             }
+        } finally {
+            setLoading(false); // End loading state
         }
     };
 
@@ -330,39 +371,48 @@ const UserProfile = () => {
     // --- Component Render ---
     return (
         <div className="profile-container p-8 md:p-12 min-h-screen bg-gray-100">
+             <div className="max-w-4xl mx-auto mb-4">
+                <button
+                    onClick={() => navigate(-1)} // Navigate back to the previous page
+                    className="flex items-center text-blue-600 hover:text-blue-800 font-semibold text-lg transition duration-200 focus:outline-none"
+                    aria-label="Go back" // Accessibility
+                >
+                    <FaArrowLeft className="mr-2" /> Back
+                </button>
+            </div>
             <div className="max-w-4xl mx-auto bg-white rounded-xl shadow-lg p-8">
                 <div className="flex items-center mb-8 pb-4 border-b border-gray-200">
                     {/* User Avatar Section */}
-                    <div 
-                        className="relative w-24 h-24 bg-gray-200 rounded-full flex items-center justify-center text-gray-500 text-6xl mr-6 overflow-hidden cursor-pointer"
+                    <div className="relative w-24 h-24 bg-gray-200 rounded-full flex items-center justify-center text-gray-500 text-6xl mr-6 cursor-pointer"
                         onClick={() => fileInputRef.current.click()} // Make the entire circle clickable
                         title="Click to change profile image"
                     >
-                        {/* Conditional rendering for profile image */}
+                        
                         {imagePreview ? (
                             <>
                                 <img
                                     src={imagePreview}
                                     alt="Profile"
-                                    className="w-full h-full object-cover"
+                                    className="w-full h-full object-cover rounded-full border-2 border-black"
                                 />
-                                {/* Remove Image Button (X icon) */}
-                                <button 
-                                    onClick={(e) => { 
-                                        e.stopPropagation(); // Prevent triggering file input click
-                                        handleImageRemove(); 
+                                {/* Remove Image Button */}
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleImageRemove();
                                     }}
-                                    className="absolute top-0 right-0 bg-red-500 text-white rounded-full p-1 text-xs hover:bg-red-600 focus:outline-none"
+                                    className="absolute top-0 right-0 m-1 bg-red-500 text-white rounded-full p-1 text-xs hover:bg-red-600 focus:outline-none shadow-md z-10"
                                     title="Remove profile image"
                                 >
-                                    <MdClose size={16} />
+                                    <MdClose size={12} />
                                 </button>
+
                             </>
                         ) : (
-                            <AiOutlineUser /> // Default icon if no image
+                            <AiOutlineUser />
                         )}
                     </div>
-                    
+
                     <div>
                         <h2 className="text-3xl font-extrabold text-gray-900">
                             {profileData.FullName || 'User Profile'}
@@ -370,14 +420,14 @@ const UserProfile = () => {
                         <p className="text-lg text-gray-600">
                             {profileData.Email} - <span className="font-semibold">{profileData.Role || 'User'}</span>
                         </p>
-                        
+
                         {/* Hidden file input */}
                         <input
                             type="file"
-                            ref={fileInputRef} // Assign the ref
+                            ref={fileInputRef} 
                             onChange={handleFileChange}
                             accept="image/*" // Only accept image files
-                            style={{ display: 'none' }} // Hide the input
+                            style={{ display: 'none' }} 
                         />
 
                         {/* Upload Button - only show if a file is selected locally */}

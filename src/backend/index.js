@@ -455,14 +455,18 @@ app.put('/api/user/profile/:id', (req, res) => {
             queryParams = [FullName, Email, Phone, userId];
         }
 
-        db.query(updateQuery, queryParams, (updateErr, updateResult) => {
+          db.query(updateQuery, queryParams, (updateErr, updateResult) => {
             if (updateErr) {
                 console.error('Error updating user profile:', updateErr);
                 res.status(500).json({ message: 'Error updating profile' });
-            } else if (updateResult.affectedRows === 0) {
-                res.status(404).json({ message: 'User not found or no changes made' });
-            } else {
-                res.status(200).json({ message: 'Profile updated successfully' });
+            } else { // No database error occurred
+                if (updateResult.affectedRows === 0) {
+                    
+                    res.status(200).json({ message: 'No changes were made to the profile.' }); 
+                } else {
+                    // Actual changes occurred
+                    res.status(200).json({ message: 'Profile updated successfully' });
+                }
             }
         });
     });
