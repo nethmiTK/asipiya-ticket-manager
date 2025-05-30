@@ -5,8 +5,13 @@ import express from 'express';
 import nodemailer from 'nodemailer';
 import bodyParser from 'body-parser';
 import cors from 'cors';
+import multer from 'multer';
+import path from 'path'; 
+import { fileURLToPath } from 'url'; 
+import fs from 'fs'; 
+import bcrypt from 'bcryptjs';
 
-// Create a connection to the database
+// --- Database Connection ---
 const db = mysql.createConnection({
     host: 'localhost',
     user: 'root',
@@ -27,17 +32,56 @@ const app = express();
 app.use(bodyParser.json());
 app.use(cors());
 
-// Register endpoint
+// Get __dirname equivalent for ES Modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// --- Multer Configuration for Profile Images ---
+const profileImageStorage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        const uploadDir = path.join(__dirname, 'uploads', 'profile_images');
+        // Create the directory if it doesn't exist
+        fs.mkdirSync(uploadDir, { recursive: true });
+        cb(null, uploadDir); 
+    },
+    filename: (req, file, cb) => {
+        const userId = req.params.id; 
+        const fileExtension = file.originalname.split('.').pop();
+        cb(null, `${userId}-${Date.now()}.${fileExtension}`); 
+    }
+});
+
+const upload = multer({ storage: profileImageStorage }); 
+
+//  Define salt rounds for bcrypt hashing.
+const saltRounds = 10;
+
+// -------Register endpoint------- //
 app.post('/register', (req, res) => {
     const { FullName, Email, Password, Role, Phone } = req.body;
-    const query = 'INSERT INTO appuser (FullName, Email, Password, Role, Phone) VALUES (?, ?, ?, ?, ?)';
-    db.query(query, [FullName, Email, Password, Role, Phone], (err, result) => {
+
+    bcrypt.hash(Password, saltRounds, (err, hashedPassword) => {
         if (err) {
-            console.error('Error inserting user:', err);
-            res.status(500).send('Error registering user');
-        } else {
-            res.status(200).send('User registered successfully');
+            console.error('Error hashing password:', err);
+            return res.status(500).send('Error registering user: Password hashing failed');
         }
+
+        const query = 'INSERT INTO appuser (FullName, Email, Password, Role, Phone) VALUES (?, ?, ?, ?, ?)';
+        
+        db.query(query, [FullName, Email, hashedPassword, Role, Phone], (err, result) => {
+            if (err) {
+                console.error('Error inserting user:', err);
+              
+                if (err.code === 'ER_DUP_ENTRY') { 
+                    return res.status(409).send('User with this email already exists.');
+                }
+                res.status(500).send('Error registering user');
+            } else {
+                res.status(200).send('User registered successfully');
+            }
+        });
     });
 });
 // API endpoint to fetch tickets
@@ -60,33 +104,114 @@ app.get('/api/tickets', (req, res) => {
     });
 });
 
-// Login endpoint - MODIFIED to return the full user object
+// Login endpoint
 app.post('/login', (req, res) => {
     const { Email, Password } = req.body;
-    // Select all necessary fields for the user profile
-    const query = 'SELECT UserID, FullName, Email, Phone, Role FROM appuser WHERE Email = ? AND Password = ?';
-    db.query(query, [Email, Password], (err, results) => {
+    const query = 'SELECT UserID, FullName, Email, Phone, Role, ProfileImagePath, Password AS HashedPassword FROM appuser WHERE Email = ?';
+
+    db.query(query, [Email], (err, results) => {
         if (err) {
             console.error('Error during login:', err);
-            res.status(500).json({ message: 'Error during login' });
-        } else if (results.length > 0) {
-            const user = results[0]; // This is the full user object from the database
-            res.status(200).json({
-                message: 'Login successful',
-                user: {
-                    UserID: user.UserID,
-                    FullName: user.FullName,
-                    Email: user.Email,
-                    Phone: user.Phone,
-                    Role: user.Role.toLowerCase() // Ensure role is lowercase for consistency
-                }
-            });
+            return res.status(500).json({ message: 'Error during login' });
+        }
+
+        if (results.length === 0) {
+            return res.status(401).json({ message: 'Invalid credentials' });
+        }
+
+        const user = results[0]; 
+
+        bcrypt.compare(Password, user.HashedPassword, (compareErr, isMatch) => {
+            if (compareErr) {
+                console.error('Error comparing passwords:', compareErr);
+                return res.status(500).json({ message: 'Error during login' });
+            }
+
+            if (isMatch) {
+                // Passwords match! Login successful.
+                res.status(200).json({
+                    message: 'Login successful',
+                    user: {
+                        UserID: user.UserID,
+                        FullName: user.FullName,
+                        Email: user.Email,
+                        Phone: user.Phone,
+                        Role: user.Role.toLowerCase(),
+                        ProfileImagePath: user.ProfileImagePath || null
+                    }
+                });
+            } else {
+                // Passwords do not match
+                res.status(401).json({ message: 'Invalid credentials' });
+            }
+        });
+    });
+});
+
+// Get admin  profile endpoint 
+app.get('/api/user/profile/:id', (req, res) => {
+    const userId = req.params.id;
+    // Select all fields that the frontend profile form expects
+     const query = 'SELECT UserID, FullName, Email, Phone, Role, ProfileImagePath FROM appuser WHERE UserID = ?';
+
+    db.query(query, [userId], (err, results) => {
+        if (err) {
+            console.error('Error fetching user profile:', err);
+            res.status(500).json({ message: 'Server error' });
+        } else if (results.length === 0) {
+            res.status(404).json({ message: 'User not found' });
         } else {
-            res.status(401).json({ message: 'Invalid credentials' });
+            res.status(200).json(results[0]);
         }
     });
 });
 
+// Get admin profile update  endpoint 
+app.put('/api/user/profile/:id', (req, res) => {
+    const userId = req.params.id;
+    const { FullName, Email, Phone, CurrentPassword, NewPassword } = req.body;
+
+    const verifyQuery = 'SELECT Password FROM appuser WHERE UserID = ?';
+
+    db.query(verifyQuery, [userId], (err, results) => {
+        if (err) {
+            console.error('Error verifying user for profile update:', err);
+            return res.status(500).json({ message: 'Server error' });
+        }
+
+        if (results.length === 0) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        const currentUser = results[0];
+
+        let updateQuery;
+        let queryParams;
+
+        if (CurrentPassword && NewPassword) {
+            if (CurrentPassword !== currentUser.Password) {
+                return res.status(400).json({ message: 'Current password is incorrect' });
+            }
+            updateQuery = 'UPDATE appuser SET FullName = ?, Email = ?, Phone = ?, Password = ? WHERE UserID = ?';
+            queryParams = [FullName, Email, Phone, NewPassword, userId];
+        } else {
+            updateQuery = 'UPDATE appuser SET FullName = ?, Email = ?, Phone = ? WHERE UserID = ?';
+            queryParams = [FullName, Email, Phone, userId];
+        }
+
+        db.query(updateQuery, queryParams, (updateErr, updateResult) => {
+            if (updateErr) {
+                console.error('Error updating user profile:', updateErr);
+                res.status(500).json({ message: 'Error updating profile' });
+            } else if (updateResult.affectedRows === 0) {
+                res.status(404).json({ message: 'User not found or no changes made' });
+            } else {
+                res.status(200).json({ message: 'Profile updated successfully' });
+            }
+        });
+    });
+});
+ 
 /* ------------------------- Add Members ------------------------- */
 
 // Get all supervisors (excluding users)
@@ -317,9 +442,9 @@ app.get('/ticket_category', (req, res) => {
 
 //View ticket details
 app.get('/api/ticket_view/:id', (req, res) => {
-    const ticketId = req.params.id;
-    const query = `SELECT t.TicketID, u.FullName AS UserName, u.Email AS UserEmail, s.SystemName, c.CategoryName,t.Description,t.DateTime,
-  t.Status,t.Priority,t.FirstRespondedTime,t.LastRespondedTime,t.TicketDuration,t.UserNote
+  const ticketId = req.params.id;
+  const query = `SELECT t.TicketID, u.FullName AS UserName, s.SystemName, c.CategoryName, t.Description, t.DateTime,
+  t.Status, t.Priority, t.FirstRespondedTime, t.LastRespondedTime, t.TicketDuration, t.UserNote
   FROM 
     ticket t
   JOIN 
@@ -347,77 +472,10 @@ app.get('/api/ticket_view/:id', (req, res) => {
 
 /*----------------------------------------------------------------------------------*/
 
-// Get admin profile endpoint 
-app.get('/api/admin/profile/:id', (req, res) => {
-    const userId = req.params.id;
-    const query = 'SELECT UserID, FullName, Email, Phone, Role FROM appuser WHERE UserID = ? AND Role = "admin"'; // Added Role to selection
-
-    db.query(query, [userId], (err, results) => {
-        if (err) {
-            console.error('Error fetching admin profile:', err);
-            res.status(500).json({ message: 'Server error' });
-        } else if (results.length === 0) {
-            res.status(404).json({ message: 'Admin not found' });
-        } else {
-            res.status(200).json(results[0]);
-        }
-    });
-});
-
-// Update admin profile endpoint 
-app.put('/api/admin/profile/:id', (req, res) => {
-    const userId = req.params.id;
-    const { FullName, Email, Phone, CurrentPassword, NewPassword } = req.body;
-
-    const verifyQuery = 'SELECT Password FROM appuser WHERE UserID = ? AND Role = "admin"'; // Check for admin role
-
-    db.query(verifyQuery, [userId], (err, results) => {
-        if (err) {
-            console.error('Error verifying admin:', err);
-            return res.status(500).json({ message: 'Server error' });
-        }
-
-        if (results.length === 0) {
-            return res.status(404).json({ message: 'Admin not found' });
-        }
-
-        const admin = results[0];
-
-        if (CurrentPassword && NewPassword) {
-            if (CurrentPassword !== admin.Password) {
-                return res.status(400).json({ message: 'Current password is incorrect' });
-            }
-
-            const updateQuery = 'UPDATE appuser SET FullName = ?, Email = ?, Phone = ?, Password = ? WHERE UserID = ? AND Role = "admin"';
-            db.query(updateQuery, [FullName, Email, Phone, NewPassword, userId], (updateErr, updateResult) => {
-                if (updateErr) {
-                    console.error('Error updating admin profile:', updateErr);
-                    res.status(500).json({ message: 'Error updating profile' });
-                } else {
-                    res.status(200).json({ message: 'Profile updated successfully' });
-                }
-            });
-        } else {
-            // Update without password change
-            const updateQuery = 'UPDATE appuser SET FullName = ?, Email = ?, Phone = ? WHERE UserID = ? AND Role = "admin"';
-            db.query(updateQuery, [FullName, Email, Phone, userId], (updateErr, updateResult) => {
-                if (updateErr) {
-                    console.error('Error updating admin profile:', updateErr);
-                    res.status(500).json({ message: 'Error updating profile' });
-                } else {
-                    res.status(200).json({ message: 'Profile updated successfully' });
-                }
-            });
-        }
-    });
-});
-
-
-//  Get user profile endpoint (general user)
+// Get user profile endpoint (general user) 
 app.get('/api/user/profile/:id', (req, res) => {
     const userId = req.params.id;
-    // Select all fields that the frontend profile form expects
-    const query = 'SELECT UserID, FullName, Email, Phone, Role FROM appuser WHERE UserID = ?';
+    const query = 'SELECT UserID, FullName, Email, Phone, Role, ProfileImagePath FROM appuser WHERE UserID = ?'; 
 
     db.query(query, [userId], (err, results) => {
         if (err) {
@@ -436,47 +494,130 @@ app.put('/api/user/profile/:id', (req, res) => {
     const userId = req.params.id;
     const { FullName, Email, Phone, CurrentPassword, NewPassword } = req.body;
 
-    const verifyQuery = 'SELECT Password FROM appuser WHERE UserID = ?';
+    // Select the hashed password from the DB for comparison
+    const verifyQuery = 'SELECT Password AS HashedPassword FROM appuser WHERE UserID = ?';
 
     db.query(verifyQuery, [userId], (err, results) => {
         if (err) {
             console.error('Error verifying user for profile update:', err);
             return res.status(500).json({ message: 'Server error' });
         }
-
         if (results.length === 0) {
             return res.status(404).json({ message: 'User not found' });
         }
 
-        const currentUser = results[0];
+        const currentUser = results[0]; 
 
-        let updateQuery;
-        let queryParams;
+        const handleProfileUpdate = async () => {
+            let updateQuery;
+            let queryParams;
 
-        if (CurrentPassword && NewPassword) {
-            if (CurrentPassword !== currentUser.Password) {
-                return res.status(400).json({ message: 'Current password is incorrect' });
-            }
-            updateQuery = 'UPDATE appuser SET FullName = ?, Email = ?, Phone = ?, Password = ? WHERE UserID = ?';
-            queryParams = [FullName, Email, Phone, NewPassword, userId];
-        } else {
-            updateQuery = 'UPDATE appuser SET FullName = ?, Email = ?, Phone = ? WHERE UserID = ?';
-            queryParams = [FullName, Email, Phone, userId];
-        }
+            if (CurrentPassword && NewPassword) {
+                try {
+                    // Compare provided current password with the stored hashed password
+                    const isCurrentPasswordMatch = await bcrypt.compare(CurrentPassword, currentUser.HashedPassword);
+                    if (!isCurrentPasswordMatch) {
+                        return res.status(400).json({ message: 'Current password is incorrect' });
+                    }
 
-        db.query(updateQuery, queryParams, (updateErr, updateResult) => {
-            if (updateErr) {
-                console.error('Error updating user profile:', updateErr);
-                res.status(500).json({ message: 'Error updating profile' });
-            } else if (updateResult.affectedRows === 0) {
-                res.status(404).json({ message: 'User not found or no changes made' });
+                    // Hash the new password before updating
+                    const hashedNewPassword = await bcrypt.hash(NewPassword, saltRounds);
+                    updateQuery = 'UPDATE appuser SET FullName = ?, Email = ?, Phone = ?, Password = ? WHERE UserID = ?';
+                    queryParams = [FullName, Email, Phone, hashedNewPassword, userId];
+                } catch (hashErr) {
+                    console.error('Error hashing new password:', hashErr);
+                    return res.status(500).json({ message: 'Error processing new password' });
+                }
             } else {
-                res.status(200).json({ message: 'Profile updated successfully' });
+                // User is NOT changing password, just updating other details
+                updateQuery = 'UPDATE appuser SET FullName = ?, Email = ?, Phone = ? WHERE UserID = ?';
+                queryParams = [FullName, Email, Phone, userId];
             }
+
+            db.query(updateQuery, queryParams, (updateErr, updateResult) => {
+                if (updateErr) {
+                    console.error('Error updating user profile:', updateErr);
+                    res.status(500).json({ message: 'Error updating profile' });
+                } else {
+                    if (updateResult.affectedRows === 0) {
+                        res.status(200).json({ message: 'No changes were made to the profile.' });
+                    } else {
+                        res.status(200).json({ message: 'Profile updated successfully' });
+                    }
+                }
+            });
+        };
+
+        handleProfileUpdate();
+    });
+});
+
+// PROFILE IMAGE UPLOAD ENDPOINT
+app.post('/api/user/profile/upload/:id', upload.single('profileImage'), (req, res) => {
+    const userId = req.params.id;
+    
+    if (!req.file) {
+        return res.status(400).json({ message: 'No file uploaded.' });
+    }
+
+    // Path relative to the 'uploads' directory, to be stored in DB
+    const imagePath = `profile_images/${req.file.filename}`; 
+
+    const query = 'UPDATE appuser SET ProfileImagePath = ? WHERE UserID = ?';
+    db.query(query, [imagePath, userId], (err, result) => {
+        if (err) {
+            console.error('Error updating profile image path in DB:', err);
+            fs.unlink(req.file.path, (unlinkErr) => {
+                if (unlinkErr) console.error('Error deleting uploaded file after DB failure:', unlinkErr);
+            });
+            return res.status(500).json({ message: 'Error saving image path to database.' });
+        }
+        res.status(200).json({ 
+            message: 'Profile image uploaded successfully', 
+            imagePath: imagePath 
         });
     });
 });
 
+// DELETE PROFILE IMAGE ENDPOINT
+app.delete('/api/user/profile/image/:id', (req, res) => {
+    const userId = req.params.id;
+
+    const getImagePathQuery = 'SELECT ProfileImagePath FROM appuser WHERE UserID = ?';
+    db.query(getImagePathQuery, [userId], (err, results) => {
+        if (err) {
+            console.error('Error fetching image path for deletion:', err);
+            return res.status(500).json({ message: 'Server error retrieving image path.' });
+        }
+
+        if (results.length === 0 || !results[0].ProfileImagePath) {
+            return res.status(404).json({ message: 'User or existing profile image not found.' });
+        }
+
+        const oldImagePath = results[0].ProfileImagePath;
+        const fullPathToDelete = path.join(__dirname, 'uploads', oldImagePath); 
+
+        // Update DB first to clear the path
+        const updateDbQuery = 'UPDATE appuser SET ProfileImagePath = NULL WHERE UserID = ?';
+        db.query(updateDbQuery, [userId], (dbErr, dbResult) => {
+            if (dbErr) {
+                console.error('Error clearing profile image path in DB:', dbErr);
+                return res.status(500).json({ message: 'Error clearing image path in database.' });
+            }
+
+            // Attempt to delete the file from the file system
+            fs.unlink(fullPathToDelete, (unlinkErr) => {
+                if (unlinkErr) {
+                    console.warn(`Warning: Could not delete old file at ${fullPathToDelete}:`, unlinkErr);
+                    return res.status(200).json({ message: 'Profile image removed from DB, but file could not be deleted from server.', imagePath: null });
+                }
+                res.status(200).json({ message: 'Profile image removed successfully!', imagePath: null });
+            });
+        });
+    });
+});
+
+/*----------------------------------------------------------------------------------*/
 
 //Create ticket 
 app.get("/system_registration", (req, res) => {
@@ -501,6 +642,151 @@ app.get("/ticket_category", (req, res) => {
     });
 });
 
+// API endpoint to fetch ticket counts
+app.get('/api/tickets/counts', (req, res) => {
+    const queries = {
+        total: 'SELECT COUNT(*) AS count FROM ticket',
+        open: "SELECT COUNT(*) AS count FROM ticket WHERE Status = 'open'",
+        today: "SELECT COUNT(*) AS count FROM ticket WHERE DATE(DateTime) = CURDATE()",
+        highPriority: "SELECT COUNT(*) AS count FROM ticket WHERE Priority = 'High'",
+        closed: "SELECT COUNT(*) AS count FROM ticket WHERE Status = 'close'"
+    };
+
+    const results = {};
+    let completed = 0;
+
+    Object.keys(queries).forEach((key) => {
+        db.query(queries[key], (err, result) => {
+            if (err) {
+                console.error(`Error fetching ${key} count:`, err);
+                res.status(500).json({ error: 'Failed to fetch ticket counts' });
+                return;
+            }
+
+            results[key] = result[0].count;
+            completed++;
+
+            if (completed === Object.keys(queries).length) {
+                res.json(results);
+            }
+        });
+    });
+});
+
+// API endpoint to fetch filtered tickets
+app.get('/api/tickets/filter', (req, res) => {
+    const { type } = req.query;
+
+    let baseQuery = `
+        SELECT 
+            t.TicketID,
+            u.FullName AS UserName,
+            t.Description,
+            t.Status,
+            t.Priority,
+            t.UserNote
+        FROM ticket t
+        LEFT JOIN appuser u ON t.UserId = u.UserID
+    `;
+
+    let whereClause = '';
+    switch (type) {
+        case 'open':
+            whereClause = "WHERE t.Status = 'Open'";
+            break;
+        case 'today':
+            whereClause = "WHERE DATE(t.DateTime) = CURDATE()";
+            break;
+        case 'high-priority':
+            whereClause = "WHERE t.Priority = 'High'";
+            break;
+        case 'closed':
+            whereClause = "WHERE t.Status = 'Closed'";
+            break;
+    }
+
+    const query = baseQuery + (whereClause ? ' ' + whereClause : '');
+
+    db.query(query, (err, results) => {
+        if (err) {
+            console.error('Error fetching filtered tickets:', err);
+            res.status(500).json({ error: 'Failed to fetch tickets' });
+            return;
+        }
+        res.json(results);
+    });
+});
+
+// API endpoint to fetch ticket status distribution
+app.get('/api/tickets/status-distribution', (req, res) => {
+    const query = `
+        SELECT 
+            SUM(CASE WHEN Priority = 'High' THEN 1 ELSE 0 END) AS high,
+            SUM(CASE WHEN Priority = 'Medium' THEN 1 ELSE 0 END) AS medium,
+            SUM(CASE WHEN Priority = 'Low' THEN 1 ELSE 0 END) AS low
+        FROM ticket;
+    `;
+
+    db.query(query, (err, results) => {
+        if (err) {
+            console.error('Error fetching ticket status distribution:', err);
+            res.status(500).json({ error: 'Failed to fetch ticket status distribution' });
+            return;
+        }
+
+        res.json(results[0]);
+    });
+});
+
+// API endpoint to fetch the last five activities
+app.get('/api/tickets/recent-activities', (req, res) => {
+    const query = `
+        SELECT TicketID, Description, Status, Priority, DateTime
+        FROM ticket
+        ORDER BY DateTime DESC
+        LIMIT 5;
+    `;
+
+    db.query(query, (err, results) => {
+        if (err) {
+            console.error('Error fetching recent activities:', err);
+            res.status(500).json({ error: 'Failed to fetch recent activities' });
+            return;
+        }
+
+        res.json(results);
+    });
+});
+
+// API endpoint to fetch ticket  
+app.get('/api/tickets/ ', (req, res) => {
+    const query = `
+        SELECT 
+            t.TicketID, 
+            u.FullName AS UserName, 
+             t.Description, 
+            t.Status, 
+            t.Priority, 
+            t.UserNote,
+         FROM 
+            ticket t
+        LEFT JOIN 
+            appuser u 
+        ON 
+            t.UserId = u.UserID;
+    `;
+
+    db.query(query, (err, results) => {
+        if (err) {
+            console.error('Error fetching tickets  s:', err);
+            res.status(500).json({ error: 'Failed to fetch tickets ' });
+            return;
+        }
+        res.json(results);
+    });
+});
+
+// Start the server
 app.listen(5000, () => {
     console.log('Server is running on port 5000');
 });

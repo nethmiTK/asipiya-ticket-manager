@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { FaTicketAlt, FaExclamationCircle, FaCalendarDay, FaTasks, FaHome } from "react-icons/fa";
 import { Link, useNavigate } from "react-router-dom";
 import { BsChevronLeft } from "react-icons/bs";
@@ -8,6 +8,12 @@ import { VscNotebook } from "react-icons/vsc";
 import { CiLogout } from "react-icons/ci";
 import { GrSystem } from "react-icons/gr";
 import AdminSideBar from "../../user_components/SideBar/AdminSideBar";
+import axios from "axios";
+import { Pie } from "react-chartjs-2";
+import { Chart as ChartJS, ArcElement, Tooltip, Legend } from "chart.js";
+import RecentlyActivity from "./RecentlyActivity"; // Import the RecentlyActivity component
+
+ChartJS.register(ArcElement, Tooltip, Legend);
 
 const Menus = [
   { title: "Dashboard", icon: <FaHome />, path: "/admin-dashboard" },
@@ -137,7 +143,85 @@ const Sidebar = ({ open, setOpen }) => {
   );
 };
 
+const TicketByStatusChart = () => {
+  const [chartData, setChartData] = useState(null);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const response = await axios.get("http://localhost:5000/api/tickets/status-distribution");
+        const data = response.data;
+
+        const chartData = {
+          labels: ["High", "Medium", "Low"],
+          datasets: [
+            {
+              data: [data.high, data.medium, data.low],
+              backgroundColor: ["#FF6384", "#FFCE56", "#36A2EB"],
+              hoverBackgroundColor: ["#FF6384", "#FFCE56", "#36A2EB"],
+            },
+          ],
+        };
+
+        setChartData(chartData);
+      } catch (error) {
+        console.error("Error fetching ticket status distribution:", error);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  if (!chartData) {
+    return <p>Loading chart...</p>;
+  }
+
+  return (
+    <div className="bg-white p-4 rounded shadow">
+      <h2 className="text-lg font-semibold mb-4">Ticket by Status</h2>
+      <Pie data={chartData} />
+      <div className="mt-4">
+        {chartData.labels.map((label, index) => (
+          <p key={index} className="text-sm">
+            <span
+              className="inline-block w-3 h-3 mr-2 rounded"
+              style={{ backgroundColor: chartData.datasets[0].backgroundColor[index] }}
+            ></span>
+            {label}: {chartData.datasets[0].data[index]}%
+          </p>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 const Dashboard = () => {
+  const navigate = useNavigate();
+  const [counts, setCounts] = useState({
+    total: 0,
+    open: 0,
+    today: 0,
+    highPriority: 0,
+    closed: 0,
+  });
+
+  useEffect(() => {
+    const fetchCounts = async () => {
+      try {
+        const response = await axios.get("http://localhost:5000/api/tickets/counts");
+        setCounts(response.data);
+      } catch (error) {
+        console.error("Error fetching ticket counts:", error);
+      }
+    };
+
+    fetchCounts();
+  }, []);
+
+  const handleNavigation = (type) => {
+    navigate(`/tickets?type=${type}`);
+  };
+
   return (
     <div className="p-6 bg-gray-100 min-h-screen">
       <header className="flex flex-col md:flex-row justify-between items-center mb-6">
@@ -150,33 +234,47 @@ const Dashboard = () => {
         <div className="text-2xl mt-4 md:mt-0">🔔</div>
       </header>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
-  <div className="bg-blue-500 text-white p-4 rounded shadow text-center">
-    <FaTicketAlt className="text-3xl mb-2 mx-auto" />
-    <h2 className="text-lg font-semibold">1248</h2>
-    <p>Total Tickets</p>
-  </div>
-  <div className="bg-gray-800 text-white p-4 rounded shadow text-center">
-    <FaTasks className="text-3xl mb-2 mx-auto" />
-    <h2 className="text-lg font-semibold">78</h2>
-    <p>Open Tickets</p>
-  </div>
-  <div className="bg-gray-500 text-white p-4 rounded shadow text-center">
-    <FaCalendarDay className="text-3xl mb-2 mx-auto" />
-    <h2 className="text-lg font-semibold">125</h2>
-    <p>Tickets Today</p>
-  </div>
-  <div className="bg-red-500 text-white p-4 rounded shadow text-center">
-    <FaExclamationCircle className="text-3xl mb-2 mx-auto" />
-    <h2 className="text-lg font-semibold">76</h2>
-    <p>High Priority</p>
-  </div>
-  <div className="bg-green-600 text-white p-4 rounded shadow text-center cursor-pointer hover:bg-green-700">
-    <FaTicketAlt className="text-3xl mb-2 mx-auto" />
-    <h2 className="text-lg font-semibold">+</h2>
-    <p>Issue Ticket</p>
-  </div>
- 
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+        <div
+          className="bg-blue-500 text-white p-4 rounded shadow text-center cursor-pointer hover:bg-blue-600"
+          onClick={() => handleNavigation("total")}
+        >
+          <FaTicketAlt className="text-3xl mb-2 mx-auto" />
+          <h2 className="text-lg font-semibold">{counts.total}</h2>
+          <p>Total Tickets</p>
+        </div>
+        <div
+          className="bg-gray-800 text-white p-4 rounded shadow text-center cursor-pointer hover:bg-gray-700"
+          onClick={() => handleNavigation("open")}
+        >
+          <FaTasks className="text-3xl mb-2 mx-auto" />
+          <h2 className="text-lg font-semibold">{counts.open}</h2>
+          <p>Open Tickets</p>
+        </div>
+        <div
+          className="bg-gray-500 text-white p-4 rounded shadow text-center cursor-pointer hover:bg-gray-600"
+          onClick={() => handleNavigation("today")}
+        >
+          <FaCalendarDay className="text-3xl mb-2 mx-auto" />
+          <h2 className="text-lg font-semibold">{counts.today}</h2>
+          <p>Tickets Today</p>
+        </div>
+        <div
+          className="bg-red-500 text-white p-4 rounded shadow text-center cursor-pointer hover:bg-red-600"
+          onClick={() => handleNavigation("high-priority")}
+        >
+          <FaExclamationCircle className="text-3xl mb-2 mx-auto" />
+          <h2 className="text-lg font-semibold">{counts.highPriority}</h2>
+          <p>High Priority</p>
+        </div>
+        <div
+          className="bg-green-600 text-white p-4 rounded shadow text-center cursor-pointer hover:bg-green-700"
+          onClick={() => handleNavigation("new")}
+        >
+          <FaTicketAlt className="text-3xl mb-2 mx-auto" />
+          <h2 className="text-lg font-semibold">+</h2>
+          <p>Issue Ticket</p>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
@@ -197,10 +295,7 @@ const Dashboard = () => {
           </table>
         </div>
 
-        <div className="bg-white p-4 rounded shadow">
-          <h2 className="text-lg font-semibold mb-4">Ticket by Status</h2>
-          <div className="text-center text-gray-500">[Pie Chart Placeholder]</div>
-        </div>
+        <TicketByStatusChart />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

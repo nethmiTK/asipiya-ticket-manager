@@ -1,40 +1,52 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { toast } from 'react-toastify';
-import { useAuth } from '../../App.jsx'; 
-import { AiOutlineUser } from 'react-icons/ai';
+import { useAuth } from '../../App.jsx';
+import { AiOutlineUser } from 'react-icons/ai'; 
+import { MdClose } from 'react-icons/md'; 
+import { FaArrowLeft } from 'react-icons/fa'; 
+import { useNavigate } from 'react-router-dom'; 
 
 const UserProfile = () => {
     const { loggedInUser: user, setLoggedInUser } = useAuth();
+    const navigate = useNavigate();
 
+    // profileData will store the fetched state from the backend
     const [profileData, setProfileData] = useState({
         FullName: '',
         Email: '',
         Phone: '',
-        Role: ''
+        Role: '',
+        ProfileImagePath: '' 
     });
+
+    // formData will store the current input values from the user
     const [formData, setFormData] = useState({
         FullName: '',
         Email: '',
-        S_Phone: '', 
         Phone: '',
         CurrentPassword: '',
         NewPassword: '',
         ConfirmNewPassword: ''
     });
+
     const [loading, setLoading] = useState(true);
-    const [errors, setErrors] = useState({}); 
+    const [errors, setErrors] = useState({});
+    const [selectedFile, setSelectedFile] = useState(null); 
+    const [imagePreview, setImagePreview] = useState(null); 
+
+    const fileInputRef = useRef(null); 
 
     useEffect(() => {
-        // Fetch user data 
         const fetchUserProfile = async () => {
-            if (user && user.UserID) { // Ensure user and UserID exist from context
+            if (user && user.UserID) {
                 try {
                     setLoading(true);
-                    // This API call now targets the new general user profile endpoint in index.js
                     const response = await axios.get(`http://localhost:5000/api/user/profile/${user.UserID}`);
                     const fetchedData = response.data;
-                    setProfileData(fetchedData);
+
+                    setProfileData(fetchedData); 
+
                     setFormData({
                         FullName: fetchedData.FullName,
                         Email: fetchedData.Email,
@@ -43,6 +55,13 @@ const UserProfile = () => {
                         NewPassword: '',
                         ConfirmNewPassword: ''
                     });
+
+                    // Set image preview if an image path exists from the backend
+                    if (fetchedData.ProfileImagePath) {
+                        setImagePreview(`http://localhost:5000/uploads/${fetchedData.ProfileImagePath}`); // Construct full URL
+                    } else {
+                        setImagePreview(null); // No image, clear preview
+                    }
                     setLoading(false);
                 } catch (error) {
                     console.error('Error fetching user profile:', error);
@@ -57,12 +76,14 @@ const UserProfile = () => {
         fetchUserProfile();
     }, [user]); 
 
+    // Handles changes in form input fields
     const handleChange = (e) => {
         const { name, value } = e.target;
         setFormData({ ...formData, [name]: value });
         setErrors(prevErrors => ({ ...prevErrors, [name]: '' }));
     };
 
+    // Validates form fields before submission
     const validateForm = () => {
         const newErrors = {};
         const { FullName, Email, Phone, CurrentPassword, NewPassword, ConfirmNewPassword } = formData;
@@ -111,55 +132,211 @@ const UserProfile = () => {
         return Object.keys(newErrors).length === 0;
     };
 
+    // Handles selection of a file for upload
+    const handleFileChange = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            setSelectedFile(file);
+            setImagePreview(URL.createObjectURL(file)); 
+            toast.info("Image selected. Click 'Upload Image' to save it.");
+        } else {
+            setSelectedFile(null);
+            // Revert to current profile image if user cancels file selection
+            setImagePreview(profileData.ProfileImagePath ? `http://localhost:5000/uploads/${profileData.ProfileImagePath}` : null);
+        }
+    };
+
+    // Handles the actual image upload to the server
+    const handleImageUpload = async () => {
+        if (!selectedFile) {
+            toast.error("Please select an image first.");
+            return;
+        }
+
+        if (!user || !user.UserID) {
+            toast.error("User not logged in or UserID not available.");
+            return;
+        }
+
+        setLoading(true);
+        const formDataPayload = new FormData();
+        formDataPayload.append('profileImage', selectedFile); // 'profileImage' must match Multer's field name in backend
+
+        try {
+            const response = await axios.post(`http://localhost:5000/api/user/profile/upload/${user.UserID}`, formDataPayload, {
+                headers: {
+                    'Content-Type': 'multipart/form-data', 
+                },
+            });
+            toast.success(response.data.message || "Profile image uploaded successfully!");
+
+            
+            setProfileData(prevData => ({
+                ...prevData,
+                ProfileImagePath: response.data.imagePath
+            }));
+
+            // Update loggedInUser context and localStorage
+            if (setLoggedInUser) {
+                const updatedUser = {
+                    ...user, 
+                    ProfileImagePath: response.data.imagePath, 
+                };
+                setLoggedInUser(updatedUser);
+                localStorage.setItem('user', JSON.stringify(updatedUser));
+            }
+
+            // Clear selected file state after successful upload
+            setSelectedFile(null);
+           
+        } catch (error) {
+            console.error('Error uploading image:', error);
+            if (error.response && error.response.data && error.response.data.message) {
+                toast.error(`Image upload failed: ${error.response.data.message}`);
+            } else {
+                toast.error('Image upload failed. Please try again.');
+            }
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Handles removal of the profile image
+    const handleImageRemove = async () => {
+        if (!user || !user.UserID) {
+            toast.error("User not logged in or UserID not available.");
+            return;
+        }
+
+        if (!profileData.ProfileImagePath && !selectedFile) {
+            toast.info("No profile image to remove.");
+            return;
+        }
+
+        // If there's a selected file that hasn't been uploaded yet, just clear it locally
+        if (selectedFile) {
+            setSelectedFile(null);
+            setImagePreview(null); // Clear local preview
+            setProfileData(prevData => ({ ...prevData, ProfileImagePath: null })); // Clear DB path
+            toast.info("Selected image cleared locally.");
+            return;
+        }
+
+        // If there's an image from the server, send delete request
+        setLoading(true);
+        try {
+            const response = await axios.delete(`http://localhost:5000/api/user/profile/image/${user.UserID}`);
+            toast.success(response.data.message || "Profile image removed successfully!");
+
+            // Clear image states and profileData
+            setSelectedFile(null);
+            setImagePreview(null);
+            setProfileData(prevData => ({ ...prevData, ProfileImagePath: null }));
+
+            // Update loggedInUser context and localStorage
+            if (setLoggedInUser) {
+                const updatedUser = {
+                    ...user, // Keep existing user data
+                    ProfileImagePath: null, // Clear the image path
+                };
+                setLoggedInUser(updatedUser);
+                localStorage.setItem('user', JSON.stringify(updatedUser));
+            }
+        } catch (error) {
+            console.error('Error removing image:', error);
+            if (error.response && error.response.data && error.response.data.message) {
+                toast.error(`Image removal failed: ${error.response.data.message}`);
+            } else {
+                toast.error('Image removal failed. Please try again.');
+            }
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Handles saving of general profile details
     const handleSave = async (e) => {
         e.preventDefault();
 
+        // Validate form fields first
         if (!validateForm()) {
             toast.error('Please correct the errors in the form.');
             return;
         }
 
-        try {
-            const updatePayload = {
-                FullName: formData.FullName,
-                Email: formData.Email,
-                Phone: formData.Phone,
-            };
+        const currentFullName = formData.FullName.trim();
+        const currentEmail = formData.Email.trim();
+        const currentPhone = formData.Phone.trim();
 
-            if (formData.CurrentPassword && formData.NewPassword) {
-                updatePayload.CurrentPassword = formData.CurrentPassword;
-                updatePayload.NewPassword = formData.NewPassword;
-            }
+        const originalFullName = profileData.FullName ? profileData.FullName.trim() : '';
+        const originalEmail = profileData.Email ? profileData.Email.trim() : '';
+        const originalPhone = profileData.Phone ? profileData.Phone.trim() : '';
 
-            // This API call now targets the new general user profile endpoint in index.js
-            const response = await axios.put(`http://localhost:5000/api/user/profile/${user.UserID}`, updatePayload);
-            toast.success(response.data.message || 'Profile updated successfully!');
+        // Check for changes in text fields
+        const hasTextChanges =
+            currentFullName !== originalFullName ||
+            currentEmail !== originalEmail ||
+            currentPhone !== originalPhone;
 
-            if (setLoggedInUser) {
-                const updatedUser = {
-                    ...user,
-                    FullName: formData.FullName,
-                    Email: formData.Email,
-                    Phone: formData.Phone,
-                };
-                setLoggedInUser(updatedUser); // Update context
-                localStorage.setItem('user', JSON.stringify(updatedUser)); // Update localStorage
-            }
+        // Check if the user attempted to change the password (by filling current or new password)
+        const hasPasswordChanges = formData.CurrentPassword !== '' || formData.NewPassword !== '';
 
-            // Clear password fields after successful update
+        // If no changes in text fields and no password change attempt, stop here
+        if (!hasTextChanges && !hasPasswordChanges) {
+            toast.info('No changes detected to save.');
+           
             setFormData(prevData => ({
                 ...prevData,
                 CurrentPassword: '',
                 NewPassword: '',
                 ConfirmNewPassword: ''
             }));
+            return; // Exit the function
+        }
+       
+        try {
+            setLoading(true); 
 
-            // Re-fetch profile data or update state directly to reflect changes
+            const updatePayload = {
+                FullName: currentFullName, 
+                Email: currentEmail,
+                Phone: currentPhone,
+            };
+
+            if (hasPasswordChanges) { 
+                updatePayload.CurrentPassword = formData.CurrentPassword;
+                updatePayload.NewPassword = formData.NewPassword;
+            }
+
+            const response = await axios.put(`http://localhost:5000/api/user/profile/${user.UserID}`, updatePayload);
+            toast.success(response.data.message || 'Profile updated successfully!');
+
             setProfileData(prevData => ({
                 ...prevData,
-                FullName: formData.FullName,
-                Email: formData.Email,
-                Phone: formData.Phone,
+                FullName: currentFullName,
+                Email: currentEmail,
+                Phone: currentPhone,
+                
+            }));
+
+            // Also update loggedInUser context and localStorage
+            if (setLoggedInUser) {
+                const updatedUser = {
+                    ...user, // Retain existing user data, including ProfileImagePath
+                    FullName: currentFullName,
+                    Email: currentEmail,
+                    Phone: currentPhone,
+                };
+                setLoggedInUser(updatedUser); // Update context
+                localStorage.setItem('user', JSON.stringify(updatedUser)); // Update localStorage
+            }
+
+            // Clear password fields in formData after a successful password change
+            setFormData(prevData => ({
+                ...prevData,
+                CurrentPassword: '',
+                NewPassword: '',
+                ConfirmNewPassword: ''
             }));
 
         } catch (error) {
@@ -169,9 +346,12 @@ const UserProfile = () => {
             } else {
                 toast.error('Profile update failed. Please try again.');
             }
+        } finally {
+            setLoading(false); // End loading state
         }
     };
 
+    // --- Loading and Error States ---
     if (loading) {
         return (
             <div className="flex justify-center items-center h-screen">
@@ -188,14 +368,51 @@ const UserProfile = () => {
         );
     }
 
+    // --- Component Render ---
     return (
         <div className="profile-container p-8 md:p-12 min-h-screen bg-gray-100">
+             <div className="max-w-4xl mx-auto mb-4">
+                <button
+                    onClick={() => navigate(-1)} // Navigate back to the previous page
+                    className="flex items-center text-blue-600 hover:text-blue-800 font-semibold text-lg transition duration-200 focus:outline-none"
+                    aria-label="Go back" // Accessibility
+                >
+                    <FaArrowLeft className="mr-2" /> Back
+                </button>
+            </div>
             <div className="max-w-4xl mx-auto bg-white rounded-xl shadow-lg p-8">
                 <div className="flex items-center mb-8 pb-4 border-b border-gray-200">
-                    {/* User Avatar Section (placeholder) */}
-                    <div className="w-24 h-24 bg-gray-200 rounded-full flex items-center justify-center text-gray-500 text-6xl mr-6 overflow-hidden">
-                        <AiOutlineUser />
+                    {/* User Avatar Section */}
+                    <div className="relative w-24 h-24 bg-gray-200 rounded-full flex items-center justify-center text-gray-500 text-6xl mr-6 cursor-pointer"
+                        onClick={() => fileInputRef.current.click()} // Make the entire circle clickable
+                        title="Click to change profile image"
+                    >
+                        
+                        {imagePreview ? (
+                            <>
+                                <img
+                                    src={imagePreview}
+                                    alt="Profile"
+                                    className="w-full h-full object-cover rounded-full border-2 border-black"
+                                />
+                                {/* Remove Image Button */}
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleImageRemove();
+                                    }}
+                                    className="absolute top-0 right-0 m-1 bg-red-500 text-white rounded-full p-1 text-xs hover:bg-red-600 focus:outline-none shadow-md z-10"
+                                    title="Remove profile image"
+                                >
+                                    <MdClose size={12} />
+                                </button>
+
+                            </>
+                        ) : (
+                            <AiOutlineUser />
+                        )}
                     </div>
+
                     <div>
                         <h2 className="text-3xl font-extrabold text-gray-900">
                             {profileData.FullName || 'User Profile'}
@@ -203,16 +420,25 @@ const UserProfile = () => {
                         <p className="text-lg text-gray-600">
                             {profileData.Email} - <span className="font-semibold">{profileData.Role || 'User'}</span>
                         </p>
-                        <p className="text-sm text-blue-600 mt-2">
-                            Avatar from gravatar.com Or Upload your own...
-                        </p>
-                        <button
-                            onClick={() => toast.info("Image upload functionality is not implemented yet!")}
-                            className="text-gray-500 hover:text-gray-700 text-sm mt-1"
-                        >
-                            <img src="https://via.placeholder.com/20" alt="Camera Icon" className="inline-block mr-1" /> 
-                            Drop your files here or click in this area
-                        </button>
+
+                        {/* Hidden file input */}
+                        <input
+                            type="file"
+                            ref={fileInputRef} 
+                            onChange={handleFileChange}
+                            accept="image/*" // Only accept image files
+                            style={{ display: 'none' }} 
+                        />
+
+                        {/* Upload Button - only show if a file is selected locally */}
+                        {selectedFile && (
+                            <button
+                                onClick={handleImageUpload}
+                                className="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg text-sm mt-2 transition duration-200"
+                            >
+                                Upload Image
+                            </button>
+                        )}
                     </div>
                 </div>
 
