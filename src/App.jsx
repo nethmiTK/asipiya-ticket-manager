@@ -108,7 +108,14 @@ const AppRoutes = ({ isLoggedIn, setIsLoggedIn, userRole, setUserRole, loggedInU
                         </ProtectedRoute>
                     }
                 />
-
+   <Route
+                    path='/admin-dashboard'
+                    element={
+                        <ProtectedRoute allowedRoles={['admin']}>
+                            <Dashboard />
+                        </ProtectedRoute>
+                    }
+                />
                 <Route
                     path="/tickets"
                     element={
