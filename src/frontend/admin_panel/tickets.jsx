@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import AdminSideBar from "../../user_components/SideBar/AdminSideBar";
@@ -6,17 +6,22 @@ import AdminSideBar from "../../user_components/SideBar/AdminSideBar";
 const Tickets = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [tickets, setTickets] = useState([]);
+  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
   useEffect(() => {
-    axios
-      .get("http://localhost:5000/api/tickets")
-      .then((response) => {
+    const fetchTickets = async () => {
+      try {
+        const response = await axios.get("http://localhost:5000/api/tickets");
         setTickets(response.data);
-      })
-      .catch((error) => {
+        setLoading(false);
+      } catch (error) {
         console.error("Error fetching tickets:", error);
-      });
+        setLoading(false);
+      }
+    };
+
+    fetchTickets();
   }, []);
 
   const getStatusColor = (status) => {
@@ -54,6 +59,10 @@ const Tickets = () => {
     return `${hours}h ${minutes}m`;
   };
 
+  if (loading) {
+    return <p>Loading tickets...</p>;
+  }
+
   return (
     <div className="flex">
       <AdminSideBar open={isSidebarOpen} setOpen={setIsSidebarOpen} />
@@ -67,16 +76,21 @@ const Tickets = () => {
           <h1 className="text-2xl font-bold mb-4">Tickets</h1>
         </header>
 
-        <table className="w-full border-collapse border border-gray-200 text-sm">
+        <table className="min-w-full bg-white border border-gray-300">
           <thead>
             <tr>
-              <th className="border border-gray-200 px-2 py-1">ID</th>
-              <th className="border border-gray-200 px-2 py-1">User Email</th>
-              <th className="border border-gray-200 px-2 py-1">System</th>
-              <th className="border border-gray-200 px-2 py-1">Category</th>
-              <th className="border border-gray-200 px-2 py-1">Status</th>
-              <th className="border border-gray-200 px-2 py-1">Priority</th>
-              <th className="border border-gray-200 px-2 py-1">Duration</th>
+              <th className="border px-4 py-2">TicketID</th>
+              <th className="border px-4 py-2">UserId</th>
+              <th className="border px-4 py-2">AsipiyaSystemID</th>
+              <th className="border px-4 py-2">DateTime</th>
+              <th className="border px-4 py-2">TicketCategoryID</th>
+              <th className="border px-4 py-2">Description</th>
+              <th className="border px-4 py-2">Status</th>
+              <th className="border px-4 py-2">Priority</th>
+              <th className="border px-4 py-2">FirstRespondedTime</th>
+              <th className="border px-4 py-2">LastRespondedTime</th>
+              <th className="border px-4 py-2">TicketDuration</th>
+              <th className="border px-4 py-2">UserNote</th>
             </tr>
           </thead>
           <tbody>
@@ -86,35 +100,32 @@ const Tickets = () => {
                 className="cursor-pointer hover:bg-gray-100"
                 onClick={() => navigate(`/ticket_view_page/${ticket.TicketID}`)}
               >
-                <td className="border border-gray-200 px-2 py-1">
-                  {ticket.TicketID}
-                </td>
-                <td className="border border-gray-200 px-2 py-1">
-                  {ticket.UserEmail}
-                </td>
-                <td className="border border-gray-200 px-2 py-1">
-                  {ticket.System}
-                </td>
-                <td className="border border-gray-200 px-2 py-1">
-                  {ticket.Category}
-                </td>
+                <td className="border px-4 py-2">{ticket.TicketID}</td>
+                <td className="border px-4 py-2">{ticket.UserId}</td>
+                <td className="border px-4 py-2">{ticket.AsipiyaSystemID}</td>
+                <td className="border px-4 py-2">{ticket.DateTime}</td>
+                <td className="border px-4 py-2">{ticket.TicketCategoryID}</td>
+                <td className="border px-4 py-2">{ticket.Description}</td>
                 <td
-                  className={`border border-gray-200 px-2 py-1 ${getStatusColor(
-                    ticket.Status
-                  )}`}
+                  className={`border px-4 py-2 ${getStatusColor(ticket.Status)}`}
                 >
                   {ticket.Status}
                 </td>
                 <td
-                  className={`border border-gray-200 px-2 py-1 ${getPriorityColor(
-                    ticket.Priority
-                  )}`}
+                  className={`border px-4 py-2 ${getPriorityColor(ticket.Priority)}`}
                 >
                   {ticket.Priority}
                 </td>
-                <td className="border border-gray-200 px-2 py-1">
+                <td className="border px-4 py-2">
+                  {ticket.FirstRespondedTime}
+                </td>
+                <td className="border px-4 py-2">
+                  {ticket.LastRespondedTime}
+                </td>
+                <td className="border px-4 py-2">
                   {calculateDuration(ticket.DateTime)}
                 </td>
+                <td className="border px-4 py-2">{ticket.UserNote}</td>
               </tr>
             ))}
           </tbody>
