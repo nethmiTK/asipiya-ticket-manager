@@ -29,12 +29,12 @@ const Tickets = () => {
   }, [type]);
 
   const getStatusColor = (status) => {
-    switch (status) {
-      case "Open":
+    switch (status.toLowerCase()) {
+      case "open":
         return "text-red-500";
-      case "In Progress":
+      case "in progress":
         return "text-yellow-500";
-      case "Closed":
+      case "closed":
         return "text-green-500";
       default:
         return "";
@@ -42,12 +42,12 @@ const Tickets = () => {
   };
 
   const getPriorityColor = (priority) => {
-    switch (priority) {
-      case "High":
+    switch (priority.toLowerCase()) {
+      case "high":
         return "text-red-500";
-      case "Medium":
+      case "medium":
         return "text-yellow-500";
-      case "Low":
+      case "low":
         return "text-green-500";
       default:
         return "";
@@ -64,7 +64,11 @@ const Tickets = () => {
   };
 
   if (loading) {
-    return <p>Loading tickets...</p>;
+    return (
+      <div className="flex justify-center items-center h-screen">
+        <p className="text-xl">Loading tickets...</p>
+      </div>
+    );
   }
 
   return (
@@ -78,64 +82,78 @@ const Tickets = () => {
       >
         <header className="mb-6">
           <h1 className="text-2xl font-bold mb-4">
-            {type.replace("-", " ").toUpperCase()} Tickets
+            {type ? type.replace("-", " ").toUpperCase() : "ALL"} Tickets
           </h1>
         </header>
 
-        <table className="min-w-full bg-white border border-gray-300">
-          <thead>
-            <tr>
-              <th className="border px-4 py-2">TicketID</th>
-              <th className="border px-4 py-2">UserId</th>
-              <th className="border px-4 py-2">AsipiyaSystemID</th>
-              <th className="border px-4 py-2">DateTime</th>
-              <th className="border px-4 py-2">TicketCategoryID</th>
-              <th className="border px-4 py-2">Description</th>
-              <th className="border px-4 py-2">Status</th>
-              <th className="border px-4 py-2">Priority</th>
-              <th className="border px-4 py-2">FirstRespondedTime</th>
-              <th className="border px-4 py-2">LastRespondedTime</th>
-              <th className="border px-4 py-2">TicketDuration</th>
-              <th className="border px-4 py-2">UserNote</th>
-            </tr>
-          </thead>
-          <tbody>
-            {tickets.map((ticket) => (
-              <tr
-                key={ticket.TicketID}
-                className="cursor-pointer hover:bg-gray-100"
-                onClick={() => navigate(`/ticket_view_page/${ticket.TicketID}`)}
-              >
-                <td className="border px-4 py-2">{ticket.TicketID}</td>
-                <td className="border px-4 py-2">{ticket.UserId}</td>
-                <td className="border px-4 py-2">{ticket.AsipiyaSystemID}</td>
-                <td className="border px-4 py-2">{ticket.DateTime}</td>
-                <td className="border px-4 py-2">{ticket.TicketCategoryID}</td>
-                <td className="border px-4 py-2">{ticket.Description}</td>
-                <td
-                  className={`border px-4 py-2 ${getStatusColor(ticket.Status)}`}
-                >
-                  {ticket.Status}
-                </td>
-                <td
-                  className={`border px-4 py-2 ${getPriorityColor(ticket.Priority)}`}
-                >
-                  {ticket.Priority}
-                </td>
-                <td className="border px-4 py-2">
-                  {ticket.FirstRespondedTime}
-                </td>
-                <td className="border px-4 py-2">
-                  {ticket.LastRespondedTime}
-                </td>
-                <td className="border px-4 py-2">
-                  {calculateDuration(ticket.DateTime)}
-                </td>
-                <td className="border px-4 py-2">{ticket.UserNote}</td>
+        <div className="bg-white rounded-lg shadow overflow-hidden">
+          <table className="min-w-full">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  TicketID
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  User Name
+                </th>
+                
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Description
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Status
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Priority
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  User Note
+                </th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {tickets.map((ticket) => (
+                <tr
+                  key={ticket.TicketID}
+                  className="hover:bg-gray-50 cursor-pointer transition-colors"
+                  onClick={() => navigate(`/ticket_view_page/${ticket.TicketID}`)}
+                >
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    {ticket.TicketID}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {ticket.UserName || "N/A"}
+                  </td>
+                  
+                  <td className="px-6 py-4 text-sm text-gray-500 max-w-md truncate">
+                    {ticket.Description}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    <span
+                      className={`${getStatusColor(
+                        ticket.Status
+                      )} font-medium`}
+                    >
+                      {ticket.Status}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    <span
+                      className={`${getPriorityColor(
+                        ticket.Priority
+                      )} font-medium`}
+                    >
+                      {ticket.Priority}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-sm text-gray-500 max-w-md truncate">
+                    {ticket.UserNote || "No notes"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </main>
     </div>
   );
