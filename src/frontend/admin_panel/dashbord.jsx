@@ -9,11 +9,28 @@ import { CiLogout } from "react-icons/ci";
 import { GrSystem } from "react-icons/gr";
 import AdminSideBar from "../../user_components/SideBar/AdminSideBar";
 import axios from "axios";
-import { Pie } from "react-chartjs-2";
-import { Chart as ChartJS, ArcElement, Tooltip, Legend } from "chart.js";
+import { Pie, Bar } from "react-chartjs-2";
+import {
+  Chart as ChartJS,
+  ArcElement,
+  Tooltip,
+  Legend,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title
+} from "chart.js";
 import RecentlyActivity from "./RecentlyActivity"; // Import the RecentlyActivity component
 
-ChartJS.register(ArcElement, Tooltip, Legend);
+ChartJS.register(
+  ArcElement,
+  Tooltip,
+  Legend,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title
+);
 
 const Menus = [
   { title: "Dashboard", icon: <FaHome />, path: "/admin-dashboard" },
@@ -195,6 +212,199 @@ const TicketByStatusChart = () => {
   );
 };
 
+const TicketBySystemChart = () => {
+  const [chartData, setChartData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const response = await axios.get("http://localhost:5000/api/tickets/system-distribution");
+        
+        if (!response.data || response.data.length === 0) {
+          setError("No system data available");
+          setLoading(false);
+          return;
+        }
+
+        const colors = [
+          'rgba(54, 162, 235, 0.8)',   // Blue
+          'rgba(255, 99, 132, 0.8)',   // Red
+          'rgba(75, 192, 192, 0.8)',   // Green
+          'rgba(255, 206, 86, 0.8)',   // Yellow
+          'rgba(153, 102, 255, 0.8)',  // Purple
+          'rgba(255, 159, 64, 0.8)',   // Orange
+        ];
+
+        const chartData = {
+          labels: response.data.map(item => item.SystemName),
+          datasets: [
+            {
+              label: 'Number of Tickets',
+              data: response.data.map(item => item.TicketCount),
+              backgroundColor: response.data.map((_, index) => colors[index % colors.length]),
+              borderColor: response.data.map((_, index) => colors[index % colors.length].replace('0.8', '1')),
+              borderWidth: 1,
+            },
+          ],
+        };
+
+        setChartData(chartData);
+        setLoading(false);
+      } catch (error) {
+        console.error("Error fetching ticket system distribution:", error);
+        setError("Failed to load chart data. Please try again later.");
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  const options = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        display: false, // Hide legend since we have a table below
+      },
+      title: {
+        display: true,
+        text: 'Tickets by System',
+        font: {
+          size: 16,
+          weight: 'bold'
+        },
+        padding: 20
+      },
+      tooltip: {
+        callbacks: {
+          label: (context) => {
+            const value = context.raw;
+            const systemName = context.label;
+            return [
+              `System: ${systemName}`,
+              `Tickets: ${value}`
+            ];
+          }
+        }
+      }
+    },
+    scales: {
+      y: {
+        beginAtZero: true,
+        title: {
+          display: true,
+          text: 'Number of Tickets',
+          font: {
+            size: 14,
+            weight: 'bold'
+          }
+        },
+        ticks: {
+          precision: 0,
+          font: {
+            size: 12
+          }
+        },
+        grid: {
+          color: 'rgba(0, 0, 0, 0.1)'
+        }
+      },
+      x: {
+        title: {
+          display: true,
+          text: 'System Name',
+          font: {
+            size: 14,
+            weight: 'bold'
+          }
+        },
+        ticks: {
+          font: {
+            size: 12
+          },
+          maxRotation: 45,
+          minRotation: 45
+        },
+        grid: {
+          display: false
+        }
+      }
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="bg-white p-4 rounded shadow h-[400px] flex items-center justify-center">
+        <div className="flex flex-col items-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+          <p className="mt-4 text-gray-600">Loading chart data...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-white p-4 rounded shadow h-[400px] flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-red-500 mb-2">{error}</p>
+          <button 
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!chartData || chartData.labels.length === 0) {
+    return (
+      <div className="bg-white p-4 rounded shadow h-[400px] flex items-center justify-center">
+        <p className="text-gray-500">No system data available</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white p-4 rounded shadow">
+      <div className="h-[400px] mb-6">
+        <Bar data={chartData} options={options} />
+      </div>
+      <div className="mt-4 overflow-x-auto">
+        <table className="min-w-full text-sm">
+          <thead>
+            <tr className="bg-gray-50">
+              <th className="px-4 py-2 text-left font-medium text-gray-600">System Name</th>
+              <th className="px-4 py-2 text-left font-medium text-gray-600">Description</th>
+              <th className="px-4 py-2 text-right font-medium text-gray-600">Ticket Count</th>
+            </tr>
+          </thead>
+          <tbody>
+            {chartData.labels.map((label, index) => (
+              <tr key={label} className="border-t hover:bg-gray-50">
+                <td className="px-4 py-2">{label}</td>
+                <td className="px-4 py-2 text-gray-600">
+                  {chartData.datasets[0].data[index]}
+                </td>
+                <td className="px-4 py-2 text-right font-medium">
+                  {chartData.datasets[0].data[index]}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+};
+
 const Dashboard = () => {
   const navigate = useNavigate();
   const [counts, setCounts] = useState({
@@ -219,7 +429,11 @@ const Dashboard = () => {
   }, []);
 
   const handleNavigation = (type) => {
-    navigate(`/tickets?type=${type}`);
+    let path = '/tickets';
+    if (type !== 'total') {
+      path += `?type=${type}`;
+    }
+    navigate(path);
   };
 
   return (
@@ -236,44 +450,44 @@ const Dashboard = () => {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
         <div
-          className="bg-blue-500 text-white p-4 rounded shadow text-center cursor-pointer hover:bg-blue-600"
-          onClick={() => handleNavigation("total")}
+          onClick={() => handleNavigation('total')}
+          className="bg-blue-500 text-white p-4 rounded shadow text-center cursor-pointer hover:bg-blue-600 transition-colors"
         >
           <FaTicketAlt className="text-3xl mb-2 mx-auto" />
           <h2 className="text-lg font-semibold">{counts.total}</h2>
           <p>Total Tickets</p>
         </div>
         <div
-          className="bg-gray-800 text-white p-4 rounded shadow text-center cursor-pointer hover:bg-gray-700"
-          onClick={() => handleNavigation("open")}
+          onClick={() => handleNavigation('open')}
+          className="bg-gray-800 text-white p-4 rounded shadow text-center cursor-pointer hover:bg-gray-700 transition-colors"
         >
           <FaTasks className="text-3xl mb-2 mx-auto" />
           <h2 className="text-lg font-semibold">{counts.open}</h2>
           <p>Open Tickets</p>
         </div>
         <div
-          className="bg-gray-500 text-white p-4 rounded shadow text-center cursor-pointer hover:bg-gray-600"
-          onClick={() => handleNavigation("today")}
+          onClick={() => handleNavigation('today')}
+          className="bg-gray-500 text-white p-4 rounded shadow text-center cursor-pointer hover:bg-gray-600 transition-colors"
         >
           <FaCalendarDay className="text-3xl mb-2 mx-auto" />
           <h2 className="text-lg font-semibold">{counts.today}</h2>
           <p>Tickets Today</p>
         </div>
         <div
-          className="bg-red-500 text-white p-4 rounded shadow text-center cursor-pointer hover:bg-red-600"
-          onClick={() => handleNavigation("high-priority")}
+          onClick={() => handleNavigation('high-priority')}
+          className="bg-red-500 text-white p-4 rounded shadow text-center cursor-pointer hover:bg-red-600 transition-colors"
         >
           <FaExclamationCircle className="text-3xl mb-2 mx-auto" />
           <h2 className="text-lg font-semibold">{counts.highPriority}</h2>
           <p>High Priority</p>
         </div>
         <div
-          className="bg-green-600 text-white p-4 rounded shadow text-center cursor-pointer hover:bg-green-700"
-          onClick={() => handleNavigation("new")}
+          onClick={() => handleNavigation('closed')}
+          className="bg-green-600 text-white p-4 rounded shadow text-center cursor-pointer hover:bg-green-700 transition-colors"
         >
           <FaTicketAlt className="text-3xl mb-2 mx-auto" />
-          <h2 className="text-lg font-semibold">+</h2>
-          <p>Issue Ticket</p>
+          <h2 className="text-lg font-semibold">{counts.closed}</h2>
+          <p>Closed Tickets</p>
         </div>
       </div>
 
@@ -299,10 +513,7 @@ const Dashboard = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="bg-white p-4 rounded shadow">
-          <h2 className="text-lg font-semibold mb-4">Tickets by System</h2>
-          <div className="text-center text-gray-500">[Chart]</div>
-        </div>
+        <TicketBySystemChart />
         <div className="bg-white p-4 rounded shadow">
           <h2 className="text-lg font-semibold mb-4">Active Clients</h2>
           <div className="text-center text-gray-500">[Clients]</div>

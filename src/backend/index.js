@@ -411,29 +411,36 @@ app.get('/system_registration', (req, res) => {
 
 //Adding Category
 app.post('/ticket_category', (req, res) => {
-    const { categoryName, categoryDescription } = req.body;
+    const { CategoryName, Description } = req.body;
 
-    if (!categoryName || !categoryDescription) {
-        return res.status(400).json({ error: 'All fields are required.' });
+    if (!CategoryName) {
+        return res.status(400).json({ error: 'Category name is required.' });
     }
 
     const sql = 'INSERT INTO ticketcategory (CategoryName, Description) VALUES (?, ?)';
-    db.query(sql, [categoryName, categoryDescription], (err) => {
+    db.query(sql, [CategoryName, Description], (err, result) => {
         if (err) {
             console.error("Database error:", err);
-            return res.status(500).json({ message: "Database error" });
+            return res.status(500).json({ message: "Failed to add ticket category" });
         }
-        res.status(200).json({ message: 'System registered successfully' });
+        res.status(200).json({ 
+            message: 'Ticket category added successfully',
+            category: {
+                TicketCategoryID: result.insertId,
+                CategoryName,
+                Description
+            }
+        });
     });
 });
 
 //View Categories
 app.get('/ticket_category', (req, res) => {
-    const sql = 'SELECT * FROM ticketcategory';
+    const sql = 'SELECT TicketCategoryID, CategoryName, Description FROM ticketcategory ORDER BY TicketCategoryID DESC';
     db.query(sql, (err, results) => {
         if (err) {
-            console.error('Error fetching systems:', err);
-            return res.status(500).json({ message: 'Error fetching systems' });
+            console.error('Error fetching categories:', err);
+            return res.status(500).json({ message: 'Error fetching categories' });
         }
         res.status(200).json(results);
     });
@@ -646,21 +653,20 @@ app.get("/ticket_category", (req, res) => {
 app.get('/api/tickets/counts', (req, res) => {
     const queries = {
         total: 'SELECT COUNT(*) AS count FROM ticket',
-        open: "SELECT COUNT(*) AS count FROM ticket WHERE Status = 'open'",
+        open: "SELECT COUNT(*) AS count FROM ticket WHERE Status = 'Open'",
         today: "SELECT COUNT(*) AS count FROM ticket WHERE DATE(DateTime) = CURDATE()",
         highPriority: "SELECT COUNT(*) AS count FROM ticket WHERE Priority = 'High'",
-        closed: "SELECT COUNT(*) AS count FROM ticket WHERE Status = 'close'"
+        closed: "SELECT COUNT(*) AS count FROM ticket WHERE Status = 'Closed'"
     };
 
     const results = {};
     let completed = 0;
 
-    Object.keys(queries).forEach((key) => {
-        db.query(queries[key], (err, result) => {
+    Object.entries(queries).forEach(([key, query]) => {
+        db.query(query, (err, result) => {
             if (err) {
                 console.error(`Error fetching ${key} count:`, err);
-                res.status(500).json({ error: 'Failed to fetch ticket counts' });
-                return;
+                return res.status(500).json({ error: `Failed to fetch ${key} ticket count` });
             }
 
             results[key] = result[0].count;
@@ -780,6 +786,28 @@ app.get('/api/tickets/ ', (req, res) => {
         if (err) {
             console.error('Error fetching tickets  s:', err);
             res.status(500).json({ error: 'Failed to fetch tickets ' });
+            return;
+        }
+        res.json(results);
+    });
+});
+
+// API endpoint to fetch ticket counts by system
+app.get('/api/tickets/system-distribution', (req, res) => {
+    const query = `
+        SELECT 
+            s.SystemName,
+            COUNT(t.TicketID) as TicketCount
+        FROM asipiyasystem s
+        LEFT JOIN ticket t ON s.AsipiyaSystemID = t.AsipiyaSystemID
+        GROUP BY s.SystemName
+        ORDER BY TicketCount DESC;
+    `;
+
+    db.query(query, (err, results) => {
+        if (err) {
+            console.error('Error fetching ticket system distribution:', err);
+            res.status(500).json({ error: 'Failed to fetch ticket system distribution' });
             return;
         }
         res.json(results);

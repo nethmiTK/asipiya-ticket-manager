@@ -47,9 +47,10 @@ CREATE TABLE IF NOT EXISTS `appuser` (
 DROP TABLE IF EXISTS `asipiyasystem`;
 CREATE TABLE IF NOT EXISTS `asipiyasystem` (
   `AsipiyaSystemID` int NOT NULL AUTO_INCREMENT,
-  `Description` varchar(45) DEFAULT NULL,
+  `SystemName` varchar(100) NOT NULL,
+  `Description` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`AsipiyaSystemID`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- --------------------------------------------------------
 
@@ -120,9 +121,10 @@ CREATE TABLE IF NOT EXISTS `ticket` (
 DROP TABLE IF EXISTS `ticketcategory`;
 CREATE TABLE IF NOT EXISTS `ticketcategory` (
   `TicketCategoryID` int NOT NULL AUTO_INCREMENT,
-  `Description` varchar(45) DEFAULT NULL,
+  `CategoryName` varchar(100) NOT NULL,
+  `Description` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`TicketCategoryID`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- --------------------------------------------------------
 

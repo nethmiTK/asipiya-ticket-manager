@@ -15,7 +15,7 @@ const Tickets = () => {
     const fetchTickets = async () => {
       try {
         const response = await axios.get(
-          `http://localhost:5000/api/tickets/filter?type=${type}`
+          `http://localhost:5000/api/tickets/filter?type=${type || ''}`
         );
         setTickets(response.data);
         setLoading(false);
@@ -81,9 +81,49 @@ const Tickets = () => {
         }`}
       >
         <header className="mb-6">
-          <h1 className="text-2xl font-bold mb-4">
-            {type ? type.replace("-", " ").toUpperCase() : "ALL"} Tickets
-          </h1>
+          <h1 className="text-2xl font-bold mb-4">Tickets</h1>
+          <div className="flex gap-4 mb-6">
+            <button
+              onClick={() => navigate('/tickets')}
+              className={`px-6 py-2 rounded-lg transition-colors ${
+                !type ? 'bg-blue-500 text-white' : 'bg-gray-200 hover:bg-gray-300'
+              }`}
+            >
+              All Tickets
+            </button>
+            <button
+              onClick={() => navigate('/tickets?type=open')}
+              className={`px-6 py-2 rounded-lg transition-colors ${
+                type === 'open' ? 'bg-blue-500 text-white' : 'bg-gray-200 hover:bg-gray-300'
+              }`}
+            >
+              Open Tickets
+            </button>
+            <button
+              onClick={() => navigate('/tickets?type=today')}
+              className={`px-6 py-2 rounded-lg transition-colors ${
+                type === 'today' ? 'bg-blue-500 text-white' : 'bg-gray-200 hover:bg-gray-300'
+              }`}
+            >
+              Today's Tickets
+            </button>
+            <button
+              onClick={() => navigate('/tickets?type=high-priority')}
+              className={`px-6 py-2 rounded-lg transition-colors ${
+                type === 'high-priority' ? 'bg-blue-500 text-white' : 'bg-gray-200 hover:bg-gray-300'
+              }`}
+            >
+              High Priority
+            </button>
+            <button
+              onClick={() => navigate('/tickets?type=closed')}
+              className={`px-6 py-2 rounded-lg transition-colors ${
+                type === 'closed' ? 'bg-blue-500 text-white' : 'bg-gray-200 hover:bg-gray-300'
+              }`}
+            >
+              Closed Tickets
+            </button>
+          </div>
         </header>
 
         <div className="bg-white rounded-lg shadow overflow-hidden">
@@ -96,7 +136,6 @@ const Tickets = () => {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   User Name
                 </th>
-                
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Description
                 </th>
@@ -124,25 +163,16 @@ const Tickets = () => {
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {ticket.UserName || "N/A"}
                   </td>
-                  
                   <td className="px-6 py-4 text-sm text-gray-500 max-w-md truncate">
                     {ticket.Description}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    <span
-                      className={`${getStatusColor(
-                        ticket.Status
-                      )} font-medium`}
-                    >
+                    <span className={`${getStatusColor(ticket.Status)} font-medium`}>
                       {ticket.Status}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    <span
-                      className={`${getPriorityColor(
-                        ticket.Priority
-                      )} font-medium`}
-                    >
+                    <span className={`${getPriorityColor(ticket.Priority)} font-medium`}>
                       {ticket.Priority}
                     </span>
                   </td>
