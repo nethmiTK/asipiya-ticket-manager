@@ -1,33 +1,41 @@
 // src/App.jsx
-import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
-import Register from './frontend/Authenication/Register';
-import Login from './frontend/Authenication/Login';
-import UserDashboard from './frontend/users_panel/usersDashboard';
-import Dashboard from './frontend/admin_panel/dashbord';
-import { useState, useEffect, createContext, useContext } from 'react';
-import './App.css';
-import { ToastContainer } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  Navigate,
+  useNavigate,
+  useLocation,
+} from "react-router-dom";
+import Register from "./frontend/Authenication/Register";
+import Login from "./frontend/Authenication/Login";
+import UserDashboard from "./frontend/users_panel/usersDashboard";
+import Dashboard from "./frontend/admin_panel/dashbord";
+import { useState, useEffect, createContext, useContext } from "react";
+import "./App.css";
+import { ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
-import AdminSideBar from './user_components/SideBar/AdminSideBar';
-import AdminProfile from './frontend/admin_panel/AdminProfile';
+import AdminSideBar from "./user_components/SideBar/AdminSideBar";
+import AdminProfile from "./frontend/admin_panel/AdminProfile";
 
-import AddSupervisor from './frontend/admin_panel/AddSupervisor';
-import AddMember from './frontend/admin_panel/AddMember';
-import TicketManage from './frontend/admin_panel/TicketManage';
-import EditMember from './frontend/admin_panel/EditMember';
-import Tickets from './frontend/admin_panel/tickets';
-import OpenTickets from './frontend/users_panel/openTickets';
-import SystemRegistration from './frontend/admin_panel/SystemRegistration';
-import TicketCategory from './frontend/admin_panel/TicketCategory';
-import UserProfile from './frontend/users_panel/UserProfile';
-import TicketViewPage from './frontend/admin_panel/TicketViewPage'
+import AddSupervisor from "./frontend/admin_panel/AddSupervisor";
+import AddMember from "./frontend/admin_panel/AddMember";
+import TicketManage from "./frontend/admin_panel/TicketManage";
+import EditMember from "./frontend/admin_panel/EditMember";
+import Tickets from "./frontend/admin_panel/tickets";
+import OpenTickets from "./frontend/users_panel/openTickets";
+import SystemRegistration from "./frontend/admin_panel/SystemRegistration";
+import TicketCategory from "./frontend/admin_panel/TicketCategory";
+import UserProfile from "./frontend/users_panel/UserProfile";
+import TicketViewPage from "./frontend/admin_panel/TicketViewPage";
+import TicketRequest from "./frontend/admin_panel/TicketRequest";
 
 // Create Auth Context - loggedInUser and setLoggedInUser
 const AuthContext = createContext(null);
 export const useAuth = () => useContext(AuthContext);
 
-// Protected Route Component 
+// Protected Route Component
 const ProtectedRoute = ({ children, allowedRoles }) => {
     const { isLoggedIn, userRole } = useAuth();
     const navigate = useNavigate();
@@ -60,9 +68,16 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
     return children;
 };
 
-// App Routes Component 
-const AppRoutes = ({ isLoggedIn, setIsLoggedIn, userRole, setUserRole, loggedInUser, setLoggedInUser }) => {
-    const navigate = useNavigate();
+// App Routes Component
+const AppRoutes = ({
+  isLoggedIn,
+  setIsLoggedIn,
+  userRole,
+  setUserRole,
+  loggedInUser,
+  setLoggedInUser,
+}) => {
+  const navigate = useNavigate();
 
     // handleLoginSuccess now accepts the full user object
     const handleLoginSuccess = (user) => {
@@ -201,26 +216,34 @@ const AppRoutes = ({ isLoggedIn, setIsLoggedIn, userRole, setUserRole, loggedInU
 
                 <Route path='/ticket_view_page/:id' element={[<TicketViewPage />]} />
 
-            </Routes>
-            <ToastContainer
-                position="top-right"
-                autoClose={3000}
-                hideProgressBar={false}
-                newestOnTop
-                closeOnClick
-                rtl={false}
-                pauseOnFocusLoss
-                draggable
-                pauseOnHover
-                theme="colored"
-            />
-        </AuthContext.Provider>
-    );
+        <Route path="/ticket_view_page/:id" element={[<TicketViewPage />]} />
+      </Routes>
+      <ToastContainer
+        position="top-right"
+        autoClose={3000}
+        hideProgressBar={false}
+        newestOnTop
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="colored"
+      />
+    </AuthContext.Provider>
+  );
 };
 
-// Component to render sidebar conditionally based on route and role 
-const RenderWithLayout = ({ isLoggedIn, userRole, setIsLoggedIn, setUserRole, loggedInUser, setLoggedInUser }) => {
-    const location = useLocation();
+// Component to render sidebar conditionally based on route and role
+const RenderWithLayout = ({
+  isLoggedIn,
+  userRole,
+  setIsLoggedIn,
+  setUserRole,
+  loggedInUser,
+  setLoggedInUser,
+}) => {
+  const location = useLocation();
 
     // Show AdminSideBar only for logged in admin-side roles and not on auth routes
     const showAdminSidebar =
@@ -245,7 +268,7 @@ const RenderWithLayout = ({ isLoggedIn, userRole, setIsLoggedIn, setUserRole, lo
     );
 };
 
-// Main App component 
+// Main App component
 function App() {
     const [isLoggedIn, setIsLoggedIn] = useState(false);
     const [userRole, setUserRole] = useState(null);
