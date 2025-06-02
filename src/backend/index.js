@@ -636,25 +636,64 @@ app.delete('/api/user/profile/image/:id', (req, res) => {
 
 //Create ticket 
 app.get("/system_registration", (req, res) => {
-    const sql = "SELECT SystemName FROM asipiyasystem";
-    db.query(sql, (err, results) => {
-        if (err) {
-            console.error("Error fetching systems:", err);
-            return res.status(500).json({ error: "Database error" });
-        }
-        res.json(results);
-    });
+  const sql = "SELECT SystemName FROM asipiyasystem";
+  db.query(sql, (err, results) => {
+    if (err) {
+      console.error("Error fetching systems:", err);
+      return res.status(500).json({ error: "Database error" });
+    }
+    res.json(results);
+  });
 });
 
 app.get("/ticket_category", (req, res) => {
-    const sql = "SELECT CategoryName FROM ticketcategory";
-    db.query(sql, (err, results) => {
+  const sql = "SELECT CategoryName FROM ticketcategory";
+  db.query(sql, (err, results) => {
+    if (err) {
+      console.error("Error fetching systems:", err);
+      return res.status(500).json({ error: "Database error" });
+    }
+    res.json(results);
+  });
+});
+
+
+app.post("/create_ticket", (req, res) => {
+  const { userId, systemName, ticketCategory, description } = req.body;
+
+  if (!userId || !systemName || !ticketCategory || !description) {
+    return res.status(400).json({ message: "All fields are required" });
+  }
+
+  const getSystemId = "SELECT AsipiyaSystemID FROM asipiyasystem WHERE SystemName = ?";
+  db.query(getSystemId, [systemName], (err, systemResults) => {
+    if (err || systemResults.length === 0) {
+      console.error("Error fetching system ID:", err);
+      return res.status(400).json({ message: "Invalid system name" });
+    }
+    const systemId = systemResults[0].AsipiyaSystemID;
+
+    const getCategoryId = "SELECT TicketCategoryID FROM ticketcategory WHERE CategoryName = ?";
+    db.query(getCategoryId, [ticketCategory], (err, categoryResults) => {
+      if (err || categoryResults.length === 0) {
+        console.error("Error fetching category ID:", err);
+        return res.status(400).json({ message: "Invalid ticket category" });
+      }
+      const categoryId = categoryResults[0].TicketCategoryID;
+
+      const insertTicket = `
+        INSERT INTO ticket (UserId, AsipiyaSystemID, TicketCategoryID, Description, Status, Priority, DateTime)
+        VALUES (?, ?, ?, ?, 'Pending', 'High', NOW())
+      `;
+      db.query(insertTicket, [userId, systemId, categoryId, description], (err, result) => {
         if (err) {
-            console.error("Error fetching systems:", err);
-            return res.status(500).json({ error: "Database error" });
+          console.error("Error inserting ticket:", err);
+          return res.status(500).json({ message: "Server error" });
         }
-        res.json(results);
+        res.status(200).json({ message: "Ticket created", ticketId: result.insertId });
+      });
     });
+  });
 });
 
 // API endpoint to fetch ticket counts
