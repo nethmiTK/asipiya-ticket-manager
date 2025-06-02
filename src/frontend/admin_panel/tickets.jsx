@@ -29,7 +29,7 @@ const Tickets = () => {
   }, [type]);
 
   const getStatusColor = (status) => {
-    switch (status.toLowerCase()) {
+    switch (status?.toLowerCase()) {
       case "open":
         return "text-red-500";
       case "in progress":
@@ -41,12 +41,12 @@ const Tickets = () => {
       case "accept":
         return "text-blue-500";
       default:
-        return "";
+        return "text-gray-500";
     }
   };
 
   const getPriorityColor = (priority) => {
-    switch (priority.toLowerCase()) {
+    switch (priority?.toLowerCase()) {
       case "high":
         return "text-red-500";
       case "medium":
@@ -54,7 +54,7 @@ const Tickets = () => {
       case "low":
         return "text-green-500";
       default:
-        return "";
+        return "text-gray-500";
     }
   };
 

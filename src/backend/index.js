@@ -690,31 +690,32 @@ app.get('/api/tickets/filter', (req, res) => {
             t.Description,
             t.Status,
             t.Priority,
-            t.UserNote
+            t.UserNote,
+            t.DateTime
         FROM ticket t
         LEFT JOIN appuser u ON t.UserId = u.UserID
     `;
 
     let whereClause = '';
-    let orderClause = '';
+    let orderClause = 'ORDER BY t.DateTime DESC';
     
     switch (type) {
         case 'open':
-            whereClause = "WHERE t.Status != 'Reject'";
+            whereClause = "WHERE t.Status NOT IN ('Reject', 'Closed')";
             break;
         case 'today':
             whereClause = "WHERE DATE(t.DateTime) = CURDATE()";
             break;
         case 'high-priority':
             whereClause = "WHERE t.Status NOT IN ('Closed', 'Reject')";
-            orderClause = "ORDER BY FIELD(t.Priority, 'High', 'Medium', 'Low')";
+            orderClause = "ORDER BY FIELD(t.Priority, 'High', 'Medium', 'Low'), t.DateTime DESC";
             break;
         case 'closed':
             whereClause = "WHERE t.Status = 'Closed'";
             break;
     }
 
-    const query = baseQuery + (whereClause ? ' ' + whereClause : '') + (orderClause ? ' ' + orderClause : '');
+    const query = baseQuery + (whereClause ? ' ' + whereClause : '') + ' ' + orderClause;
 
     db.query(query, (err, results) => {
         if (err) {
