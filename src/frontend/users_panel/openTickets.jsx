@@ -121,8 +121,29 @@ const OpenTickets = () => {
                   ticketCategory: "",
                   description: "",
                 }}
-                onSubmit={(values) => {
-                  console.log("Form values:", values);
+                onSubmit={async (values, { resetForm }) => {
+                  try {
+                    const user = JSON.parse(localStorage.getItem("user"));
+                    if (!user || !user.UserID) {
+                      alert("User not logged in. Please login first.");
+                      return;
+                    }
+                    const payload = {
+                      ...values,
+                      userId: user.UserID,
+                    };
+
+                    const res = await axios.post(
+                      "http://localhost:5000/create_ticket",
+                      payload
+                    );
+                    alert("Ticket submitted successfully");
+                    resetForm();
+                    setFiles([]);
+                  } catch (err) {
+                    console.error("Error submitting ticket:", err);
+                    alert("Failed to submit ticket");
+                  }
                 }}
               >
                 <Form className="space-y-4">

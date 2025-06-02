@@ -6,9 +6,9 @@ import nodemailer from 'nodemailer';
 import bodyParser from 'body-parser';
 import cors from 'cors';
 import multer from 'multer';
-import path from 'path'; 
-import { fileURLToPath } from 'url'; 
-import fs from 'fs'; 
+import path from 'path';
+import { fileURLToPath } from 'url';
+import fs from 'fs';
 import bcrypt from 'bcryptjs';
 
 // --- Database Connection ---
@@ -44,16 +44,16 @@ const profileImageStorage = multer.diskStorage({
         const uploadDir = path.join(__dirname, 'uploads', 'profile_images');
         // Create the directory if it doesn't exist
         fs.mkdirSync(uploadDir, { recursive: true });
-        cb(null, uploadDir); 
+        cb(null, uploadDir);
     },
     filename: (req, file, cb) => {
-        const userId = req.params.id; 
+        const userId = req.params.id;
         const fileExtension = file.originalname.split('.').pop();
-        cb(null, `${userId}-${Date.now()}.${fileExtension}`); 
+        cb(null, `${userId}-${Date.now()}.${fileExtension}`);
     }
 });
 
-const upload = multer({ storage: profileImageStorage }); 
+const upload = multer({ storage: profileImageStorage });
 
 //  Define salt rounds for bcrypt hashing.
 const saltRounds = 10;
@@ -69,12 +69,12 @@ app.post('/register', (req, res) => {
         }
 
         const query = 'INSERT INTO appuser (FullName, Email, Password, Role, Phone) VALUES (?, ?, ?, ?, ?)';
-        
+
         db.query(query, [FullName, Email, hashedPassword, Role, Phone], (err, result) => {
             if (err) {
                 console.error('Error inserting user:', err);
-              
-                if (err.code === 'ER_DUP_ENTRY') { 
+
+                if (err.code === 'ER_DUP_ENTRY') {
                     return res.status(409).json({ message: 'User with this email already exists.' });
                 }
                 res.status(500).send('Error registering user');
@@ -119,7 +119,7 @@ app.post('/login', (req, res) => {
             return res.status(401).json({ message: 'Invalid credentials' });
         }
 
-        const user = results[0]; 
+        const user = results[0];
 
         bcrypt.compare(Password, user.HashedPassword, (compareErr, isMatch) => {
             if (compareErr) {
@@ -136,7 +136,7 @@ app.post('/login', (req, res) => {
                         FullName: user.FullName,
                         Email: user.Email,
                         Phone: user.Phone,
-                        Role: user.Role.toLowerCase(),
+                        Role: user.Role,
                         ProfileImagePath: user.ProfileImagePath || null
                     }
                 });
@@ -152,7 +152,7 @@ app.post('/login', (req, res) => {
 app.get('/api/user/profile/:id', (req, res) => {
     const userId = req.params.id;
     // Select all fields that the frontend profile form expects
-     const query = 'SELECT UserID, FullName, Email, Phone, Role, ProfileImagePath FROM appuser WHERE UserID = ?';
+    const query = 'SELECT UserID, FullName, Email, Phone, Role, ProfileImagePath FROM appuser WHERE UserID = ?';
 
     db.query(query, [userId], (err, results) => {
         if (err) {
@@ -219,7 +219,7 @@ app.put('/api/user/profile/:id', async (req, res) => {
         res.status(500).json({ message: 'Server error while updating profile' });
     }
 });
- 
+
 /* ------------------------- Add Members ------------------------- */
 
 // Get all supervisors (excluding users)
@@ -290,12 +290,22 @@ function isValidEmail(email) {
 app.post('/api/invite', (req, res) => {
     const { email, role } = req.body;
 
+    // --- Validation ----
+    const allowedRoles = ['User', 'Supervisor', 'Manager', 'Developer'];
+    if (!allowedRoles.includes(role)) {
+        return res.status(400).json({ message: `Invalid role specified: ${role}. Allowed roles are: ${allowedRoles.join(', ')}` });
+    }
+
     if (!email || !role || !isValidEmail(email)) {
         return res.status(400).json({ message: 'Valid email and role are required' });
     }
+
     const checkQuery = 'SELECT * FROM appuser WHERE Email = ?';
     db.query(checkQuery, [email], async (err, results) => {
-        if (err) return res.status(500).json({ message: 'Server error' });
+        if (err) {
+            console.error('Error checking existing user:', err); 
+            return res.status(500).json({ message: 'Server error' });
+        }
 
         const mailOptions = {
             from: `"Asipiya Soft Solution (PVT) LTD" <${process.env.EMAIL_USER}>`,
@@ -303,14 +313,14 @@ app.post('/api/invite', (req, res) => {
             subject: `You're invited to manage user complaints - Role: ${role}`,
             html: `
     <div style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: auto; background-color: #ffe6f0; border: 1px solid #ddd; border-radius: 10px; padding: 20px;">
-      
-      <!-- 1. Logo and Company Name Inline -->
+
+     <!-- 1. Logo and Company Name Inline -->
       <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 20px;">
         <img src="https://miro.medium.com/v2/resize:fit:2400/1*-okfOPV73mecuWxCZz6uJA.jpeg" alt="Asipiya Logo" style="width: 50px; height: auto;">
         <h2 style="margin: 0; color: #005baa;">Asipiya Soft Solution (PVT) LTD</h2>
       </div>
 
-      <!-- 2. Personalized Welcome -->
+       <!-- 2. Personalized Welcome -->
       <h3 style="text-align: center; color: #005baa;">Welcome Aboard!</h3>
       <p>Hello <strong>${role}</strong>,</p>
 
@@ -324,10 +334,10 @@ app.post('/api/invite', (req, res) => {
         <li>💬 Collaborate with your team to solve problems efficiently</li>
       </ul>
 
-      <!-- 5. Onboarding Step -->
+          <!-- 5. Onboarding Step -->
       <p><strong>Step 1:</strong> Set your password to activate your account.</p>
 
-      <!-- 6. CTA Button -->
+       <!-- 6. CTA Button -->
       <div style="text-align: center; margin: 30px 0;">
         <a href="${process.env.APP_URL}/register?email=${encodeURIComponent(email)}&role=${encodeURIComponent(role)}"
            style="background: #005baa; color: #fff; text-decoration: none; padding: 14px 24px; border-radius: 6px; font-size: 16px;">
@@ -343,14 +353,12 @@ app.post('/api/invite', (req, res) => {
       <!-- 8. Support Info -->
       <p>❓ Need help? Contact our support team at <a href="mailto:support@asipiya.lk">support@asipiya.lk</a></p>
 
-      <!-- Footer -->
+       <!-- Footer -->
       <hr style="margin-top: 30px;">
       <p style="font-size: 12px; text-align: center; color: #aaa;">&copy; ${new Date().getFullYear()} Asipiya Soft Solution (PVT) LTD. All rights reserved.</p>
     </div>
   `
         };
-
-
 
         try {
             await transporter.sendMail(mailOptions);
@@ -431,7 +439,7 @@ app.post('/ticket_category', (req, res) => {
             console.error("Database error:", err);
             return res.status(500).json({ message: "Failed to add ticket category" });
         }
-        res.status(200).json({ 
+        res.status(200).json({
             message: 'Ticket category added successfully',
             category: {
                 TicketCategoryID: result.insertId,
@@ -457,8 +465,8 @@ app.get('/ticket_category', (req, res) => {
 
 //View ticket details
 app.get('/api/ticket_view/:id', (req, res) => {
-  const ticketId = req.params.id;
-  const query = `SELECT t.TicketID, u.FullName AS UserName, s.SystemName, c.CategoryName, t.Description, t.DateTime,
+    const ticketId = req.params.id;
+    const query = `SELECT t.TicketID, u.FullName AS UserName, s.SystemName, c.CategoryName, t.Description, t.DateTime,
   t.Status, t.Priority, t.FirstRespondedTime, t.LastRespondedTime, t.TicketDuration, t.UserNote
   FROM 
     ticket t
@@ -490,7 +498,7 @@ app.get('/api/ticket_view/:id', (req, res) => {
 // Get user profile endpoint (general user) 
 app.get('/api/user/profile/:id', (req, res) => {
     const userId = req.params.id;
-    const query = 'SELECT UserID, FullName, Email, Phone, Role, ProfileImagePath FROM appuser WHERE UserID = ?'; 
+    const query = 'SELECT UserID, FullName, Email, Phone, Role, ProfileImagePath FROM appuser WHERE UserID = ?';
 
     db.query(query, [userId], (err, results) => {
         if (err) {
@@ -522,7 +530,7 @@ app.put('/api/user/profile/:id', (req, res) => {
             return res.status(404).json({ message: 'User not found' });
         }
 
-        const currentUser = results[0]; 
+        const currentUser = results[0];
 
         const handleProfileUpdate = async () => {
             let updateQuery;
@@ -571,13 +579,13 @@ app.put('/api/user/profile/:id', (req, res) => {
 // PROFILE IMAGE UPLOAD ENDPOINT
 app.post('/api/user/profile/upload/:id', upload.single('profileImage'), (req, res) => {
     const userId = req.params.id;
-    
+
     if (!req.file) {
         return res.status(400).json({ message: 'No file uploaded.' });
     }
 
     // Path relative to the 'uploads' directory, to be stored in DB
-    const imagePath = `profile_images/${req.file.filename}`; 
+    const imagePath = `profile_images/${req.file.filename}`;
 
     const query = 'UPDATE appuser SET ProfileImagePath = ? WHERE UserID = ?';
     db.query(query, [imagePath, userId], (err, result) => {
@@ -588,9 +596,9 @@ app.post('/api/user/profile/upload/:id', upload.single('profileImage'), (req, re
             });
             return res.status(500).json({ message: 'Error saving image path to database.' });
         }
-        res.status(200).json({ 
-            message: 'Profile image uploaded successfully', 
-            imagePath: imagePath 
+        res.status(200).json({
+            message: 'Profile image uploaded successfully',
+            imagePath: imagePath
         });
     });
 });
@@ -611,7 +619,7 @@ app.delete('/api/user/profile/image/:id', (req, res) => {
         }
 
         const oldImagePath = results[0].ProfileImagePath;
-        const fullPathToDelete = path.join(__dirname, 'uploads', oldImagePath); 
+        const fullPathToDelete = path.join(__dirname, 'uploads', oldImagePath);
 
         // Update DB first to clear the path
         const updateDbQuery = 'UPDATE appuser SET ProfileImagePath = NULL WHERE UserID = ?';
@@ -637,25 +645,64 @@ app.delete('/api/user/profile/image/:id', (req, res) => {
 
 //Create ticket 
 app.get("/system_registration", (req, res) => {
-    const sql = "SELECT SystemName FROM asipiyasystem";
-    db.query(sql, (err, results) => {
-        if (err) {
-            console.error("Error fetching systems:", err);
-            return res.status(500).json({ error: "Database error" });
-        }
-        res.json(results);
-    });
+  const sql = "SELECT SystemName FROM asipiyasystem";
+  db.query(sql, (err, results) => {
+    if (err) {
+      console.error("Error fetching systems:", err);
+      return res.status(500).json({ error: "Database error" });
+    }
+    res.json(results);
+  });
 });
 
 app.get("/ticket_category", (req, res) => {
-    const sql = "SELECT CategoryName FROM ticketcategory";
-    db.query(sql, (err, results) => {
+  const sql = "SELECT CategoryName FROM ticketcategory";
+  db.query(sql, (err, results) => {
+    if (err) {
+      console.error("Error fetching systems:", err);
+      return res.status(500).json({ error: "Database error" });
+    }
+    res.json(results);
+  });
+});
+
+
+app.post("/create_ticket", (req, res) => {
+  const { userId, systemName, ticketCategory, description } = req.body;
+
+  if (!userId || !systemName || !ticketCategory || !description) {
+    return res.status(400).json({ message: "All fields are required" });
+  }
+
+  const getSystemId = "SELECT AsipiyaSystemID FROM asipiyasystem WHERE SystemName = ?";
+  db.query(getSystemId, [systemName], (err, systemResults) => {
+    if (err || systemResults.length === 0) {
+      console.error("Error fetching system ID:", err);
+      return res.status(400).json({ message: "Invalid system name" });
+    }
+    const systemId = systemResults[0].AsipiyaSystemID;
+
+    const getCategoryId = "SELECT TicketCategoryID FROM ticketcategory WHERE CategoryName = ?";
+    db.query(getCategoryId, [ticketCategory], (err, categoryResults) => {
+      if (err || categoryResults.length === 0) {
+        console.error("Error fetching category ID:", err);
+        return res.status(400).json({ message: "Invalid ticket category" });
+      }
+      const categoryId = categoryResults[0].TicketCategoryID;
+
+      const insertTicket = `
+        INSERT INTO ticket (UserId, AsipiyaSystemID, TicketCategoryID, Description, Status, Priority, DateTime)
+        VALUES (?, ?, ?, ?, 'Pending', 'High', NOW())
+      `;
+      db.query(insertTicket, [userId, systemId, categoryId, description], (err, result) => {
         if (err) {
-            console.error("Error fetching systems:", err);
-            return res.status(500).json({ error: "Database error" });
+          console.error("Error inserting ticket:", err);
+          return res.status(500).json({ message: "Server error" });
         }
-        res.json(results);
+        res.status(200).json({ message: "Ticket created", ticketId: result.insertId });
+      });
     });
+  });
 });
 
 // API endpoint to fetch ticket counts
@@ -832,4 +879,4 @@ app.listen(5000, () => {
     console.log('Server is running on port 5000');
 });
 
-export default db;
+export default db;                

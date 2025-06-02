@@ -27,8 +27,8 @@ const Menus = [
     ]
   },
   { title: "Ticket Manage", icon: <LuTicketCheck />, path: "/ticket-manage" },
-  { title: "Supervisor Manage", icon: <VscNotebook />, path: "/supervisor" },
-  {
+    { title: "Supervisor Add", icon: <VscNotebook />, path: "/supervisor" },
+   {
     title: "Asipiya Systems",
     icon: <GrSystem />,
     subMenu: true,

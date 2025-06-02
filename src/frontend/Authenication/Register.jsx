@@ -1,9 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { toast } from 'react-toastify';
 
 const Register = () => {
+    const navigate = useNavigate();
+    const location = useLocation();
+
+    // State for form data
     const [formData, setFormData] = useState({
         FullName: '',
         Email: '',
@@ -11,15 +15,36 @@ const Register = () => {
         Role: 'User', // Default value
         Phone: ''
     });
+
     // State to store validation errors
     const [errors, setErrors] = useState({});
 
-    const navigate = useNavigate();
+    // State to track if the email and role were pre-filled from the URL
+    const [isEmailPreFilled, setIsEmailPreFilled] = useState(false);
+    const [isRolePreFilled, setIsRolePreFilled] = useState(false);
+
+
+    // Use useEffect to parse URL parameters when the component mounts
+    useEffect(() => {
+        const params = new URLSearchParams(location.search);
+        const emailFromUrl = params.get('email');
+        const roleFromUrl = params.get('role');
+
+        if (emailFromUrl) {
+            setFormData(prevData => ({ ...prevData, Email: emailFromUrl }));
+            setIsEmailPreFilled(true);
+        }
+        if (roleFromUrl) {
+            // Capitalize the first letter of the role for display/consistency if needed
+            const formattedRole = roleFromUrl.charAt(0).toUpperCase() + roleFromUrl.slice(1).toLowerCase();
+            setFormData(prevData => ({ ...prevData, Role: formattedRole }));
+            setIsRolePreFilled(true);
+        }
+    }, [location.search]);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
         setFormData({ ...formData, [name]: value });
-        // Clear error for the current field as user types
         setErrors(prevErrors => ({ ...prevErrors, [name]: '' }));
     };
 
@@ -28,19 +53,16 @@ const Register = () => {
         const newErrors = {};
         const { FullName, Email, Password, Phone } = formData;
 
-        // FullName validation 
         if (!FullName.trim()) {
             newErrors.FullName = 'Full Name is required.';
         }
 
-        // Email validation
         if (!Email.trim()) {
             newErrors.Email = 'Email is required.';
-        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(Email)) { // Basic email regex
+        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(Email)) {
             newErrors.Email = 'Invalid email format (e.g., user@example.com).';
         }
 
-        // Password validation
         if (!Password) {
             newErrors.Password = 'Password is required.';
         } else if (Password.length < 8) {
@@ -51,22 +73,21 @@ const Register = () => {
             newErrors.Password = 'Password must contain at least one lowercase letter.';
         } else if (!/[0-9]/.test(Password)) {
             newErrors.Password = 'Password must contain at least one number.';
-        } else if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(Password)) { // Special characters
+        } else if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(Password)) {
             newErrors.Password = 'Password must contain at least one special character.';
         }
 
         // Phone validation
         if (!Phone.trim()) {
             newErrors.Phone = 'Phone number is required.';
-        } else if (!/^\d+$/.test(Phone)) { // Only digits allowed
+        } else if (!/^\d+$/.test(Phone)) {
             newErrors.Phone = 'Phone number must contain only digits.';
-        } else if (Phone.length < 10) { 
+        } else if (Phone.length < 10) {
             newErrors.Phone = 'Phone number must be at least 10 digits long.';
         }
 
-
         setErrors(newErrors);
-        return Object.keys(newErrors).length === 0; // Return true if no errors
+        return Object.keys(newErrors).length === 0;
     };
 
 
@@ -106,9 +127,8 @@ const Register = () => {
                             value={formData.FullName}
                             onChange={handleChange}
                             required
-                            className={`p-3 rounded-lg border w-full text-lg placeholder-gray-500 focus:outline-none focus:ring-2 ${
-                                errors.FullName ? 'border-red-500 focus:ring-red-500' : 'border-gray-400 focus:ring-blue-500'
-                            }`}
+                            className={`p-3 rounded-lg border w-full text-lg placeholder-gray-500 focus:outline-none focus:ring-2 ${errors.FullName ? 'border-red-500 focus:ring-red-500' : 'border-gray-400 focus:ring-blue-500'
+                                }`}
                         />
                         {errors.FullName && <p className="text-red-500 text-sm mt-1">{errors.FullName}</p>}
                     </div>
@@ -120,9 +140,9 @@ const Register = () => {
                             value={formData.Email}
                             onChange={handleChange}
                             required
-                            className={`p-3 rounded-lg border w-full text-lg placeholder-gray-500 focus:outline-none focus:ring-2 ${
-                                errors.Email ? 'border-red-500 focus:ring-red-500' : 'border-gray-400 focus:ring-blue-500'
-                            }`}
+                            readOnly={isEmailPreFilled}
+                            className={`p-3 rounded-lg border w-full text-lg placeholder-gray-500 focus:outline-none focus:ring-2 ${errors.Email ? 'border-red-500 focus:ring-red-500' : 'border-gray-400 focus:ring-blue-500'
+                                } ${isEmailPreFilled ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                         />
                         {errors.Email && <p className="text-red-500 text-sm mt-1">{errors.Email}</p>}
                     </div>
@@ -134,12 +154,28 @@ const Register = () => {
                             value={formData.Password}
                             onChange={handleChange}
                             required
-                            className={`p-3 rounded-lg border w-full text-lg placeholder-gray-500 focus:outline-none focus:ring-2 ${
-                                errors.Password ? 'border-red-500 focus:ring-red-500' : 'border-gray-400 focus:ring-blue-500'
-                            }`}
+                            className={`p-3 rounded-lg border w-full text-lg placeholder-gray-500 focus:outline-none focus:ring-2 ${errors.Password ? 'border-red-500 focus:ring-red-500' : 'border-gray-400 focus:ring-blue-500'
+                                }`}
                         />
                         {errors.Password && <p className="text-red-500 text-sm mt-1">{errors.Password}</p>}
                     </div>
+                    {/* ONLY RENDER THE ROLE INPUT IF IT WAS PRE-FILLED FROM THE URL */}
+                    {isRolePreFilled && (
+                        <div>
+                            <label htmlFor="Role" className="block text-sm font-medium text-gray-700 mb-1">Assigned Role:</label>
+                            <input
+                                type="text"
+                                id="Role"
+                                name="Role"
+                                placeholder="Role"
+                                value={formData.Role}
+                                onChange={handleChange}
+                                required
+                                readOnly={true}
+                                className={`p-3 rounded-lg border w-full text-lg placeholder-gray-500 focus:outline-none focus:ring-2 bg-gray-100 cursor-not-allowed`}
+                            />
+                        </div>
+                    )}
                     <div>
                         <input
                             type="text"
@@ -148,9 +184,8 @@ const Register = () => {
                             value={formData.Phone}
                             onChange={handleChange}
                             required
-                            className={`p-3 rounded-lg border w-full text-lg placeholder-gray-500 focus:outline-none focus:ring-2 ${
-                                errors.Phone ? 'border-red-500 focus:ring-red-500' : 'border-gray-400 focus:ring-blue-500'
-                            }`}
+                            className={`p-3 rounded-lg border w-full text-lg placeholder-gray-500 focus:outline-none focus:ring-2 ${errors.Phone ? 'border-red-500 focus:ring-red-500' : 'border-gray-400 focus:ring-blue-500'
+                                }`}
                         />
                         {errors.Phone && <p className="text-red-500 text-sm mt-1">{errors.Phone}</p>}
                     </div>
@@ -169,4 +204,4 @@ const Register = () => {
     );
 };
 
-export default Register;
+export default Register;       
