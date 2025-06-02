@@ -4,7 +4,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import AdminSideBar from "../../user_components/SideBar/AdminSideBar";
 
 const Tickets = () => {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchParams] = useSearchParams();
@@ -36,6 +36,10 @@ const Tickets = () => {
         return "text-yellow-500";
       case "closed":
         return "text-green-500";
+      case "reject":
+        return "text-purple-500";
+      case "accept":
+        return "text-blue-500";
       default:
         return "";
     }
