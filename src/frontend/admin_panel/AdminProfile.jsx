@@ -3,17 +3,22 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { toast } from 'react-toastify';
 import { useAuth } from '../../App.jsx'; 
-import { AiOutlineUser } from 'react-icons/ai';
+import { AiOutlineUser, AiOutlineCamera } from 'react-icons/ai';
+import { IoClose } from 'react-icons/io5';
 import AdminSideBar from "../../user_components/SideBar/AdminSideBar";
 
 const AdminProfile = () => {
     const { loggedInUser: user, setLoggedInUser } = useAuth();
+    const [profileImage, setProfileImage] = useState(null);
+    const [previewUrl, setPreviewUrl] = useState(null);
+    const [isOpen, setIsOpen] = useState(true);
 
     const [profileData, setProfileData] = useState({
         FullName: '',
         Email: '',
         Phone: '',
-        Role: ''
+        Role: '',
+        ProfileImagePath: null
     });
     const [formData, setFormData] = useState({
         FullName: '',
@@ -30,10 +35,9 @@ const AdminProfile = () => {
     useEffect(() => {
         // Fetch user data 
         const fetchUserProfile = async () => {
-            if (user && user.UserID) { // Ensure user and UserID exist from context
+            if (user && user.UserID) {
                 try {
                     setLoading(true);
-                    // This API call now targets the new general user profile endpoint in index.js
                     const response = await axios.get(`http://localhost:5000/api/user/profile/${user.UserID}`);
                     const fetchedData = response.data;
                     setProfileData(fetchedData);
@@ -45,6 +49,9 @@ const AdminProfile = () => {
                         NewPassword: '',
                         ConfirmNewPassword: ''
                     });
+                    if (fetchedData.ProfileImagePath) {
+                        setPreviewUrl(`http://localhost:5000/uploads/${fetchedData.ProfileImagePath}`);
+                    }
                     setLoading(false);
                 } catch (error) {
                     console.error('Error fetching user profile:', error);
@@ -58,6 +65,66 @@ const AdminProfile = () => {
         };
         fetchUserProfile();
     }, [user]); 
+
+    const handleImageChange = async (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            if (file.size > 5 * 1024 * 1024) {
+                toast.error('Image size should be less than 5MB');
+                return;
+            }
+            if (!file.type.startsWith('image/')) {
+                toast.error('Please upload an image file');
+                return;
+            }
+
+            // Create FormData and upload immediately
+            const formData = new FormData();
+            formData.append('profileImage', file);
+
+            try {
+                const response = await axios.post(
+                    `http://localhost:5000/api/user/profile/upload/${user.UserID}`,
+                    formData,
+                    {
+                        headers: {
+                            'Content-Type': 'multipart/form-data'
+                        }
+                    }
+                );
+
+                if (response.data.imagePath) {
+                    setPreviewUrl(`http://localhost:5000/uploads/${response.data.imagePath}`);
+                    setLoggedInUser({
+                        ...user,
+                        ProfileImagePath: response.data.imagePath
+                    });
+                    toast.success('Profile image updated successfully');
+                }
+            } catch (error) {
+                console.error('Error uploading image:', error);
+                toast.error('Failed to upload profile image');
+            }
+        }
+    };
+
+    const handleImageClick = async () => {
+        if (previewUrl) {
+            try {
+                await axios.delete(`http://localhost:5000/api/user/profile/image/${user.UserID}`);
+                setPreviewUrl(null);
+                setProfileImage(null);
+                setLoggedInUser({
+                    ...user,
+                    ProfileImagePath: null
+                });
+                toast.success('Profile image removed successfully');
+            } catch (error) {
+                console.error('Error deleting image:', error);
+                toast.error('Failed to remove profile image');
+            }
+        }
+    };
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -190,137 +257,172 @@ const AdminProfile = () => {
     return (
         <div className="min-h-screen bg-white flex">
             <div className="flex-shrink-0 w-72 h-full bg-gray-900">
-                <AdminSideBar />
+                <AdminSideBar open={isOpen} setOpen={setIsOpen} />
             </div>
 
-            <div className="flex-1 overflow-y-auto p-6 md:p-12">
+            <div className={`flex-1 overflow-y-auto p-6 md:p-12 transition-all duration-300 ${isOpen ? "ml-0" : "ml-0"}`}>
                 <div className="max-w-5xl mx-auto bg-white rounded-2xl shadow-xl p-8">
-                  
-
-                  {/* Form */}
-                  <h3 className="text-2xl font-semibold text-gray-800 mb-6">Personal Information</h3>
-
-                  <form onSubmit={handleSavePersonalInfo} className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Full Name */}
-                    <div className="col-span-full">
-                      <label htmlFor="FullName" className="text-sm font-medium text-gray-700 block mb-1">
-                        Full Name
-                      </label>
-                      <input
-                        type="text"
-                        id="FullName"
-                        name="FullName"
-                        value={formData.FullName}
-                        onChange={handleChange}
-                        required
-                        className={`w-full rounded-md border ${errors.FullName ? 'border-red-500' : 'border-gray-300'} px-4 py-3 focus:ring-2 focus:ring-blue-500 outline-none`}
-                      />
-                      {errors.FullName && <p className="text-red-500 text-xs mt-1">{errors.FullName}</p>}
+                    {/* Profile Image Section */}
+                    <div className="flex flex-col items-center mb-8">
+                        <div className="relative">
+                            <div className="w-32 h-32 rounded-full overflow-hidden bg-gray-200 mb-4">
+                                {previewUrl ? (
+                                    <>
+                                        <img 
+                                            src={previewUrl} 
+                                            alt="Profile" 
+                                            className="w-full h-full object-cover"
+                                        />
+                                        <button
+                                            onClick={handleImageClick}
+                                            className="absolute top-0 right-0 bg-red-500 rounded-full p-1 text-white hover:bg-red-600 transition-colors"
+                                        >
+                                            <IoClose size={16} />
+                                        </button>
+                                    </>
+                                ) : (
+                                    <div className="w-full h-full flex items-center justify-center">
+                                        <AiOutlineUser className="w-16 h-16 text-gray-400" />
+                                    </div>
+                                )}
+                            </div>
+                            <label htmlFor="profile-image" className="absolute bottom-0 right-0 bg-blue-500 p-2 rounded-full cursor-pointer hover:bg-blue-600 transition-colors">
+                                <AiOutlineCamera className="text-white w-5 h-5" />
+                                <input
+                                    type="file"
+                                    id="profile-image"
+                                    className="hidden"
+                                    accept="image/*"
+                                    onChange={handleImageChange}
+                                />
+                            </label>
+                        </div>
                     </div>
 
-                    {/* Email */}
-                    <div>
-                      <label htmlFor="Email" className="text-sm font-medium text-gray-700 block mb-1">
-                        Email
-                      </label>
-                      <input
-                        type="email"
-                        id="Email"
-                        name="Email"
-                        value={formData.Email}
-                        onChange={handleChange}
-                        required
-                        className={`w-full rounded-md border ${errors.Email ? 'border-red-500' : 'border-gray-300'} px-4 py-3 focus:ring-2 focus:ring-blue-500 outline-none`}
-                      />
-                      {errors.Email && <p className="text-red-500 text-xs mt-1">{errors.Email}</p>}
-                    </div>
+                    {/* Form */}
+                    <h3 className="text-2xl font-semibold text-gray-800 mb-6">Personal Information</h3>
 
-                    {/* Phone */}
-                    <div>
-                      <label htmlFor="Phone" className="text-sm font-medium text-gray-700 block mb-1">
-                        Phone
-                      </label>
-                      <input
-                        type="text"
-                        id="Phone"
-                        name="Phone"
-                        value={formData.Phone}
-                        onChange={handleChange}
-                        required
-                        className={`w-full rounded-md border ${errors.Phone ? 'border-red-500' : 'border-gray-300'} px-4 py-3 focus:ring-2 focus:ring-blue-500 outline-none`}
-                      />
-                      {errors.Phone && <p className="text-red-500 text-xs mt-1">{errors.Phone}</p>}
-                    </div>
+                    <form onSubmit={handleSavePersonalInfo} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {/* Full Name */}
+                        <div className="col-span-full">
+                            <label htmlFor="FullName" className="text-sm font-medium text-gray-700 block mb-1">
+                                Full Name
+                            </label>
+                            <input
+                                type="text"
+                                id="FullName"
+                                name="FullName"
+                                value={formData.FullName}
+                                onChange={handleChange}
+                                required
+                                className={`w-full rounded-md border ${errors.FullName ? 'border-red-500' : 'border-gray-300'} px-4 py-3 focus:ring-2 focus:ring-blue-500 outline-none`}
+                            />
+                            {errors.FullName && <p className="text-red-500 text-xs mt-1">{errors.FullName}</p>}
+                        </div>
 
-                    <div className="col-span-full flex justify-end mt-6">
-                      <button
-                        type="submit"
-                        className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition duration-200"
-                      >
-                        Save Personal Information
-                      </button>
-                    </div>
-                  </form>
+                        {/* Email */}
+                        <div>
+                            <label htmlFor="Email" className="text-sm font-medium text-gray-700 block mb-1">
+                                Email
+                            </label>
+                            <input
+                                type="email"
+                                id="Email"
+                                name="Email"
+                                value={formData.Email}
+                                onChange={handleChange}
+                                required
+                                className={`w-full rounded-md border ${errors.Email ? 'border-red-500' : 'border-gray-300'} px-4 py-3 focus:ring-2 focus:ring-blue-500 outline-none`}
+                            />
+                            {errors.Email && <p className="text-red-500 text-xs mt-1">{errors.Email}</p>}
+                        </div>
 
-                  <h3 className="text-2xl font-semibold text-gray-800 mt-12 mb-6">Security Information</h3>
-                  <form onSubmit={handleSaveSecurityInfo} className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Current Password */}
-                    <div>
-                      <label htmlFor="CurrentPassword" className="text-sm font-medium text-gray-700 block mb-1">
-                        Current Password
-                                 </label>
-                      <input
-                        type="password"
-                        id="CurrentPassword"
-                        name="CurrentPassword"
-                        value={formData.CurrentPassword}
-                        onChange={handleChange}
-                        className={`w-full rounded-md border ${errors.CurrentPassword ? 'border-red-500' : 'border-gray-300'} px-4 py-3 focus:ring-2 focus:ring-blue-500 outline-none`}
-                      />
-                      {errors.CurrentPassword && <p className="text-red-500 text-xs mt-1">{errors.CurrentPassword}</p>}
-                    </div>
+                        {/* Phone */}
+                        <div>
+                            <label htmlFor="Phone" className="text-sm font-medium text-gray-700 block mb-1">
+                                Phone
+                            </label>
+                            <input
+                                type="text"
+                                id="Phone"
+                                name="Phone"
+                                value={formData.Phone}
+                                onChange={handleChange}
+                                required
+                                className={`w-full rounded-md border ${errors.Phone ? 'border-red-500' : 'border-gray-300'} px-4 py-3 focus:ring-2 focus:ring-blue-500 outline-none`}
+                            />
+                            {errors.Phone && <p className="text-red-500 text-xs mt-1">{errors.Phone}</p>}
+                        </div>
 
-                    {/* New Password */}
-                    <div>
-                      <label htmlFor="NewPassword" className="text-sm font-medium text-gray-700 block mb-1">
-                        New Password
-                      </label>
-                      <input
-                        type="password"
-                        id="NewPassword"
-                        name="NewPassword"
-                        value={formData.NewPassword}
-                        onChange={handleChange}
-                        className={`w-full rounded-md border ${errors.NewPassword ? 'border-red-500' : 'border-gray-300'} px-4 py-3 focus:ring-2 focus:ring-blue-500 outline-none`}
-                      />
-                      {errors.NewPassword && <p className="text-red-500 text-xs mt-1">{errors.NewPassword}</p>}
-                    </div>
+                        <div className="col-span-full flex justify-end mt-6">
+                            <button
+                                type="submit"
+                                className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition duration-200"
+                            >
+                                Save Personal Information
+                            </button>
+                        </div>
+                    </form>
 
-                    {/* Confirm New Password */}
-                    <div className="col-span-full">
-                      <label htmlFor="ConfirmNewPassword" className="text-sm font-medium text-gray-700 block mb-1">
-                        Confirm New Password
-                      </label>
-                      <input
-                        type="password"
-                        id="ConfirmNewPassword"
-                        name="ConfirmNewPassword"
-                        value={formData.ConfirmNewPassword}
-                        onChange={handleChange}
-                        className={`w-full rounded-md border ${errors.ConfirmNewPassword ? 'border-red-500' : 'border-gray-300'} px-4 py-3 focus:ring-2 focus:ring-blue-500 outline-none`}
-                      />
-                      {errors.ConfirmNewPassword && <p className="text-red-500 text-xs mt-1">{errors.ConfirmNewPassword}</p>}
-                    </div>
+                    <h3 className="text-2xl font-semibold text-gray-800 mt-12 mb-6">Security Information</h3>
+                    <form onSubmit={handleSaveSecurityInfo} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {/* Current Password */}
+                        <div>
+                            <label htmlFor="CurrentPassword" className="text-sm font-medium text-gray-700 block mb-1">
+                                Current Password
+                            </label>
+                            <input
+                                type="password"
+                                id="CurrentPassword"
+                                name="CurrentPassword"
+                                value={formData.CurrentPassword}
+                                onChange={handleChange}
+                                className={`w-full rounded-md border ${errors.CurrentPassword ? 'border-red-500' : 'border-gray-300'} px-4 py-3 focus:ring-2 focus:ring-blue-500 outline-none`}
+                            />
+                            {errors.CurrentPassword && <p className="text-red-500 text-xs mt-1">{errors.CurrentPassword}</p>}
+                        </div>
 
-                    <div className="col-span-full flex justify-end mt-6">
-                      <button
-                        type="submit"
-                        className="bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-6 rounded-lg transition duration-200"
-                      >
-                        Save Security Information
-                      </button>
-                    </div>
-                  </form>
+                        {/* New Password */}
+                        <div>
+                            <label htmlFor="NewPassword" className="text-sm font-medium text-gray-700 block mb-1">
+                                New Password
+                            </label>
+                            <input
+                                type="password"
+                                id="NewPassword"
+                                name="NewPassword"
+                                value={formData.NewPassword}
+                                onChange={handleChange}
+                                className={`w-full rounded-md border ${errors.NewPassword ? 'border-red-500' : 'border-gray-300'} px-4 py-3 focus:ring-2 focus:ring-blue-500 outline-none`}
+                            />
+                            {errors.NewPassword && <p className="text-red-500 text-xs mt-1">{errors.NewPassword}</p>}
+                        </div>
+
+                        {/* Confirm New Password */}
+                        <div className="col-span-full">
+                            <label htmlFor="ConfirmNewPassword" className="text-sm font-medium text-gray-700 block mb-1">
+                                Confirm New Password
+                            </label>
+                            <input
+                                type="password"
+                                id="ConfirmNewPassword"
+                                name="ConfirmNewPassword"
+                                value={formData.ConfirmNewPassword}
+                                onChange={handleChange}
+                                className={`w-full rounded-md border ${errors.ConfirmNewPassword ? 'border-red-500' : 'border-gray-300'} px-4 py-3 focus:ring-2 focus:ring-blue-500 outline-none`}
+                            />
+                            {errors.ConfirmNewPassword && <p className="text-red-500 text-xs mt-1">{errors.ConfirmNewPassword}</p>}
+                        </div>
+
+                        <div className="col-span-full flex justify-end mt-6">
+                            <button
+                                type="submit"
+                                className="bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-6 rounded-lg transition duration-200"
+                            >
+                                Save Security Information
+                            </button>
+                        </div>
+                    </form>
                 </div>
             </div>
         </div>

@@ -166,50 +166,58 @@ app.get('/api/user/profile/:id', (req, res) => {
     });
 });
 
-// Get admin profile update  endpoint 
-app.put('/api/user/profile/:id', (req, res) => {
+// Get admin profile update endpoint 
+app.put('/api/user/profile/:id', async (req, res) => {
     const userId = req.params.id;
     const { FullName, Email, Phone, CurrentPassword, NewPassword } = req.body;
 
-    const verifyQuery = 'SELECT Password FROM appuser WHERE UserID = ?';
+    try {
+        // First get the current user data to verify password
+        const getUserQuery = 'SELECT Password FROM appuser WHERE UserID = ?';
+        const [user] = await db.promise().query(getUserQuery, [userId]);
 
-    db.query(verifyQuery, [userId], (err, results) => {
-        if (err) {
-            console.error('Error verifying user for profile update:', err);
-            return res.status(500).json({ message: 'Server error' });
-        }
-
-        if (results.length === 0) {
+        if (user.length === 0) {
             return res.status(404).json({ message: 'User not found' });
         }
 
-        const currentUser = results[0];
-
-        let updateQuery;
-        let queryParams;
-
+        // If password change is requested
         if (CurrentPassword && NewPassword) {
-            if (CurrentPassword !== currentUser.Password) {
+            // Verify current password
+            const isPasswordValid = await bcrypt.compare(CurrentPassword, user[0].Password);
+            
+            if (!isPasswordValid) {
                 return res.status(400).json({ message: 'Current password is incorrect' });
             }
-            updateQuery = 'UPDATE appuser SET FullName = ?, Email = ?, Phone = ?, Password = ? WHERE UserID = ?';
-            queryParams = [FullName, Email, Phone, NewPassword, userId];
+
+            // Hash new password
+            const hashedNewPassword = await bcrypt.hash(NewPassword, saltRounds);
+
+            // Update all fields including password
+            const updateQuery = 'UPDATE appuser SET FullName = ?, Email = ?, Phone = ?, Password = ? WHERE UserID = ?';
+            await db.promise().query(updateQuery, [FullName, Email, Phone, hashedNewPassword, userId]);
         } else {
-            updateQuery = 'UPDATE appuser SET FullName = ?, Email = ?, Phone = ? WHERE UserID = ?';
-            queryParams = [FullName, Email, Phone, userId];
+            // Update only non-password fields
+            const updateQuery = 'UPDATE appuser SET FullName = ?, Email = ?, Phone = ? WHERE UserID = ?';
+            await db.promise().query(updateQuery, [FullName, Email, Phone, userId]);
         }
 
-        db.query(updateQuery, queryParams, (updateErr, updateResult) => {
-            if (updateErr) {
-                console.error('Error updating user profile:', updateErr);
-                res.status(500).json({ message: 'Error updating profile' });
-            } else if (updateResult.affectedRows === 0) {
-                res.status(404).json({ message: 'User not found or no changes made' });
-            } else {
-                res.status(200).json({ message: 'Profile updated successfully' });
-            }
+        // Get updated user data
+        const getUpdatedUserQuery = 'SELECT UserID, FullName, Email, Phone, Role, ProfileImagePath FROM appuser WHERE UserID = ?';
+        const [updatedUser] = await db.promise().query(getUpdatedUserQuery, [userId]);
+
+        if (updatedUser.length === 0) {
+            return res.status(404).json({ message: 'Failed to retrieve updated user data' });
+        }
+
+        res.status(200).json({
+            message: 'Profile updated successfully',
+            user: updatedUser[0]
         });
-    });
+
+    } catch (error) {
+        console.error('Error updating profile:', error);
+        res.status(500).json({ message: 'Server error while updating profile' });
+    }
 });
 
 /* ------------------------- Add Members ------------------------- */
@@ -496,6 +504,7 @@ app.get('/api/user/profile/:id', (req, res) => {
         if (err) {
             console.error('Error fetching user profile:', err);
             res.status(500).json({ message: 'Server error' });
+            
         } else if (results.length === 0) {
             res.status(404).json({ message: 'User not found' });
         } else {
@@ -737,28 +746,32 @@ app.get('/api/tickets/filter', (req, res) => {
             t.Description,
             t.Status,
             t.Priority,
-            t.UserNote
+            t.UserNote,
+            t.DateTime
         FROM ticket t
         LEFT JOIN appuser u ON t.UserId = u.UserID
     `;
 
     let whereClause = '';
+    let orderClause = 'ORDER BY t.DateTime DESC';
+    
     switch (type) {
         case 'open':
-            whereClause = "WHERE t.Status = 'Open'";
+            whereClause = "WHERE t.Status NOT IN ('Reject', 'Closed')";
             break;
         case 'today':
             whereClause = "WHERE DATE(t.DateTime) = CURDATE()";
             break;
         case 'high-priority':
-            whereClause = "WHERE t.Priority = 'High'";
+            whereClause = "WHERE t.Status NOT IN ('Closed', 'Reject')";
+            orderClause = "ORDER BY FIELD(t.Priority, 'High', 'Medium', 'Low'), t.DateTime DESC";
             break;
         case 'closed':
             whereClause = "WHERE t.Status = 'Closed'";
             break;
     }
 
-    const query = baseQuery + (whereClause ? ' ' + whereClause : '');
+    const query = baseQuery + (whereClause ? ' ' + whereClause : '') + ' ' + orderClause;
 
     db.query(query, (err, results) => {
         if (err) {

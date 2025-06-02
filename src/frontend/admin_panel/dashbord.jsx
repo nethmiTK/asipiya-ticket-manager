@@ -21,6 +21,9 @@ import {
   Title
 } from "chart.js";
 import RecentlyActivity from "./RecentlyActivity"; // Import the RecentlyActivity component
+import { useAuth } from '../../App.jsx';
+import { IoNotificationsOutline } from 'react-icons/io5';
+import NotificationPanel from './NotificationPanel';
 
 ChartJS.register(
   ArcElement,
@@ -231,12 +234,12 @@ const TicketBySystemChart = () => {
         }
 
         const colors = [
-          'rgba(54, 162, 235, 0.8)',   // Blue
-          'rgba(255, 99, 132, 0.8)',   // Red
-          'rgba(75, 192, 192, 0.8)',   // Green
-          'rgba(255, 206, 86, 0.8)',   // Yellow
-          'rgba(153, 102, 255, 0.8)',  // Purple
-          'rgba(255, 159, 64, 0.8)',   // Orange
+          'rgba(54, 162, 235, 0.8)',
+          'rgba(255, 99, 132, 0.8)',
+          'rgba(75, 192, 192, 0.8)',
+          'rgba(255, 206, 86, 0.8)',
+          'rgba(153, 102, 255, 0.8)',
+          'rgba(255, 159, 64, 0.8)',
         ];
 
         const chartData = {
@@ -269,7 +272,7 @@ const TicketBySystemChart = () => {
     maintainAspectRatio: false,
     plugins: {
       legend: {
-        display: false, // Hide legend since we have a table below
+        display: false,
       },
       title: {
         display: true,
@@ -279,18 +282,6 @@ const TicketBySystemChart = () => {
           weight: 'bold'
         },
         padding: 20
-      },
-      tooltip: {
-        callbacks: {
-          label: (context) => {
-            const value = context.raw;
-            const systemName = context.label;
-            return [
-              `System: ${systemName}`,
-              `Tickets: ${value}`
-            ];
-          }
-        }
       }
     },
     scales: {
@@ -305,13 +296,7 @@ const TicketBySystemChart = () => {
           }
         },
         ticks: {
-          precision: 0,
-          font: {
-            size: 12
-          }
-        },
-        grid: {
-          color: 'rgba(0, 0, 0, 0.1)'
+          precision: 0
         }
       },
       x: {
@@ -324,14 +309,8 @@ const TicketBySystemChart = () => {
           }
         },
         ticks: {
-          font: {
-            size: 12
-          },
           maxRotation: 45,
           minRotation: 45
-        },
-        grid: {
-          display: false
         }
       }
     }
@@ -340,10 +319,7 @@ const TicketBySystemChart = () => {
   if (loading) {
     return (
       <div className="bg-white p-4 rounded shadow h-[400px] flex items-center justify-center">
-        <div className="flex flex-col items-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
-          <p className="mt-4 text-gray-600">Loading chart data...</p>
-        </div>
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
       </div>
     );
   }
@@ -351,55 +327,15 @@ const TicketBySystemChart = () => {
   if (error) {
     return (
       <div className="bg-white p-4 rounded shadow h-[400px] flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-red-500 mb-2">{error}</p>
-          <button 
-            onClick={() => window.location.reload()}
-            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
-          >
-            Retry
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  if (!chartData || chartData.labels.length === 0) {
-    return (
-      <div className="bg-white p-4 rounded shadow h-[400px] flex items-center justify-center">
-        <p className="text-gray-500">No system data available</p>
+        <p className="text-red-500">{error}</p>
       </div>
     );
   }
 
   return (
     <div className="bg-white p-4 rounded shadow">
-      <div className="h-[400px] mb-6">
+      <div className="h-[400px]">
         <Bar data={chartData} options={options} />
-      </div>
-      <div className="mt-4 overflow-x-auto">
-        <table className="min-w-full text-sm">
-          <thead>
-            <tr className="bg-gray-50">
-              <th className="px-4 py-2 text-left font-medium text-gray-600">System Name</th>
-              <th className="px-4 py-2 text-left font-medium text-gray-600">Description</th>
-              <th className="px-4 py-2 text-right font-medium text-gray-600">Ticket Count</th>
-            </tr>
-          </thead>
-          <tbody>
-            {chartData.labels.map((label, index) => (
-              <tr key={label} className="border-t hover:bg-gray-50">
-                <td className="px-4 py-2">{label}</td>
-                <td className="px-4 py-2 text-gray-600">
-                  {chartData.datasets[0].data[index]}
-                </td>
-                <td className="px-4 py-2 text-right font-medium">
-                  {chartData.datasets[0].data[index]}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
       </div>
     </div>
   );
@@ -407,6 +343,7 @@ const TicketBySystemChart = () => {
 
 const Dashboard = () => {
   const navigate = useNavigate();
+  const { loggedInUser: user } = useAuth();
   const [counts, setCounts] = useState({
     total: 0,
     open: 0,
@@ -414,6 +351,7 @@ const Dashboard = () => {
     highPriority: 0,
     closed: 0,
   });
+  const [isNotificationOpen, setIsNotificationOpen] = useState(false);
 
   useEffect(() => {
     const fetchCounts = async () => {
@@ -436,16 +374,57 @@ const Dashboard = () => {
     navigate(path);
   };
 
+  const handleProfileClick = () => {
+    navigate('/admin-profile');
+  };
+
+  const toggleNotifications = () => {
+    setIsNotificationOpen(!isNotificationOpen);
+  };
+
   return (
     <div className="p-6 bg-gray-100 min-h-screen">
       <header className="flex flex-col md:flex-row justify-between items-center mb-6">
         <h1 className="text-2xl font-bold mb-4 md:mb-0">Dashboard</h1>
-        <input
-          type="text"
-          placeholder="Search..."
-          className="border rounded px-4 py-2 w-full md:w-auto"
-        />
-        <div className="text-2xl mt-4 md:mt-0">🔔</div>
+        
+        <div className="flex items-center gap-4">
+          <div className="relative">
+            <button 
+              className="relative p-2 hover:bg-gray-100 rounded-full"
+              onClick={toggleNotifications}
+            >
+              <IoNotificationsOutline className="text-2xl" />
+              <span className="absolute top-0 right-0 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                3
+              </span>
+            </button>
+            <NotificationPanel 
+              isOpen={isNotificationOpen} 
+              onClose={() => setIsNotificationOpen(false)} 
+            />
+          </div>
+          
+          <div className="flex items-center gap-3 cursor-pointer" onClick={handleProfileClick}>
+            <div className="text-right">
+              <p className="font-semibold text-gray-800">{user?.FullName}</p>
+              <p className="text-sm text-gray-500">{user?.Role}</p>
+            </div>
+            
+            <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-200">
+              {user?.ProfileImagePath ? (
+                <img 
+                  src={`http://localhost:5000/uploads/${user.ProfileImagePath}`}
+                  alt="Profile"
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center bg-blue-500 text-white">
+                  {user?.FullName?.charAt(0)}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       </header>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
