@@ -21,7 +21,7 @@ import OpenTickets from './frontend/users_panel/openTickets';
 import SystemRegistration from './frontend/admin_panel/SystemRegistration';
 import TicketCategory from './frontend/admin_panel/TicketCategory';
 import UserProfile from './frontend/users_panel/UserProfile';
-import TicketViewPage from './frontend/admin_panel/TicketViewPage' 
+import TicketViewPage from './frontend/admin_panel/TicketViewPage'
 
 // Create Auth Context - loggedInUser and setLoggedInUser
 const AuthContext = createContext(null);
@@ -29,8 +29,11 @@ export const useAuth = () => useContext(AuthContext);
 
 // Protected Route Component 
 const ProtectedRoute = ({ children, allowedRoles }) => {
-    const { isLoggedIn, userRole } = useAuth(); // loggedInUser is implicitly available via context
+    const { isLoggedIn, userRole } = useAuth();
     const navigate = useNavigate();
+
+    // This handles cases where userRole might be null initially or undefined
+    const normalizedUserRole = userRole ? userRole.toLowerCase() : '';
 
     useEffect(() => {
         if (!isLoggedIn) {
@@ -38,13 +41,22 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
             return;
         }
 
-        if (allowedRoles && !allowedRoles.includes(userRole)) {
+        // Check if the normalized user role is in the allowedRoles array
+        if (allowedRoles && !allowedRoles.includes(normalizedUserRole)) {
             alert('Access Denied');
-            navigate(userRole === 'user' ? '/user-dashboard' : '/login', { replace: true });
+            if (['admin', 'supervisor', 'manager', 'developer'].includes(normalizedUserRole)) {
+                navigate('/admin-dashboard', { replace: true });
+            } else if (normalizedUserRole === 'user') {
+                navigate('/user-dashboard', { replace: true });
+            } else {
+                // Fallback for any unknown or non-logged-in roles
+                navigate('/login', { replace: true });
+            }
+            return; 
         }
-    }, [isLoggedIn, userRole, allowedRoles, navigate]);
+    }, [isLoggedIn, normalizedUserRole, allowedRoles, navigate]);
 
-    if (!isLoggedIn || (allowedRoles && !allowedRoles.includes(userRole))) return null;
+    if (!isLoggedIn || (allowedRoles && !allowedRoles.includes(normalizedUserRole))) return null;
     return children;
 };
 
@@ -55,20 +67,28 @@ const AppRoutes = ({ isLoggedIn, setIsLoggedIn, userRole, setUserRole, loggedInU
     // handleLoginSuccess now accepts the full user object
     const handleLoginSuccess = (user) => {
         setIsLoggedIn(true);
-        setUserRole(user.Role); 
-        setLoggedInUser(user); // Set the full user object in state
-        localStorage.setItem('user', JSON.stringify(user)); // Store full user object in localStorage
-        localStorage.setItem('role', user.Role); 
+        const normalizedRole = user.Role.toLowerCase(); 
+        setUserRole(normalizedRole);
+        setLoggedInUser(user); 
+        localStorage.setItem('user', JSON.stringify(user)); 
+        localStorage.setItem('role', normalizedRole); 
 
-        navigate(user.Role === 'admin' ? '/admin-dashboard' : '/user-dashboard');
+        // Navigate based on the clarified role logic 
+        if (['admin', 'supervisor', 'manager', 'developer'].includes(normalizedRole)) {
+            navigate('/admin-dashboard');
+        } else if (normalizedRole === 'user') {
+            navigate('/user-dashboard');
+        } else {
+            navigate('/login');
+        }
     };
 
     const handleLogout = () => {
-        localStorage.removeItem('user'); // Clear the full user object
-        localStorage.removeItem('role'); 
+        localStorage.removeItem('user'); 
+        localStorage.removeItem('role');
         setIsLoggedIn(false);
         setUserRole(null);
-        setLoggedInUser(null); // Clear loggedInUser from state
+        setLoggedInUser(null); 
         navigate('/login');
     };
 
@@ -78,22 +98,21 @@ const AppRoutes = ({ isLoggedIn, setIsLoggedIn, userRole, setUserRole, loggedInU
                 <Route path='/' element={<Navigate to="/login" replace />} />
                 <Route path='/register' element={<Register />} />
                 <Route path='/login' element={<Login onLoginSuccess={handleLoginSuccess} />} />
-                <Route path='/all-tickets' element={<UserDashboard />} />
-                <Route path='/open-tickets' element={<OpenTickets />} />
+                <Route path='/all-tickets' element={<UserDashboard />} /> 
+                <Route path='/open-tickets' element={<OpenTickets />} /> 
 
                 <Route
                     path='/user-dashboard'
                     element={
-                        <ProtectedRoute allowedRoles={['user']}>
+                        <ProtectedRoute allowedRoles={['user']}> {/* Only 'user' can access user dashboard */}
                             <UserDashboard />
                         </ProtectedRoute>
                     }
                 />
-                
+
                 <Route
                     path='/user-profile'
                     element={
-                        // UserProfile can be accessed by both 'user' and 'admin' roles
                         <ProtectedRoute allowedRoles={['user']}>
                             <UserProfile />
                         </ProtectedRoute>
@@ -103,33 +122,26 @@ const AppRoutes = ({ isLoggedIn, setIsLoggedIn, userRole, setUserRole, loggedInU
                 <Route
                     path='/admin-dashboard'
                     element={
-                        <ProtectedRoute allowedRoles={['admin']}>
+                        <ProtectedRoute allowedRoles={['admin', 'supervisor', 'manager', 'developer']}>
                             <Dashboard />
                         </ProtectedRoute>
                     }
                 />
-   <Route
-                    path='/admin-dashboard'
-                    element={
-                        <ProtectedRoute allowedRoles={['admin']}>
-                            <Dashboard />
-                        </ProtectedRoute>
-                    }
-                />
+               
                 <Route
                     path="/tickets"
                     element={
-                        <ProtectedRoute allowedRoles={['admin']}>
+                        <ProtectedRoute allowedRoles={['admin', 'supervisor', 'manager', 'developer']}>
                             <Tickets />
                         </ProtectedRoute>
                     }
                 />
 
-                {/* Admin only routes */}
+                {/* Admin only routes  */}
                 <Route
                     path="/supervisor"
                     element={
-                        <ProtectedRoute allowedRoles={['admin']}>
+                        <ProtectedRoute allowedRoles={['admin', 'supervisor', 'manager', 'developer']}>
                             <AddSupervisor />
                         </ProtectedRoute>
                     }
@@ -137,7 +149,7 @@ const AppRoutes = ({ isLoggedIn, setIsLoggedIn, userRole, setUserRole, loggedInU
                 <Route
                     path="/add-member"
                     element={
-                        <ProtectedRoute allowedRoles={['admin']}>
+                        <ProtectedRoute allowedRoles={['admin', 'supervisor', 'manager', 'developer']}>
                             <AddMember />
                         </ProtectedRoute>
                     }
@@ -145,7 +157,7 @@ const AppRoutes = ({ isLoggedIn, setIsLoggedIn, userRole, setUserRole, loggedInU
                 <Route
                     path="/ticket-manage"
                     element={
-                        <ProtectedRoute allowedRoles={['admin']}>
+                        <ProtectedRoute allowedRoles={['admin', 'supervisor', 'manager', 'developer']}>
                             <TicketManage />
                         </ProtectedRoute>
                     }
@@ -153,7 +165,7 @@ const AppRoutes = ({ isLoggedIn, setIsLoggedIn, userRole, setUserRole, loggedInU
                 <Route
                     path="/edit-supervisor/:id"
                     element={
-                        <ProtectedRoute allowedRoles={['admin']}>
+                        <ProtectedRoute allowedRoles={['admin', 'supervisor', 'manager', 'developer']}>
                             <EditMember />
                         </ProtectedRoute>
                     }
@@ -162,7 +174,7 @@ const AppRoutes = ({ isLoggedIn, setIsLoggedIn, userRole, setUserRole, loggedInU
                 <Route
                     path='/system_registration'
                     element={
-                        <ProtectedRoute allowedRoles={['admin']}>
+                        <ProtectedRoute allowedRoles={['admin', 'supervisor', 'manager', 'developer']}>
                             <SystemRegistration />
                         </ProtectedRoute>
                     }
@@ -171,7 +183,8 @@ const AppRoutes = ({ isLoggedIn, setIsLoggedIn, userRole, setUserRole, loggedInU
                 <Route
                     path="/admin-profile"
                     element={
-                        <ProtectedRoute allowedRoles={['admin']}>
+                        // AdminProfile accessible to all admin-side roles
+                        <ProtectedRoute allowedRoles={['admin', 'supervisor', 'manager', 'developer']}>
                             <AdminProfile />
                         </ProtectedRoute>
                     }
@@ -180,13 +193,13 @@ const AppRoutes = ({ isLoggedIn, setIsLoggedIn, userRole, setUserRole, loggedInU
                 <Route
                     path='/ticket_category'
                     element={
-                        <ProtectedRoute allowedRoles={['admin']}>
+                        <ProtectedRoute allowedRoles={['admin', 'supervisor', 'manager', 'developer']}>
                             <TicketCategory />
                         </ProtectedRoute>
                     }
                 />
 
-                <Route path='/ticket_view_page/:id' element={[<TicketViewPage />]}/>
+                <Route path='/ticket_view_page/:id' element={[<TicketViewPage />]} />
 
             </Routes>
             <ToastContainer
@@ -209,10 +222,10 @@ const AppRoutes = ({ isLoggedIn, setIsLoggedIn, userRole, setUserRole, loggedInU
 const RenderWithLayout = ({ isLoggedIn, userRole, setIsLoggedIn, setUserRole, loggedInUser, setLoggedInUser }) => {
     const location = useLocation();
 
-    // Show AdminSideBar only for logged in admin and not on auth routes
+    // Show AdminSideBar only for logged in admin-side roles and not on auth routes
     const showAdminSidebar =
         isLoggedIn &&
-        userRole === 'admin' &&
+        (userRole ? ['admin', 'supervisor', 'manager', 'developer'].includes(userRole.toLowerCase()) : false) &&
         !['/login', '/register', '/'].includes(location.pathname);
 
     return (
@@ -224,8 +237,8 @@ const RenderWithLayout = ({ isLoggedIn, userRole, setIsLoggedIn, setUserRole, lo
                     setIsLoggedIn={setIsLoggedIn}
                     userRole={userRole}
                     setUserRole={setUserRole}
-                    loggedInUser={loggedInUser} 
-                    setLoggedInUser={setLoggedInUser} 
+                    loggedInUser={loggedInUser}
+                    setLoggedInUser={setLoggedInUser}
                 />
             </div>
         </div>
@@ -236,22 +249,22 @@ const RenderWithLayout = ({ isLoggedIn, userRole, setIsLoggedIn, setUserRole, lo
 function App() {
     const [isLoggedIn, setIsLoggedIn] = useState(false);
     const [userRole, setUserRole] = useState(null);
-    const [loggedInUser, setLoggedInUser] = useState(null); 
+    const [loggedInUser, setLoggedInUser] = useState(null);
 
     useEffect(() => {
-        const storedUser = localStorage.getItem('user'); 
+        const storedUser = localStorage.getItem('user');
         if (storedUser) {
             try {
                 const user = JSON.parse(storedUser);
                 setIsLoggedIn(true);
-                setUserRole(user.Role); 
-                setLoggedInUser(user); 
+                setUserRole(user.Role.toLowerCase());
+                setLoggedInUser(user);
             } catch (e) {
                 console.error("Failed to parse user from localStorage", e);
-               
+                
                 localStorage.removeItem('user');
                 localStorage.removeItem('role');
-                
+
             }
         }
     }, []);
@@ -263,11 +276,11 @@ function App() {
                 userRole={userRole}
                 setIsLoggedIn={setIsLoggedIn}
                 setUserRole={setUserRole}
-                loggedInUser={loggedInUser} 
+                loggedInUser={loggedInUser}
                 setLoggedInUser={setLoggedInUser}
             />
         </BrowserRouter>
     );
 }
 
-export default App;
+export default App; 
