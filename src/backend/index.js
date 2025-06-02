@@ -75,7 +75,7 @@ app.post('/register', (req, res) => {
                 console.error('Error inserting user:', err);
               
                 if (err.code === 'ER_DUP_ENTRY') { 
-                    return res.status(409).send('User with this email already exists.');
+                    return res.status(409).json({ message: 'User with this email already exists.' });
                 }
                 res.status(500).send('Error registering user');
             } else {
