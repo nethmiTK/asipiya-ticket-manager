@@ -4,12 +4,14 @@ import axios from 'axios';
 import { toast } from 'react-toastify';
 import { useAuth } from '../../App.jsx'; 
 import { AiOutlineUser, AiOutlineCamera } from 'react-icons/ai';
+import { IoClose } from 'react-icons/io5';
 import AdminSideBar from "../../user_components/SideBar/AdminSideBar";
 
 const AdminProfile = () => {
     const { loggedInUser: user, setLoggedInUser } = useAuth();
     const [profileImage, setProfileImage] = useState(null);
     const [previewUrl, setPreviewUrl] = useState(null);
+    const [isOpen, setIsOpen] = useState(true);
 
     const [profileData, setProfileData] = useState({
         FullName: '',
@@ -64,10 +66,10 @@ const AdminProfile = () => {
         fetchUserProfile();
     }, [user]); 
 
-    const handleImageChange = (e) => {
+    const handleImageChange = async (e) => {
         const file = e.target.files[0];
         if (file) {
-            if (file.size > 5 * 1024 * 1024) { // 5MB limit
+            if (file.size > 5 * 1024 * 1024) {
                 toast.error('Image size should be less than 5MB');
                 return;
             }
@@ -75,57 +77,52 @@ const AdminProfile = () => {
                 toast.error('Please upload an image file');
                 return;
             }
-            setProfileImage(file);
-            setPreviewUrl(URL.createObjectURL(file));
+
+            // Create FormData and upload immediately
+            const formData = new FormData();
+            formData.append('profileImage', file);
+
+            try {
+                const response = await axios.post(
+                    `http://localhost:5000/api/user/profile/upload/${user.UserID}`,
+                    formData,
+                    {
+                        headers: {
+                            'Content-Type': 'multipart/form-data'
+                        }
+                    }
+                );
+
+                if (response.data.imagePath) {
+                    setPreviewUrl(`http://localhost:5000/uploads/${response.data.imagePath}`);
+                    setLoggedInUser({
+                        ...user,
+                        ProfileImagePath: response.data.imagePath
+                    });
+                    toast.success('Profile image updated successfully');
+                }
+            } catch (error) {
+                console.error('Error uploading image:', error);
+                toast.error('Failed to upload profile image');
+            }
         }
     };
 
-    const handleImageUpload = async () => {
-        if (!profileImage) {
-            toast.error('Please select an image first');
-            return;
-        }
-
-        const formData = new FormData();
-        formData.append('profileImage', profileImage);
-
-        try {
-            const response = await axios.post(
-                `http://localhost:5000/api/user/profile/upload/${user.UserID}`,
-                formData,
-                {
-                    headers: {
-                        'Content-Type': 'multipart/form-data'
-                    }
-                }
-            );
-
-            if (response.data.imagePath) {
+    const handleImageClick = async () => {
+        if (previewUrl) {
+            try {
+                await axios.delete(`http://localhost:5000/api/user/profile/image/${user.UserID}`);
+                setPreviewUrl(null);
+                setProfileImage(null);
                 setLoggedInUser({
                     ...user,
-                    ProfileImagePath: response.data.imagePath
+                    ProfileImagePath: null
                 });
-                toast.success('Profile image updated successfully');
+                toast.success('Profile image removed successfully');
+            } catch (error) {
+                console.error('Error deleting image:', error);
+                toast.error('Failed to remove profile image');
             }
-        } catch (error) {
-            console.error('Error uploading image:', error);
-            toast.error('Failed to upload profile image');
-        }
-    };
-
-    const handleDeleteImage = async () => {
-        try {
-            await axios.delete(`http://localhost:5000/api/user/profile/image/${user.UserID}`);
-            setPreviewUrl(null);
-            setProfileImage(null);
-            setLoggedInUser({
-                ...user,
-                ProfileImagePath: null
-            });
-            toast.success('Profile image removed successfully');
-        } catch (error) {
-            console.error('Error deleting image:', error);
-            toast.error('Failed to remove profile image');
         }
     };
 
@@ -260,21 +257,29 @@ const AdminProfile = () => {
     return (
         <div className="min-h-screen bg-white flex">
             <div className="flex-shrink-0 w-72 h-full bg-gray-900">
-                <AdminSideBar />
+                <AdminSideBar open={isOpen} setOpen={setIsOpen} />
             </div>
 
-            <div className="flex-1 overflow-y-auto p-6 md:p-12">
+            <div className={`flex-1 overflow-y-auto p-6 md:p-12 transition-all duration-300 ${isOpen ? "ml-0" : "ml-0"}`}>
                 <div className="max-w-5xl mx-auto bg-white rounded-2xl shadow-xl p-8">
                     {/* Profile Image Section */}
                     <div className="flex flex-col items-center mb-8">
                         <div className="relative">
                             <div className="w-32 h-32 rounded-full overflow-hidden bg-gray-200 mb-4">
                                 {previewUrl ? (
-                                    <img 
-                                        src={previewUrl} 
-                                        alt="Profile" 
-                                        className="w-full h-full object-cover"
-                                    />
+                                    <>
+                                        <img 
+                                            src={previewUrl} 
+                                            alt="Profile" 
+                                            className="w-full h-full object-cover"
+                                        />
+                                        <button
+                                            onClick={handleImageClick}
+                                            className="absolute top-0 right-0 bg-red-500 rounded-full p-1 text-white hover:bg-red-600 transition-colors"
+                                        >
+                                            <IoClose size={16} />
+                                        </button>
+                                    </>
                                 ) : (
                                     <div className="w-full h-full flex items-center justify-center">
                                         <AiOutlineUser className="w-16 h-16 text-gray-400" />
@@ -291,23 +296,6 @@ const AdminProfile = () => {
                                     onChange={handleImageChange}
                                 />
                             </label>
-                        </div>
-                        <div className="flex gap-4 mt-4">
-                            <button
-                                onClick={handleImageUpload}
-                                className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors"
-                                disabled={!profileImage}
-                            >
-                                Upload Photo
-                            </button>
-                            {previewUrl && (
-                                <button
-                                    onClick={handleDeleteImage}
-                                    className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 transition-colors"
-                                >
-                                    Remove Photo
-                                </button>
-                            )}
                         </div>
                     </div>
 

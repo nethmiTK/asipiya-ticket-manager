@@ -27,9 +27,7 @@ const Menus = [
     ]
   },
   { title: "Ticket Manage", icon: <LuTicketCheck />, path: "/ticket-manage" },
-  { title: "Supervisor Manage", icon: <VscNotebook />, path: "/supervisor-manage" },
-  
-    { title: "Supervisor add", icon: <VscNotebook />, path: "/supervisor" },
+  { title: "Supervisor Manage", icon: <VscNotebook />, path: "/supervisor" },
   {
     title: "Asipiya Systems",
     icon: <GrSystem />,
@@ -193,14 +191,14 @@ const AdminSideBar = ({ open: propOpen, setOpen: propSetOpen }) => {
                 <div className="flex items-center gap-x-4 w-full justify-between">
                   <div className="flex items-center gap-x-4">
                     <span className="text-2xl">
-                      <CiLogout />
+                      <CiLogout   />
                     </span>
                     <span
                       className={`font-medium flex-1 overflow-hidden whitespace-nowrap duration-300 ${
                         open ? "opacity-100" : "opacity-0 w-0"
                       }`}
                     >
-                      Log Out
+                          Log Out
                     </span>
                   </div>
                   {propOpen && (
