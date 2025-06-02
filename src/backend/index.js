@@ -683,7 +683,7 @@ app.post("/create_ticket", (req, res) => {
 
       const insertTicket = `
         INSERT INTO ticket (UserId, AsipiyaSystemID, TicketCategoryID, Description, Status, Priority, DateTime)
-        VALUES (?, ?, ?, ?, 'Open', 'Medium', NOW())
+        VALUES (?, ?, ?, ?, 'Pending', 'High', NOW())
       `;
       db.query(insertTicket, [userId, systemId, categoryId, description], (err, result) => {
         if (err) {
