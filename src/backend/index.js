@@ -709,9 +709,9 @@ app.post("/create_ticket", (req, res) => {
 app.get('/api/tickets/counts', (req, res) => {
     const queries = {
         total: 'SELECT COUNT(*) AS count FROM ticket',
-        open: "SELECT COUNT(*) AS count FROM ticket WHERE Status = 'Open'",
+        open: "SELECT COUNT(*) AS count FROM ticket WHERE Status IN ('Open', 'In Progress') AND Status != 'Rejected'",
         today: "SELECT COUNT(*) AS count FROM ticket WHERE DATE(DateTime) = CURDATE()",
-        highPriority: "SELECT COUNT(*) AS count FROM ticket WHERE Priority = 'High'",
+        highPriority: "SELECT COUNT(*) AS count FROM ticket WHERE Priority = 'High' AND Status != 'Rejected'",
         closed: "SELECT COUNT(*) AS count FROM ticket WHERE Status = 'Closed'"
     };
 
@@ -757,13 +757,13 @@ app.get('/api/tickets/filter', (req, res) => {
     
     switch (type) {
         case 'open':
-            whereClause = "WHERE t.Status NOT IN ('Reject', 'Closed')";
+            whereClause = "WHERE t.Status IN ('Open', 'In Progress') AND t.Status != 'Rejected'";
             break;
         case 'today':
             whereClause = "WHERE DATE(t.DateTime) = CURDATE()";
             break;
         case 'high-priority':
-            whereClause = "WHERE t.Status NOT IN ('Closed', 'Reject')";
+            whereClause = "WHERE t.Status != 'Rejected'";
             orderClause = "ORDER BY FIELD(t.Priority, 'High', 'Medium', 'Low'), t.DateTime DESC";
             break;
         case 'closed':

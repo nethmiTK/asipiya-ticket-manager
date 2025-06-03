@@ -256,11 +256,9 @@ const AdminProfile = () => {
 
     return (
         <div className="min-h-screen bg-white flex">
-            <div className="flex-shrink-0 w-72 h-full bg-gray-900">
-                <AdminSideBar open={isOpen} setOpen={setIsOpen} />
-            </div>
+            <AdminSideBar open={isOpen} setOpen={setIsOpen} />
 
-            <div className={`flex-1 overflow-y-auto p-6 md:p-12 transition-all duration-300 ${isOpen ? "ml-0" : "ml-0"}`}>
+            <div className={`flex-1 overflow-y-auto p-6 md:p-12 transition-all duration-300 ${isOpen ? "ml-72" : "ml-20"}`}>
                 <div className="max-w-5xl mx-auto bg-white rounded-2xl shadow-xl p-8">
                     {/* Profile Image Section */}
                     <div className="flex flex-col items-center mb-8">
