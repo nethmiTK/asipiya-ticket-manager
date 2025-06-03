@@ -645,6 +645,26 @@ app.get('/api/tickets', (req, res) => {
     });
 });
 
+app.get('/api/pending_ticket', (req, res) => {
+  const query = `
+    SELECT t.TicketID, s.Description AS SystemName, tc.Description AS CategoryName, u.FullName AS UserName, t.Status
+    FROM ticket t
+    LEFT JOIN asipiyasystem s ON t.AsipiyaSystemID = s.AsipiyaSystemID
+    LEFT JOIN ticketcategory tc ON t.TicketCategoryID = tc.TicketCategoryID
+    LEFT JOIN appuser u ON t.UserId = u.UserID
+  `;
+
+  db.query(query, (err, results) => {
+    if (err) {
+      console.error('Error fetching tickets:', err);
+      res.status(500).json({ error: 'Failed to fetch tickets' });
+      return;
+    }
+    res.json(results);
+  });
+});
+
+
 //Add systems
 app.post('/system_registration', (req, res) => {
     const { systemName, description } = req.body;
@@ -814,18 +834,22 @@ app.delete('/api/ticket_category_delete/:id', (req, res) => {
 //View ticket details
 app.get('/api/ticket_view/:id', (req, res) => {
     const ticketId = req.params.id;
-    const query = `SELECT t.TicketID, u.FullName AS UserName, s.SystemName, c.CategoryName, t.Description, t.DateTime,
-  t.Status, t.Priority, t.FirstRespondedTime, t.LastRespondedTime, t.TicketDuration, t.UserNote
-  FROM 
-    ticket t
-  JOIN 
-    appuser u ON t.UserId = u.UserID
-  JOIN 
-    asipiyasystem s ON t.AsipiyaSystemID = s.AsipiyaSystemID
-  JOIN 
-    ticketcategory c ON t.TicketCategoryID = c.TicketCategoryID
-  WHERE 
-    t.TicketID = ?`;
+    const query = `SELECT t.TicketID, u.FullName AS UserName, u.Email AS UserEmail,    
+    s.SystemName,
+    c.CategoryName,
+    t.Description,
+    t.DateTime,
+    t.Status,
+    t.Priority,
+    t.FirstRespondedTime,
+    t.LastRespondedTime,
+    t.TicketDuration,
+    t.UserNote
+  FROM ticket t
+  JOIN appuser u ON t.UserId = u.UserID
+  JOIN asipiyasystem s ON t.AsipiyaSystemID = s.AsipiyaSystemID
+  JOIN ticketcategory c ON t.TicketCategoryID = c.TicketCategoryID
+  WHERE t.TicketID = ?`;
 
     db.query(query, [ticketId], (err, results) => {
         if (err) {
@@ -881,7 +905,7 @@ app.get('/api/supervisors', (req, res) => {
 // Example for Express backend
 app.put('/api/tickets/:id/assign', (req, res) => {
   const ticketId = req.params.id;
-  const { supervisorName, status, priority } = req.body;
+  const { status, priority, supervisorName } = req.body;
 
   // TODO: Replace with your DB query
   const sql = `UPDATE ticket SET Status = ?, Priority = ?, SupervisorName = ? WHERE TicketID = ?`;

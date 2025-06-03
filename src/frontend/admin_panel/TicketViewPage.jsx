@@ -28,6 +28,13 @@ const TicketViewPage = ({ ticketId, popupMode = false }) => {
   if (loading) return <div className="text-center mt-10 text-gray-600">Loading ticket details...</div>;
   if (error) return <div className="text-center mt-10 text-red-600">{error}</div>;
 
+  const fields = {
+    SystemName: 'System Name',
+    UserEmail: 'User Email',
+    CategoryName: 'Category',
+    Description: 'Description',
+  };
+
   return (
     <div
       className={`${
@@ -40,9 +47,9 @@ const TicketViewPage = ({ ticketId, popupMode = false }) => {
         <h2 className="text-2xl font-semibold mb-8 text-center">Complain Details</h2>
 
         <div className="space-y-6">
-          {['SystemName', 'UserEmail', 'CategoryName', 'Description'].map((key) => (
+          {Object.entries(fields).map(([key, label]) => (
             <div className="flex items-start" key={key}>
-              <label className="w-40 font-medium">{key.replace(/([A-Z])/g, ' $1')}</label>
+              <label className="w-40 font-medium">{label}</label>
               <div className="flex-1 bg-gray-200 px-4 py-2 rounded">{ticketData[key]}</div>
             </div>
           ))}
