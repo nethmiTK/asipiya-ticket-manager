@@ -3,6 +3,7 @@ import axios from "axios";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import AdminSideBar from "../../user_components/SideBar/AdminSideBar";
 import { FaEye } from 'react-icons/fa';
+import Ticket_secret from "./Ticket_secret";
 
 const Tickets = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -11,6 +12,7 @@ const Tickets = () => {
   const [searchParams] = useSearchParams();
   const type = searchParams.get("type");
   const navigate = useNavigate();
+  const [selectedTicket, setSelectedTicket] = useState(null);
 
   useEffect(() => {
     const fetchTickets = async () => {
@@ -81,126 +83,137 @@ const Tickets = () => {
       <AdminSideBar open={isSidebarOpen} setOpen={setIsSidebarOpen} />
 
       <main
-        className={`flex-1 min-h-screen bg-gray-100 p-6 transition-all duration-300 ${
-          isSidebarOpen ? "ml-72" : "ml-20"
+        className={`flex-1 min-h-screen bg-gray-100 transition-all duration-300 ${
+          isSidebarOpen ? "ml-80" : "ml-24"
         }`}
       >
-        <header className="mb-6">
-          <h1 className="text-2xl font-bold mb-4">Tickets</h1>
-          <div className="flex gap-4 mb-6">
-            <button
-              onClick={() => navigate('/tickets')}
-              className={`px-6 py-2 rounded-lg transition-colors ${
-                !type ? 'bg-blue-500 text-white' : 'bg-gray-200 hover:bg-gray-300'
-              }`}
-            >
-              All Tickets
-            </button>
-            <button
-              onClick={() => navigate('/tickets?type=open')}
-              className={`px-6 py-2 rounded-lg transition-colors ${
-                type === 'open' ? 'bg-blue-500 text-white' : 'bg-gray-200 hover:bg-gray-300'
-              }`}
-            >
-              Open Tickets
-            </button>
-            <button
-              onClick={() => navigate('/tickets?type=today')}
-              className={`px-6 py-2 rounded-lg transition-colors ${
-                type === 'today' ? 'bg-blue-500 text-white' : 'bg-gray-200 hover:bg-gray-300'
-              }`}
-            >
-              Today's Tickets
-            </button>
-            <button
-              onClick={() => navigate('/tickets?type=pending')}
-              className={`px-6 py-2 rounded-lg transition-colors ${
-                type === 'pending' ? 'bg-blue-500 text-white' : 'bg-gray-200 hover:bg-gray-300'
-              }`}
-            >
-              Pending Tickets
-            </button>
-            <button
-              onClick={() => navigate('/tickets?type=high-priority')}
-              className={`px-6 py-2 rounded-lg transition-colors ${
-                type === 'high-priority' ? 'bg-blue-500 text-white' : 'bg-gray-200 hover:bg-gray-300'
-              }`}
-            >
-              High Priority
-            </button>
-            <button
-              onClick={() => navigate('/tickets?type=closed')}
-              className={`px-6 py-2 rounded-lg transition-colors ${
-                type === 'closed' ? 'bg-blue-500 text-white' : 'bg-gray-200 hover:bg-gray-300'
-              }`}
-            >
-              Closed Tickets
-            </button>
-          </div>
-        </header>
+        <div className="p-4 sm:p-6 lg:p-8">
+          <header className="mb-6">
+            <h1 className="text-2xl font-bold mb-4">Tickets</h1>
+            <div className="flex flex-wrap gap-4 mb-6">
+              <button
+                onClick={() => navigate('/tickets')}
+                className={`px-4 sm:px-6 py-2 rounded-lg transition-colors text-sm sm:text-base ${
+                  !type ? 'bg-blue-500 text-white' : 'bg-gray-200 hover:bg-gray-300'
+                }`}
+              >
+                All Tickets
+              </button>
+              <button
+                onClick={() => navigate('/tickets?type=open')}
+                className={`px-4 sm:px-6 py-2 rounded-lg transition-colors text-sm sm:text-base ${
+                  type === 'open' ? 'bg-blue-500 text-white' : 'bg-gray-200 hover:bg-gray-300'
+                }`}
+              >
+                Open Tickets
+              </button>
+              <button
+                onClick={() => navigate('/tickets?type=today')}
+                className={`px-4 sm:px-6 py-2 rounded-lg transition-colors text-sm sm:text-base ${
+                  type === 'today' ? 'bg-blue-500 text-white' : 'bg-gray-200 hover:bg-gray-300'
+                }`}
+              >
+                Today's Tickets
+              </button>
+              <button
+                onClick={() => navigate('/tickets?type=pending')}
+                className={`px-4 sm:px-6 py-2 rounded-lg transition-colors text-sm sm:text-base ${
+                  type === 'pending' ? 'bg-blue-500 text-white' : 'bg-gray-200 hover:bg-gray-300'
+                }`}
+              >
+                Pending Tickets
+              </button>
+              <button
+                onClick={() => navigate('/tickets?type=high-priority')}
+                className={`px-4 sm:px-6 py-2 rounded-lg transition-colors text-sm sm:text-base ${
+                  type === 'high-priority' ? 'bg-blue-500 text-white' : 'bg-gray-200 hover:bg-gray-300'
+                }`}
+              >
+                High Priority
+              </button>
+              <button
+                onClick={() => navigate('/tickets?type=closed')}
+                className={`px-4 sm:px-6 py-2 rounded-lg transition-colors text-sm sm:text-base ${
+                  type === 'closed' ? 'bg-blue-500 text-white' : 'bg-gray-200 hover:bg-gray-300'
+                }`}
+              >
+                Closed Tickets
+              </button>
+            </div>
+          </header>
 
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          <table className="min-w-full">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  TicketID
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  User Name
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Description
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Priority
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Action
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {tickets.map((ticket) => (
-                <tr
-                  key={ticket.TicketID}
-                  className="hover:bg-gray-50 transition-colors"
-                >
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    {ticket.TicketID}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {ticket.UserName || "N/A"}
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-500 max-w-md truncate">
-                    {ticket.Description}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    <span className={`${getStatusColor(ticket.Status)} font-medium`}>
-                      {ticket.Status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    <span className={`${getPriorityColor(ticket.Priority)} font-medium`}>
-                      {ticket.Priority}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    <button
-                      onClick={() => navigate(`/ticket_view_page/${ticket.TicketID}`)}
-                      className="text-blue-600 hover:text-blue-800 transition-colors"
-                      title="View Ticket Details"
+          <div className="bg-white rounded-lg shadow overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="min-w-full">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      TicketID
+                    </th>
+                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      User Name
+                    </th>
+                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Description
+                    </th>
+                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Status
+                    </th>
+                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Priority
+                    </th>
+                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Action
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {tickets.map((ticket) => (
+                    <tr
+                      key={ticket.TicketID}
+                      className="hover:bg-gray-50 transition-colors"
                     >
-                      <FaEye className="w-5 h-5" />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                        {ticket.TicketID}
+                      </td>
+                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {ticket.UserName || "N/A"}
+                      </td>
+                      <td className="px-4 sm:px-6 py-4 text-sm text-gray-500 max-w-xs truncate">
+                        {ticket.Description}
+                      </td>
+                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm">
+                        <span className={`${getStatusColor(ticket.Status)} font-medium`}>
+                          {ticket.Status}
+                        </span>
+                      </td>
+                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm">
+                        <span className={`${getPriorityColor(ticket.Priority)} font-medium`}>
+                          {ticket.Priority}
+                        </span>
+                      </td>
+                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm">
+                        <button
+                          onClick={() => setSelectedTicket(ticket)}
+                          className="text-blue-600 hover:text-blue-800 transition-colors"
+                          title="View Ticket Details"
+                        >
+                          <FaEye className="w-5 h-5" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {selectedTicket && (
+            <Ticket_secret
+              ticket={selectedTicket}
+              onClose={() => setSelectedTicket(null)}
+            />
+          )}
         </div>
       </main>
     </div>

@@ -24,6 +24,7 @@ import RecentlyActivity from "./RecentlyActivity"; // Import the RecentlyActivit
 import { useAuth } from '../../App.jsx';
 import { IoNotificationsOutline } from 'react-icons/io5';
 import NotificationPanel from './NotificationPanel';
+import Ticket_secret from "./Ticket_secret";
 
 ChartJS.register(
   ArcElement,
@@ -119,7 +120,7 @@ const TicketByStatusChart = () => {
               className="inline-block w-3 h-3 mr-2 rounded"
               style={{ backgroundColor: chartData.datasets[0].backgroundColor[index] }}
             ></span>
-            {label}: {chartData.datasets[0].data[index]}%
+            {label}: {chartData.datasets[0].data[index]}
           </p>
         ))}
       </div>
@@ -267,6 +268,7 @@ const Dashboard = () => {
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [recentActivities, setRecentActivities] = useState([]);
   const [recentUsers, setRecentUsers] = useState([]);
+  const [selectedTicket, setSelectedTicket] = useState(null);
 
   // Add status color function
   const getStatusColor = (status) => {
@@ -347,51 +349,8 @@ const Dashboard = () => {
   };
 
   return (
-    <div className="p-6 bg-gray-100 min-h-screen">
-      <header className="flex flex-col md:flex-row justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold mb-4 md:mb-0">Dashboard</h1>
-        
-        <div className="flex items-center gap-4">
-          <div className="relative">
-            <button 
-              className="relative p-2 hover:bg-gray-100 rounded-full"
-              onClick={toggleNotifications}
-            >
-              <IoNotificationsOutline className="text-2xl" />
-              <span className="absolute top-0 right-0 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                3
-              </span>
-            </button>
-            <NotificationPanel 
-              isOpen={isNotificationOpen} 
-              onClose={() => setIsNotificationOpen(false)} 
-            />
-          </div>
-          
-          <div className="flex items-center gap-3 cursor-pointer" onClick={handleProfileClick}>
-            <div className="text-right">
-              <p className="font-semibold text-gray-800">{user?.FullName}</p>
-              <p className="text-sm text-gray-500">{user?.Role}</p>
-            </div>
-            
-            <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-200">
-              {user?.ProfileImagePath ? (
-                <img 
-                  src={`http://localhost:5000/uploads/${user.ProfileImagePath}`}
-                  alt="Profile"
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center bg-blue-500 text-white">
-                  {user?.FullName?.charAt(0)}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </header>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4 mb-6">
+    <div className="space-y-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-6">
         <div
           onClick={() => handleNavigation('total')}
           className="bg-blue-500 text-white p-4 rounded shadow text-center cursor-pointer hover:bg-blue-600 transition-colors"
@@ -442,82 +401,165 @@ const Dashboard = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
-        <div className="bg-white p-4 rounded shadow">
-          <h2 className="text-lg font-semibold mb-4">Recently Activity</h2>
-          <table className="w-full border-collapse border border-gray-200 text-sm">
-            <thead>
-              <tr>
-                <th className="border border-gray-200 px-2 py-1">Tickets</th>
-                <th className="border border-gray-200 px-2 py-1">Clients</th>
-                <th className="border border-gray-200 px-2 py-1">Category</th>
-                <th className="border border-gray-200 px-2 py-1">Status</th>
-                <th className="border border-gray-200 px-2 py-1">Priority</th>
-                <th className="border border-gray-200 px-2 py-1">Assigned</th>
-              </tr>
-            </thead>
-            <tbody>{/* Add dynamic rows here */}</tbody>
-          </table>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="bg-white p-6 rounded-lg shadow">
+          <h2 className="text-xl font-semibold mb-6">Recently Activity</h2>
+          <div className="overflow-x-auto">
+            <table className="min-w-full border-collapse">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ticket ID</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Priority</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {recentActivities.map((ticket) => (
+                  <tr key={ticket.TicketID} className="hover:bg-gray-50">
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">#{ticket.TicketID}</td>
+                    <td className="px-4 py-3 text-sm text-gray-500 max-w-xs truncate">{ticket.Description}</td>
+                    <td className="px-4 py-3 whitespace-nowrap text-sm">
+                      <span className={`${getStatusColor(ticket.Status)} font-medium`}>
+                        {ticket.Status}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-sm">
+                      <span className={`${getPriorityColor(ticket.Priority)} font-medium`}>
+                        {ticket.Priority}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
-        <TicketByStatusChart />
+        <TicketBySystemChart />
+      </div>
 
-        <div className="bg-white p-4 rounded shadow">
-          <h2 className="text-lg font-semibold mb-4">Recently Users</h2>
-          <div className="flex flex-wrap gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <TicketByStatusChart />
+        <div className="bg-white p-6 rounded-lg shadow">
+          <h2 className="text-xl font-semibold mb-6">Recently Users</h2>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6">
             {recentUsers.map((user) => (
               <div 
                 key={user.UserID} 
-                className={`relative ${user.hasPendingTicket ? 'ring-2 ring-green-500 ring-offset-2' : ''} rounded-full p-1`}
+                className="flex flex-col items-center"
               >
-                <div className="w-16 h-16 rounded-full overflow-hidden">
-                  {user.ProfileImagePath ? (
-                    <img 
-                      src={`http://localhost:5000/uploads/${user.ProfileImagePath}`}
-                      alt={user.FullName}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center bg-gray-300 text-gray-600 text-xl">
-                      {user.FullName.charAt(0)}
-                    </div>
-                  )}
-                  {user.hasPendingTicket && (
-                    <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white"></div>
-                  )}
+                <div className="relative">
+                  <div className={`w-16 h-16 rounded-full overflow-hidden relative ${
+                    user.hasPendingTicket ? 'ring-2 ring-green-500' : ''
+                  }`}>
+                    {user.ProfileImagePath ? (
+                      <img 
+                        src={`http://localhost:5000/uploads/${user.ProfileImagePath}`}
+                        alt={user.FullName}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.target.onerror = null;
+                          e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(user.FullName)}&background=random`;
+                        }}
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center bg-gray-300 text-gray-600 text-xl">
+                        {user.FullName.charAt(0)}
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <span className="block text-sm text-center mt-2 font-medium text-gray-700">{user.FullName}</span>
+                <p className="mt-3 text-sm font-medium text-gray-700 text-center truncate w-full">
+                  {user.FullName}
+                </p>
               </div>
             ))}
           </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <TicketBySystemChart />
-        <div className="bg-white p-4 rounded shadow">
-          <h2 className="text-lg font-semibold mb-4">Active Clients</h2>
-          <div className="text-center text-gray-500">[Clients]</div>
-        </div>
-      </div>
+      {selectedTicket && (
+        <Ticket_secret
+          ticket={selectedTicket}
+          onClose={() => setSelectedTicket(null)}
+        />
+      )}
     </div>
   );
 };
 
 const DashboardLayout = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+  const { loggedInUser: user } = useAuth();
+  const navigate = useNavigate();
+
+  const toggleNotifications = () => {
+    setIsNotificationOpen(!isNotificationOpen);
+  };
+
+  const handleProfileClick = () => {
+    navigate('/admin-profile');
+  };
 
   return (
     <div className="flex">
-      {/* Sidebar */}
       <AdminSideBar open={isSidebarOpen} setOpen={setIsSidebarOpen} />
 
-      {/* Main Content */}
       <main
-        className={`flex-1 min-h-screen bg-gray-100 p-6 transition-all duration-300 ${
-          isSidebarOpen ? "ml-72" : "ml-20"
+        className={`flex-1 min-h-screen bg-gray-100 transition-all duration-300 ${
+          isSidebarOpen ? "ml-80" : "ml-24"
         }`}
       >
-        <Dashboard />
+        <div className="p-4 sm:p-6 lg:p-8">
+          <header className="flex flex-col md:flex-row justify-between items-center bg-white p-6 rounded-lg shadow-sm mb-8">
+            <h1 className="text-2xl font-bold mb-4 md:mb-0">Dashboard</h1>
+            
+            <div className="flex items-center gap-4">
+              <div className="relative">
+                <button 
+                  className="relative p-2 hover:bg-gray-100 rounded-full transition-colors"
+                  onClick={toggleNotifications}
+                >
+                  <IoNotificationsOutline className="text-2xl" />
+                  <span className="absolute top-0 right-0 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                    3
+                  </span>
+                </button>
+                <NotificationPanel 
+                  isOpen={isNotificationOpen} 
+                  onClose={() => setIsNotificationOpen(false)} 
+                />
+              </div>
+              
+              <div 
+                className="flex items-center gap-3 cursor-pointer hover:bg-gray-50 p-2 rounded-lg transition-colors"
+                onClick={handleProfileClick}
+              >
+                <div className="text-right hidden sm:block">
+                  <p className="font-semibold text-gray-800">{user?.FullName}</p>
+                  <p className="text-sm text-gray-500">{user?.Role}</p>
+                </div>
+                
+                <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-200 flex-shrink-0">
+                  {user?.ProfileImagePath ? (
+                    <img 
+                      src={`http://localhost:5000/uploads/${user.ProfileImagePath}`}
+                      alt="Profile"
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-blue-500 text-white">
+                      {user?.FullName?.charAt(0)}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </header>
+
+          <Dashboard />
+        </div>
       </main>
     </div>
   );

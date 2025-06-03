@@ -46,9 +46,9 @@ const AdminSideBar = ({ open: propOpen, setOpen: propSetOpen }) => {
   const location = useLocation();
 
   const authContext = useAuth();
-  if (!authContext) return null;
-
-  const { handleLogout } = authContext;
+  const handleLogout = authContext?.handleLogout || (() => {
+    console.warn('Logout function not available');
+  });
 
   // Automatically expand menus based on current path
   useEffect(() => {
@@ -105,6 +105,14 @@ const AdminSideBar = ({ open: propOpen, setOpen: propSetOpen }) => {
   const cancelLogout = () => {
     setShowLogoutModal(false);
   };
+
+  if (!authContext) {
+    return (
+      <div className="bg-gray-900 h-screen p-5 pt-30 fixed top-0 left-0 z-50">
+        <p className="text-white">Loading...</p>
+      </div>
+    );
+  }
 
   return (
     <>
