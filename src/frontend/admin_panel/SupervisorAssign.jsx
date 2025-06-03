@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { useParams, useNavigate } from 'react-router-dom';
+import AdminSideBar from '../../user_components/SideBar/AdminSideBar';
 
 const SupervisorAssignPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [ticketData, setTicketData] = useState(null);
   const [supervisors, setSupervisors] = useState([]);
   const [selectedSupervisor, setSelectedSupervisor] = useState('');
@@ -61,6 +62,7 @@ const SupervisorAssignPage = () => {
 
   return (
     <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
+      <AdminSideBar open={isSidebarOpen} setOpen={setIsSidebarOpen}/>
       <div className="bg-white p-8 rounded-xl shadow-lg max-w-xl w-full">
         <h2 className="text-2xl font-semibold text-center mb-6">
           Assign Supervisor for Ticket ID: {id}
@@ -95,6 +97,7 @@ const SupervisorAssignPage = () => {
               className="w-full mt-1 px-4 py-2 border border-gray-300 rounded"
             >
               <option value="Pending">Pending</option>
+              <option value="Open">Open</option>
               <option value="In Progress">In Progress</option>
               <option value="Resolved">Resolved</option>
             </select>
