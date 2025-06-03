@@ -32,6 +32,13 @@ const app = express();
 app.use(bodyParser.json());
 app.use(cors());
 
+//evidence uploads
+app.use("/uploads", express.static("uploads"));
+const uploadDir = "uploads";
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir);
+}
+
 // Get __dirname equivalent for ES Modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -425,6 +432,56 @@ app.get('/system_registration', (req, res) => {
     });
 });
 
+app.put('/api/system_registration_update/:id', (req, res) => {
+  const { id } = req.params;
+  const { systemName, description } = req.body;
+
+  const sql = 'UPDATE asipiyasystem SET SystemName = ?, Description = ? WHERE AsipiyaSystemID = ?';
+  db.query(sql, [systemName, description, id], (err, result) => {
+    if (err) {
+      console.error('Update error:', err);
+      return res.status(500).json({ error: 'Error updating system' });
+    }
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: 'System not found' });
+    }
+
+    res.status(200).json({ message: 'System updated successfully' });
+  });
+});
+
+app.delete('/api/system_registration_delete/:id', (req, res) => {
+  const { id } = req.params;
+
+  const checkSql = 'SELECT * FROM ticket WHERE AsipiyaSystemID = ?'; // if your ticket table uses this FK
+  db.query(checkSql, [id], (err, results) => {
+    if (err) {
+      console.error('Check usage error:', err);
+      return res.status(500).json({ error: 'Database error checking system usage' });
+    }
+
+    if (results.length > 0) {
+      return res.status(409).json({ message: 'System is in use and cannot be deleted' });
+    }
+
+    const deleteSql = 'DELETE FROM asipiyasystem WHERE AsipiyaSystemID = ?';
+    db.query(deleteSql, [id], (err, result) => {
+      if (err) {
+        console.error('Delete error:', err);
+        return res.status(500).json({ error: 'Error deleting system' });
+      }
+
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ message: 'System not found' });
+      }
+
+      res.status(200).json({ message: 'System deleted successfully' });
+    });
+  });
+});
+
+
 //Adding Category
 app.post('/ticket_category', (req, res) => {
     const { CategoryName, Description } = req.body;
@@ -460,6 +517,54 @@ app.get('/ticket_category', (req, res) => {
         }
         res.status(200).json(results);
     });
+});
+
+app.put('/api/ticket_category_update/:id', (req, res) => {
+  const { id } = req.params;
+  const { CategoryName, Description } = req.body;
+
+  const sql = 'UPDATE ticketcategory SET CategoryName = ?, Description = ? WHERE TicketCategoryID = ?';
+  db.query(sql, [CategoryName, Description, id], (err, result) => {
+    if (err) {
+      console.error('Update error:', err);
+      return res.status(500).json({ error: 'Error updating category' });
+    }
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: 'Category not found' });
+    }
+
+    res.status(200).json({ message: 'Category updated successfully' });
+  });
+});
+
+
+app.delete('/api/ticket_category_delete/:id', (req, res) => {
+  const { id } = req.params;
+
+  const checkSql = 'SELECT * FROM ticket WHERE TicketCategoryID = ?';
+  db.query(checkSql, [id], (err, results) => {
+    if (err) {
+      return res.status(500).json({ error: 'Database error checking category usage' });
+    }
+
+    if (results.length > 0) {
+      return res.status(409).json({ message: 'Category in use and cannot be deleted' });
+    }
+
+    const deleteSql = 'DELETE FROM ticketcategory WHERE TicketCategoryID = ?';
+    db.query(deleteSql, [id], (err, result) => {
+      if (err) {
+        return res.status(500).json({ error: 'Error deleting category' });
+      }
+
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ message: 'Category not found' });
+      }
+
+      res.status(200).json({ message: 'Category deleted successfully' });
+    });
+  });
 });
 
 
@@ -702,6 +807,52 @@ app.post("/create_ticket", (req, res) => {
         res.status(200).json({ message: "Ticket created", ticketId: result.insertId });
       });
     });
+  });
+});
+
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, "uploads/");
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    cb(
+      null,
+      file.fieldname + "-" + uniqueSuffix + path.extname(file.originalname)
+    );
+  },
+});
+
+const upload_evidence = multer({ storage: storage });
+
+app.post("/upload_evidence", upload_evidence.array("evidenceFiles"), (req, res) => {
+  const { ticketId, description } = req.body;
+
+  if (!req.files || req.files.length === 0) {
+    return res.status(400).json({ message: "No files uploaded" });
+  }
+
+  if (!ticketId) {
+    return res.status(400).json({ message: "Ticket ID is required" });
+  }
+
+  const values = req.files.map((file) => [ticketId, file.path, description]);
+
+  const insertEvidenceQuery = `
+    INSERT INTO evidence (ComplaintID, FilePath, Description) VALUES ?
+  `;
+
+  db.query(insertEvidenceQuery, [values], (err, result) => {
+    if (err) {
+      console.error("Error inserting evidence:", err);
+      return res.status(500).json({ message: "Error saving evidence" });
+    }
+    res
+      .status(200)
+      .json({
+        message: "Evidence files uploaded",
+        inserted: result.affectedRows,
+      });
   });
 });
 
