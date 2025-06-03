@@ -253,7 +253,7 @@ const RenderWithLayout = ({
     const showAdminSidebar =
         isLoggedIn &&
         (userRole ? ['admin', 'supervisor', 'manager', 'developer'].includes(userRole.toLowerCase()) : false) &&
-        !['/login', '/register', '/'].includes(location.pathname);
+        !['/login', '/register', '/', '/forgot-password', '/reset-password'].includes(location.pathname);
 
     return (
         <div className="flex min-h-screen">

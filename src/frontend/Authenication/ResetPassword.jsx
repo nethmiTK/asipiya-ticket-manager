@@ -9,7 +9,7 @@ const ResetPassword = () => {
     const [errors, setErrors] = useState({});
     const [loading, setLoading] = useState(false);
     const [token, setToken] = useState(null);
-    const [email, setEmail] = useState(null); // To store the email from the URL if needed
+    const [email, setEmail] = useState(null); 
     const navigate = useNavigate();
     const location = useLocation();
 
@@ -17,19 +17,16 @@ const ResetPassword = () => {
     useEffect(() => {
         const params = new URLSearchParams(location.search);
         const urlToken = params.get('token');
-        const urlEmail = params.get('email'); // Assuming email is also passed for convenience/verification
+        const urlEmail = params.get('email'); 
 
         if (!urlToken || !urlEmail) {
             toast.error('Invalid or missing reset token/email. Please request a new link.');
-            navigate('/forgot-password'); // Redirect if token or email is missing
+            navigate('/forgot-password'); 
             return;
         }
         setToken(urlToken);
         setEmail(urlEmail);
 
-        // Optionally, you might want to send a backend request here to validate the token's existence
-        // and expiry immediately, before the user even types a new password.
-        // For simplicity, we'll validate it during the password reset submission.
     }, [location.search, navigate]);
 
     const handleChange = (e) => {
@@ -84,8 +81,8 @@ const ResetPassword = () => {
         try {
             // Send the new password, token, and email to the backend for verification and update
             const response = await axios.post('http://localhost:5000/reset-password', {
-                email, // Send email for backend lookup
-                token, // Send token for verification
+                email, 
+                token, 
                 newPassword: password
             });
             toast.success(response.data.message || 'Your password has been reset successfully!');
