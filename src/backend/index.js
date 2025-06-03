@@ -778,6 +778,40 @@ app.get('/api/user/profile/:id', (req, res) => {
     });
 });
 
+app.get('/api/supervisors', (req, res) => {
+  const query = `
+    SELECT UserID, FullName FROM appuser 
+    WHERE Role IN ('supervisor', 'developer', 'manager')
+  `;
+  
+  db.query(query, (err, results) => {
+    if (err) {
+      console.error("Error fetching supervisors:", err);
+      return res.status(500).json({ error: "Database error" });
+    }
+    console.log("Supervisor result:", results); // Add this
+    res.json(results); // Make sure it's just `results`, not wrapped in an object
+  });
+});
+
+
+// Example for Express backend
+app.put('/api/tickets/:id/assign', (req, res) => {
+  const ticketId = req.params.id;
+  const { supervisorName, status, priority } = req.body;
+
+  // TODO: Replace with your DB query
+  const sql = `UPDATE ticket SET Status = ?, Priority = ?, SupervisorName = ? WHERE TicketID = ?`;
+
+  db.query(sql, [status, priority, supervisorName, ticketId], (err, result) => {
+    if (err) {
+      console.error('Error assigning supervisor:', err);
+      return res.status(500).json({ error: 'Database error' });
+    }
+    res.json({ message: 'Supervisor assigned successfully' });
+  });
+});
+
 // Update user profile endpoint (general user)
 app.put('/api/user/profile/:id', (req, res) => {
     const userId = req.params.id;

@@ -27,6 +27,7 @@ const Menus = [
       { title: "Closed Tickets", path: "/tickets?type=closed" }
     ]
   },
+  { title: "Pending Ticket", icon: <LuTicketCheck />, path: "/pending_ticket" },
   { title: "Ticket Manage", icon: <LuTicketCheck />, path: "/ticket-manage" },
     { title: "Supervisor Add", icon: <VscNotebook />, path: "/supervisor" },
    {

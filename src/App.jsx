@@ -32,6 +32,8 @@ import TicketViewPage from "./frontend/admin_panel/TicketViewPage";
 import TicketRequest from "./frontend/admin_panel/TicketRequest";
 import ForgotPassword from "./frontend/Authenication/ForgotPassword"; 
 import ResetPassword from "./frontend/Authenication/ResetPassword"; 
+import PendingTicket from "./frontend/admin_panel/PendingTicket"
+import SupervisorAssign from "./frontend/admin_panel/SupervisorAssign"
 
 // Create Auth Context - loggedInUser and setLoggedInUser
 const AuthContext = createContext(null);
@@ -219,6 +221,13 @@ const AppRoutes = ({
                 />
 
                 <Route path='/ticket_view_page/:id' element={[<TicketViewPage />]} />
+
+                <Route path='/pending_ticket' element={
+                    <ProtectedRoute>
+                        <PendingTicket />
+                    </ProtectedRoute>
+                }/>
+                <Route path='supervisor_assign/:id' element={[<SupervisorAssign/>]}/>
 
         <Route path="/ticket_view_page/:id" element={[<TicketViewPage />]} />
       </Routes>
