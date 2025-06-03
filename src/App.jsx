@@ -30,6 +30,8 @@ import TicketCategory from "./frontend/admin_panel/TicketCategory";
 import UserProfile from "./frontend/users_panel/UserProfile";
 import TicketViewPage from "./frontend/admin_panel/TicketViewPage";
 import TicketRequest from "./frontend/admin_panel/TicketRequest";
+import ForgotPassword from "./frontend/Authenication/ForgotPassword"; 
+import ResetPassword from "./frontend/Authenication/ResetPassword"; 
 
 // Create Auth Context - loggedInUser and setLoggedInUser
 const AuthContext = createContext(null);
@@ -113,6 +115,8 @@ const AppRoutes = ({
                 <Route path='/' element={<Navigate to="/login" replace />} />
                 <Route path='/register' element={<Register />} />
                 <Route path='/login' element={<Login onLoginSuccess={handleLoginSuccess} />} />
+                <Route path='/forgot-password' element={<ForgotPassword />} />
+                <Route path='/reset-password' element={<ResetPassword />} /> 
                 <Route path='/all-tickets' element={<UserDashboard />} /> 
                 <Route path='/open-tickets' element={<OpenTickets />} /> 
 

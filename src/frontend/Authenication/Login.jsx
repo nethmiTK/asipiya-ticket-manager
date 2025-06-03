@@ -69,6 +69,11 @@ const Login = ({ onLoginSuccess }) => {
                         Login
                     </button>
                 </form>
+                 <p className="mt-4 text-right text-gray-700">
+                    <Link to="/forgot-password" className="text-blue-600 hover:underline font-semibold">
+                        Forgot your password?
+                    </Link>
+                </p>
                 <p className="mt-6 text-center text-gray-700">
                     Don't have an account? <Link to="/register" className="text-blue-600 hover:underline font-semibold">Register</Link>
                 </p>
