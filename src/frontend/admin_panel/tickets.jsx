@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import AdminSideBar from "../../user_components/SideBar/AdminSideBar";
+import { FaEye } from 'react-icons/fa';
 
 const Tickets = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -112,6 +113,14 @@ const Tickets = () => {
               Today's Tickets
             </button>
             <button
+              onClick={() => navigate('/tickets?type=pending')}
+              className={`px-6 py-2 rounded-lg transition-colors ${
+                type === 'pending' ? 'bg-blue-500 text-white' : 'bg-gray-200 hover:bg-gray-300'
+              }`}
+            >
+              Pending Tickets
+            </button>
+            <button
               onClick={() => navigate('/tickets?type=high-priority')}
               className={`px-6 py-2 rounded-lg transition-colors ${
                 type === 'high-priority' ? 'bg-blue-500 text-white' : 'bg-gray-200 hover:bg-gray-300'
@@ -150,7 +159,7 @@ const Tickets = () => {
                   Priority
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  User Note
+                  Action
                 </th>
               </tr>
             </thead>
@@ -158,8 +167,7 @@ const Tickets = () => {
               {tickets.map((ticket) => (
                 <tr
                   key={ticket.TicketID}
-                  className="hover:bg-gray-50 cursor-pointer transition-colors"
-                  onClick={() => navigate(`/ticket_view_page/${ticket.TicketID}`)}
+                  className="hover:bg-gray-50 transition-colors"
                 >
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                     {ticket.TicketID}
@@ -180,8 +188,14 @@ const Tickets = () => {
                       {ticket.Priority}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-sm text-gray-500 max-w-md truncate">
-                    {ticket.UserNote || "No notes"}
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    <button
+                      onClick={() => navigate(`/ticket_view_page/${ticket.TicketID}`)}
+                      className="text-blue-600 hover:text-blue-800 transition-colors"
+                      title="View Ticket Details"
+                    >
+                      <FaEye className="w-5 h-5" />
+                    </button>
                   </td>
                 </tr>
               ))}

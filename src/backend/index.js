@@ -712,7 +712,8 @@ app.get('/api/tickets/counts', (req, res) => {
         open: "SELECT COUNT(*) AS count FROM ticket WHERE Status IN ('Open', 'In Progress') AND Status != 'Rejected'",
         today: "SELECT COUNT(*) AS count FROM ticket WHERE DATE(DateTime) = CURDATE()",
         highPriority: "SELECT COUNT(*) AS count FROM ticket WHERE Priority = 'High' AND Status != 'Rejected'",
-        closed: "SELECT COUNT(*) AS count FROM ticket WHERE Status = 'Closed'"
+        closed: "SELECT COUNT(*) AS count FROM ticket WHERE Status = 'Closed'",
+        pending: "SELECT COUNT(*) AS count FROM ticket WHERE Status = 'Pending'"
     };
 
     const results = {};
@@ -746,7 +747,6 @@ app.get('/api/tickets/filter', (req, res) => {
             t.Description,
             t.Status,
             t.Priority,
-            t.UserNote,
             t.DateTime
         FROM ticket t
         LEFT JOIN appuser u ON t.UserId = u.UserID
@@ -756,6 +756,9 @@ app.get('/api/tickets/filter', (req, res) => {
     let orderClause = 'ORDER BY t.DateTime DESC';
     
     switch (type) {
+        case 'pending':
+            whereClause = "WHERE t.Status = 'Pending'";
+            break;
         case 'open':
             whereClause = "WHERE t.Status IN ('Open', 'In Progress') AND t.Status != 'Rejected'";
             break;
@@ -807,19 +810,22 @@ app.get('/api/tickets/status-distribution', (req, res) => {
 // API endpoint to fetch the last five activities
 app.get('/api/tickets/recent-activities', (req, res) => {
     const query = `
-        SELECT TicketID, Description, Status, Priority, DateTime
-        FROM ticket
-        ORDER BY DateTime DESC
-        LIMIT 5;
+        SELECT 
+            t.TicketID,
+            t.Description,
+            t.Status,
+            t.Priority,
+            t.DateTime
+        FROM ticket t
+        ORDER BY t.DateTime DESC
+        LIMIT 5
     `;
 
     db.query(query, (err, results) => {
         if (err) {
             console.error('Error fetching recent activities:', err);
-            res.status(500).json({ error: 'Failed to fetch recent activities' });
-            return;
+            return res.status(500).json({ error: 'Failed to fetch recent activities' });
         }
-
         res.json(results);
     });
 });
@@ -869,6 +875,34 @@ app.get('/api/tickets/system-distribution', (req, res) => {
             console.error('Error fetching ticket system distribution:', err);
             res.status(500).json({ error: 'Failed to fetch ticket system distribution' });
             return;
+        }
+        res.json(results);
+    });
+});
+
+// Update endpoint for recent users
+app.get('/api/users/recent', (req, res) => {
+    const query = `
+        SELECT DISTINCT 
+            u.UserID,
+            u.FullName,
+            u.ProfileImagePath,
+            EXISTS(
+                SELECT 1 
+                FROM ticket t 
+                WHERE t.UserId = u.UserID 
+                AND t.Status = 'Pending'
+            ) as hasPendingTicket
+        FROM appuser u
+        WHERE u.Role = 'User'
+        ORDER BY u.UserID DESC
+        LIMIT 5
+    `;
+
+    db.query(query, (err, results) => {
+        if (err) {
+            console.error('Error fetching recent users:', err);
+            return res.status(500).json({ error: 'Failed to fetch recent users' });
         }
         res.json(results);
     });

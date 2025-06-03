@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { FaTicketAlt, FaExclamationCircle, FaCalendarDay, FaTasks, FaHome } from "react-icons/fa";
+import { FaTicketAlt, FaExclamationCircle, FaCalendarDay, FaTasks, FaHome, FaEye, FaClock } from "react-icons/fa";
 import { Link, useNavigate } from "react-router-dom";
 import { BsChevronLeft } from "react-icons/bs";
 import { LuTicketCheck } from "react-icons/lu";
@@ -262,8 +262,43 @@ const Dashboard = () => {
     today: 0,
     highPriority: 0,
     closed: 0,
+    pending: 0,
   });
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+  const [recentActivities, setRecentActivities] = useState([]);
+  const [recentUsers, setRecentUsers] = useState([]);
+
+  // Add status color function
+  const getStatusColor = (status) => {
+    switch (status?.toLowerCase()) {
+      case "open":
+        return "text-blue-500";
+      case "in progress":
+        return "text-yellow-500";
+      case "closed":
+        return "text-green-500";
+      case "rejected":
+        return "text-red-500";
+      case "pending":
+        return "text-orange-500";
+      default:
+        return "text-gray-500";
+    }
+  };
+
+  // Add priority color function
+  const getPriorityColor = (priority) => {
+    switch (priority?.toLowerCase()) {
+      case "high":
+        return "text-red-500";
+      case "medium":
+        return "text-yellow-500";
+      case "low":
+        return "text-green-500";
+      default:
+        return "text-gray-500";
+    }
+  };
 
   useEffect(() => {
     const fetchCounts = async () => {
@@ -276,6 +311,23 @@ const Dashboard = () => {
     };
 
     fetchCounts();
+  }, []);
+
+  useEffect(() => {
+    const fetchRecentData = async () => {
+      try {
+        const [activitiesRes, usersRes] = await Promise.all([
+          axios.get("http://localhost:5000/api/tickets/recent-activities"),
+          axios.get("http://localhost:5000/api/users/recent")
+        ]);
+        setRecentActivities(activitiesRes.data);
+        setRecentUsers(usersRes.data);
+      } catch (error) {
+        console.error("Error fetching recent data:", error);
+      }
+    };
+
+    fetchRecentData();
   }, []);
 
   const handleNavigation = (type) => {
@@ -339,7 +391,7 @@ const Dashboard = () => {
         </div>
       </header>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4 mb-6">
         <div
           onClick={() => handleNavigation('total')}
           className="bg-blue-500 text-white p-4 rounded shadow text-center cursor-pointer hover:bg-blue-600 transition-colors"
@@ -362,7 +414,15 @@ const Dashboard = () => {
         >
           <FaCalendarDay className="text-3xl mb-2 mx-auto" />
           <h2 className="text-lg font-semibold">{counts.today}</h2>
-          <p>Tickets Today</p>
+          <p>Today's Tickets</p>
+        </div>
+        <div
+          onClick={() => handleNavigation('pending')}
+          className="bg-yellow-500 text-white p-4 rounded shadow text-center cursor-pointer hover:bg-yellow-600 transition-colors"
+        >
+          <FaClock className="text-3xl mb-2 mx-auto" />
+          <h2 className="text-lg font-semibold">{counts.pending}</h2>
+          <p>Pending Tickets</p>
         </div>
         <div
           onClick={() => handleNavigation('high-priority')}
@@ -399,8 +459,37 @@ const Dashboard = () => {
             <tbody>{/* Add dynamic rows here */}</tbody>
           </table>
         </div>
-
         <TicketByStatusChart />
+
+        <div className="bg-white p-4 rounded shadow">
+          <h2 className="text-lg font-semibold mb-4">Recently Users</h2>
+          <div className="flex flex-wrap gap-4">
+            {recentUsers.map((user) => (
+              <div 
+                key={user.UserID} 
+                className={`relative ${user.hasPendingTicket ? 'ring-2 ring-green-500 ring-offset-2' : ''} rounded-full p-1`}
+              >
+                <div className="w-16 h-16 rounded-full overflow-hidden">
+                  {user.ProfileImagePath ? (
+                    <img 
+                      src={`http://localhost:5000/uploads/${user.ProfileImagePath}`}
+                      alt={user.FullName}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-gray-300 text-gray-600 text-xl">
+                      {user.FullName.charAt(0)}
+                    </div>
+                  )}
+                  {user.hasPendingTicket && (
+                    <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white"></div>
+                  )}
+                </div>
+                <span className="block text-sm text-center mt-2 font-medium text-gray-700">{user.FullName}</span>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

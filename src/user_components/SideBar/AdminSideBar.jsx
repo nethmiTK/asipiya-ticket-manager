@@ -22,6 +22,7 @@ const Menus = [
       { title: "All Tickets", path: "/tickets" },
       { title: "Open Tickets", path: "/tickets?type=open" },
       { title: "Today's Tickets", path: "/tickets?type=today" },
+      { title: "Pending Tickets", path: "/tickets?type=pending" },
       { title: "High Priority", path: "/tickets?type=high-priority" },
       { title: "Closed Tickets", path: "/tickets?type=closed" }
     ]
