@@ -9,8 +9,8 @@ import { useAuth } from '../../App.jsx';
 import { toast } from 'react-toastify';
 
 const Menus = [
-  { title: "My All Tickets", icon: <LuTicketCheck />, path: "/all-tickets" },
-  { title: "My Open Tickets", icon: <LuTicketPlus />, path: "/open-tickets" },
+  { title: "Dashboard", icon: <LuTicketCheck />, path: "/all-tickets" },
+  { title: "Create Tickets", icon: <LuTicketPlus />, path: "/open-tickets" },
    { title: "My Profile", icon: <AiOutlineUser />, path: "/user-profile" }, 
 ];
 

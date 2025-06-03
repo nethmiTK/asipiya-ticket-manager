@@ -30,6 +30,10 @@ import TicketCategory from "./frontend/admin_panel/TicketCategory";
 import UserProfile from "./frontend/users_panel/UserProfile";
 import TicketViewPage from "./frontend/admin_panel/TicketViewPage";
 import TicketRequest from "./frontend/admin_panel/TicketRequest";
+import ForgotPassword from "./frontend/Authenication/ForgotPassword"; 
+import ResetPassword from "./frontend/Authenication/ResetPassword"; 
+import PendingTicket from "./frontend/admin_panel/PendingTicket"
+import SupervisorAssign from "./frontend/admin_panel/SupervisorAssign"
 
 // Create Auth Context - loggedInUser and setLoggedInUser
 const AuthContext = createContext(null);
@@ -113,6 +117,8 @@ const AppRoutes = ({
                 <Route path='/' element={<Navigate to="/login" replace />} />
                 <Route path='/register' element={<Register />} />
                 <Route path='/login' element={<Login onLoginSuccess={handleLoginSuccess} />} />
+                <Route path='/forgot-password' element={<ForgotPassword />} />
+                <Route path='/reset-password' element={<ResetPassword />} /> 
                 <Route path='/all-tickets' element={<UserDashboard />} /> 
                 <Route path='/open-tickets' element={<OpenTickets />} /> 
 
@@ -224,6 +230,13 @@ const AppRoutes = ({
 
                 <Route path='/ticket_view_page/:id' element={[<TicketViewPage />]} />
 
+                <Route path='/pending_ticket' element={
+                    <ProtectedRoute>
+                        <PendingTicket />
+                    </ProtectedRoute>
+                }/>
+                <Route path='supervisor_assign/:id' element={[<SupervisorAssign/>]}/>
+
         <Route path="/ticket_view_page/:id" element={[<TicketViewPage />]} />
       </Routes>
       <ToastContainer
@@ -257,7 +270,7 @@ const RenderWithLayout = ({
     const showAdminSidebar =
         isLoggedIn &&
         (userRole ? ['admin', 'supervisor', 'manager', 'developer'].includes(userRole.toLowerCase()) : false) &&
-        !['/login', '/register', '/'].includes(location.pathname);
+        !['/login', '/register', '/', '/forgot-password', '/reset-password'].includes(location.pathname);
 
     return (
         <div className="flex min-h-screen">
