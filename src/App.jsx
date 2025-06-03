@@ -178,6 +178,14 @@ const AppRoutes = ({
                     }
                 />
                 <Route
+                    path="/ticket-request"
+                    element={
+                        <ProtectedRoute allowedRoles={['admin', 'supervisor', 'manager', 'developer']}>
+                            <TicketRequest />
+                        </ProtectedRoute>
+                    }
+                />
+                <Route
                     path="/edit-supervisor/:id"
                     element={
                         <ProtectedRoute allowedRoles={['admin', 'supervisor', 'manager', 'developer']}>
