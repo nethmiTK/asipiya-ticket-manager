@@ -1050,6 +1050,40 @@ app.post("/upload_evidence", upload_evidence.array("evidenceFiles"), (req, res) 
   });
 });
 
+//user ticket view
+
+app.get("/tickets", (req, res) => {
+  const { userId } = req.query;
+
+  if (!userId) {
+    return res.status(400).json({ message: "User ID is required" });
+  }
+
+  const sql = `
+    SELECT 
+      t.TicketID AS id,
+      t.Description AS description,
+      t.Status AS status,
+      a.SystemName AS system_name,
+      c.CategoryName AS category,
+      t.DateTime AS datetime
+    FROM ticket t
+    JOIN asipiyasystem a ON t.AsipiyaSystemID = a.AsipiyaSystemID
+    JOIN ticketcategory c ON t.TicketCategoryID = c.TicketCategoryID
+    WHERE t.UserID = ?
+    ORDER BY t.DateTime DESC
+  `;
+
+  db.query(sql, [userId], (err, results) => {
+    if (err) {
+      console.error("Error fetching tickets:", err);
+      return res.status(500).json({ message: "Error fetching tickets" });
+    }
+    res.status(200).json(results);
+  });
+});
+
+
 // API endpoint to fetch ticket counts
 app.get('/api/tickets/counts', (req, res) => {
     const queries = {

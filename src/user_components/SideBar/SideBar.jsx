@@ -1,17 +1,18 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { BsChevronLeft } from "react-icons/bs";
-import { LuTicketCheck, LuTicketPlus } from "react-icons/lu";
+import { LuTicketCheck, LuTicketPlus, LuLayoutDashboard } from "react-icons/lu";
 import { IoIosArrowBack } from "react-icons/io";
 import { AiOutlineUser } from "react-icons/ai";
 import { CiLogout } from "react-icons/ci";
-import { useAuth } from '../../App.jsx';
-import { toast } from 'react-toastify';
+import { useAuth } from "../../App.jsx";
+import { toast } from "react-toastify";
 
 const Menus = [
-  { title: "Dashboard", icon: <LuTicketCheck />, path: "/all-tickets" },
+  { title: "Dashboard", icon: <LuLayoutDashboard />, path: "/all-tickets" },
   { title: "Create Tickets", icon: <LuTicketPlus />, path: "/open-tickets" },
-   { title: "My Profile", icon: <AiOutlineUser />, path: "/user-profile" }, 
+  { title: "View My Tickets", icon: <LuTicketCheck />, path: "/ticket-view" },
+  { title: "My Profile", icon: <AiOutlineUser />, path: "/user-profile" },
 ];
 
 const SideBar = () => {
@@ -114,7 +115,9 @@ const SideBar = () => {
       {showLogoutModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white p-6 rounded-lg shadow-lg text-center w-[90%] max-w-sm">
-            <h2 className="text-lg font-semibold mb-4">Are you sure you want to log out?</h2>
+            <h2 className="text-lg font-semibold mb-4">
+              Are you sure you want to log out?
+            </h2>
             <div className="flex justify-center gap-4">
               <button
                 onClick={confirmLogout}
