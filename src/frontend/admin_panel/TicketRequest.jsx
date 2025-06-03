@@ -1,46 +1,71 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-
-// Sample data
-const sampleRequests = [
-  {
-    id: 1,
-    companyName: "Asipiya Soft Solutions Pvt Ltd",
-    userName: "Mr. Roy",
-    description:
-      "A bud in a system refers to a potential point of growth or improvement within an existing structure...",
-    dateTime: "20/05/2025 14:34:19",
-    status: "Pending",
-  },
-  {
-    id: 2,
-    companyName: "CodeWaves Pvt Ltd",
-    userName: "Mr. Kamal",
-    description: "Facing issues with the login module of HRMS system.",
-    dateTime: "20/05/2025 15:05:43",
-    status: "Pending",
-  },
-];
 
 const TicketRequest = () => {
   const navigate = useNavigate();
-  const [requests, setRequests] = useState(sampleRequests);
+  const [requests, setRequests] = useState([]);
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [showModal, setShowModal] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
-  const updateStatus = (id, newStatus) => {
-    const updated = requests.map((r) =>
-      r.id === id ? { ...r, status: newStatus } : r
-    );
-    setRequests(updated);
+  const fetchTickets = async (supervisorName) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const url = supervisorName
+        ? `http://localhost:5000/tickets/supervisor/${encodeURIComponent(supervisorName)}`
+        : `http://localhost:5000/tickets`;
+
+      const response = await fetch(url);
+      if (!response.ok) throw new Error("Failed to fetch tickets");
+      const data = await response.json();
+      setRequests(data);
+    } catch (err) {
+      setError(err.message || "Unexpected error");
+      setRequests([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleAccept = (id) => updateStatus(id, "Accepted");
+  useEffect(() => {
+    const delayDebounce = setTimeout(() => {
+      fetchTickets(searchTerm.trim());
+    }, 500);
+    return () => clearTimeout(delayDebounce);
+  }, [searchTerm]);
 
   const handleView = (request) => {
     setSelectedRequest(request);
     setShowModal(true);
   };
+
+  const handleAccept = async (ticketID) => {
+  try {
+    const response = await fetch(`http://localhost:5000/tickets/accept/${ticketID}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    const contentType = response.headers.get("content-type");
+    if (!response.ok) throw new Error("Failed to accept ticket");
+    if (!contentType || !contentType.includes("application/json")) {
+      const text = await response.text(); // inspect the HTML
+      throw new Error(`Expected JSON, got: ${text.slice(0, 100)}`);
+    }
+
+    const data = await response.json(); // This line fails if the response is HTML
+    alert("Ticket accepted!");
+  } catch (error) {
+    console.error("Failed to accept ticket:", error.message);
+    alert("Error: " + error.message);
+  }
+};
+
 
   return (
     <>
@@ -57,75 +82,78 @@ const TicketRequest = () => {
             viewBox="0 0 24 24"
             stroke="currentColor"
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M9 5l7 7-7 7"
-            />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
           </svg>
         </button>
       </div>
 
       <div className="min-h-screen bg-gray-100 p-6">
         <div className="max-w-6xl mx-auto bg-white p-6 rounded-xl shadow-md">
-          <h2 className="text-2xl font-bold text-center mb-6">
-            Support Requests
-          </h2>
+          <h2 className="text-2xl font-bold text-center mb-6">Support Requests</h2>
 
-          <div className="overflow-x-auto">
-            <table className="w-full table-auto border-collapse">
-              <thead>
-                <tr className="bg-blue-100 text-left">
-                  <th className="py-3 px-4 border-b">Company Name</th>
-                  <th className="py-3 px-4 border-b">User Name</th>
-                  <th className="py-3 px-4 border-b">Date & Time</th>
-                  <th className="py-3 px-4 border-b">Status</th>
-                  <th className="py-3 px-4 border-b text-center">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {requests.map((req) => (
-                  <tr
-                    key={req.id}
-                    className="hover:bg-gray-50 transition duration-200"
-                  >
-                    <td className="py-3 px-4 border-b">{req.companyName}</td>
-                    <td className="py-3 px-4 border-b">{req.userName}</td>
-                    <td className="py-3 px-4 border-b">{req.dateTime}</td>
-                    <td className="py-3 px-4 border-b">{req.status}</td>
-                    <td className="py-3 px-4 border-b text-center space-x-2">
-                      <button
-                        className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded"
-                        onClick={() => handleAccept(req.id)}
-                      >
-                        Accept
-                      </button>
-                      <button
-                        className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded"
-                        onClick={() => handleView(req)}
-                      >
-                        View
-                      </button>
-                    </td>
+          <input
+            type="text"
+            placeholder="Search by Supervisor name"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="mb-4 p-2 border rounded w-full max-w-xs"
+          />
+
+          {loading && <p>Loading tickets...</p>}
+          {error && <p className="text-red-600">{error}</p>}
+
+          {!loading && !error && (
+            <div className="overflow-x-auto">
+              <table className="w-full table-auto border-collapse">
+                <thead>
+                  <tr className="bg-blue-100 text-left">
+                    <th className="py-3 px-4 border-b">Ticket ID</th>
+                    <th className="py-3 px-4 border-b">Supervisor Name</th>
+                    <th className="py-3 px-4 border-b">Date & Time</th>
+                    <th className="py-3 px-4 border-b">Status</th>
+                    <th className="py-3 px-4 border-b text-center">Actions</th>
                   </tr>
-                ))}
-                {requests.length === 0 && (
-                  <tr>
-                    <td
-                      colSpan={5}
-                      className="text-center py-6 text-gray-500"
-                    >
-                      No requests found.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {requests.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="text-center py-6 text-gray-500">
+                        No requests found.
+                      </td>
+                    </tr>
+                  )}
+
+                  {requests.map((req) => (
+                    <tr key={req.TicketID} className="hover:bg-gray-50 transition duration-200">
+                      <td className="py-3 px-4 border-b">{req.TicketID}</td>
+                      <td className="py-3 px-4 border-b">{req.SupervisorName}</td>
+                      <td className="py-3 px-4 border-b">{req.DateTime}</td>
+                      <td className="py-3 px-4 border-b">{req.Status}</td>
+                      <td className="py-3 px-4 border-b text-center">
+                        <button
+                          className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded mr-2"
+                          onClick={() => handleView(req)}
+                        >
+                          View
+                        </button>
+
+                        {req.Status !== "Accepted" && (
+                          <button
+                            className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded"
+                            onClick={() => handleAccept(req.TicketID)}
+                          >
+                            Accept
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
 
-        {/* Modal */}
         {showModal && selectedRequest && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 bg-opacity-40">
             <div className="bg-white p-6 rounded-lg w-full max-w-md shadow-xl relative">
@@ -136,39 +164,28 @@ const TicketRequest = () => {
                 &times;
               </button>
               <h3 className="text-xl font-semibold mb-4">Request Details</h3>
-              <p>
-                <strong>Company:</strong> {selectedRequest.companyName}
-              </p>
-              <p>
-                <strong>User:</strong> {selectedRequest.userName}
-              </p>
+              <p><strong>Ticket ID:</strong> {selectedRequest.TicketID}</p>
+              <p><strong>Supervisor:</strong> {selectedRequest.SupervisorName}</p>
               <p className="my-2">
                 <strong>Description:</strong>
                 <br />
-                <span className="block mt-1 text-gray-700">
-                  {selectedRequest.description}
-                </span>
+                <span className="block mt-1 text-gray-700">{selectedRequest.Description}</span>
               </p>
-              <p>
-                <strong>Date & Time:</strong> {selectedRequest.dateTime}
-              </p>
-              <p>
-                <strong>Status:</strong> {selectedRequest.status}
-              </p>
+              <p><strong>Date & Time:</strong> {selectedRequest.DateTime}</p>
+              <p><strong>Status:</strong> {selectedRequest.Status}</p>
 
               <div className="mt-6 flex justify-between">
-                <button
-                  onClick={() => {
-                    handleAccept(selectedRequest.id);
-                    setShowModal(false);
-                  }}
-                  className="bg-green-600 hover:bg-green-700 text-white font-semibold px-4 py-2 rounded"
-                >
-                  Accept
-                </button>
+                {selectedRequest.Status !== "Accepted" && (
+                  <button
+                    className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded"
+                    onClick={() => handleAccept(selectedRequest.TicketID)}
+                  >
+                    Accept
+                  </button>
+                )}
                 <button
                   onClick={() => setShowModal(false)}
-                  className="bg-gray-400 hover:bg-gray-500 text-white font-semibold px-4 py-2 rounded"
+                  className="bg-gray-400 hover:bg-gray-500 text-white px-4 py-2 rounded"
                 >
                   Close
                 </button>

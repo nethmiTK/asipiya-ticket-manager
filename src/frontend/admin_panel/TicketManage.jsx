@@ -3,6 +3,20 @@ import { FaBell } from "react-icons/fa6";
 import TicketCard from "./TicketCard";
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
+import ChatSection from "./ChatSection";
+import { MessageCircle } from "lucide-react";
+
+const USER = {
+  id: "user1",
+  name: "You",
+  avatar: "https://i.pravatar.cc/40?u=user1",
+};
+
+const SUPPORT = {
+  id: "support",
+  name: "Support",
+  avatar: "https://i.pravatar.cc/40?u=support",
+};
 
 export default function TicketManage() {
   const navigate = useNavigate();
@@ -35,22 +49,17 @@ export default function TicketManage() {
     }
   };
 
-  /*const handleFileChange = (e) => {
-    const files = Array.from(e.target.files);
-    const fileLogs = files.map((file) => `📎 Attached: ${file.name}`);
-    setSelectedTicket((prev) => ({
-      ...prev,
-      logs: [...prev.logs, ...fileLogs],
-    }));
+  const [chatMode, setChatMode] = useState(true);
 
-    const previews = files.map((file) => ({
-      name: file.name,
-      url: URL.createObjectURL(file),
-      type: file.type,
-    }));
-
-    setAttachments(previews);
-  };*/
+  const initialMessages = [
+    {
+      id: 1,
+      sender: SUPPORT,
+      text: "Welcome to support chat!",
+      timestamp: new Date().toLocaleTimeString(),
+      status: "delivered",
+    },
+  ];
 
   const tickets = [
     {
@@ -89,7 +98,7 @@ export default function TicketManage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <nav className="bg-white shadow-md px-6 py-4 flex justify-between items-center">
-        <h1 className="text-xl sm:text-2xl font-bold text-gray-700">
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-700 ">
           Ticket Management
         </h1>
         <div
@@ -243,57 +252,38 @@ export default function TicketManage() {
                 >
                   Send
                 </button>
-                <button className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">
-                  Save Changes
-                </button>
               </div>
+              {/* Chat popup or section */}
+              {chatMode && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 bg-opacity-40 backdrop-blur-sm">
+                  <div className="relative w-full max-w-lg p-4 bg-white rounded-lg shadow-lg">
+                    {/* Close Button */}
+                    <button
+                      onClick={() => setChatMode(false)}
+                      className="absolute top-2 right-2 text-gray-500 hover:text-red-600 text-xl"
+                      aria-label="Open Chat"
+                    >
+                      ❌
+                    </button>
 
-              {/*<div>
-                <label className="block text-sm font-medium mb-1">
-                  Attach Files (image, video, pdf)
-                </label>
-                <input
-                  type="file"
-                  multiple
-                  accept="image/*,video/*,application/pdf"
-                  className="w-full border p-2 rounded-md"
-                  onChange={handleFileChange}
-                />
-              </div>*/}
-
-              {/* Preview Section */}
-              <div className="space-y-2">
-                {attachments.map((file, index) => (
-                  <div key={index}>
-                    <p className="text-sm text-gray-600 font-medium">
-                      {file.name}
-                    </p>
-                    {file.type.startsWith("image/") && (
-                      <img
-                        src={file.url}
-                        alt={file.name}
-                        className="w-full max-h-40 object-contain rounded border"
-                      />
-                    )}
-                    {file.type.startsWith("video/") && (
-                      <video
-                        controls
-                        className="w-full max-h-40 rounded border"
-                      >
-                        <source src={file.url} type={file.type} />
-                        Your browser does not support the video tag.
-                      </video>
-                    )}
-                    {file.type === "application/pdf" && (
-                      <embed
-                        src={file.url}
-                        type="application/pdf"
-                        className="w-full h-48 border rounded"
-                      />
-                    )}
+                    {/* Chat Section */}
+                    <ChatSection
+                      user={USER}
+                      supportUser={SUPPORT}
+                      initialMessages={initialMessages}
+                    />
                   </div>
-                ))}
-              </div>
+                </div>
+              )}
+
+              {/* Button to toggle chat */}
+              <button
+                onClick={() => setChatMode(!chatMode)}
+                className="m-4 p-2 bg-blue-600 text-white rounded flex items-center gap-2"
+              >
+                <MessageCircle size={20} />
+                {chatMode ? "Close Chat" : "Open Chat"}
+              </button>
             </div>
           </div>
         </div>

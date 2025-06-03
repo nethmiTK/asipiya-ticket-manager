@@ -379,6 +379,7 @@ app.post('/api/invite', (req, res) => {
     });
 });
 
+
 // --- ADDED: FORGOT PASSWORD ENDPOINT ---
 app.post('/forgot-password', (req, res) => {
     const { email } = req.body;
@@ -538,6 +539,88 @@ app.post('/reset-password', (req, res) => {
 
 /*---------------------------------------------------------------------------------------*/
 
+// Get all chat messages for a ticket
+app.get('/ticketchat/:ticketId', (req, res) => {
+    const ticketId = req.params.ticketId;
+    const sql = 'SELECT * FROM ticketchat WHERE TicketID = ? ORDER BY TicketChatID ASC';
+    db.query(sql, [ticketId], (err, results) => {
+        if (err) {
+            console.error('Error fetching chat messages:', err);
+            return res.status(500).json({ error: 'Database error' });
+        }
+        res.json(results);
+    });
+});
+
+// Add a new chat message for a ticket
+app.post('/ticketchat', (req, res) => {
+    const { TicketID, Type, Note, UserCustomerID, UserID, Path } = req.body;
+
+    // Basic validation
+    if (!TicketID || !Note) {
+        return res.status(400).json({ error: 'TicketID and Note are required.' });
+    }
+
+    const sql = `INSERT INTO ticketchat (TicketID, Type, Note, UserCustomerID, UserID, Path)
+                 VALUES (?, ?, ?, ?, ?, ?)`;
+
+    db.query(sql, [TicketID, Type || null, Note, UserCustomerID || null, UserID || null, Path || null], (err, result) => {
+        if (err) {
+            console.error('Error adding chat message:', err);
+            return res.status(500).json({ error: 'Database error' });
+        }
+        res.status(201).json({ message: 'Chat message added', chatId: result.insertId });
+    });
+});
+
+/*-------------------------------Fetch Requests-----------------------------------------*/
+// Route: Get tickets assigned to a specific supervisor
+app.get("/tickets/supervisor/:fullName", (req, res) => {
+  const supervisorName = req.params.fullName;
+
+  const query = `
+    SELECT t.* 
+    FROM ticket t
+    WHERE t.SupervisorName = ?
+  `;
+
+  db.query(query, [supervisorName], (err, results) => {
+    if (err) {
+      console.error("Error fetching tickets for supervisor:", err);
+      return res.status(500).json({ error: "Internal server error" });
+    }
+
+    res.json(results);
+  });
+});
+app.get("/tickets", (req, res) => {
+  const query = `
+    SELECT * 
+    FROM ticket 
+  `;
+
+  db.query(query, (err, results) => {
+    if (err) {
+      console.error("Error fetching tickets for supervisor:", err);
+      return res.status(500).json({ error: "Internal server error" });
+    }
+
+    res.json(results);
+  });
+});
+
+// Add this to your existing Node.js/Express backend
+app.put('/tickets/accept/:ticketID', (req, res) => {
+  const { ticketID } = req.params;
+  
+  db.query('UPDATE ticket SET Status = "Accepted" WHERE TicketID = ?', [ticketID], (err, result) => {
+    if (err) {
+      console.error(err);
+      return res.status(500).json({ error: "Database error" });
+    }
+    return res.json({ message: "Ticket accepted successfully" });
+  });
+});
 
 /*---------------------------------------------------------------------------------------*/
 
