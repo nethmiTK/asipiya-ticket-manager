@@ -32,6 +32,13 @@ const app = express();
 app.use(bodyParser.json());
 app.use(cors());
 
+//evidence uploads
+app.use("/uploads", express.static("uploads"));
+const uploadDir = "uploads";
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir);
+}
+
 // Get __dirname equivalent for ES Modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -702,6 +709,52 @@ app.post("/create_ticket", (req, res) => {
         res.status(200).json({ message: "Ticket created", ticketId: result.insertId });
       });
     });
+  });
+});
+
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, "uploads/");
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    cb(
+      null,
+      file.fieldname + "-" + uniqueSuffix + path.extname(file.originalname)
+    );
+  },
+});
+
+const upload_evidence = multer({ storage: storage });
+
+app.post("/upload_evidence", upload_evidence.array("evidenceFiles"), (req, res) => {
+  const { ticketId, description } = req.body;
+
+  if (!req.files || req.files.length === 0) {
+    return res.status(400).json({ message: "No files uploaded" });
+  }
+
+  if (!ticketId) {
+    return res.status(400).json({ message: "Ticket ID is required" });
+  }
+
+  const values = req.files.map((file) => [ticketId, file.path, description]);
+
+  const insertEvidenceQuery = `
+    INSERT INTO evidence (ComplaintID, FilePath, Description) VALUES ?
+  `;
+
+  db.query(insertEvidenceQuery, [values], (err, result) => {
+    if (err) {
+      console.error("Error inserting evidence:", err);
+      return res.status(500).json({ message: "Error saving evidence" });
+    }
+    res
+      .status(200)
+      .json({
+        message: "Evidence files uploaded",
+        inserted: result.affectedRows,
+      });
   });
 });
 
