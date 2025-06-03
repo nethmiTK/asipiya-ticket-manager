@@ -109,7 +109,7 @@ const OpenTickets = () => {
       >
         <NavBar />
         <div className="p-6 mt-[60px]">
-          <h1 className="text-2xl font-bold mb-6">My Open Tickets</h1>
+          <h1 className="text-2xl font-bold mb-6">Create Your Tickets</h1>
           <div className="flex flex-col items-center justify-start">
             <div className="w-[750px] bg-slate-100 text-black p-8 rounded-2xl shadow-lg">
               <h1 className="text-2xl md:text-3xl font-bold text-center mb-4">
@@ -128,21 +128,44 @@ const OpenTickets = () => {
                       alert("User not logged in. Please login first.");
                       return;
                     }
-                    const payload = {
+
+                    const ticketPayload = {
                       ...values,
                       userId: user.UserID,
                     };
 
-                    const res = await axios.post(
+                    const ticketRes = await axios.post(
                       "http://localhost:5000/create_ticket",
-                      payload
+                      ticketPayload
                     );
-                    alert("Ticket submitted successfully");
+
+                    const ticketId = ticketRes.data.ticketId;
+
+                    if (files.length > 0) {
+                      const formData = new FormData();
+                      files.forEach((file) => {
+                        formData.append("evidenceFiles", file);
+                      });
+                      formData.append("ticketId", ticketId);
+                      formData.append("description", values.description); 
+
+                      await axios.post(
+                        "http://localhost:5000/upload_evidence",
+                        formData,
+                        {
+                          headers: {
+                            "Content-Type": "multipart/form-data",
+                          },
+                        }
+                      );
+                    }
+
+                    alert("Ticket and evidence submitted successfully");
                     resetForm();
                     setFiles([]);
                   } catch (err) {
-                    console.error("Error submitting ticket:", err);
-                    alert("Failed to submit ticket");
+                    console.error("Error submitting ticket and evidence:", err);
+                    alert("Failed to submit ticket or evidence");
                   }
                 }}
               >
