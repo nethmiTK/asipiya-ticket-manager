@@ -43,7 +43,7 @@ const SupervisorAssignPage = () => {
   }
 
   axios.put(`http://localhost:5000/api/tickets/${id}/assign`, {
-    supervisorName: selectedSupervisor,
+    supervisorId: selectedSupervisor, // now it's the ID
     status,
     priority,
   })
@@ -111,12 +111,13 @@ const SupervisorAssignPage = () => {
               className="w-full mt-1 px-4 py-2 border border-gray-300 rounded"
             >
               <option value="">Select supervisor</option>
-              {supervisors.map((user, index) => (
-                <option key={user.UserID || index} value={user.FullName}>
+              {supervisors.map((user) => (
+                <option key={user.UserID} value={user.UserID}>
                   {user.FullName}
                 </option>
               ))}
             </select>
+
           </div>
 
           <div>

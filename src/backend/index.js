@@ -903,14 +903,14 @@ app.get('/api/supervisors', (req, res) => {
 
 
 // Example for Express backend
+// Updated PUT route
 app.put('/api/tickets/:id/assign', (req, res) => {
   const ticketId = req.params.id;
-  const { status, priority, supervisorName } = req.body;
+  const { status, priority, supervisorId } = req.body;
 
-  // TODO: Replace with your DB query
-  const sql = `UPDATE ticket SET Status = ?, Priority = ?, SupervisorName = ? WHERE TicketID = ?`;
+  const sql = `UPDATE ticket SET Status = ?, Priority = ?, SupervisorID = ? WHERE TicketID = ?`;
 
-  db.query(sql, [status, priority, supervisorName, ticketId], (err, result) => {
+  db.query(sql, [status, priority, supervisorId, ticketId], (err, result) => {
     if (err) {
       console.error('Error assigning supervisor:', err);
       return res.status(500).json({ error: 'Database error' });
