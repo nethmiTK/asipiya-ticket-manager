@@ -1194,7 +1194,6 @@ app.post("/upload_evidence", upload_evidence.array("evidenceFiles"), (req, res) 
 });
 
 //user ticket view
-
 app.get("/userTickets", (req, res) => {
   const { userId } = req.query;
 
@@ -1209,10 +1208,13 @@ app.get("/userTickets", (req, res) => {
       t.Status AS status,
       a.SystemName AS system_name,
       c.CategoryName AS category,
-      t.DateTime AS datetime
+      t.DateTime AS datetime,
+      t.SupervisorID AS supervisor_id,
+      u.FullName AS supervisor_name
     FROM ticket t
     JOIN asipiyasystem a ON t.AsipiyaSystemID = a.AsipiyaSystemID
     JOIN ticketcategory c ON t.TicketCategoryID = c.TicketCategoryID
+    LEFT JOIN appUser u ON t.SupervisorID = u.UserID
     WHERE t.UserID = ?
     ORDER BY t.DateTime DESC
   `;
