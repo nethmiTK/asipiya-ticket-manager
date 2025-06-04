@@ -1394,6 +1394,52 @@ app.get('/api/users/recent', (req, res) => {
     });
 });
 
+// API endpoint to fetch notifications
+app.get('/api/notifications', (req, res) => {
+    const query = `
+        SELECT 
+            tl.TicketLogID,
+            tl.TicketID,
+            tl.DateTime,
+            tl.Type,
+            tl.Description,
+            tl.Note,
+            t.Description as TicketDescription,
+            u.FullName as UserName
+        FROM ticketlog tl
+        LEFT JOIN ticket t ON tl.TicketID = t.TicketID
+        LEFT JOIN appuser u ON t.UserId = u.UserID
+        ORDER BY tl.DateTime DESC
+        LIMIT 10
+    `;
+
+    db.query(query, (err, results) => {
+        if (err) {
+            console.error('Error fetching notifications:', err);
+            return res.status(500).json({ error: 'Failed to fetch notifications' });
+        }
+        res.json(results);
+    });
+});
+
+// API endpoint to add a notification
+app.post('/api/notifications', (req, res) => {
+    const { ticketId, type, description, note, userId } = req.body;
+    
+    const query = `
+        INSERT INTO ticketlog (TicketID, DateTime, Type, Description, Note, UserID)
+        VALUES (?, NOW(), ?, ?, ?, ?)
+    `;
+
+    db.query(query, [ticketId, type, description, note, userId], (err, result) => {
+        if (err) {
+            console.error('Error adding notification:', err);
+            return res.status(500).json({ error: 'Failed to add notification' });
+        }
+        res.json({ message: 'Notification added successfully', id: result.insertId });
+    });
+});
+
 // Start the server
 app.listen(5000, () => {
     console.log('Server is running on port 5000');

@@ -1,30 +1,53 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { IoClose } from 'react-icons/io5';
+import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
 
 const NotificationPanel = ({ isOpen, onClose }) => {
-  const notifications = [
-    {
-      id: 1,
-      title: "New Ticket Created",
-      message: "A new high priority ticket has been created",
-      time: "5 minutes ago",
-      isRead: false
-    },
-    {
-      id: 2,
-      title: "Ticket Updated",
-      message: "Ticket #123 has been updated by supervisor",
-      time: "1 hour ago",
-      isRead: false
-    },
-    {
-      id: 3,
-      title: "System Alert",
-      message: "System maintenance scheduled for tomorrow",
-      time: "2 hours ago",
-      isRead: true
+  const [notifications, setNotifications] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchNotifications();
     }
-  ];
+  }, [isOpen]);
+
+  const fetchNotifications = async () => {
+    try {
+      const response = await axios.get('http://localhost:5000/api/notifications');
+      setNotifications(response.data);
+      setLoading(false);
+    } catch (error) {
+      console.error('Error fetching notifications:', error);
+      setLoading(false);
+    }
+  };
+
+  const formatDateTime = (dateTime) => {
+    const date = new Date(dateTime);
+    return date.toLocaleString();
+  };
+
+  const getNotificationMessage = (notification) => {
+    switch (notification.Type) {
+      case 'Response':
+        return `${notification.UserName} responded to ticket #${notification.TicketID}`;
+      case 'Update':
+        return `Ticket #${notification.TicketID} has been updated`;
+      case 'Close':
+        return `Ticket #${notification.TicketID} has been closed`;
+      default:
+        return notification.Description;
+    }
+  };
+
+  const handleNotificationClick = (notification) => {
+    // Navigate to the appropriate ticket view
+    navigate(`/tickets?id=${notification.TicketID}`);
+    onClose();
+  };
 
   if (!isOpen) return null;
 
@@ -41,25 +64,39 @@ const NotificationPanel = ({ isOpen, onClose }) => {
       </div>
       
       <div className="max-h-[400px] overflow-y-auto">
-        {notifications.map((notification) => (
-          <div 
-            key={notification.id}
-            className={`p-4 border-b hover:bg-gray-50 cursor-pointer ${
-              !notification.isRead ? 'bg-blue-50' : ''
-            }`}
-          >
-            <div className="flex justify-between items-start mb-1">
-              <h4 className="font-medium text-gray-800">{notification.title}</h4>
-              <span className="text-xs text-gray-500">{notification.time}</span>
+        {loading ? (
+          <div className="p-4 text-center text-gray-500">Loading notifications...</div>
+        ) : notifications.length === 0 ? (
+          <div className="p-4 text-center text-gray-500">No notifications</div>
+        ) : (
+          notifications.map((notification) => (
+            <div 
+              key={notification.TicketLogID}
+              onClick={() => handleNotificationClick(notification)}
+              className="p-4 border-b hover:bg-gray-50 cursor-pointer"
+            >
+              <div className="flex justify-between items-start mb-1">
+                <h4 className="font-medium text-gray-800">
+                  {getNotificationMessage(notification)}
+                </h4>
+                <span className="text-xs text-gray-500">
+                  {formatDateTime(notification.DateTime)}
+                </span>
+              </div>
+              {notification.Note && (
+                <p className="text-sm text-gray-600">{notification.Note}</p>
+              )}
             </div>
-            <p className="text-sm text-gray-600">{notification.message}</p>
-          </div>
-        ))}
+          ))
+        )}
       </div>
 
       <div className="p-4 border-t">
-        <button className="text-blue-600 hover:text-blue-800 text-sm font-medium">
-          Mark all as read
+        <button 
+          onClick={fetchNotifications}
+          className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+        >
+          Refresh
         </button>
       </div>
     </div>

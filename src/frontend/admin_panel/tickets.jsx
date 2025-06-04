@@ -4,6 +4,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import AdminSideBar from "../../user_components/SideBar/AdminSideBar";
 import { FaEye } from 'react-icons/fa';
 import Ticket_secret from "./Ticket_secret";
+import TicketViewPage from "./TicketViewPage";
 
 const Tickets = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -11,6 +12,7 @@ const Tickets = () => {
   const [loading, setLoading] = useState(true);
   const [searchParams] = useSearchParams();
   const type = searchParams.get("type");
+  const ticketId = searchParams.get("id");
   const navigate = useNavigate();
   const [selectedTicket, setSelectedTicket] = useState(null);
 
@@ -21,6 +23,15 @@ const Tickets = () => {
           `http://localhost:5000/api/tickets/filter?type=${type || ''}`
         );
         setTickets(response.data);
+        
+        // If there's a specific ticket ID in the URL, find and select that ticket
+        if (ticketId) {
+          const ticket = response.data.find(t => t.TicketID.toString() === ticketId);
+          if (ticket) {
+            setSelectedTicket(ticket);
+          }
+        }
+        
         setLoading(false);
       } catch (error) {
         console.error("Error fetching tickets:", error);
@@ -29,7 +40,7 @@ const Tickets = () => {
     };
 
     fetchTickets();
-  }, [type]);
+  }, [type, ticketId]);
 
   const getStatusColor = (status) => {
     switch (status?.toLowerCase()) {
@@ -68,6 +79,10 @@ const Tickets = () => {
     const hours = Math.floor(duration / (1000 * 60 * 60));
     const minutes = Math.floor((duration % (1000 * 60 * 60)) / (1000 * 60));
     return `${hours}h ${minutes}m`;
+  };
+
+  const handleViewTicket = (ticket) => {
+    setSelectedTicket(ticket);
   };
 
   if (loading) {
@@ -194,7 +209,7 @@ const Tickets = () => {
                       </td>
                       <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm">
                         <button
-                          onClick={() => setSelectedTicket(ticket)}
+                          onClick={() => handleViewTicket(ticket)}
                           className="text-blue-600 hover:text-blue-800 transition-colors"
                           title="View Ticket Details"
                         >
@@ -209,10 +224,21 @@ const Tickets = () => {
           </div>
 
           {selectedTicket && (
-            <Ticket_secret
-              ticket={selectedTicket}
-              onClose={() => setSelectedTicket(null)}
-            />
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+              <div className="bg-white rounded-lg shadow-xl w-[90%] max-w-4xl p-6 relative max-h-[90vh] overflow-y-auto">
+                <button
+                  className="absolute top-3 right-4 text-2xl font-bold text-gray-500 hover:text-red-600"
+                  onClick={() => setSelectedTicket(null)}
+                >
+                  ×
+                </button>
+                {type === 'pending' ? (
+                  <TicketViewPage ticketId={selectedTicket.TicketID} popupMode={true} />
+                ) : (
+                  <Ticket_secret ticket={selectedTicket} onClose={() => setSelectedTicket(null)} />
+                )}
+              </div>
+            </div>
           )}
         </div>
       </main>
