@@ -7,7 +7,7 @@ import { LuTicketCheck, LuTicketX, LuTicket } from "react-icons/lu";
 import { FaHistory } from "react-icons/fa"; 
 import { toast } from 'react-toastify'; 
 
-const UserDashboard = () => {
+const usersDashboard = () => {
     const { loggedInUser } = useAuth(); 
     const [ticketCounts, setTicketCounts] = useState({ total: 0, pending: 0, resolved: 0 });
     const [recentTickets, setRecentTickets] = useState([]);
@@ -184,4 +184,4 @@ const UserDashboard = () => {
     );
 };
 
-export default UserDashboard;
+export default usersDashboard;
