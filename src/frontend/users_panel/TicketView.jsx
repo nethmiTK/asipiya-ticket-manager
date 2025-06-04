@@ -22,7 +22,7 @@ const TicketView = () => {
       if (!userId) return;
 
       try {
-        const res = await axios.get("http://localhost:5000/tickets", {
+        const res = await axios.get("http://localhost:5000/userTickets", {
           params: { userId },
         });
         setTickets(res.data);
