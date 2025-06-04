@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import axios from "axios";
 import SideBar from "../../user_components/SideBar/SideBar";
 import NavBar from "../../user_components/NavBar/NavBar";
@@ -13,6 +13,10 @@ const statusColors = {
 const TicketView = () => {
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedTicket, setSelectedTicket] = useState(null);
+  const [activeTab, setActiveTab] = useState("details");
+  const modalRef = useRef(null);
 
   useEffect(() => {
     const fetchTickets = async () => {
@@ -36,9 +40,27 @@ const TicketView = () => {
     fetchTickets();
   }, []);
 
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (modalRef.current && !modalRef.current.contains(event.target)) {
+        setIsModalOpen(false);
+      }
+    };
+
+    if (isModalOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    } else {
+      document.removeEventListener("mousedown", handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isModalOpen]);
+
   return (
     <div className="flex">
-    <title>My All Tickets</title>
+      <title>My All Tickets</title>
       <SideBar />
       <div className="flex-1 ml-72 flex flex-col h-screen overflow-y-auto">
         <NavBar />
@@ -64,7 +86,15 @@ const TicketView = () => {
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {tickets.map((ticket) => (
-                    <tr key={ticket.id} className="hover:bg-gray-50">
+                    <tr
+                      key={ticket.id}
+                      onClick={() => {
+                        setSelectedTicket(ticket);
+                        setActiveTab("details");
+                        setIsModalOpen(true);
+                      }}
+                      className="hover:bg-gray-50 cursor-pointer"
+                    >
                       <td className="px-4 py-2 font-medium text-gray-900">
                         {ticket.id}
                       </td>
@@ -93,6 +123,74 @@ const TicketView = () => {
             </div>
           )}
         </div>
+
+        {isModalOpen && selectedTicket && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm">
+            <div
+              ref={modalRef}
+              className="bg-gray-100 rounded-lg shadow-xl w-[90%] max-w-md min-h-[500px] border border-gray-300 relative"
+            >
+              <div className="flex border-b border-gray-300 relative">
+                <button
+                  className={`px-4 py-2 w-1/2 text-sm font-medium rounded-tl-lg ${
+                    activeTab === "details"
+                      ? "bg-gray-900 text-white"
+                      : "bg-purple-100 text-gray-900"
+                  }`}
+                  onClick={() => setActiveTab("details")}
+                >
+                  Ticket Details
+                </button>
+                <button
+                  className={`px-4 py-2 w-1/2 text-sm font-medium rounded-tr-lg ${
+                    activeTab === "chat"
+                      ? "bg-gray-900 text-white"
+                      : "bg-purple-100 text-gray-900"
+                  }`}
+                  onClick={() => setActiveTab("chat")}
+                >
+                  Chat
+                </button>
+              </div>
+
+              <div className="p-4 text-sm h-[450px] overflow-y-auto">
+                {activeTab === "details" ? (
+                  <div className="space-y-3">
+                    <h2 className="font-bold mb-6 text-2xl">Ticket Details</h2>
+                    <p>
+                      <strong>Ticket ID:</strong> {selectedTicket.id}
+                    </p>
+                    <p>
+                      <strong>Status:</strong> {selectedTicket.status}
+                    </p>
+                    <p>
+                      <strong className="text-justify">Description:</strong>{" "}
+                      {selectedTicket.description}
+                    </p>
+                    <p>
+                      <strong>System Name:</strong> {selectedTicket.system_name}
+                    </p>
+                    <p>
+                      <strong>Category:</strong> {selectedTicket.category}
+                    </p>
+                    <p>
+                      <strong>Date & Time:</strong>{" "}
+                      {new Date(selectedTicket.datetime).toLocaleString()}
+                    </p>
+                    <p>
+                      <strong>Supervisor:</strong>{" "}
+                      {selectedTicket.supervisor_name || "Not Assigned"}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <h2 className="font-semibold mb-2">Chat</h2>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
