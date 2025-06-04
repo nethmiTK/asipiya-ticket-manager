@@ -1454,6 +1454,74 @@ app.post('/api/notifications', (req, res) => {
     });
 });
 
+/*----------------------------------------------------------------------------------*/
+
+// API endpoint to fetch ticket counts for a SPECIFIC USER
+app.get('/api/user/tickets/counts/:userId', (req, res) => {
+    const userId = req.params.userId;
+    const queries = {
+        total: 'SELECT COUNT(*) AS count FROM ticket WHERE UserId = ?',
+        pending: "SELECT COUNT(*) AS count FROM ticket WHERE UserId = ? AND Status = 'Pending'",
+        resolved: "SELECT COUNT(*) AS count FROM ticket WHERE UserId = ? AND Status = 'Resolved'" 
+    };
+
+    const results = {};
+    const totalQueries = Object.keys(queries).length;
+
+    const promises = Object.entries(queries).map(([key, query]) => {
+        return new Promise((resolve, reject) => {
+            db.query(query, [userId], (err, result) => {
+                if (err) {
+                    console.error(`Error fetching user ${key} count:`, err);
+                    reject({ error: `Failed to fetch user ${key} ticket count` });
+                } else {
+                    results[key] = result[0].count;
+                    resolve();
+                }
+            });
+        });
+    });
+
+    Promise.all(promises)
+        .then(() => {
+            res.json(results);
+        })
+        .catch(error => {
+            res.status(500).json(error);
+        });
+});
+
+// API endpoint to fetch the last five activities for a SPECIFIC USER
+app.get('/api/user/tickets/recent/:userId', (req, res) => {
+    const userId = req.params.userId;
+    const query = `
+        SELECT
+            t.TicketID,
+            t.Description,
+            t.Status,
+            t.Priority,
+            t.DateTime,
+            s.SystemName,       -- Added SystemName
+            tc.CategoryName     -- Added CategoryName
+        FROM ticket t
+        LEFT JOIN asipiyasystem s ON t.AsipiyaSystemID = s.AsipiyaSystemID
+        LEFT JOIN ticketcategory tc ON t.TicketCategoryID = tc.TicketCategoryID
+        WHERE t.UserId = ?
+        ORDER BY t.DateTime DESC
+        LIMIT 5
+    `;
+
+    db.query(query, [userId], (err, results) => {
+        if (err) {
+            console.error('Error fetching user recent activities:', err);
+            return res.status(500).json({ error: 'Failed to fetch user recent activities' });
+        }
+        res.json(results);
+    });
+});
+
+/*----------------------------------------------------------------------------------*/
+
 // Start the server
 app.listen(5000, () => {
     console.log('Server is running on port 5000');
