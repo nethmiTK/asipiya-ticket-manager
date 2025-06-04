@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { useParams, useNavigate } from 'react-router-dom';
 import AdminSideBar from '../../user_components/SideBar/AdminSideBar';
+import { toast } from 'react-toastify';
+import { IoArrowBack} from 'react-icons/io5';
 
 const SupervisorAssignPage = () => {
   const { id } = useParams();
@@ -37,33 +39,43 @@ const SupervisorAssignPage = () => {
   }, [id]);
 
   const handleAssign = () => {
-  if (!selectedSupervisor) {
-    alert("Please select a supervisor.");
-    return;
-  }
+    if (!selectedSupervisor) {
+      alert("Please select a supervisor.");
+      return;
+    }
 
-  axios.put(`http://localhost:5000/api/tickets/${id}/assign`, {
-    supervisorName: selectedSupervisor,
-    status,
-    priority,
-  })
-  .then(() => {
-    alert('Supervisor assigned successfully!');
-    // Optional: redirect or update state
-  })
-  .catch(err => {
-    console.error('Error assigning supervisor:', err);
-    alert('Failed to assign supervisor.');
-  });
-};
-
+    axios.put(`http://localhost:5000/api/tickets/${id}/assign`, {
+      supervisorId: selectedSupervisor, // now it's the ID
+      status,
+      priority,
+    })
+      .then(() => {
+        toast.success('Supervisor assigned successfully!');
+        // Optional: redirect or update state
+      })
+      .catch(err => {
+        console.error('Error assigning supervisor:', err);
+        toast.error('Failed to assign supervisor.');
+      });
+  };
 
   if (!ticketData) return <div className="p-4">Loading...</div>;
 
   return (
     <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
-      <AdminSideBar open={isSidebarOpen} setOpen={setIsSidebarOpen}/>
-      <div className="bg-white p-8 rounded-xl shadow-lg max-w-xl w-full">
+      
+      <AdminSideBar open={isSidebarOpen} setOpen={setIsSidebarOpen} />
+        
+      <div className="bg-white p-8 rounded-xl shadow-lg max-w-xl w-full relative">
+        <button
+          onClick={() => navigate(-1)}
+          title="Back"
+          className="flex items-center gap-1 text-gray-600 hover:text-gray-900"
+        >
+          <IoArrowBack size={20} />
+          Back
+        </button>
+
         <h2 className="text-2xl font-semibold text-center mb-6">
           Assign Supervisor for Ticket ID: {id}
         </h2>
@@ -111,12 +123,13 @@ const SupervisorAssignPage = () => {
               className="w-full mt-1 px-4 py-2 border border-gray-300 rounded"
             >
               <option value="">Select supervisor</option>
-              {supervisors.map((user, index) => (
-                <option key={user.UserID || index} value={user.FullName}>
+              {supervisors.map((user) => (
+                <option key={user.UserID} value={user.UserID}>
                   {user.FullName}
                 </option>
               ))}
             </select>
+
           </div>
 
           <div>
@@ -135,7 +148,7 @@ const SupervisorAssignPage = () => {
 
         <div className="mt-8 flex justify-end">
           <button
-            className="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700"
+            className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700"
             onClick={handleAssign}
           >
             Assign

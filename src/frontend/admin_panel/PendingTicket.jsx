@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import AdminSideBar from "../../user_components/SideBar/AdminSideBar";
-import TicketViewPage from "../admin_panel/TicketViewPage"
+import TicketViewPage from "../admin_panel/TicketViewPage";
+import { FaEye } from 'react-icons/fa';
 
 const PendingTicket = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -78,6 +79,7 @@ const PendingTicket = () => {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
@@ -85,7 +87,6 @@ const PendingTicket = () => {
                 <tr
                   key={ticket.TicketID}
                   className="hover:bg-gray-50 cursor-pointer transition-colors"
-                  onClick={() => handleTicketClick(ticket.TicketID)}
                 >
                   <td className="px-6 py-4 text-sm font-medium text-gray-900">{ticket.TicketID}</td>
                   <td className="px-6 py-4 text-sm text-gray-700">{ticket.SystemName || "N/A"}</td>
@@ -96,6 +97,15 @@ const PendingTicket = () => {
                       {ticket.Status}
                     </span>
                   </td>
+                  <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm">
+                    <button
+                      onClick={() => handleTicketClick(ticket.TicketID)}
+                      className="text-blue-600 hover:text-blue-800 transition-colors"
+                      title="View Ticket Details"
+                    >
+                      <FaEye className="w-5 h-5" />
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -103,16 +113,20 @@ const PendingTicket = () => {
         </div>
       </main>
 
+      {/* Popup Modal */}
       {showTicketPopup && (
         <div className="fixed inset-0 z-50 bg-black bg-opacity-40 flex justify-center items-center">
-          <div className="bg-white rounded-lg shadow-xl w-[90%] max-w-4xl p-6 relative max-h-[90vh] overflow-y-auto">
-            <button
-              className="absolute top-3 right-4 text-2xl font-bold text-gray-500 hover:text-red-600"
-              onClick={() => setShowTicketPopup(false)}
-            >
-              ×
-            </button>
-            <TicketViewPage ticketId={selectedTicketId} popupMode={true} />
+          <div className=" rounded-lg  w-[90%] max-w-4xl relative">
+            {/* Close button on top right */}
+            
+
+            <div className="p-6 max-h-[90vh] overflow-y-auto">
+              <TicketViewPage
+                ticketId={selectedTicketId}
+                popupMode={true}
+                onClose={() => setShowTicketPopup(false)}  // Pass onClose handler
+              />
+            </div>
           </div>
         </div>
       )}
