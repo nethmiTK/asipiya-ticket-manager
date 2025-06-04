@@ -575,24 +575,46 @@ app.post('/ticketchat', (req, res) => {
 
 /*-------------------------------Fetch Requests-----------------------------------------*/
 // Route: Get tickets assigned to a specific supervisor
-app.get("/tickets/supervisor/:fullName", (req, res) => {
-  const supervisorName = req.params.fullName;
 
-  const query = `
-    SELECT t.* 
-    FROM ticket t
-    WHERE t.SupervisorName = ?
-  `;
+// Get tickets assigned to a specific supervisor (by UserID in appuser)
+app.get("/tickets", (req, res) => {
+  const { supervisorId } = req.query;
 
-  db.query(query, [supervisorName], (err, results) => {
+  if (!supervisorId) {
+    return res.status(400).json({ error: "Supervisor ID is required" });
+  }
+
+  const sql = "SELECT * FROM ticket WHERE SupervisorID = ?";
+  db.query(sql, [supervisorId], (err, results) => {
     if (err) {
-      console.error("Error fetching tickets for supervisor:", err);
-      return res.status(500).json({ error: "Internal server error" });
+      console.error("Error fetching tickets:", err);
+      return res.status(500).json({ error: "Error fetching tickets" });
     }
-
     res.json(results);
   });
 });
+
+app.put('/tickets/:id', (req, res) => {
+  const { id } = req.params;
+  const { status, dueDate, resolution } = req.body;
+
+  const sql = `
+    UPDATE ticket 
+    SET Status = ?, DueDate = ?, Resolution = ? 
+    WHERE TicketID = ?
+  `;
+  db.query(sql, [status, dueDate, resolution, id], (err, result) => {
+    if (err) {
+      console.error("Failed to update ticket:", err);
+      return res.status(500).json({ message: "Server error" });
+    }
+    res.json({ message: "Ticket updated successfully" });
+  });
+});
+
+
+
+
 app.get("/tickets", (req, res) => {
   const query = `
     SELECT * 

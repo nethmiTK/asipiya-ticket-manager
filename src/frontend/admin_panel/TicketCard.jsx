@@ -1,7 +1,7 @@
 export default function TicketCard({ ticket, onClick }) {
   const getStatusColor = (status) => {
     switch (status) {
-      case "Accepted":
+      case "Open":
         return "text-green-700";
       case "In Process":
         return "text-yellow-700";
