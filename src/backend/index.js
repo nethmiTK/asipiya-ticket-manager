@@ -1112,7 +1112,7 @@ app.post("/create_ticket", (req, res) => {
 
       const insertTicket = `
         INSERT INTO ticket (UserId, AsipiyaSystemID, TicketCategoryID, Description, Status, Priority, DateTime)
-        VALUES (?, ?, ?, ?, 'Pending', 'High', NOW())
+        VALUES (?, ?, ?, ?, 'Pending', 'Low', NOW())
       `;
       db.query(insertTicket, [userId, systemId, categoryId, description], (err, result) => {
         if (err) {
@@ -1173,7 +1173,7 @@ app.post("/upload_evidence", upload_evidence.array("evidenceFiles"), (req, res) 
 
 //user ticket view
 
-app.get("/tickets", (req, res) => {
+app.get("/userTickets", (req, res) => {
   const { userId } = req.query;
 
   if (!userId) {
