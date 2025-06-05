@@ -5,8 +5,8 @@ import AdminSideBar from '../../user_components/SideBar/AdminSideBar';
 import { toast } from 'react-toastify';
 import { IoArrowBack} from 'react-icons/io5';
 
-const SupervisorAssignPage = () => {
-  const { id } = useParams();
+const SupervisorAssignPage = ({ ticketId }) => {
+  const params = useParams();
   const navigate = useNavigate();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [ticketData, setTicketData] = useState(null);
@@ -14,6 +14,8 @@ const SupervisorAssignPage = () => {
   const [selectedSupervisor, setSelectedSupervisor] = useState('');
   const [status, setStatus] = useState('Pending');
   const [priority, setPriority] = useState('Low');
+
+  const id = ticketId || params.id;
 
   useEffect(() => {
     // Fetch ticket data
@@ -45,7 +47,7 @@ const SupervisorAssignPage = () => {
     }
 
     axios.put(`http://localhost:5000/api/tickets/${id}/assign`, {
-      supervisorId: selectedSupervisor, // now it's the ID
+      supervisorId: selectedSupervisor,
       status,
       priority,
     })
@@ -61,11 +63,97 @@ const SupervisorAssignPage = () => {
 
   if (!ticketData) return <div className="p-4">Loading...</div>;
 
+  const content = (
+    <div className="space-y-4">
+      <h2 className="text-2xl font-semibold text-center mb-6">
+        Assign Supervisor for Ticket ID: {id}
+      </h2>
+
+      <div className="space-y-4">
+        <div>
+          <label className="block font-medium">System Name</label>
+          <input
+            type="text"
+            value={ticketData.SystemName || ''}
+            readOnly
+            className="w-full mt-1 px-4 py-2 bg-gray-100 border border-gray-300 rounded"
+          />
+        </div>
+
+        <div>
+          <label className="block font-medium">Description</label>
+          <textarea
+            value={ticketData.Description || ''}
+            readOnly
+            rows="3"
+            className="w-full mt-1 px-4 py-2 bg-gray-100 border border-gray-300 rounded resize-none"
+          />
+        </div>
+
+        <div>
+          <label className="block font-medium">Status</label>
+          <select
+            value={status}
+            onChange={e => setStatus(e.target.value)}
+            className="w-full mt-1 px-4 py-2 border border-gray-300 rounded"
+          >
+            <option value="Pending">Pending</option>
+            <option value="Open">Open</option>
+            <option value="In Progress">In Progress</option>
+            <option value="Resolved">Resolved</option>
+          </select>
+        </div>
+
+        <div>
+          <label className="block font-medium">Supervisor Name</label>
+          <select
+            value={selectedSupervisor}
+            onChange={e => setSelectedSupervisor(e.target.value)}
+            className="w-full mt-1 px-4 py-2 border border-gray-300 rounded"
+          >
+            <option value="">Select supervisor</option>
+            {supervisors.map((user) => (
+              <option key={user.UserID} value={user.UserID}>
+                {user.FullName}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className="block font-medium">Priority</label>
+          <select
+            value={priority}
+            onChange={e => setPriority(e.target.value)}
+            className="w-full mt-1 px-4 py-2 border border-gray-300 rounded"
+          >
+            <option>Low</option>
+            <option>Medium</option>
+            <option>High</option>
+          </select>
+        </div>
+      </div>
+
+      <div className="mt-8 flex justify-end">
+        <button
+          className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700"
+          onClick={handleAssign}
+        >
+          Assign
+        </button>
+      </div>
+    </div>
+  );
+
+  // If ticketId is provided, we're in popup mode
+  if (ticketId) {
+    return content;
+  }
+
+  // Otherwise, render the full page layout
   return (
     <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
-      
       <AdminSideBar open={isSidebarOpen} setOpen={setIsSidebarOpen} />
-        
       <div className="bg-white p-8 rounded-xl shadow-lg max-w-xl w-full relative">
         <button
           onClick={() => navigate(-1)}
@@ -75,85 +163,7 @@ const SupervisorAssignPage = () => {
           <IoArrowBack size={20} />
           Back
         </button>
-
-        <h2 className="text-2xl font-semibold text-center mb-6">
-          Assign Supervisor for Ticket ID: {id}
-        </h2>
-
-        <div className="space-y-4">
-          <div>
-            <label className="block font-medium">System Name</label>
-            <input
-              type="text"
-              value={ticketData.SystemName || ''}
-              readOnly
-              className="w-full mt-1 px-4 py-2 bg-gray-100 border border-gray-300 rounded"
-            />
-          </div>
-
-          <div>
-            <label className="block font-medium">Description</label>
-            <textarea
-              value={ticketData.Description || ''}
-              readOnly
-              rows="3"
-              className="w-full mt-1 px-4 py-2 bg-gray-100 border border-gray-300 rounded resize-none"
-            />
-          </div>
-
-          <div>
-            <label className="block font-medium">Status</label>
-            <select
-              value={status}
-              onChange={e => setStatus(e.target.value)}
-              className="w-full mt-1 px-4 py-2 border border-gray-300 rounded"
-            >
-              <option value="Pending">Pending</option>
-              <option value="Open">Open</option>
-              <option value="In Progress">In Progress</option>
-              <option value="Resolved">Resolved</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="block font-medium">Supervisor Name</label>
-            <select
-              value={selectedSupervisor}
-              onChange={e => setSelectedSupervisor(e.target.value)}
-              className="w-full mt-1 px-4 py-2 border border-gray-300 rounded"
-            >
-              <option value="">Select supervisor</option>
-              {supervisors.map((user) => (
-                <option key={user.UserID} value={user.UserID}>
-                  {user.FullName}
-                </option>
-              ))}
-            </select>
-
-          </div>
-
-          <div>
-            <label className="block font-medium">Priority</label>
-            <select
-              value={priority}
-              onChange={e => setPriority(e.target.value)}
-              className="w-full mt-1 px-4 py-2 border border-gray-300 rounded"
-            >
-              <option>Low</option>
-              <option>Medium</option>
-              <option>High</option>
-            </select>
-          </div>
-        </div>
-
-        <div className="mt-8 flex justify-end">
-          <button
-            className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700"
-            onClick={handleAssign}
-          >
-            Assign
-          </button>
-        </div>
+        {content}
       </div>
     </div>
   );

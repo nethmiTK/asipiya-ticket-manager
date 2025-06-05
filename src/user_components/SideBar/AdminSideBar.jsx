@@ -11,7 +11,6 @@ import { useAuth } from '../../App.jsx';
 import { toast } from "react-toastify";
 
 const Menus = [
-  { title: "Profile", icon: <FaUserCog />, path: "/admin-profile" },
   { title: "Dashboard", icon: <FaHome />, path: "/admin-dashboard" },
   { 
     title: "Tickets", 
@@ -29,8 +28,8 @@ const Menus = [
   },
   { title: "Pending Ticket", icon: <LuTicketCheck />, path: "/pending_ticket" },
   { title: "Ticket Manage", icon: <LuTicketCheck />, path: "/ticket-manage" },
-    { title: "Supervisor Add", icon: <VscNotebook />, path: "/supervisor" },
-   {
+  { title: "Supervisor Add", icon: <VscNotebook />, path: "/supervisor" },
+  {
     title: "Asipiya Systems",
     icon: <GrSystem />,
     subMenu: true,
@@ -39,6 +38,7 @@ const Menus = [
       { title: "Ticket Category", path: "/ticket_category" }
     ],
   },
+  { title: "Profile", icon: <FaUserCog />, path: "/admin-profile" }
 ];
 
 const AdminSideBar = ({ open: propOpen, setOpen: propSetOpen }) => {
@@ -51,8 +51,7 @@ const AdminSideBar = ({ open: propOpen, setOpen: propSetOpen }) => {
     console.warn('Logout function not available');
   });
 
-  // Automatically expand menus based on current path
-  useEffect(() => {
+   useEffect(() => {
     const currentPath = location.pathname;
     let menuToExpand = null;
 
@@ -201,14 +200,14 @@ const AdminSideBar = ({ open: propOpen, setOpen: propSetOpen }) => {
                 <div className="flex items-center gap-x-4 w-full justify-between">
                   <div className="flex items-center gap-x-4">
                     <span className="text-2xl">
-                      <CiLogout   />
+                      <CiLogout />
                     </span>
                     <span
                       className={`font-medium flex-1 overflow-hidden whitespace-nowrap duration-300 ${
-                        open ? "opacity-100" : "opacity-0 w-0"
+                        propOpen ? "opacity-100" : "opacity-0 w-0"
                       }`}
                     >
-                          Log Out
+                      Log Out
                     </span>
                   </div>
                   {propOpen && (

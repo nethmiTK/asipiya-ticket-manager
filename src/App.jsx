@@ -35,6 +35,7 @@ import ResetPassword from "./frontend/Authenication/ResetPassword";
 import PendingTicket from "./frontend/admin_panel/PendingTicket"
 import SupervisorAssign from "./frontend/admin_panel/SupervisorAssign"
 import TicketView from "./frontend/users_panel/TicketView";
+import UserDetails from "./frontend/admin_panel/UserDetails";
 
 // Create Auth Context - loggedInUser and setLoggedInUser
 const AuthContext = createContext(null);
@@ -59,7 +60,7 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
             alert('Access Denied');
             if (['admin', 'supervisor', 'manager', 'developer'].includes(normalizedUserRole)) {
                 navigate('/admin-dashboard', { replace: true });
-            } else if (normalizedUserRole === 'user') {
+            } else if (normalizedRole === 'user') {
                 navigate('/user-dashboard', { replace: true });
             } else {
                 // Fallback for any unknown or non-logged-in roles
@@ -225,6 +226,15 @@ const AppRoutes = ({
                     element={
                         <ProtectedRoute allowedRoles={['admin', 'supervisor', 'manager', 'developer']}>
                             <TicketCategory />
+                        </ProtectedRoute>
+                    }
+                />
+
+                <Route 
+                    path="/user-details/:userId" 
+                    element={
+                        <ProtectedRoute allowedRoles={['admin', 'supervisor', 'manager', 'developer']}>
+                            <UserDetails />
                         </ProtectedRoute>
                     }
                 />

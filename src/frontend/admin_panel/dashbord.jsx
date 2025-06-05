@@ -348,6 +348,11 @@ const Dashboard = () => {
     setIsNotificationOpen(!isNotificationOpen);
   };
 
+  // Add this new function
+  const handleUserClick = (userId) => {
+    navigate(`/user-details/${userId}`);
+  };
+
   return (
     <div className="space-y-8">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-6">
@@ -446,7 +451,8 @@ const Dashboard = () => {
             {recentUsers.map((user) => (
               <div 
                 key={user.UserID} 
-                className="flex flex-col items-center"
+                className="flex flex-col items-center cursor-pointer hover:opacity-80 transition-opacity"
+                onClick={() => handleUserClick(user.UserID)}
               >
                 <div className="relative">
                   <div className={`w-16 h-16 rounded-full overflow-hidden relative ${
@@ -508,7 +514,7 @@ const DashboardLayout = () => {
 
       <main
         className={`flex-1 min-h-screen bg-gray-100 transition-all duration-300 ${
-          isSidebarOpen ? "ml-80" : "ml-24"
+          isSidebarOpen ? "ml-72" : "ml-20"
         }`}
       >
         <div className="p-4 sm:p-6 lg:p-8">
@@ -516,6 +522,29 @@ const DashboardLayout = () => {
             <h1 className="text-2xl font-bold mb-4 md:mb-0">Dashboard</h1>
             
             <div className="flex items-center gap-4">
+              <div 
+                className="flex items-center gap-3 cursor-pointer hover:bg-gray-50 p-2 rounded-lg transition-colors"
+                onClick={handleProfileClick}
+              >
+                <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-200 flex-shrink-0">
+                  {user?.ProfileImagePath ? (
+                    <img 
+                      src={`http://localhost:5000/uploads/${user.ProfileImagePath}`}
+                      alt="Profile"
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-blue-500 text-white">
+                      {user?.FullName?.charAt(0)}
+                    </div>
+                  )}
+                </div>
+                <div className="text-right hidden sm:block">
+                  <p className="font-semibold text-gray-800">{user?.FullName}</p>
+                  <p className="text-sm text-gray-500">{user?.Role}</p>
+                </div>
+              </div>
+
               <div className="relative">
                 <button 
                   className="relative p-2 hover:bg-gray-100 rounded-full transition-colors"
@@ -530,30 +559,6 @@ const DashboardLayout = () => {
                   isOpen={isNotificationOpen} 
                   onClose={() => setIsNotificationOpen(false)} 
                 />
-              </div>
-              
-              <div 
-                className="flex items-center gap-3 cursor-pointer hover:bg-gray-50 p-2 rounded-lg transition-colors"
-                onClick={handleProfileClick}
-              >
-                <div className="text-right hidden sm:block">
-                  <p className="font-semibold text-gray-800">{user?.FullName}</p>
-                  <p className="text-sm text-gray-500">{user?.Role}</p>
-                </div>
-                
-                <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-200 flex-shrink-0">
-                  {user?.ProfileImagePath ? (
-                    <img 
-                      src={`http://localhost:5000/uploads/${user.ProfileImagePath}`}
-                      alt="Profile"
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center bg-blue-500 text-white">
-                      {user?.FullName?.charAt(0)}
-                    </div>
-                  )}
-                </div>
               </div>
             </div>
           </header>
