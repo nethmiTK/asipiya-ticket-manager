@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from "react";
 import axios from "axios";
 import SideBar from "../../user_components/SideBar/SideBar";
 import NavBar from "../../user_components/NavBar/NavBar";
+import ChatUI from "../../user_components/ChatUI/ChatUI";
 
 const statusColors = {
   pending: "bg-yellow-100 text-yellow-800",
@@ -185,6 +186,7 @@ const TicketView = () => {
                 ) : (
                   <div className="space-y-2">
                     <h2 className="font-semibold mb-2">Chat</h2>
+                    <ChatUI />
                   </div>
                 )}
               </div>
