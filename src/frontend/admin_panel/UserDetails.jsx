@@ -13,11 +13,9 @@ const UserDetails = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Fetch user data
         const userResponse = await axios.get(`http://localhost:5000/api/users/${userId}`);
         setUserData(userResponse.data);
 
-        // Fetch user's tickets
         const ticketsResponse = await axios.get(`http://localhost:5000/api/tickets/user/${userId}`);
         setTickets(ticketsResponse.data);
         
@@ -43,7 +41,10 @@ const UserDetails = () => {
     return <div>User not found</div>;
   }
 
-  const latestTicket = tickets[0] || {};
+  // Calculate ticket statistics
+  const totalTickets = tickets.length;
+  const pendingTickets = tickets.filter(ticket => ticket.Status === 'Pending').length;
+  const resolvedTickets = tickets.filter(ticket => ticket.Status === 'Resolved').length;
 
   return (
     <div className="flex">
@@ -53,10 +54,10 @@ const UserDetails = () => {
         isSidebarOpen ? "ml-72" : "ml-20"
       }`}>
         <div className="p-8">
-          <div className="bg-white rounded-lg shadow-md p-6">
-            {/* User Profile Section */}
-            <div className="flex items-center gap-6 mb-8">
-              <div className="w-24 h-24 rounded-full overflow-hidden bg-gray-200">
+          {/* User Profile Card */}
+          <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+            <div className="flex items-center gap-6">
+              <div className="w-32 h-32 rounded-full overflow-hidden bg-gray-200">
                 {userData.ProfileImagePath ? (
                   <img 
                     src={`http://localhost:5000/uploads/${userData.ProfileImagePath}`}
@@ -64,50 +65,113 @@ const UserDetails = () => {
                     className="w-full h-full object-cover"
                   />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center bg-gray-300 text-gray-600 text-2xl">
+                  <div className="w-full h-full flex items-center justify-center bg-gray-300 text-gray-600 text-3xl">
                     {userData.FullName?.charAt(0)}
                   </div>
                 )}
               </div>
               
               <div>
-                <h1 className="text-2xl font-bold text-gray-800">{userData.FullName}</h1>
-                <p className="text-gray-600">{userData.ContactNo}</p>
-                <p className="text-gray-600">{userData.Email}</p>
+                <h1 className="text-3xl font-bold text-gray-800 mb-2">{userData.FullName}</h1>
+                <p className="text-gray-600 mb-1">
+                  <span className="font-medium">Phone:</span> {userData.ContactNo}
+                </p>
+                <p className="text-gray-600">
+                  <span className="font-medium">Email:</span> {userData.Email}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Statistics Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div className="bg-blue-500 text-white rounded-lg shadow-md p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-lg font-semibold mb-1">Total Tickets</p>
+                  <h3 className="text-3xl font-bold">{totalTickets}</h3>
+                </div>
+                <div className="text-4xl">📊</div>
               </div>
             </div>
 
-            {/* Ticket Information */}
-            <div className="bg-gray-50 rounded-lg p-6">
-              <h2 className="text-lg font-semibold mb-4">Total Tickets: {tickets.length}</h2>
-              
-              {latestTicket && (
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-gray-600">Ticket ID</p>
-                      <p className="font-medium">#{latestTicket.TicketID}</p>
-                    </div>
-                    <div>
-                      <p className="text-gray-600">Ticket Duration</p>
-                      <p className="font-medium">{latestTicket.Duration || 'N/A'}</p>
-                    </div>
-                    <div>
-                      <p className="text-gray-600">Priority</p>
-                      <p className="font-medium">{latestTicket.Priority}</p>
-                    </div>
-                    <div>
-                      <p className="text-gray-600">Status</p>
-                      <p className="font-medium">{latestTicket.Status}</p>
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <p className="text-gray-600">Description</p>
-                    <p className="font-medium">{latestTicket.Description}</p>
-                  </div>
+            <div className="bg-yellow-500 text-white rounded-lg shadow-md p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-lg font-semibold mb-1">Pending Tickets</p>
+                  <h3 className="text-3xl font-bold">{pendingTickets}</h3>
                 </div>
-              )}
+                <div className="text-4xl">⏳</div>
+              </div>
+            </div>
+
+            <div className="bg-green-500 text-white rounded-lg shadow-md p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-lg font-semibold mb-1">Resolved Tickets</p>
+                  <h3 className="text-3xl font-bold">{resolvedTickets}</h3>
+                </div>
+                <div className="text-4xl">✅</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Latest Ticket Information */}
+          <div className="bg-white rounded-lg shadow-md p-6">
+            <h2 className="text-xl font-bold mb-4">Latest Ticket Information</h2>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead>
+                  <tr>
+                    <th className="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Ticket ID
+                    </th>
+                    <th className="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Description
+                    </th>
+                    <th className="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Status
+                    </th>
+                    <th className="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Priority
+                    </th>
+                    <th className="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      System
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {tickets.map((ticket) => (
+                    <tr key={ticket.TicketID}>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                        #{ticket.TicketID}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {ticket.Description}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                          ${ticket.Status === 'Resolved' ? 'bg-green-100 text-green-800' : 
+                            ticket.Status === 'Pending' ? 'bg-yellow-100 text-yellow-800' : 
+                            'bg-gray-100 text-gray-800'}`}>
+                          {ticket.Status}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                          ${ticket.Priority === 'High' ? 'bg-red-100 text-red-800' : 
+                            ticket.Priority === 'Medium' ? 'bg-yellow-100 text-yellow-800' : 
+                            'bg-green-100 text-green-800'}`}>
+                          {ticket.Priority}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {ticket.SystemName}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
@@ -116,4 +180,4 @@ const UserDetails = () => {
   );
 };
 
-export default UserDetails; 
+export default UserDetails;
