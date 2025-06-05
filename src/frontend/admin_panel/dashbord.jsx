@@ -277,7 +277,7 @@ const Dashboard = () => {
         return "text-blue-500";
       case "in progress":
         return "text-yellow-500";
-      case "closed":
+      case "resolved":
         return "text-green-500";
       case "rejected":
         return "text-red-500";
@@ -397,12 +397,12 @@ const Dashboard = () => {
           <p>High Priority</p>
         </div>
         <div
-          onClick={() => handleNavigation('closed')}
+          onClick={() => handleNavigation('resolved')}
           className="bg-green-600 text-white p-4 rounded shadow text-center cursor-pointer hover:bg-green-700 transition-colors"
         >
           <FaTicketAlt className="text-3xl mb-2 mx-auto" />
-          <h2 className="text-lg font-semibold">{counts.closed}</h2>
-          <p>Closed Tickets</p>
+          <h2 className="text-lg font-semibold">{counts.resolved}</h2>
+          <p>Resolved Tickets</p>
         </div>
       </div>
 
