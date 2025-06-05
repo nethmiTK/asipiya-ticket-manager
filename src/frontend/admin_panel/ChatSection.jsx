@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
 
-export default function ChatSection({ user, supportUser, ticketId, ticket }) {
+export default function ChatSection({ user, supportUser, ticketId, ticket, role }) {
   const [chatMessages, setChatMessages] = useState([]);
   const [chatInput, setChatInput] = useState("");
   const [sendingFile, setSendingFile] = useState(null);
@@ -30,9 +30,9 @@ export default function ChatSection({ user, supportUser, ticketId, ticket }) {
     const newMsg = {
       id: optimisticId,
       ticketid: ticketId,
-      usercustomerid: user?.usercustomerid || null,
-      userid: supportUser?.userid || null,
-      role: ticket?.role || "supervisor",
+      usercustomerid: user || null,
+      userid: supportUser || null,
+      role: role,
       content: chatInput,
       timestamp: new Date().toISOString(),
       type: "text",
@@ -47,9 +47,9 @@ export default function ChatSection({ user, supportUser, ticketId, ticket }) {
         TicketID: ticketId,
         Note: chatInput,
         Type: "text",
-        UserCustomerID: user?.usercustomerid || "",
-        UserID: supportUser?.userid || "",
-        Role: ticket?.role || "supervisor",
+        UserCustomerID: user || "",
+        UserID: supportUser || "",
+        Role:role,
       });
 
       const newId = res.data.chatId;
@@ -103,7 +103,7 @@ export default function ChatSection({ user, supportUser, ticketId, ticket }) {
             >
               {isClient && (
                 <img
-                  src={supportUser?.avatar || "/default-avatar.png"}
+                  src={supportUser?.avatar || "https://i.pravatar.cc/40?u=user1"}
                   alt="avatar"
                   className="w-8 h-8 rounded-full mr-2 self-end"
                 />
@@ -147,7 +147,7 @@ export default function ChatSection({ user, supportUser, ticketId, ticket }) {
 
               {!isClient && (
                 <img
-                  src={user?.avatar || "/default-avatar.png"}
+                  src={user?.avatar || "https://i.pravatar.cc/40?u=support"}
                   alt="avatar"
                   className="w-8 h-8 rounded-full ml-2 self-end"
                 />

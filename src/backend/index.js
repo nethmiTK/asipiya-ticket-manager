@@ -672,7 +672,7 @@ app.put('/tickets/:id', (req, res) => {
 
 
 
-
+//nope
 app.get("/tickets", (req, res) => {
   const query = `
     SELECT * 

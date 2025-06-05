@@ -48,9 +48,10 @@ export default function TicketManage() {
           problem: ticket.Description,
           priority: ticket.Priority,
           status: ticket.Status,
-          assignedBy: "Supervisor " + ticket.SupervisorID,
+          assignedBy: ticket.SupervisorID,
           dueDate: ticket.DueDate ? ticket.DueDate.split("T")[0] : "",
           resolution: ticket.Resolution,
+          user:ticket.UserId,
         }));
         setTickets(mappedTickets);
       } catch (err) {
@@ -333,11 +334,12 @@ export default function TicketManage() {
                       ❌
                     </button>
                     <ChatSection
-                      user={USER}
-                      supportUser={SUPPORT}
+                      user={selectedTicket.user}
+                      supportUser={selectedTicket.assignedBy}
                       initialMessages={initialMessages}
                       ticket={selectedTicket}
                       ticketId={selectedTicket.id}
+                      role={"Supervisor"}
                     />
                   </div>
                 </div>
