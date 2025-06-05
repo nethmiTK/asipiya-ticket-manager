@@ -1546,6 +1546,66 @@ app.get('/api/user/tickets/recent/:userId', (req, res) => {
 
 /*----------------------------------------------------------------------------------*/
 
+// Get user details by ID
+app.get('/api/users/:userId', (req, res) => {
+  const userId = req.params.userId;
+  const query = `
+    SELECT 
+      u.UserID,
+      u.FullName,
+      u.Email,
+      u.Phone as ContactNo,
+      u.ProfileImagePath,
+      COUNT(t.TicketID) as TotalTickets,
+      SUM(CASE WHEN t.Status = 'Closed' THEN 1 ELSE 0 END) as ClosedTickets,
+      SUM(CASE WHEN t.Priority = 'High' THEN 1 ELSE 0 END) as HighPriorityTickets
+    FROM appuser u
+    LEFT JOIN ticket t ON u.UserID = t.UserId
+    WHERE u.UserID = ?
+    GROUP BY u.UserID
+  `;
+
+  db.query(query, [userId], (err, results) => {
+    if (err) {
+      console.error('Error fetching user details:', err);
+      return res.status(500).json({ error: 'Database error' });
+    }
+    if (results.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    res.json(results[0]);
+  });
+});
+
+// Get user's tickets
+app.get('/api/tickets/user/:userId', (req, res) => {
+  const userId = req.params.userId;
+  const query = `
+    SELECT 
+      t.TicketID,
+      t.Description,
+      t.Status,
+      t.Priority,
+      t.DateTime,
+      t.TicketDuration as Duration,
+      s.SystemName,
+      tc.CategoryName
+    FROM ticket t
+    LEFT JOIN asipiyasystem s ON t.AsipiyaSystemID = s.AsipiyaSystemID
+    LEFT JOIN ticketcategory tc ON t.TicketCategoryID = tc.TicketCategoryID
+    WHERE t.UserId = ?
+    ORDER BY t.DateTime DESC
+  `;
+
+  db.query(query, [userId], (err, results) => {
+    if (err) {
+      console.error('Error fetching user tickets:', err);
+      return res.status(500).json({ error: 'Database error' });
+    }
+    res.json(results);
+  });
+});
+
 // Start the server
 app.listen(5000, () => {
     console.log('Server is running on port 5000');

@@ -1,51 +1,35 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import axios from 'axios';
-import { FaUser, FaEnvelope, FaPhone, FaUserTag, FaArrowLeft } from 'react-icons/fa';
-import { format } from 'date-fns';
 import AdminSideBar from '../../user_components/SideBar/AdminSideBar';
 
 const UserDetails = () => {
-  const { userId } = useParams();
-  const navigate = useNavigate();
-  const [user, setUser] = useState(null);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [userData, setUserData] = useState(null);
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const { userId } = useParams();
 
   useEffect(() => {
-    const fetchUserDetails = async () => {
+    const fetchData = async () => {
       try {
-        const [userResponse, ticketsResponse] = await Promise.all([
-          axios.get(`http://localhost:5000/api/users/${userId}`),
-          axios.get(`http://localhost:5000/api/tickets/user/${userId}`)
-        ]);
-        setUser(userResponse.data);
+        // Fetch user data
+        const userResponse = await axios.get(`http://localhost:5000/api/users/${userId}`);
+        setUserData(userResponse.data);
+
+        // Fetch user's tickets
+        const ticketsResponse = await axios.get(`http://localhost:5000/api/tickets/user/${userId}`);
         setTickets(ticketsResponse.data);
+        
         setLoading(false);
       } catch (error) {
-        console.error('Error fetching user details:', error);
+        console.error('Error fetching data:', error);
         setLoading(false);
       }
     };
 
-    fetchUserDetails();
+    fetchData();
   }, [userId]);
-
-  const getStatusColor = (status) => {
-    switch (status?.toLowerCase()) {
-      case "open":
-        return "text-blue-500";
-      case "in progress":
-        return "text-yellow-500";
-      case "closed":
-        return "text-green-500";
-      case "rejected":
-        return "text-red-500";
-      default:
-        return "text-gray-500";
-    }
-  };
 
   if (loading) {
     return (
@@ -55,6 +39,12 @@ const UserDetails = () => {
     );
   }
 
+  if (!userData) {
+    return <div>User not found</div>;
+  }
+
+  const latestTicket = tickets[0] || {};
+
   return (
     <div className="flex">
       <AdminSideBar open={isSidebarOpen} setOpen={setIsSidebarOpen} />
@@ -63,64 +53,61 @@ const UserDetails = () => {
         isSidebarOpen ? "ml-72" : "ml-20"
       }`}>
         <div className="p-8">
-          <div className="bg-white rounded-lg shadow-md p-6 mb-8">
-            <div className="flex items-center gap-6 mb-6">
+          <div className="bg-white rounded-lg shadow-md p-6">
+            {/* User Profile Section */}
+            <div className="flex items-center gap-6 mb-8">
               <div className="w-24 h-24 rounded-full overflow-hidden bg-gray-200">
-                {user?.ProfileImagePath ? (
+                {userData.ProfileImagePath ? (
                   <img 
-                    src={`http://localhost:5000/uploads/${user.ProfileImagePath}`}
-                    alt={user.FullName}
+                    src={`http://localhost:5000/uploads/${userData.ProfileImagePath}`}
+                    alt={userData.FullName}
                     className="w-full h-full object-cover"
                   />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center bg-blue-500 text-white text-3xl">
-                    {user?.FullName?.charAt(0)}
+                  <div className="w-full h-full flex items-center justify-center bg-gray-300 text-gray-600 text-2xl">
+                    {userData.FullName?.charAt(0)}
                   </div>
                 )}
               </div>
               
               <div>
-                <h1 className="text-2xl font-bold text-gray-800">{user?.FullName}</h1>
-                <p className="text-gray-600">{user?.Email}</p>
-                <p className="text-gray-600">{user?.ContactNo}</p>
-                <p className="text-gray-600">Branch: {user?.Branch}</p>
+                <h1 className="text-2xl font-bold text-gray-800">{userData.FullName}</h1>
+                <p className="text-gray-600">{userData.ContactNo}</p>
+                <p className="text-gray-600">{userData.Email}</p>
               </div>
             </div>
-          </div>
 
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <h2 className="text-xl font-bold mb-6">User Tickets</h2>
-            <div className="overflow-x-auto">
-              <table className="min-w-full">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ticket ID</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Created At</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {tickets.map((ticket) => (
-                    <tr key={ticket.TicketID} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        #{ticket.TicketID}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-500 max-w-xs truncate">
-                        {ticket.Description}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        <span className={`${getStatusColor(ticket.Status)} font-medium`}>
-                          {ticket.Status}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {new Date(ticket.CreatedAt).toLocaleDateString()}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            {/* Ticket Information */}
+            <div className="bg-gray-50 rounded-lg p-6">
+              <h2 className="text-lg font-semibold mb-4">Total Tickets: {tickets.length}</h2>
+              
+              {latestTicket && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-gray-600">Ticket ID</p>
+                      <p className="font-medium">#{latestTicket.TicketID}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-600">Ticket Duration</p>
+                      <p className="font-medium">{latestTicket.Duration || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-600">Priority</p>
+                      <p className="font-medium">{latestTicket.Priority}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-600">Status</p>
+                      <p className="font-medium">{latestTicket.Status}</p>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <p className="text-gray-600">Description</p>
+                    <p className="font-medium">{latestTicket.Description}</p>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
