@@ -233,7 +233,7 @@ const Tickets = () => {
                   ×
                 </button>
                 {type === 'pending' ? (
-                  <TicketViewPage ticketId={selectedTicket.TicketID} popupMode={true} />
+                  <TicketViewPage ticketId={selectedTicket.TicketID} popupMode={true} onClose={() => setSelectedTicket(null)} />
                 ) : (
                   <Ticket_secret ticket={selectedTicket} onClose={() => setSelectedTicket(null)} />
                 )}
