@@ -48,9 +48,10 @@ export default function TicketManage() {
           problem: ticket.Description,
           priority: ticket.Priority,
           status: ticket.Status,
-          assignedBy: "Supervisor " + ticket.SupervisorID,
+          assignedBy: ticket.SupervisorID,
           dueDate: ticket.DueDate ? ticket.DueDate.split("T")[0] : "",
-          resolution:ticket.Resolution,
+          resolution: ticket.Resolution,
+          user:ticket.UserId,
         }));
         setTickets(mappedTickets);
       } catch (err) {
@@ -85,7 +86,7 @@ export default function TicketManage() {
 
   const open = tickets.filter((t) => t.status === "Open");
   const inProcess = tickets.filter((t) => t.status === "In Process");
-  const completed = tickets.filter((t) => t.status === "Completed");
+  const resolved = tickets.filter((t) => t.status === "Resolved");
 
   const initialMessages = [
     {
@@ -121,9 +122,12 @@ export default function TicketManage() {
       setTickets((prev) =>
         prev.map((t) =>
           t.id === selectedTicket.id
-            ? { ...t, status: selectedTicket.status,
-              dueDate: selectedTicket.dueDate,
-              resolution: selectedTicket.resolution, }
+            ? {
+                ...t,
+                status: selectedTicket.status,
+                dueDate: selectedTicket.dueDate,
+                resolution: selectedTicket.resolution,
+              }
             : t
         )
       );
@@ -175,8 +179,8 @@ export default function TicketManage() {
             />
             <hr className="border-t-2 border-gray-300" />
             <Section
-              title="Completed"
-              tickets={completed}
+              title="Resolved"
+              tickets={resolved}
               onCardClick={handleCardClick}
               color="text-blue-700"
             />
@@ -230,7 +234,7 @@ export default function TicketManage() {
                     >
                       <option>Open</option>
                       <option>In Process</option>
-                      <option>Completed</option>
+                      <option>Resolved</option>
                     </select>
                   </div>
 
@@ -310,7 +314,7 @@ export default function TicketManage() {
 
                   <button
                     onClick={() => setChatMode(!chatMode)}
-                    className="mt-4 p-2 bg-blue-600 text-white rounded flex items-center gap-2"
+                    className="mt-4 p-2 bg-green-600 text-white rounded flex items-center gap-2"
                   >
                     <MessageCircle size={20} />
                     {chatMode ? "Close Chat" : "Open Chat"}
@@ -321,7 +325,7 @@ export default function TicketManage() {
               {/* Chat Modal */}
               {chatMode && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-                  <div className="relative w-full max-w-lg p-4 bg-white rounded-lg shadow-lg">
+                  <div className="relative w-full max-w-lg h-[600px] p-4 bg-white rounded-lg shadow-lg flex flex-col">
                     <button
                       onClick={() => setChatMode(false)}
                       className="absolute top-2 right-2 text-gray-500 hover:text-red-600 text-xl"
@@ -330,9 +334,12 @@ export default function TicketManage() {
                       ❌
                     </button>
                     <ChatSection
-                      user={USER}
-                      supportUser={SUPPORT}
+                      user={selectedTicket.user}
+                      supportUser={selectedTicket.assignedBy}
                       initialMessages={initialMessages}
+                      ticket={selectedTicket}
+                      ticketId={selectedTicket.id}
+                      role={"Supervisor"}
                     />
                   </div>
                 </div>

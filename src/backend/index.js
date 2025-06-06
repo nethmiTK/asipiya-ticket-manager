@@ -573,6 +573,64 @@ app.post('/ticketchat', (req, res) => {
     });
 });
 
+// ✅ GET messages for a specific ticket
+app.get("/messages/:ticketId", (req, res) => {
+  const ticketId = req.params.ticketId;
+
+  db.query(
+    `SELECT TicketChatID as id, TicketID, Type, Note as content,
+      UserCustomerID, UserID, Path, Role, CreatedAt as timestamp
+      FROM ticketchat WHERE TicketID = ? ORDER BY CreatedAt ASC`,
+    [ticketId],
+    (err, rows) => {
+      if (err) {
+        console.error(err);
+        return res.status(500).json({ error: "Failed to fetch messages" });
+      }
+
+      const formatted = rows.map((r) => ({
+        id: r.id,
+        ticketid: r.TicketID,
+        type: r.Type,
+        content: r.content,
+        usercustomerid: r.UserCustomerID,
+        userid: r.UserID,
+        role: r.Role,
+        timestamp: r.timestamp,
+        file: r.Path
+          ? {
+              name: path.basename(r.Path),
+              url: `http://localhost:${PORT}/uploads/${r.Path}`,
+            }
+          : null,
+        status: "delivered",
+      }));
+
+      res.json(formatted);
+    }
+  );
+});
+
+
+// POST a new chat message without file upload
+app.post("/ticketchat", async (req, res) => {
+  try {
+    const { TicketID, Note, Type, UserCustomerID, UserID, Role } = req.body;
+
+    // Insert only text messages
+    const [result] = await db.execute(
+      `INSERT INTO ticketchat (TicketID, Type, Note, UserCustomerID, UserID, Path, Role)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [TicketID, Type, Note, UserCustomerID, UserID, null, Role || "customer"]
+    );
+
+    res.json({ chatId: result.insertId });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to send message" });
+  }
+});
+
 /*-------------------------------Fetch Requests-----------------------------------------*/
 // Route: Get tickets assigned to a specific supervisor
 
@@ -614,7 +672,7 @@ app.put('/tickets/:id', (req, res) => {
 
 
 
-
+//nope
 app.get("/tickets", (req, res) => {
   const query = `
     SELECT * 
