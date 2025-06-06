@@ -1294,7 +1294,7 @@ app.get('/api/tickets/counts', (req, res) => {
         open: "SELECT COUNT(*) AS count FROM ticket WHERE Status IN ('Open', 'In Progress') AND Status != 'Rejected'",
         today: "SELECT COUNT(*) AS count FROM ticket WHERE DATE(DateTime) = CURDATE()",
         highPriority: "SELECT COUNT(*) AS count FROM ticket WHERE Priority = 'High' AND Status != 'Rejected'",
-        closed: "SELECT COUNT(*) AS count FROM ticket WHERE Status = 'Closed'",
+        resolved: "SELECT COUNT(*) AS count FROM ticket WHERE Status = 'Resolved'",
         pending: "SELECT COUNT(*) AS count FROM ticket WHERE Status = 'Pending'"
     };
 
@@ -1351,8 +1351,8 @@ app.get('/api/tickets/filter', (req, res) => {
             whereClause = "WHERE t.Status != 'Rejected'";
             orderClause = "ORDER BY FIELD(t.Priority, 'High', 'Medium', 'Low'), t.DateTime DESC";
             break;
-        case 'closed':
-            whereClause = "WHERE t.Status = 'Closed'";
+        case 'resolved':
+            whereClause = "WHERE t.Status = 'Resolved'";
             break;
     }
 

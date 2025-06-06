@@ -23,7 +23,7 @@ const Menus = [
       { title: "Today's Tickets", path: "/tickets?type=today" },
       { title: "Pending Tickets", path: "/tickets?type=pending" },
       { title: "High Priority", path: "/tickets?type=high-priority" },
-      { title: "Closed Tickets", path: "/tickets?type=closed" }
+      { title: "Resolved Tickets", path: "/tickets?type=resolved" }
     ]
   },
   { title: "Pending Ticket", icon: <LuTicketCheck />, path: "/pending_ticket" },
