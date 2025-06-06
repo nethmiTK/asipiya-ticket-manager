@@ -115,16 +115,13 @@ const PendingTicket = () => {
 
       {/* Popup Modal */}
       {showTicketPopup && (
-        <div className="fixed inset-0 z-50 bg-black bg-opacity-40 flex justify-center items-center">
+        <div className="fixed inset-0 z-50 bg-black/65 flex justify-center items-center">
           <div className=" rounded-lg  w-[90%] max-w-4xl relative">
-            {/* Close button on top right */}
-            
-
             <div className="p-6 max-h-[90vh] overflow-y-auto">
               <TicketViewPage
                 ticketId={selectedTicketId}
                 popupMode={true}
-                onClose={() => setShowTicketPopup(false)}  // Pass onClose handler
+                onClose={() => setShowTicketPopup(false)}
               />
             </div>
           </div>

@@ -97,7 +97,6 @@ const SupervisorAssignPage = ({ ticketId }) => {
             onChange={e => setStatus(e.target.value)}
             className="w-full mt-1 px-4 py-2 border border-gray-300 rounded"
           >
-            <option value="Pending">Pending</option>
             <option value="Open">Open</option>
             <option value="In Progress">In Progress</option>
             <option value="Resolved">Resolved</option>
