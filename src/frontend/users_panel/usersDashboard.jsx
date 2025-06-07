@@ -1,74 +1,106 @@
-import React, { useState, useEffect } from "react"; 
+import React, { useState, useEffect, useRef } from "react"; 
 import SideBar from "../../user_components/SideBar/SideBar";
-import NavBar from "../../user_components/NavBar/NavBar";
 import { useAuth } from '../../App'; 
 import axios from 'axios'; 
 import { LuTicketCheck, LuTicketX, LuTicket } from "react-icons/lu"; 
 import { FaHistory } from "react-icons/fa"; 
 import { toast } from 'react-toastify'; 
+import { IoNotificationsOutline } from "react-icons/io5";
+import NotificationPanel from "../components/NotificationPanel";
+import { useNavigate } from "react-router-dom";
 
-const usersDashboard = () => {
+const UsersDashboard = () => {
+    const navigate = useNavigate();
     const { loggedInUser } = useAuth(); 
     const [ticketCounts, setTicketCounts] = useState({ total: 0, pending: 0, resolved: 0 });
     const [recentTickets, setRecentTickets] = useState([]);
     const [loadingCounts, setLoadingCounts] = useState(true);
     const [loadingRecent, setLoadingRecent] = useState(true);
     const [error, setError] = useState(null);
+    const [showNotifications, setShowNotifications] = useState(false);
+    const [unreadNotifications, setUnreadNotifications] = useState(0);
+    const notificationRef = useRef(null);
 
-    // Fetch ticket counts for the logged-in user
     useEffect(() => {
-        const fetchUserTicketCounts = async () => {
-            if (!loggedInUser || !loggedInUser.UserID) {
-                setLoadingCounts(false);
-                return;
-            }
-
-            try {
-                const response = await axios.get(`http://localhost:5000/api/user/tickets/counts/${loggedInUser.UserID}`);
-                setTicketCounts(response.data);
-            } catch (err) {
-                console.error("Error fetching user ticket counts:", err);
-                toast.error("Failed to load ticket counts.");
-                setError("Failed to load ticket counts.");
-            } finally {
-                setLoadingCounts(false);
+        const handleClickOutside = (event) => {
+            if (notificationRef.current && !notificationRef.current.contains(event.target)) {
+                setShowNotifications(false);
             }
         };
 
-        fetchUserTicketCounts();
-    }, [loggedInUser]); 
-
-    // Fetch recent tickets for the logged-in user
-    useEffect(() => {
-        const fetchUserRecentTickets = async () => {
-            if (!loggedInUser || !loggedInUser.UserID) {
-                setLoadingRecent(false);
-                return;
-            }
-
-            try {
-                const response = await axios.get(`http://localhost:5000/api/user/tickets/recent/${loggedInUser.UserID}`);
-                setRecentTickets(response.data);
-            } catch (err) {
-                console.error("Error fetching user recent tickets:", err);
-                toast.error("Failed to load recent tickets.");
-                setError("Failed to load recent tickets.");
-            } finally {
-                setLoadingRecent(false);
-            }
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
         };
+    }, []);
 
-        fetchUserRecentTickets();
-    }, [loggedInUser]); 
+    useEffect(() => {
+        if (loggedInUser?.UserID) {
+            fetchUserTicketCounts();
+            fetchUserRecentTickets();
+            fetchUnreadNotifications();
+        }
+    }, [loggedInUser]);
 
-    // Helper function to format date/time
+    const fetchUnreadNotifications = async () => {
+        try {
+            const response = await axios.get(`http://localhost:5000/api/notifications/count/${loggedInUser.UserID}`);
+            setUnreadNotifications(response.data.count);
+        } catch (error) {
+            console.error('Error fetching unread notifications:', error);
+        }
+    };
+
+    useEffect(() => {
+        if (loggedInUser?.UserID) {
+            fetchUnreadNotifications();
+            const interval = setInterval(fetchUnreadNotifications, 30000); // Check every 30 seconds
+            return () => clearInterval(interval);
+        }
+    }, [loggedInUser]);
+
+    const fetchUserTicketCounts = async () => {
+        if (!loggedInUser || !loggedInUser.UserID) {
+            setLoadingCounts(false);
+            return;
+        }
+
+        try {
+            const response = await axios.get(`http://localhost:5000/api/user/tickets/counts/${loggedInUser.UserID}`);
+            setTicketCounts(response.data);
+        } catch (err) {
+            console.error("Error fetching user ticket counts:", err);
+            toast.error("Failed to load ticket counts.");
+            setError("Failed to load ticket counts.");
+        } finally {
+            setLoadingCounts(false);
+        }
+    };
+
+    const fetchUserRecentTickets = async () => {
+        if (!loggedInUser || !loggedInUser.UserID) {
+            setLoadingRecent(false);
+            return;
+        }
+
+        try {
+            const response = await axios.get(`http://localhost:5000/api/user/tickets/recent/${loggedInUser.UserID}`);
+            setRecentTickets(response.data);
+        } catch (err) {
+            console.error("Error fetching user recent tickets:", err);
+            toast.error("Failed to load recent tickets.");
+            setError("Failed to load recent tickets.");
+        } finally {
+            setLoadingRecent(false);
+        }
+    };
+
     const formatDateTime = (dateTimeString) => {
         if (!dateTimeString) return 'N/A';
         const date = new Date(dateTimeString);
         return date.toLocaleString(); 
     };
 
-    // Helper function to get status color
     const getStatusColor = (status) => {
         switch (status?.toLowerCase()) {
             case 'pending':
@@ -86,15 +118,74 @@ const usersDashboard = () => {
         }
     };
 
+    const handleProfileClick = () => {
+        navigate('/user-profile');
+    };
+
     return (
         <div className="flex">
             <title>User Dashboard</title> 
             <SideBar />
 
             <div className="flex-1 ml-72 flex flex-col h-screen overflow-y-auto">
-                <NavBar />
+                <div className="fixed top-0 right-0 left-72 bg-white z-10 shadow-sm">
+                    <div className="flex justify-between items-center px-6 py-4">
+                        <h1 className="text-2xl font-bold text-gray-800">Dashboard</h1>
+                        
+                        <div className="flex items-center gap-4">
+                            <div 
+                                className="flex items-center gap-3 cursor-pointer hover:bg-gray-50 p-2 rounded-lg transition-colors"
+                                onClick={handleProfileClick}
+                            >
+                                <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-200">
+                                    {loggedInUser?.ProfileImagePath ? (
+                                        <img
+                                            src={`http://localhost:5000/uploads/${loggedInUser.ProfileImagePath}`}
+                                            alt="Profile"
+                                            className="w-full h-full object-cover"
+                                        />
+                                    ) : (
+                                        <div className="w-full h-full flex items-center justify-center bg-blue-500 text-white">
+                                            {loggedInUser?.FullName?.charAt(0)}
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="text-right">
+                                    <p className="font-semibold text-gray-800">{loggedInUser?.FullName}</p>
+                                    <p className="text-sm text-gray-500">{loggedInUser?.Role}</p>
+                                </div>
 
-                <div className="p-6 mt-[60px] flex-1">
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setShowNotifications(!showNotifications);
+                                    }}
+                                    className="relative p-2 hover:bg-gray-100 rounded-full transition-colors ml-2"
+                                >
+                                    <IoNotificationsOutline className="text-2xl text-gray-600" />
+                                    {unreadNotifications > 0 && (
+                                        <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                                            {unreadNotifications}
+                                        </span>
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="p-6 mt-[80px] flex-1">
+                    {/* Notification Panel */}
+                    {showNotifications && (
+                        <div ref={notificationRef} className="absolute right-4 top-32 z-50">
+                            <NotificationPanel
+                                userId={loggedInUser?.UserID}
+                                role={loggedInUser?.Role}
+                                onClose={() => setShowNotifications(false)}
+                            />
+                        </div>
+                    )}
+
                     <h1 className="text-2xl font-bold mb-6 text-gray-800">Welcome to Your Dashboard!</h1>
 
                     {error && <div className="text-red-600 mb-4">{error}</div>}
@@ -184,4 +275,4 @@ const usersDashboard = () => {
     );
 };
 
-export default usersDashboard;
+export default UsersDashboard;

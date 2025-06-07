@@ -977,24 +977,8 @@ app.put('/api/tickets/:id/assign', (req, res) => {
   });
 });
 
-app.put('/api/ticket_status/:id', (req, res) => {
-  const { id } = req.params;
-  const { status } = req.body;
-
-  const sql = 'UPDATE ticket SET Status = ? WHERE TicketID = ?';
-  db.query(sql, [status, id], (err, result) => {
-    if (err) {
-      console.error('Update error:', err);
-      return res.status(500).json({ error: 'Error Reject the Ticket' });
-    }
-    res.status(200).json({ message: 'Ticket rejected successfully' });
-  });
-});
-
-
-
-/*----------------------------------------------------------------------------------*/
-
+ 
+ 
 // Get user profile endpoint (general user) 
 app.get('/api/user/profile/:id', (req, res) => {
     const userId = req.params.id;
@@ -1166,6 +1150,23 @@ app.get("/ticket_category", (req, res) => {
   });
 });
 
+// Helper function to create notifications
+const createNotification = (userId, message, type, ticketLogId = null) => {
+  return new Promise((resolve, reject) => {
+    const query = `
+      INSERT INTO notifications (UserID, Message, Type, TicketLogID)
+      VALUES (?, ?, ?, ?)
+    `;
+    db.query(query, [userId, message, type, ticketLogId], (err, result) => {
+      if (err) {
+        console.error('Error creating notification:', err);
+        reject(err);
+      } else {
+        resolve(result.insertId);
+      }
+    });
+  });
+};
 
 app.post("/create_ticket", (req, res) => {
   const { userId, systemName, ticketCategory, description } = req.body;
@@ -1194,15 +1195,103 @@ app.post("/create_ticket", (req, res) => {
         INSERT INTO ticket (UserId, AsipiyaSystemID, TicketCategoryID, Description, Status, Priority, DateTime)
         VALUES (?, ?, ?, ?, 'Pending', 'Low', NOW())
       `;
-      db.query(insertTicket, [userId, systemId, categoryId, description], (err, result) => {
+      db.query(insertTicket, [userId, systemId, categoryId, description], async (err, result) => {
         if (err) {
           console.error("Error inserting ticket:", err);
           return res.status(500).json({ message: "Server error" });
         }
-        res.status(200).json({ message: "Ticket created", ticketId: result.insertId });
+
+        // Create notification for admins
+        try {
+          // Get all admin users
+          const getAdmins = "SELECT UserID FROM appuser WHERE Role = 'Admin'";
+          db.query(getAdmins, async (err, admins) => {
+            if (err) {
+              console.error("Error fetching admins:", err);
+            } else {
+              // Create notifications for each admin
+              for (const admin of admins) {
+                await createNotification(
+                  admin.UserID,
+                  `New ticket #${result.insertId} created for ${systemName}`,
+                  'NEW_TICKET'
+                ).catch(console.error);
+              }
+            }
+          });
+
+          res.status(200).json({ message: "Ticket created", ticketId: result.insertId });
+        } catch (error) {
+          console.error("Error creating notifications:", error);
+          res.status(200).json({ message: "Ticket created", ticketId: result.insertId });
+        }
       });
     });
   });
+});
+
+// Update ticket status
+app.put('/api/tickets/:ticketId/status', async (req, res) => {
+  const { ticketId } = req.params;
+  const { status, userId } = req.body;
+
+  if (!ticketId || !status || !userId) {
+    return res.status(400).json({ message: "Ticket ID, status, and user ID are required" });
+  }
+
+  try {
+    // First get the ticket details to know the user who created it
+    const getTicket = "SELECT UserId FROM ticket WHERE TicketID = ?";
+    db.query(getTicket, [ticketId], async (err, results) => {
+      if (err) {
+        console.error("Error fetching ticket:", err);
+        return res.status(500).json({ message: "Server error" });
+      }
+
+      if (results.length === 0) {
+        return res.status(404).json({ message: "Ticket not found" });
+      }
+
+      const ticketUserId = results[0].UserId;
+
+      // Update the ticket status
+      const updateQuery = "UPDATE ticket SET Status = ? WHERE TicketID = ?";
+      db.query(updateQuery, [status, ticketId], async (err, result) => {
+        if (err) {
+          console.error("Error updating ticket status:", err);
+          return res.status(500).json({ message: "Server error" });
+        }
+
+        // Create a ticket log entry
+        const logQuery = `
+          INSERT INTO ticketlog (TicketID, DateTime, Type, Description, UserID)
+          VALUES (?, NOW(), 'STATUS_CHANGE', ?, ?)
+        `;
+        db.query(logQuery, [ticketId, `Status changed to ${status}`, userId], async (err, logResult) => {
+          if (err) {
+            console.error("Error creating ticket log:", err);
+          } else {
+            // Create notification for the ticket creator
+            try {
+              await createNotification(
+                ticketUserId,
+                `Your ticket #${ticketId} status has been updated to ${status}`,
+                'STATUS_UPDATE',
+                logResult.insertId
+              );
+            } catch (error) {
+              console.error("Error creating notification:", error);
+            }
+          }
+        });
+
+        res.json({ message: "Ticket status updated successfully" });
+      });
+    });
+  } catch (error) {
+    console.error("Error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
 });
 
 const storage = multer.diskStorage({
@@ -1490,26 +1579,42 @@ app.get('/api/users/recent', (req, res) => {
     });
 });
 
-// API endpoint to fetch notifications
-app.get('/api/notifications', (req, res) => {
+// API endpoint to get unread notifications count
+app.get('/api/notifications/count/:id', (req, res) => {
+    const userId = req.params.id;
     const query = `
-        SELECT 
-            tl.TicketLogID,
-            tl.TicketID,
-            tl.DateTime,
-            tl.Type,
-            tl.Description,
-            tl.Note,
-            t.Description as TicketDescription,
-            u.FullName as UserName
-        FROM ticketlog tl
-        LEFT JOIN ticket t ON tl.TicketID = t.TicketID
-        LEFT JOIN appuser u ON t.UserId = u.UserID
-        ORDER BY tl.DateTime DESC
-        LIMIT 10
+        SELECT COUNT(*) as count 
+        FROM notifications 
+        WHERE UserID = ? AND IsRead = FALSE
     `;
 
-    db.query(query, (err, results) => {
+    db.query(query, [userId], (err, results) => {
+        if (err) {
+            console.error('Error fetching notification count:', err);
+            return res.status(500).json({ error: 'Failed to fetch notification count' });
+        }
+        res.json({ count: results[0].count });
+    });
+});
+
+// API endpoint to get user's notifications
+app.get('/api/notifications/:userId', (req, res) => {
+    const userId = req.params.userId;
+    const query = `
+        SELECT 
+            NotificationID,
+            Message,
+            Type,
+            IsRead,
+            CreatedAt,
+            TicketLogID
+        FROM notifications 
+        WHERE UserID = ?
+        ORDER BY CreatedAt DESC
+        LIMIT 50
+    `;
+
+    db.query(query, [userId], (err, results) => {
         if (err) {
             console.error('Error fetching notifications:', err);
             return res.status(500).json({ error: 'Failed to fetch notifications' });
@@ -1518,21 +1623,26 @@ app.get('/api/notifications', (req, res) => {
     });
 });
 
-// API endpoint to add a notification
-app.post('/api/notifications', (req, res) => {
-    const { ticketId, type, description, note, userId } = req.body;
-    
+// API endpoint to mark notifications as read
+app.put('/api/notifications/read', (req, res) => {
+    const { notificationIds } = req.body;
+
+    if (!notificationIds || !Array.isArray(notificationIds) || notificationIds.length === 0) {
+        return res.status(400).json({ error: 'Notification IDs array is required' });
+    }
+
     const query = `
-        INSERT INTO ticketlog (TicketID, DateTime, Type, Description, Note, UserID)
-        VALUES (?, NOW(), ?, ?, ?, ?)
+        UPDATE notifications 
+        SET IsRead = TRUE 
+        WHERE NotificationID IN (?)
     `;
 
-    db.query(query, [ticketId, type, description, note, userId], (err, result) => {
+    db.query(query, [notificationIds], (err, result) => {
         if (err) {
-            console.error('Error adding notification:', err);
-            return res.status(500).json({ error: 'Failed to add notification' });
+            console.error('Error marking notifications as read:', err);
+            return res.status(500).json({ error: 'Failed to mark notifications as read' });
         }
-        res.json({ message: 'Notification added successfully', id: result.insertId });
+        res.json({ message: 'Notifications marked as read', updatedCount: result.affectedRows });
     });
 });
 
