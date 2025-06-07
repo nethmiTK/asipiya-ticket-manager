@@ -79,7 +79,7 @@ app.post('/register', (req, res) => {
 
         const query = 'INSERT INTO appuser (FullName, Email, Password, Role, Phone) VALUES (?, ?, ?, ?, ?)';
 
-        db.query(query, [FullName, Email, hashedPassword, Role, Phone], (err, result) => {
+        db.query(query, [FullName, Email, hashedPassword, Role, Phone], async (err, result) => {
             if (err) {
                 console.error('Error inserting user:', err);
 
@@ -88,11 +88,22 @@ app.post('/register', (req, res) => {
                 }
                 res.status(500).send('Error registering user');
             } else {
+                // Send notification to admins about new user registration
+                try {
+                    await sendNotificationsByRoles(
+                        ['Admin'],
+                        `New ${Role} registered: ${FullName} (${Email})`,
+                        'NEW_USER_REGISTRATION'
+                    );
+                } catch (error) {
+                    console.error('Error sending registration notifications:', error);
+                }
                 res.status(200).send('User registered successfully');
             }
         });
     });
 });
+
 // API endpoint to fetch tickets
 app.get('/api/tickets', (req, res) => {
     const query = `
@@ -371,6 +382,16 @@ app.post('/api/invite', (req, res) => {
 
         try {
             await transporter.sendMail(mailOptions);
+
+            // If inviting a supervisor, notify admins and existing supervisors
+            if (role === 'Supervisor') {
+                await sendNotificationsByRoles(
+                    ['Admin', 'Supervisor'],
+                    `New supervisor invitation sent to ${email}`,
+                    'NEW_SUPERVISOR_INVITED'
+                );
+            }
+
             res.json({ message: 'Invitation email sent successfully.' });
         } catch (mailErr) {
             console.error(mailErr);
@@ -754,11 +775,23 @@ app.post('/system_registration', (req, res) => {
     }
 
     const sql = 'INSERT INTO asipiyasystem (SystemName, Description) VALUES (?, ?)';
-    db.query(sql, [systemName, description], (err) => {
+    db.query(sql, [systemName, description], async (err) => {
         if (err) {
             console.error("Database error:", err);
             return res.status(500).json({ message: "Database error" });
         }
+
+        // Send notification to supervisors, developers, and admins
+        try {
+            await sendNotificationsByRoles(
+                ['Supervisor', 'Developer', 'Admin'],
+                `New system added: ${systemName}`,
+                'NEW_SYSTEM_ADDED'
+            );
+        } catch (error) {
+            console.error('Error sending system registration notifications:', error);
+        }
+
         res.status(200).json({ message: 'System registered successfully' });
     });
 });
@@ -834,11 +867,23 @@ app.post('/ticket_category', (req, res) => {
     }
 
     const sql = 'INSERT INTO ticketcategory (CategoryName, Description) VALUES (?, ?)';
-    db.query(sql, [CategoryName, Description], (err, result) => {
+    db.query(sql, [CategoryName, Description], async (err, result) => {
         if (err) {
             console.error("Database error:", err);
             return res.status(500).json({ message: "Failed to add ticket category" });
         }
+
+        // Send notification to supervisors, developers, and admins
+        try {
+            await sendNotificationsByRoles(
+                ['Supervisor', 'Developer', 'Admin'],
+                `New ticket category added: ${CategoryName}`,
+                'NEW_CATEGORY_ADDED'
+            );
+        } catch (error) {
+            console.error('Error sending category addition notifications:', error);
+        }
+
         res.status(200).json({
             message: 'Ticket category added successfully',
             category: {
@@ -966,14 +1011,55 @@ app.put('/api/tickets/:id/assign', (req, res) => {
   const ticketId = req.params.id;
   const { status, priority, supervisorId } = req.body;
 
-  const sql = `UPDATE ticket SET Status = ?, Priority = ?, SupervisorID = ? WHERE TicketID = ?`;
-
-  db.query(sql, [status, priority, supervisorId, ticketId], (err, result) => {
+  // First get the ticket details to know the user who created it
+  const getTicketQuery = 'SELECT UserId FROM ticket WHERE TicketID = ?';
+  db.query(getTicketQuery, [ticketId], async (err, ticketResults) => {
     if (err) {
-      console.error('Error assigning supervisor:', err);
+      console.error('Error fetching ticket:', err);
       return res.status(500).json({ error: 'Database error' });
     }
-    res.json({ message: 'Supervisor assigned successfully' });
+
+    if (ticketResults.length === 0) {
+      return res.status(404).json({ message: 'Ticket not found' });
+    }
+
+    const userId = ticketResults[0].UserId;
+
+    const sql = `UPDATE ticket SET Status = ?, Priority = ?, SupervisorID = ? WHERE TicketID = ?`;
+
+    db.query(sql, [status, priority, supervisorId, ticketId], async (err, result) => {
+      if (err) {
+        console.error('Error assigning supervisor:', err);
+        return res.status(500).json({ error: 'Database error' });
+      }
+
+      try {
+        // Notify the assigned supervisor
+        await createNotification(
+          supervisorId,
+          `You have been assigned to ticket #${ticketId}`,
+          'SUPERVISOR_ASSIGNED'
+        );
+
+        // Notify the ticket creator
+        await createNotification(
+          userId,
+          `A supervisor has been assigned to your ticket #${ticketId}`,
+          'TICKET_UPDATED'
+        );
+
+        // Notify admins
+        await sendNotificationsByRoles(
+          ['Admin'],
+          `Supervisor assigned to ticket #${ticketId}`,
+          'SUPERVISOR_ASSIGNMENT'
+        );
+      } catch (error) {
+        console.error('Error sending supervisor assignment notifications:', error);
+      }
+
+      res.json({ message: 'Supervisor assigned successfully' });
+    });
   });
 });
 
@@ -1166,6 +1252,34 @@ const createNotification = (userId, message, type, ticketLogId = null) => {
       }
     });
   });
+};
+
+// Helper function to get users by roles
+const getUsersByRoles = async (roles) => {
+  return new Promise((resolve, reject) => {
+    const query = 'SELECT UserID FROM appuser WHERE Role IN (?)';
+    db.query(query, [roles], (err, results) => {
+      if (err) {
+        console.error('Error fetching users by roles:', err);
+        reject(err);
+      } else {
+        resolve(results);
+      }
+    });
+  });
+};
+
+// Helper function to send notifications to users by roles
+const sendNotificationsByRoles = async (roles, message, type, ticketLogId = null) => {
+  try {
+    const users = await getUsersByRoles(roles);
+    const notifications = users.map(user => 
+      createNotification(user.UserID, message, type, ticketLogId)
+    );
+    await Promise.all(notifications);
+  } catch (error) {
+    console.error('Error sending notifications by roles:', error);
+  }
 };
 
 app.post("/create_ticket", (req, res) => {
