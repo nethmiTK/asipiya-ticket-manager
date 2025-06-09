@@ -1654,7 +1654,8 @@ app.get('/api/user/tickets/counts/:userId', (req, res) => {
     const queries = {
         total: 'SELECT COUNT(*) AS count FROM ticket WHERE UserId = ?',
         pending: "SELECT COUNT(*) AS count FROM ticket WHERE UserId = ? AND Status = 'Pending'",
-        resolved: "SELECT COUNT(*) AS count FROM ticket WHERE UserId = ? AND Status = 'Resolved'" 
+        resolved: "SELECT COUNT(*) AS count FROM ticket WHERE UserId = ? AND Status IN ('Resolved', 'Rejected')",
+        ongoing: "SELECT COUNT(*) AS count FROM ticket WHERE UserId = ? AND Status IN ('Open', 'In Progress')"
     };
 
     const results = {};
