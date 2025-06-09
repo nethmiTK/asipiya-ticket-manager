@@ -4,6 +4,8 @@ import { Formik, Form, Field } from "formik";
 import axios from "axios";
 import SideBar from "../../user_components/SideBar/SideBar";
 import NavBar from "../../user_components/NavBar/NavBar";
+import { useRef } from "react";
+import NotificationPanel from "../components/NotificationPanel";
 
 const enhanceFilesWithPreview = (acceptedFiles) =>
   acceptedFiles.map((file) =>
@@ -17,6 +19,42 @@ const OpenTickets = () => {
   const [files, setFiles] = useState([]);
   const [systemNames, setSystemNames] = useState([]);
   const [categoryName, setCategoryName] = useState([]);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
+  const notificationRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (notificationRef.current && !notificationRef.current.contains(event.target)) {
+        setShowNotifications(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  useEffect(() => {
+    const fetchUnreadNotifications = async () => {
+      const storedUser = localStorage.getItem("user");
+      const userId = storedUser ? JSON.parse(storedUser).UserID : null;
+
+      if (!userId) return;
+
+      try {
+        const response = await axios.get(`http://localhost:5000/api/notifications/count/${userId}`);
+        setUnreadNotifications(response.data.count);
+      } catch (error) {
+        console.error('Error fetching unread notifications:', error);
+      }
+    };
+
+    fetchUnreadNotifications();
+    const interval = setInterval(fetchUnreadNotifications, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   const { getRootProps, getInputProps } = useDropzone({
     onDrop: (acceptedFiles) =>
@@ -103,12 +141,26 @@ const OpenTickets = () => {
       <title>Create Ticket</title>
       <SideBar open={isSidebarOpen} setOpen={setIsSidebarOpen} />
       <div
-        className={`flex-1 flex flex-col h-screen overflow-y-auto transition-all duration-300 ${
-          isSidebarOpen ? "ml-72" : "ml-20"
-        }`}
+        className={`flex-1 flex flex-col h-screen overflow-y-auto transition-all duration-300 ${isSidebarOpen ? "ml-72" : "ml-20"
+          }`}
       >
-        <NavBar />
+        <NavBar
+          isSidebarOpen={isSidebarOpen}
+          showNotifications={showNotifications}
+          unreadNotifications={unreadNotifications}
+          setShowNotifications={setShowNotifications}
+          notificationRef={notificationRef}
+        />
         <div className="p-6 mt-[60px]">
+          {showNotifications && (
+            <div ref={notificationRef} className="absolute right-4 top-[70px] z-50">
+              <NotificationPanel
+                userId={JSON.parse(localStorage.getItem("user"))?.UserID}
+                role={JSON.parse(localStorage.getItem("user"))?.Role}
+                onClose={() => setShowNotifications(false)}
+              />
+            </div>
+          )}
           <h1 className="text-2xl font-bold mb-6">Create Your Tickets</h1>
           <div className="flex flex-col items-center justify-start">
             <div className="w-[750px] bg-slate-100 text-black p-8 rounded-2xl shadow-lg">
@@ -147,7 +199,7 @@ const OpenTickets = () => {
                         formData.append("evidenceFiles", file);
                       });
                       formData.append("ticketId", ticketId);
-                      formData.append("description", values.description); 
+                      formData.append("description", values.description);
 
                       await axios.post(
                         "http://localhost:5000/upload_evidence",

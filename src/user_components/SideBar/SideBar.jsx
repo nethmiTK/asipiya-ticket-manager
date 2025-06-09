@@ -15,8 +15,8 @@ const Menus = [
   { title: "My Profile", icon: <AiOutlineUser />, path: "/user-profile" },
 ];
 
-const SideBar = () => {
-  const [open, setOpen] = useState(true);
+const SideBar = ({ open, setOpen }) => {
+  // const [open, setOpen] = useState(true);
   const { handleLogout } = useAuth();
 
   // Modal state
@@ -46,7 +46,7 @@ const SideBar = () => {
     ${open ? "w-72" : "w-20"}`}
       >
         <BsChevronLeft
-          className={`absolute -right-3 top-16 cursor-pointer text-white text-base transition-transform duration-300
+          className={`absolute -right-3 mr-10 top-16 cursor-pointer text-white text-base transition-transform duration-300 z-50
       ${open ? "rotate-0" : "rotate-180"}`}
           onClick={() => setOpen(!open)}
           aria-label="Toggle sidebar"
@@ -57,27 +57,27 @@ const SideBar = () => {
             {Menus.map((menu, index) => (
               <li
                 key={index}
-                className="text-white text-sm flex items-center justify-between gap-x-4 mt-5 cursor-pointer p-2 hover:bg-gray-700 rounded-md"
+                  className={`text-white text-sm flex items-center gap-x-4 mt-5 cursor-pointer p-2 hover:bg-gray-700 rounded-md
+                    ${open ? "justify-between" : "justify-center"}`}
               >
-                <Link
+                 <Link
                   to={menu.path}
-                  className="flex items-center gap-x-4 w-full justify-between"
+                  className="flex items-center gap-x-4 w-full"
                 >
-                  <div className="flex items-center gap-x-4">
-                    <span className="text-2xl">{menu.icon}</span>
-                    <span
-                      className={`font-medium flex-1 overflow-hidden whitespace-nowrap duration-300
-                  ${open ? "opacity-100" : "opacity-0 w-0"}`}
-                    >
-                      {menu.title}
-                    </span>
-                  </div>
+                  <span className="text-2xl">{menu.icon}</span>
+                  <span
+                    className={`font-medium overflow-hidden whitespace-nowrap duration-300
+                      ${open ? "opacity-100" : "opacity-0 w-0"}`}
+                  >
+                    {menu.title}
+                  </span>
+                </Link>
                   {open && (
                     <span className="font-medium flex items-center">
                       <IoIosArrowBack className="rotate-180" />
                     </span>
                   )}
-                </Link>
+                
               </li>
             ))}
           </ul>
@@ -85,27 +85,28 @@ const SideBar = () => {
           <div className="mt-auto">
             {/* Logout Button */}
             <li
-              className="text-white text-sm flex items-center justify-between gap-x-4 cursor-pointer p-2 hover:bg-gray-700 rounded-md"
+             className={`text-white text-sm flex items-center gap-x-4 cursor-pointer p-2 hover:bg-gray-700 rounded-md
+                ${open ? "justify-between" : "justify-center"}`}
               onClick={handleConfirmLogout} // Show confirmation modal instead of immediate logout
             >
-              <div className="flex items-center gap-x-4 w-full justify-between">
-                <div className="flex items-center gap-x-4">
-                  <span className="text-2xl">
-                    <CiLogout />
-                  </span>
-                  <span
-                    className={`font-medium flex-1 overflow-hidden whitespace-nowrap duration-300
-                ${open ? "opacity-100" : "opacity-0 w-0"}`}
-                  >
-                    Log Out
-                  </span>
+              <div className="flex items-center gap-x-4 w-full">
+                
+                 <span className="text-2xl">
+                  <CiLogout />
+                </span>
+                <span
+                  className={`font-medium overflow-hidden whitespace-nowrap duration-300
+                    ${open ? "opacity-100" : "opacity-0 w-0"}`}
+                >
+                  Log Out
+                </span>
                 </div>
                 {open && (
                   <span className="font-medium flex items-center">
                     <IoIosArrowBack className="rotate-180" />
                   </span>
                 )}
-              </div>
+              
             </li>
           </div>
         </div>
