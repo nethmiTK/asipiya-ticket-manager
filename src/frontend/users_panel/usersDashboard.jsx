@@ -10,7 +10,7 @@ import { IoNotificationsOutline } from "react-icons/io5";
 import NotificationPanel from "../components/NotificationPanel";
 import { useNavigate } from "react-router-dom";
 
-const UsersDashboard = () => {
+const usersDashboard = () => {
     const navigate = useNavigate();
     const { loggedInUser } = useAuth();
     const [ticketCounts, setTicketCounts] = useState({ total: 0, pending: 0, resolved: 0, ongoing: 0 });
