@@ -981,11 +981,11 @@ app.get('/api/supervisors', (req, res) => {
 
 app.put('/api/tickets/:ticketId/status', async (req, res) => {
   const ticketId = req.params.ticketId;
-  const { status, userId } = req.body;
+  const { status, userId, supervisorName } = req.body;
 
   try {
     // First get the ticket details to know the user who created it and current status
-    const getTicket = "SELECT UserId, Status, SupervisorID FROM ticket WHERE TicketID = ?";
+    const getTicket = "SELECT t.UserId, t.Status, t.SupervisorID, u.FullName as SupervisorName FROM ticket t LEFT JOIN appuser u ON t.SupervisorID = u.UserID WHERE t.TicketID = ?";
     db.query(getTicket, [ticketId], async (err, results) => {
       if (err) {
         console.error("Error fetching ticket:", err);
@@ -999,6 +999,7 @@ app.put('/api/tickets/:ticketId/status', async (req, res) => {
       const ticketUserId = results[0].UserId;
       const oldStatus = results[0].Status;
       const supervisorId = results[0].SupervisorID;
+      const supervisorFullName = results[0].SupervisorName;
 
       // Update the ticket status
       const updateQuery = "UPDATE ticket SET Status = ?, LastRespondedTime = NOW() WHERE TicketID = ?";
@@ -1024,7 +1025,15 @@ app.put('/api/tickets/:ticketId/status', async (req, res) => {
             console.error("Error creating ticket log:", err);
           } else {
             try {
-              // Create notification for the ticket creator
+              // Create first notification for the ticket creator about supervisor assignment
+              await createNotification(
+                ticketUserId,
+                `Your ticket #${ticketId} has been assigned to supervisor ${supervisorFullName}. They will be handling your ticket.`,
+                'SUPERVISOR_ASSIGNED',
+                logResult.insertId
+              );
+
+              // Create second notification for the ticket creator about status change
               await createNotification(
                 ticketUserId,
                 `Your ticket #${ticketId} status has been updated from ${oldStatus} to ${status}`,
@@ -1032,23 +1041,15 @@ app.put('/api/tickets/:ticketId/status', async (req, res) => {
                 logResult.insertId
               );
 
-              // Notify supervisor if assigned
+              // Notify supervisor about the assignment
               if (supervisorId) {
                 await createNotification(
                   supervisorId,
-                  `Ticket #${ticketId} status changed from ${oldStatus} to ${status}`,
-                  'TICKET_STATUS_CHANGE',
+                  `You have been assigned to handle ticket #${ticketId}. The ticket status has been changed from ${oldStatus} to ${status}`,
+                  'TICKET_ASSIGNED',
                   logResult.insertId
                 );
               }
-
-              // Also notify admins about the status change
-              await sendNotificationsByRoles(
-                ['Admin'],
-                `Ticket #${ticketId} status changed from ${oldStatus} to ${status}`,
-                'TICKET_STATUS_CHANGE',
-                logResult.insertId
-              );
 
             } catch (error) {
               console.error("Error creating notifications:", error);
