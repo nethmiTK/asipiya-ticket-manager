@@ -12,6 +12,7 @@ import fs from 'fs';
 import bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid'; 
 import moment from 'moment'; 
+import crypto from 'crypto';
 
 // --- Database Connection ---
 const db = mysql.createConnection({
@@ -68,31 +69,35 @@ const upload = multer({ storage: profileImageStorage });
 const saltRounds = 10;
 
 // -------Register endpoint------- //
-app.post('/register', (req, res) => {
+app.post("/register", async (req, res) => {
     const { FullName, Email, Password, Role, Phone } = req.body;
 
-    bcrypt.hash(Password, saltRounds, (err, hashedPassword) => {
+    // Hash the password
+    const hashedPassword = await bcrypt.hash(Password, 10);
+
+    // Insert the user
+    const query = 'INSERT INTO appuser (FullName, Email, Password, Role, Phone) VALUES (?, ?, ?, ?, ?)';
+
+    db.query(query, [FullName, Email, hashedPassword, Role, Phone], async (err, result) => {
         if (err) {
-            console.error('Error hashing password:', err);
-            return res.status(500).send('Error registering user: Password hashing failed');
-        }
-
-        const query = 'INSERT INTO appuser (FullName, Email, Password, Role, Phone) VALUES (?, ?, ?, ?, ?)';
-
-        db.query(query, [FullName, Email, hashedPassword, Role, Phone], (err, result) => {
-            if (err) {
-                console.error('Error inserting user:', err);
-
-                if (err.code === 'ER_DUP_ENTRY') {
-                    return res.status(409).json({ message: 'User with this email already exists.' });
-                }
-                res.status(500).send('Error registering user');
-            } else {
-                res.status(200).send('User registered successfully');
+            console.error('Error inserting user:', err);
+            res.status(500).send('Error registering user');
+        } else {
+            // Send notification to admins about new user registration
+            try {
+                await sendNotificationsByRoles(
+                    ['Admin'],
+                    `New ${Role} registered: ${FullName} (${Email})`,
+                    'NEW_USER_REGISTRATION'
+                );
+            } catch (error) {
+                console.error('Error sending registration notifications:', error);
             }
-        });
+            res.status(200).send('User registered successfully');
+        }
     });
 });
+
 // API endpoint to fetch tickets
 app.get('/api/tickets', (req, res) => {
     const query = `
@@ -746,21 +751,29 @@ app.get('/api/pending_ticket', (req, res) => {
 
 
 //Add systems
-app.post('/system_registration', (req, res) => {
-    const { systemName, description } = req.body;
+app.post('/api/systems', async (req, res) => {
+  const { systemName, description } = req.body;
 
-    if (!systemName || !description) {
-        return res.status(400).json({ error: 'All fields are required.' });
+  const sql = 'INSERT INTO asipiyasystem (SystemName, Description) VALUES (?, ?)';
+  db.query(sql, [systemName, description], async (err) => {
+    if (err) {
+      console.error("Database error:", err);
+      return res.status(500).json({ message: "Database error" });
     }
 
-    const sql = 'INSERT INTO asipiyasystem (SystemName, Description) VALUES (?, ?)';
-    db.query(sql, [systemName, description], (err) => {
-        if (err) {
-            console.error("Database error:", err);
-            return res.status(500).json({ message: "Database error" });
-        }
-        res.status(200).json({ message: 'System registered successfully' });
-    });
+    // Send notification to supervisors, developers, and admins
+    try {
+      await sendNotificationsByRoles(
+        ['Supervisor', 'Developer', 'Admin'],
+        `New system added: ${systemName}`,
+        'NEW_SYSTEM_ADDED'
+      );
+    } catch (error) {
+      console.error('Error sending system registration notifications:', error);
+    }
+
+    res.status(200).json({ message: 'System registered successfully' });
+  });
 });
 
 //View systems
@@ -826,28 +839,32 @@ app.delete('/api/system_registration_delete/:id', (req, res) => {
 
 
 //Adding Category
-app.post('/ticket_category', (req, res) => {
-    const { CategoryName, Description } = req.body;
+app.post('/api/ticket-categories', async (req, res) => {
+  const { CategoryName, Description } = req.body;
 
-    if (!CategoryName) {
-        return res.status(400).json({ error: 'Category name is required.' });
+  const sql = 'INSERT INTO ticketcategory (CategoryName, Description) VALUES (?, ?)';
+  db.query(sql, [CategoryName, Description], async (err, result) => {
+    if (err) {
+      console.error("Database error:", err);
+      return res.status(500).json({ message: "Failed to add ticket category" });
     }
 
-    const sql = 'INSERT INTO ticketcategory (CategoryName, Description) VALUES (?, ?)';
-    db.query(sql, [CategoryName, Description], (err, result) => {
-        if (err) {
-            console.error("Database error:", err);
-            return res.status(500).json({ message: "Failed to add ticket category" });
-        }
-        res.status(200).json({
-            message: 'Ticket category added successfully',
-            category: {
-                TicketCategoryID: result.insertId,
-                CategoryName,
-                Description
-            }
-        });
+    // Send notification to supervisors, developers, and admins
+    try {
+      await sendNotificationsByRoles(
+        ['Supervisor', 'Developer', 'Admin'],
+        `New ticket category added: ${CategoryName}`,
+        'NEW_CATEGORY_ADDED'
+      );
+    } catch (error) {
+      console.error('Error sending category addition notifications:', error);
+    }
+
+    res.status(200).json({
+      message: 'Ticket category added successfully',
+      categoryId: result.insertId
     });
+  });
 });
 
 //View Categories
@@ -962,286 +979,13 @@ app.get('/api/supervisors', (req, res) => {
 });
 
 
-app.put('/api/tickets/:id/assign', (req, res) => {
-  const ticketId = req.params.id;
-  const { status, priority, supervisorId } = req.body;
-
-  const sql = `UPDATE ticket SET Status = ?, Priority = ?, SupervisorID = ? WHERE TicketID = ?`;
-
-  db.query(sql, [status, priority, supervisorId, ticketId], (err, result) => {
-    if (err) {
-      console.error('Error assigning supervisor:', err);
-      return res.status(500).json({ error: 'Database error' });
-    }
-    res.json({ message: 'Supervisor assigned successfully' });
-  });
-});
-
- 
- 
-// Get user profile endpoint (general user) 
-app.get('/api/user/profile/:id', (req, res) => {
-    const userId = req.params.id;
-    const query = 'SELECT UserID, FullName, Email, Phone, Role, ProfileImagePath FROM appuser WHERE UserID = ?';
-
-    db.query(query, [userId], (err, results) => {
-        if (err) {
-            console.error('Error fetching user profile:', err);
-            res.status(500).json({ message: 'Server error' });
-            
-        } else if (results.length === 0) {
-            res.status(404).json({ message: 'User not found' });
-        } else {
-            res.status(200).json(results[0]);
-        }
-    });
-});
-
-// Update user profile endpoint (general user)
-app.put('/api/user/profile/:id', (req, res) => {
-    const userId = req.params.id;
-    const { FullName, Email, Phone, CurrentPassword, NewPassword } = req.body;
-
-    // Select the hashed password from the DB for comparison
-    const verifyQuery = 'SELECT Password AS HashedPassword FROM appuser WHERE UserID = ?';
-
-    db.query(verifyQuery, [userId], (err, results) => {
-        if (err) {
-            console.error('Error verifying user for profile update:', err);
-            return res.status(500).json({ message: 'Server error' });
-        }
-        if (results.length === 0) {
-            return res.status(404).json({ message: 'User not found' });
-        }
-
-        const currentUser = results[0];
-
-        const handleProfileUpdate = async () => {
-            let updateQuery;
-            let queryParams;
-
-            if (CurrentPassword && NewPassword) {
-                try {
-                    // Compare provided current password with the stored hashed password
-                    const isCurrentPasswordMatch = await bcrypt.compare(CurrentPassword, currentUser.HashedPassword);
-                    if (!isCurrentPasswordMatch) {
-                        return res.status(400).json({ message: 'Current password is incorrect' });
-                    }
-
-                    // Hash the new password before updating
-                    const hashedNewPassword = await bcrypt.hash(NewPassword, saltRounds);
-                    updateQuery = 'UPDATE appuser SET FullName = ?, Email = ?, Phone = ?, Password = ? WHERE UserID = ?';
-                    queryParams = [FullName, Email, Phone, hashedNewPassword, userId];
-                } catch (hashErr) {
-                    console.error('Error hashing new password:', hashErr);
-                    return res.status(500).json({ message: 'Error processing new password' });
-                }
-            } else {
-                // User is NOT changing password, just updating other details
-                updateQuery = 'UPDATE appuser SET FullName = ?, Email = ?, Phone = ? WHERE UserID = ?';
-                queryParams = [FullName, Email, Phone, userId];
-            }
-
-            db.query(updateQuery, queryParams, (updateErr, updateResult) => {
-                if (updateErr) {
-                    console.error('Error updating user profile:', updateErr);
-                    res.status(500).json({ message: 'Error updating profile' });
-                } else {
-                    if (updateResult.affectedRows === 0) {
-                        res.status(200).json({ message: 'No changes were made to the profile.' });
-                    } else {
-                        res.status(200).json({ message: 'Profile updated successfully' });
-                    }
-                }
-            });
-        };
-
-        handleProfileUpdate();
-    });
-});
-
-// PROFILE IMAGE UPLOAD ENDPOINT
-app.post('/api/user/profile/upload/:id', upload.single('profileImage'), (req, res) => {
-    const userId = req.params.id;
-
-    if (!req.file) {
-        return res.status(400).json({ message: 'No file uploaded.' });
-    }
-
-    // Path relative to the 'uploads' directory, to be stored in DB
-    const imagePath = `profile_images/${req.file.filename}`;
-
-    const query = 'UPDATE appuser SET ProfileImagePath = ? WHERE UserID = ?';
-    db.query(query, [imagePath, userId], (err, result) => {
-        if (err) {
-            console.error('Error updating profile image path in DB:', err);
-            fs.unlink(req.file.path, (unlinkErr) => {
-                if (unlinkErr) console.error('Error deleting uploaded file after DB failure:', unlinkErr);
-            });
-            return res.status(500).json({ message: 'Error saving image path to database.' });
-        }
-        res.status(200).json({
-            message: 'Profile image uploaded successfully',
-            imagePath: imagePath
-        });
-    });
-});
-
-// DELETE PROFILE IMAGE ENDPOINT
-app.delete('/api/user/profile/image/:id', (req, res) => {
-    const userId = req.params.id;
-
-    const getImagePathQuery = 'SELECT ProfileImagePath FROM appuser WHERE UserID = ?';
-    db.query(getImagePathQuery, [userId], (err, results) => {
-        if (err) {
-            console.error('Error fetching image path for deletion:', err);
-            return res.status(500).json({ message: 'Server error retrieving image path.' });
-        }
-
-        if (results.length === 0 || !results[0].ProfileImagePath) {
-            return res.status(404).json({ message: 'User or existing profile image not found.' });
-        }
-
-        const oldImagePath = results[0].ProfileImagePath;
-        const fullPathToDelete = path.join(__dirname, 'uploads', oldImagePath);
-
-        // Update DB first to clear the path
-        const updateDbQuery = 'UPDATE appuser SET ProfileImagePath = NULL WHERE UserID = ?';
-        db.query(updateDbQuery, [userId], (dbErr, dbResult) => {
-            if (dbErr) {
-                console.error('Error clearing profile image path in DB:', dbErr);
-                return res.status(500).json({ message: 'Error clearing image path in database.' });
-            }
-
-            // Attempt to delete the file from the file system
-            fs.unlink(fullPathToDelete, (unlinkErr) => {
-                if (unlinkErr) {
-                    console.warn(`Warning: Could not delete old file at ${fullPathToDelete}:`, unlinkErr);
-                    return res.status(200).json({ message: 'Profile image removed from DB, but file could not be deleted from server.', imagePath: null });
-                }
-                res.status(200).json({ message: 'Profile image removed successfully!', imagePath: null });
-            });
-        });
-    });
-});
-
-/*----------------------------------------------------------------------------------*/
-
-//Create ticket 
-app.get("/system_registration", (req, res) => {
-  const sql = "SELECT SystemName FROM asipiyasystem";
-  db.query(sql, (err, results) => {
-    if (err) {
-      console.error("Error fetching systems:", err);
-      return res.status(500).json({ error: "Database error" });
-    }
-    res.json(results);
-  });
-});
-
-app.get("/ticket_category", (req, res) => {
-  const sql = "SELECT CategoryName FROM ticketcategory";
-  db.query(sql, (err, results) => {
-    if (err) {
-      console.error("Error fetching systems:", err);
-      return res.status(500).json({ error: "Database error" });
-    }
-    res.json(results);
-  });
-});
-
-// Helper function to create notifications
-const createNotification = (userId, message, type, ticketLogId = null) => {
-  return new Promise((resolve, reject) => {
-    const query = `
-      INSERT INTO notifications (UserID, Message, Type, TicketLogID)
-      VALUES (?, ?, ?, ?)
-    `;
-    db.query(query, [userId, message, type, ticketLogId], (err, result) => {
-      if (err) {
-        console.error('Error creating notification:', err);
-        reject(err);
-      } else {
-        resolve(result.insertId);
-      }
-    });
-  });
-};
-
-app.post("/create_ticket", (req, res) => {
-  const { userId, systemName, ticketCategory, description } = req.body;
-
-  if (!userId || !systemName || !ticketCategory || !description) {
-    return res.status(400).json({ message: "All fields are required" });
-  }
-
-  const getSystemId = "SELECT AsipiyaSystemID FROM asipiyasystem WHERE SystemName = ?";
-  db.query(getSystemId, [systemName], (err, systemResults) => {
-    if (err || systemResults.length === 0) {
-      console.error("Error fetching system ID:", err);
-      return res.status(400).json({ message: "Invalid system name" });
-    }
-    const systemId = systemResults[0].AsipiyaSystemID;
-
-    const getCategoryId = "SELECT TicketCategoryID FROM ticketcategory WHERE CategoryName = ?";
-    db.query(getCategoryId, [ticketCategory], (err, categoryResults) => {
-      if (err || categoryResults.length === 0) {
-        console.error("Error fetching category ID:", err);
-        return res.status(400).json({ message: "Invalid ticket category" });
-      }
-      const categoryId = categoryResults[0].TicketCategoryID;
-
-      const insertTicket = `
-        INSERT INTO ticket (UserId, AsipiyaSystemID, TicketCategoryID, Description, Status, Priority, DateTime)
-        VALUES (?, ?, ?, ?, 'Pending', 'Low', NOW())
-      `;
-      db.query(insertTicket, [userId, systemId, categoryId, description], async (err, result) => {
-        if (err) {
-          console.error("Error inserting ticket:", err);
-          return res.status(500).json({ message: "Server error" });
-        }
-
-        // Create notification for admins
-        try {
-          // Get all admin users
-          const getAdmins = "SELECT UserID FROM appuser WHERE Role = 'Admin'";
-          db.query(getAdmins, async (err, admins) => {
-            if (err) {
-              console.error("Error fetching admins:", err);
-            } else {
-              // Create notifications for each admin
-              for (const admin of admins) {
-                await createNotification(
-                  admin.UserID,
-                  `New ticket #${result.insertId} created for ${systemName}`,
-                  'NEW_TICKET'
-                ).catch(console.error);
-              }
-            }
-          });
-
-          res.status(200).json({ message: "Ticket created", ticketId: result.insertId });
-        } catch (error) {
-          console.error("Error creating notifications:", error);
-          res.status(200).json({ message: "Ticket created", ticketId: result.insertId });
-        }
-      });
-    });
-  });
-});
-
-// Update ticket status
 app.put('/api/tickets/:ticketId/status', async (req, res) => {
-  const { ticketId } = req.params;
+  const ticketId = req.params.ticketId;
   const { status, userId } = req.body;
 
-  if (!ticketId || !status || !userId) {
-    return res.status(400).json({ message: "Ticket ID, status, and user ID are required" });
-  }
-
   try {
-    // First get the ticket details to know the user who created it
-    const getTicket = "SELECT UserId FROM ticket WHERE TicketID = ?";
+    // First get the ticket details to know the user who created it and current status
+    const getTicket = "SELECT UserId, Status, SupervisorID FROM ticket WHERE TicketID = ?";
     db.query(getTicket, [ticketId], async (err, results) => {
       if (err) {
         console.error("Error fetching ticket:", err);
@@ -1253,34 +997,61 @@ app.put('/api/tickets/:ticketId/status', async (req, res) => {
       }
 
       const ticketUserId = results[0].UserId;
+      const oldStatus = results[0].Status;
+      const supervisorId = results[0].SupervisorID;
 
       // Update the ticket status
-      const updateQuery = "UPDATE ticket SET Status = ? WHERE TicketID = ?";
+      const updateQuery = "UPDATE ticket SET Status = ?, LastRespondedTime = NOW() WHERE TicketID = ?";
       db.query(updateQuery, [status, ticketId], async (err, result) => {
         if (err) {
           console.error("Error updating ticket status:", err);
           return res.status(500).json({ message: "Server error" });
         }
 
-        // Create a ticket log entry
+        // Create a ticket log entry with old and new values
         const logQuery = `
-          INSERT INTO ticketlog (TicketID, DateTime, Type, Description, UserID)
-          VALUES (?, NOW(), 'STATUS_CHANGE', ?, ?)
+          INSERT INTO ticketlog (TicketID, DateTime, Type, Description, UserID, OldValue, NewValue)
+          VALUES (?, NOW(), 'STATUS_CHANGE', ?, ?, ?, ?)
         `;
-        db.query(logQuery, [ticketId, `Status changed to ${status}`, userId], async (err, logResult) => {
+        db.query(logQuery, [
+          ticketId, 
+          `Status changed from ${oldStatus} to ${status}`, 
+          userId,
+          oldStatus,
+          status
+        ], async (err, logResult) => {
           if (err) {
             console.error("Error creating ticket log:", err);
           } else {
-            // Create notification for the ticket creator
             try {
+              // Create notification for the ticket creator
               await createNotification(
                 ticketUserId,
-                `Your ticket #${ticketId} status has been updated to ${status}`,
+                `Your ticket #${ticketId} status has been updated from ${oldStatus} to ${status}`,
                 'STATUS_UPDATE',
                 logResult.insertId
               );
+
+              // Notify supervisor if assigned
+              if (supervisorId) {
+                await createNotification(
+                  supervisorId,
+                  `Ticket #${ticketId} status changed from ${oldStatus} to ${status}`,
+                  'TICKET_STATUS_CHANGE',
+                  logResult.insertId
+                );
+              }
+
+              // Also notify admins about the status change
+              await sendNotificationsByRoles(
+                ['Admin'],
+                `Ticket #${ticketId} status changed from ${oldStatus} to ${status}`,
+                'TICKET_STATUS_CHANGE',
+                logResult.insertId
+              );
+
             } catch (error) {
-              console.error("Error creating notification:", error);
+              console.error("Error creating notifications:", error);
             }
           }
         });
@@ -1652,10 +1423,10 @@ app.put('/api/notifications/read', (req, res) => {
 app.get('/api/user/tickets/counts/:userId', (req, res) => {
     const userId = req.params.userId;
     const queries = {
-        total: 'SELECT COUNT(*) AS count FROM ticket WHERE UserId = ?',
-        pending: "SELECT COUNT(*) AS count FROM ticket WHERE UserId = ? AND Status = 'Pending'",
-        resolved: "SELECT COUNT(*) AS count FROM ticket WHERE UserId = ? AND Status IN ('Resolved', 'Rejected')",
-        ongoing: "SELECT COUNT(*) AS count FROM ticket WHERE UserId = ? AND Status IN ('Open', 'In Progress')"
+        total: 'SELECT COUNT(*) AS count FROM ticket WHERE Userid = ?',
+        pending: "SELECT COUNT(*) AS count FROM ticket WHERE Userid = ? AND Status = 'Pending'",
+        resolved: "SELECT COUNT(*) AS count FROM ticket WHERE Userid = ? AND Status IN ('Resolved', 'Rejected')",
+        ongoing: "SELECT COUNT(*) AS count FROM ticket WHERE Userid = ? AND Status IN ('Open', 'In Progress')"
     };
 
     const results = {};
@@ -1773,6 +1544,232 @@ app.get('/api/tickets/user/:userId', (req, res) => {
     }
     res.json(results);
   });
+});
+
+// Helper function to create a notification
+const createNotification = async (userId, message, type, ticketLogId = null) => {
+  return new Promise((resolve, reject) => {
+    const query = `
+      INSERT INTO notifications (UserID, Message, Type, TicketLogID)
+      VALUES (?, ?, ?, ?)
+    `;
+    db.query(query, [userId, message, type, ticketLogId], (err, result) => {
+      if (err) {
+        console.error('Error creating notification:', err);
+        reject(err);
+      } else {
+        resolve(result);
+      }
+    });
+  });
+};
+
+// Helper function to get users by roles
+const getUsersByRoles = async (roles) => {
+  return new Promise((resolve, reject) => {
+    const query = 'SELECT UserID FROM appuser WHERE Role IN (?)';
+    db.query(query, [roles], (err, results) => {
+      if (err) {
+        console.error('Error fetching users by roles:', err);
+        reject(err);
+      } else {
+        resolve(results);
+      }
+    });
+  });
+};
+
+// Helper function to send notifications to users by roles
+const sendNotificationsByRoles = async (roles, message, type, ticketLogId = null) => {
+  try {
+    const users = await getUsersByRoles(roles);
+    const notifications = users.map(user => 
+      createNotification(user.UserID, message, type, ticketLogId)
+    );
+    await Promise.all(notifications);
+  } catch (error) {
+    console.error('Error sending notifications by roles:', error);
+  }
+};
+
+// Invite supervisor endpoint
+app.post('/api/invite-supervisor', async (req, res) => {
+  const { email, role } = req.body;
+
+  // Generate invitation token
+  const token = crypto.randomBytes(32).toString('hex');
+  const mailOptions = {
+    from: process.env.EMAIL_USER,
+    to: email,
+    subject: 'Invitation to Join as Supervisor',
+    html: `
+      <h2>You've been invited to join as a Supervisor</h2>
+      <p>Please click the link below to complete your registration:</p>
+      <a href="${process.env.FRONTEND_URL}/register?token=${token}&role=${role}">Complete Registration</a>
+    `
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+
+    // If inviting a supervisor, notify admins and existing supervisors
+    if (role === 'Supervisor') {
+      await sendNotificationsByRoles(
+        ['Admin', 'Supervisor'],
+        `New supervisor invitation sent to ${email}`,
+        'NEW_SUPERVISOR_INVITED'
+      );
+    }
+
+    res.json({ message: 'Invitation email sent successfully.' });
+  } catch (mailErr) {
+    console.error('Error sending invitation email:', mailErr);
+    res.status(500).json({ message: 'Failed to send invitation email.' });
+  }
+});
+
+// Assign supervisor to ticket endpoint
+app.put('/api/tickets/:id/assign', async (req, res) => {
+  const ticketId = req.params.id;
+  const { status, priority, supervisorId } = req.body;
+
+  // First get the ticket details to know the user who created it
+  const getTicketQuery = 'SELECT UserId FROM ticket WHERE TicketID = ?';
+  db.query(getTicketQuery, [ticketId], async (err, ticketResults) => {
+    if (err) {
+      console.error('Error fetching ticket:', err);
+      return res.status(500).json({ error: 'Database error' });
+    }
+
+    if (ticketResults.length === 0) {
+      return res.status(404).json({ message: 'Ticket not found' });
+    }
+
+    const userId = ticketResults[0].UserId;
+
+    const sql = `UPDATE ticket SET Status = ?, Priority = ?, SupervisorID = ? WHERE TicketID = ?`;
+
+    db.query(sql, [status, priority, supervisorId, ticketId], async (err, result) => {
+      if (err) {
+        console.error('Error assigning supervisor:', err);
+        return res.status(500).json({ error: 'Database error' });
+      }
+
+      try {
+        // Notify the assigned supervisor
+        await createNotification(
+          supervisorId,
+          `You have been assigned to ticket #${ticketId}`,
+          'SUPERVISOR_ASSIGNED'
+        );
+
+        // Notify the ticket creator
+        await createNotification(
+          userId,
+          `A supervisor has been assigned to your ticket #${ticketId}`,
+          'TICKET_UPDATED'
+        );
+
+        // Notify admins
+        await sendNotificationsByRoles(
+          ['Admin'],
+          `Supervisor assigned to ticket #${ticketId}`,
+          'SUPERVISOR_ASSIGNMENT'
+        );
+      } catch (error) {
+        console.error('Error sending supervisor assignment notifications:', error);
+      }
+
+      res.json({ message: 'Supervisor assigned successfully' });
+    });
+  });
+});
+
+// Create new ticket
+app.post('/api/tickets', async (req, res) => {
+  const { userId, systemName, ticketCategory, description } = req.body;
+
+  try {
+    // Get system ID
+    const getSystemId = "SELECT AsipiyaSystemID FROM asipiyasystem WHERE SystemName = ?";
+    const [systemResult] = await db.promise().query(getSystemId, [systemName]);
+    
+    if (systemResult.length === 0) {
+      return res.status(400).json({ message: "Invalid system name" });
+    }
+    
+    // Get category ID
+    const getCategoryId = "SELECT TicketCategoryID FROM ticketcategory WHERE CategoryName = ?";
+    const [categoryResult] = await db.promise().query(getCategoryId, [ticketCategory]);
+    
+    if (categoryResult.length === 0) {
+      return res.status(400).json({ message: "Invalid ticket category" });
+    }
+
+    // Insert ticket
+    const insertTicket = `
+      INSERT INTO ticket (UserId, AsipiyaSystemID, TicketCategoryID, Description, Status, Priority)
+      VALUES (?, ?, ?, ?, 'Pending', 'Medium')
+    `;
+    
+    const [result] = await db.promise().query(insertTicket, [
+      userId,
+      systemResult[0].AsipiyaSystemID,
+      categoryResult[0].TicketCategoryID,
+      description
+    ]);
+
+    // Send notification to admins about new ticket
+    try {
+      await sendNotificationsByRoles(
+        ['Admin'],
+        `New ticket created by User #${userId}: ${description.substring(0, 50)}...`,
+        'NEW_TICKET'
+      );
+    } catch (error) {
+      console.error('Error sending ticket creation notifications:', error);
+    }
+
+    res.status(201).json({
+      message: 'Ticket created successfully',
+      ticketId: result.insertId
+    });
+  } catch (error) {
+    console.error('Error creating ticket:', error);
+    res.status(500).json({ message: 'Error creating ticket' });
+  }
+});
+
+// Upload evidence for a ticket
+app.post('/api/upload_evidence', upload_evidence.array('evidenceFiles'), async (req, res) => {
+  const { ticketId, description } = req.body;
+
+  if (!req.files || req.files.length === 0) {
+    return res.status(400).json({ message: 'No files uploaded' });
+  }
+
+  if (!ticketId) {
+    return res.status(400).json({ message: 'Ticket ID is required' });
+  }
+
+  try {
+    const values = req.files.map(file => [ticketId, file.path, description]);
+    
+    const insertEvidenceQuery = `
+      INSERT INTO evidence (ComplaintID, FilePath, Description)
+      VALUES ?
+    `;
+
+    await db.promise().query(insertEvidenceQuery, [values]);
+
+    res.status(200).json({
+      message: 'Evidence files uploaded successfully',
+      count: req.files.length
+    });
+  } catch (error) {
+    console.error('Error uploading evidence:', error);
+    res.status(500).json({ message: 'Error uploading evidence' });
+  }
 });
 
 // Start the server
