@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { Link } from "react-router-dom";
+import React, { useState, useEffect } from "react";
+import { Link, useLocation } from "react-router-dom";
 import { BsChevronLeft } from "react-icons/bs";
 import { LuTicketCheck, LuTicketPlus, LuLayoutDashboard } from "react-icons/lu";
 import { IoIosArrowBack } from "react-icons/io";
@@ -16,8 +16,14 @@ const Menus = [
 ];
 
 const SideBar = ({ open, setOpen }) => {
-  // const [open, setOpen] = useState(true);
   const { handleLogout } = useAuth();
+  // const [open, setOpen] = useState(true);
+  const location = useLocation();
+
+  // Auto-collapse on route change
+  useEffect(() => {
+    setOpen(false);
+  }, [location.pathname]);
 
   // Modal state
   const [showLogoutModal, setShowLogoutModal] = useState(false);
@@ -43,11 +49,11 @@ const SideBar = ({ open, setOpen }) => {
     <div className="flex">
       <div
         className={`bg-gray-900 h-screen duration-300 p-5 pt-30 fixed top-0 left-0 z-50 transition-all
-    ${open ? "w-72" : "w-20"}`}
+        ${open ? "w-72" : "w-20"}`}
       >
         <BsChevronLeft
           className={`absolute -right-3 mr-10 top-16 cursor-pointer text-white text-base transition-transform duration-300 z-50
-      ${open ? "rotate-0" : "rotate-180"}`}
+          ${open ? "rotate-0" : "rotate-180"}`}
           onClick={() => setOpen(!open)}
           aria-label="Toggle sidebar"
         />
@@ -57,27 +63,35 @@ const SideBar = ({ open, setOpen }) => {
             {Menus.map((menu, index) => (
               <li
                 key={index}
-                  className={`text-white text-sm flex items-center gap-x-4 mt-5 cursor-pointer p-2 hover:bg-gray-700 rounded-md
-                    ${open ? "justify-between" : "justify-center"}`}
+                className={`text-white text-sm flex items-center gap-x-4 mt-5 cursor-pointer p-2 rounded-md
+                  ${location.pathname === menu.path ? "bg-gray-700" : "hover:bg-gray-700"}
+                  ${open ? "justify-between" : "justify-center"}`}
               >
-                 <Link
+                <Link
                   to={menu.path}
-                  className="flex items-center gap-x-4 w-full"
+                  className="flex items-center gap-x-4 w-full relative group"
                 >
                   <span className="text-2xl">{menu.icon}</span>
                   <span
                     className={`font-medium overflow-hidden whitespace-nowrap duration-300
-                      ${open ? "opacity-100" : "opacity-0 w-0"}`}
+      ${open ? "opacity-100" : "opacity-0 w-0"}`}
                   >
                     {menu.title}
                   </span>
-                </Link>
-                  {open && (
-                    <span className="font-medium flex items-center">
-                      <IoIosArrowBack className="rotate-180" />
+
+                  {/* Tooltip when collapsed */}
+                  {!open && (
+                    <span className="absolute left-16 bg-gray-800 text-white text-xs px-2 py-1 rounded shadow-lg scale-0 group-hover:scale-100 origin-left transition-transform whitespace-nowrap z-50">
+                      {menu.title}
                     </span>
                   )}
-                
+                </Link>
+
+                {open && (
+                  <span className="font-medium flex items-center">
+                    <IoIosArrowBack className="rotate-180" />
+                  </span>
+                )}
               </li>
             ))}
           </ul>
@@ -85,28 +99,32 @@ const SideBar = ({ open, setOpen }) => {
           <div className="mt-auto">
             {/* Logout Button */}
             <li
-             className={`text-white text-sm flex items-center gap-x-4 cursor-pointer p-2 hover:bg-gray-700 rounded-md
-                ${open ? "justify-between" : "justify-center"}`}
+              className={`text-white text-sm flex items-center gap-x-4 cursor-pointer p-2 rounded-md
+                hover:bg-gray-700 ${open ? "justify-between" : "justify-center"}`}
               onClick={handleConfirmLogout} // Show confirmation modal instead of immediate logout
             >
-              <div className="flex items-center gap-x-4 w-full">
-                
-                 <span className="text-2xl">
-                  <CiLogout />
-                </span>
+              <div className="flex items-center gap-x-4 w-full relative group">
+                <span className="text-2xl"><CiLogout /></span>
                 <span
                   className={`font-medium overflow-hidden whitespace-nowrap duration-300
-                    ${open ? "opacity-100" : "opacity-0 w-0"}`}
+      ${open ? "opacity-100" : "opacity-0 w-0"}`}
                 >
                   Log Out
                 </span>
-                </div>
-                {open && (
-                  <span className="font-medium flex items-center">
-                    <IoIosArrowBack className="rotate-180" />
+
+                {/* Tooltip when collapsed */}
+                {!open && (
+                  <span className="absolute left-16 bg-gray-800 text-white text-xs px-2 py-1 rounded shadow-lg scale-0 group-hover:scale-100 origin-left transition-transform whitespace-nowrap z-50">
+                    Log Out
                   </span>
                 )}
-              
+              </div>
+
+              {open && (
+                <span className="font-medium flex items-center">
+                  <IoIosArrowBack className="rotate-180" />
+                </span>
+              )}
             </li>
           </div>
         </div>
