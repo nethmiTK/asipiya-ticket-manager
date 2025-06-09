@@ -46,14 +46,33 @@ const SupervisorAssignPage = ({ ticketId }) => {
       return;
     }
 
+    // Find the selected supervisor's name
+    const supervisor = supervisors.find(s => s.UserID.toString() === selectedSupervisor.toString());
+    if (!supervisor) {
+      alert("Selected supervisor not found.");
+      return;
+    }
+
     axios.put(`http://localhost:5000/api/tickets/${id}/assign`, {
       supervisorId: selectedSupervisor,
       status,
       priority,
+      supervisorName: supervisor.FullName
     })
       .then(() => {
-        toast.success('Supervisor assigned successfully!');
+        // After successful assignment, update the ticket status
+        return axios.put(`http://localhost:5000/api/tickets/${id}/status`, {
+          status: 'Open',
+          userId: selectedSupervisor,
+          supervisorName: supervisor.FullName
+        });
+      })
+      .then(() => {
+        toast.success('Supervisor assigned and ticket status updated successfully!');
         // Optional: redirect or update state
+        if (!ticketId) { // Only navigate if not in popup mode
+          navigate(-1);
+        }
       })
       .catch(err => {
         console.error('Error assigning supervisor:', err);
