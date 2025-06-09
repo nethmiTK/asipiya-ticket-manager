@@ -187,7 +187,7 @@ const OpenTickets = () => {
                     };
 
                     const ticketRes = await axios.post(
-                      "http://localhost:5000/create_ticket",
+                      "http://localhost:5000/api/tickets",
                       ticketPayload
                     );
 
@@ -202,7 +202,7 @@ const OpenTickets = () => {
                       formData.append("description", values.description);
 
                       await axios.post(
-                        "http://localhost:5000/upload_evidence",
+                        "http://localhost:5000/api/upload_evidence",
                         formData,
                         {
                           headers: {
