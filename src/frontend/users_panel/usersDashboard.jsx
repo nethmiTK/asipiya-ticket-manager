@@ -1,18 +1,18 @@
-import React, { useState, useEffect, useRef } from "react"; 
+import React, { useState, useEffect, useRef } from "react";
 import SideBar from "../../user_components/SideBar/SideBar";
-import { useAuth } from '../../App'; 
-import axios from 'axios'; 
-import { LuTicketCheck, LuTicketX, LuTicket } from "react-icons/lu"; 
-import { FaHistory } from "react-icons/fa"; 
-import { toast } from 'react-toastify'; 
+import { useAuth } from '../../App';
+import axios from 'axios';
+import { LuTicketCheck, LuTicketX, LuTicket, LuStar } from "react-icons/lu";
+import { FaHistory } from "react-icons/fa";
+import { toast } from 'react-toastify';
 import { IoNotificationsOutline } from "react-icons/io5";
 import NotificationPanel from "../components/NotificationPanel";
 import { useNavigate } from "react-router-dom";
 
 const UsersDashboard = () => {
     const navigate = useNavigate();
-    const { loggedInUser } = useAuth(); 
-    const [ticketCounts, setTicketCounts] = useState({ total: 0, pending: 0, resolved: 0 });
+    const { loggedInUser } = useAuth();
+    const [ticketCounts, setTicketCounts] = useState({ total: 0, pending: 0, resolved: 0, ongoing: 0 });
     const [recentTickets, setRecentTickets] = useState([]);
     const [loadingCounts, setLoadingCounts] = useState(true);
     const [loadingRecent, setLoadingRecent] = useState(true);
@@ -98,7 +98,7 @@ const UsersDashboard = () => {
     const formatDateTime = (dateTimeString) => {
         if (!dateTimeString) return 'N/A';
         const date = new Date(dateTimeString);
-        return date.toLocaleString(); 
+        return date.toLocaleString();
     };
 
     const getStatusColor = (status) => {
@@ -124,16 +124,16 @@ const UsersDashboard = () => {
 
     return (
         <div className="flex">
-            <title>User Dashboard</title> 
+            <title>User Dashboard</title>
             <SideBar />
 
             <div className="flex-1 ml-72 flex flex-col h-screen overflow-y-auto">
                 <div className="fixed top-0 right-0 left-72 bg-white z-10 shadow-sm">
                     <div className="flex justify-between items-center px-6 py-4">
                         <h1 className="text-2xl font-bold text-gray-800">Dashboard</h1>
-                        
+
                         <div className="flex items-center gap-4">
-                            <div 
+                            <div
                                 className="flex items-center gap-3 cursor-pointer hover:bg-gray-50 p-2 rounded-lg transition-colors"
                                 onClick={handleProfileClick}
                             >
@@ -191,7 +191,7 @@ const UsersDashboard = () => {
                     {error && <div className="text-red-600 mb-4">{error}</div>}
 
                     {/* Cards Section */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
                         {loadingCounts ? (
                             <div className="col-span-3 text-center text-gray-600">Loading counts...</div>
                         ) : (
@@ -222,6 +222,14 @@ const UsersDashboard = () => {
                                     </div>
                                     <LuTicket className="text-5xl text-green-400" />
                                 </div>
+                                {/* Ongoing Tickets Card */}
+                                <div className="bg-white p-6 rounded-lg shadow-md flex items-center justify-between">
+                                    <div>
+                                        <h3 className="text-lg font-semibold text-gray-700">Ongoing Tickets</h3>
+                                        <p className="text-4xl font-bold text-purple-600">{ticketCounts.ongoing}</p>
+                                    </div>
+                                    <LuStar className="text-5xl text-purple-400" /> 
+                                </div>
                             </>
                         )}
                     </div>
@@ -229,7 +237,7 @@ const UsersDashboard = () => {
                     {/* Recent tickets Section */}
                     <div className="bg-white p-6 rounded-lg shadow-md">
                         <h2 className="text-xl font-bold mb-4 text-gray-800 flex items-center">
-                            <FaHistory className="mr-2 text-blue-500" /> Recent Tickets 
+                            <FaHistory className="mr-2 text-blue-500" /> Recent Tickets
                         </h2>
 
                         {loadingRecent ? (
