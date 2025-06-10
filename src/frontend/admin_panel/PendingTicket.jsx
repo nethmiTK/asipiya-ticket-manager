@@ -15,10 +15,7 @@ const PendingTicket = () => {
     const fetchTickets = async () => {
       try {
         const response = await axios.get("http://localhost:5000/api/pending_ticket");
-        const filteredTickets = response.data.filter(
-          (ticket) => ticket.Status?.toLowerCase() === "pending"
-        );
-        setTickets(filteredTickets);
+        setTickets(response.data); // No need to filter on frontend now
         setLoading(false);
       } catch (error) {
         console.error("Error fetching tickets:", error);
@@ -28,6 +25,7 @@ const PendingTicket = () => {
 
     fetchTickets();
   }, []);
+
 
   const getStatusColor = (status) => {
     switch (status.toLowerCase()) {
@@ -121,7 +119,10 @@ const PendingTicket = () => {
               <TicketViewPage
                 ticketId={selectedTicketId}
                 popupMode={true}
-                onClose={() => setShowTicketPopup(false)}
+                onClose={() => {
+                  setShowTicketPopup(false);
+                  fetchTickets(); // Refresh the list when the modal closes
+                }}
               />
             </div>
           </div>

@@ -3,7 +3,7 @@ import axios from 'axios';
 import { useParams, useNavigate } from 'react-router-dom';
 import AdminSideBar from '../../user_components/SideBar/AdminSideBar';
 import { toast } from 'react-toastify';
-import { IoArrowBack} from 'react-icons/io5';
+import { IoArrowBack } from 'react-icons/io5';
 
 const SupervisorAssignPage = ({ ticketId }) => {
   const params = useParams();
@@ -12,7 +12,7 @@ const SupervisorAssignPage = ({ ticketId }) => {
   const [ticketData, setTicketData] = useState(null);
   const [supervisors, setSupervisors] = useState([]);
   const [selectedSupervisor, setSelectedSupervisor] = useState('');
-  const [status, setStatus] = useState('Pending');
+  const [status, setStatus] = useState('Open'); // default to Open
   const [priority, setPriority] = useState('Low');
 
   const id = ticketId || params.id;
@@ -21,10 +21,19 @@ const SupervisorAssignPage = ({ ticketId }) => {
     // Fetch ticket data
     axios.get(`http://localhost:5000/api/ticket_view/${id}`)
       .then(res => {
-        setTicketData(res.data);
-        setStatus(res.data.Status || 'Pending');
-        setPriority(res.data.Priority || 'Low');
-        setSelectedSupervisor(res.data.SupervisorName || '');
+        const ticket = res.data;
+        setTicketData(ticket);
+
+        // If current status is 'Pending', default to 'Open'
+        const currentStatus = (ticket.Status || '').toLowerCase();
+        if (currentStatus === 'pending') {
+          setStatus('Open');
+        } else {
+          setStatus(ticket.Status || 'Open');
+        }
+
+        setPriority(ticket.Priority || 'Low');
+        setSelectedSupervisor(ticket.SupervisorID || '');
       })
       .catch(err => console.error('Error fetching ticket:', err));
 
@@ -144,12 +153,10 @@ const SupervisorAssignPage = ({ ticketId }) => {
     </div>
   );
 
-  // If ticketId is provided, we're in popup mode
   if (ticketId) {
     return content;
   }
 
-  // Otherwise, render the full page layout
   return (
     <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
       <AdminSideBar open={isSidebarOpen} setOpen={setIsSidebarOpen} />

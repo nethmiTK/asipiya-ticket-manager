@@ -83,17 +83,21 @@ const TicketViewPage = ({ ticketId, popupMode = false, onClose }) => {
         <button
           onClick={async () => {
             try {
-              await axios.put(`http://localhost:5000/api/ticket_status/${id}`, {
+              const response = await axios.put(`http://localhost:5000/api/ticket_status/${id}`, {
                 status: 'Reject',
               });
-              toast.success('Ticket rejected successfully');
-              if (popupMode) {
-                onClose();
+
+              if (response.status === 200 || response.status === 204) {
+                toast.success('Ticket rejected successfully');
+                if (popupMode) {
+                  onClose();
+                } else {
+                  navigate(-1);
+                }
               } else {
-                navigate(-1);
+                toast.error('Failed to reject the ticket');
               }
             } catch (err) {
-              toast.error('Failed to reject the ticket');
               console.error(err);
             }
           }}
@@ -101,7 +105,6 @@ const TicketViewPage = ({ ticketId, popupMode = false, onClose }) => {
         >
           Reject
         </button>
-
         <button
           onClick={() => navigate(`/supervisor_assign/${id}`)}
           className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded"

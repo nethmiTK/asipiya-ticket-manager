@@ -669,11 +669,17 @@ app.get('/api/tickets', (req, res) => {
 
 app.get('/api/pending_ticket', (req, res) => {
   const query = `
-    SELECT t.TicketID, s.Description AS SystemName, tc.Description AS CategoryName, u.FullName AS UserName, t.Status
+    SELECT 
+      t.TicketID, 
+      s.Description AS SystemName, 
+      tc.Description AS CategoryName, 
+      u.FullName AS UserName, 
+      t.Status
     FROM ticket t
     LEFT JOIN asipiyasystem s ON t.AsipiyaSystemID = s.AsipiyaSystemID
     LEFT JOIN ticketcategory tc ON t.TicketCategoryID = tc.TicketCategoryID
     LEFT JOIN appuser u ON t.UserId = u.UserID
+    WHERE t.Status = 'Pending' AND t.SupervisorID IS NULL
   `;
 
   db.query(query, (err, results) => {
@@ -685,6 +691,7 @@ app.get('/api/pending_ticket', (req, res) => {
     res.json(results);
   });
 });
+
 
 
 //Add systems
@@ -908,6 +915,8 @@ app.put('/api/tickets/:id/assign', (req, res) => {
   const ticketId = req.params.id;
   const { status, priority, supervisorId } = req.body;
 
+  console.log("Assign Request:", { ticketId, status, priority, supervisorId });
+
   const sql = `UPDATE ticket SET Status = ?, Priority = ?, SupervisorID = ? WHERE TicketID = ?`;
 
   db.query(sql, [status, priority, supervisorId, ticketId], (err, result) => {
@@ -915,6 +924,12 @@ app.put('/api/tickets/:id/assign', (req, res) => {
       console.error('Error assigning supervisor:', err);
       return res.status(500).json({ error: 'Database error' });
     }
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Ticket not found or no changes applied' });
+    }
+
+    console.log("Update Result:", result);
     res.json({ message: 'Supervisor assigned successfully' });
   });
 });
