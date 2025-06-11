@@ -3,6 +3,7 @@ import axios from "axios";
 import SideBar from "../../user_components/SideBar/SideBar";
 import NavBar from "../../user_components/NavBar/NavBar";
 import ChatUI from "../../user_components/ChatUI/ChatUI";
+import NotificationPanel from "../components/NotificationPanel";
 
 const statusColors = {
   pending: "bg-yellow-100 text-yellow-800",
@@ -18,6 +19,25 @@ const TicketView = () => {
   const [selectedTicket, setSelectedTicket] = useState(null);
   const [activeTab, setActiveTab] = useState("details");
   const modalRef = useRef(null);
+  // const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
+  const notificationRef = useRef(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentTickets = tickets.slice(indexOfFirstItem, indexOfLastItem); 
+  const totalPages = Math.ceil(tickets.length / itemsPerPage);
+
+  const paginate = (pageNumber) => setCurrentPage(pageNumber);
+
+  const handleItemsPerPageChange = (e) => {
+    setItemsPerPage(Number(e.target.value));
+    setCurrentPage(1); // Reset to first page when items per page changes
+  };
 
   useEffect(() => {
     const fetchTickets = async () => {
@@ -59,13 +79,63 @@ const TicketView = () => {
     };
   }, [isModalOpen]);
 
+  //useEffect for closing notification panel when clicked outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (notificationRef.current && !notificationRef.current.contains(event.target)) {
+        setShowNotifications(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  // useEffect for fetching unread notification count
+  useEffect(() => {
+    const fetchUnreadNotifications = async () => {
+      const storedUser = localStorage.getItem("user");
+      const userId = storedUser ? JSON.parse(storedUser).UserID : null;
+
+      if (!userId) return;
+
+      try {
+        const response = await axios.get(`http://localhost:5000/api/notifications/count/${userId}`);
+        setUnreadNotifications(response.data.count);
+      } catch (error) {
+        console.error('Error fetching unread notifications:', error);
+      }
+    };
+
+    fetchUnreadNotifications();
+    const interval = setInterval(fetchUnreadNotifications, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
   return (
     <div className="flex">
       <title>My All Tickets</title>
-      <SideBar />
-      <div className="flex-1 ml-72 flex flex-col h-screen overflow-y-auto">
-        <NavBar />
+      <SideBar open={isSidebarOpen} setOpen={setIsSidebarOpen} />
+      <div className={`flex-1 ${isSidebarOpen ? 'ml-72' : 'ml-20'} flex flex-col h-screen overflow-y-auto transition-all duration-300`}>
+        <NavBar
+          isSidebarOpen={isSidebarOpen}
+          showNotifications={showNotifications}
+          unreadNotifications={unreadNotifications}
+          setShowNotifications={setShowNotifications}
+          notificationRef={notificationRef}
+        />
         <div className="p-6 mt-[60px]">
+          {showNotifications && (
+            <div ref={notificationRef} className="absolute right-4 top-[70px] z-50">
+              <NotificationPanel
+                userId={JSON.parse(localStorage.getItem("user"))?.UserID}
+                role={JSON.parse(localStorage.getItem("user"))?.Role}
+                onClose={() => setShowNotifications(false)}
+              />
+            </div>
+          )}
           <h1 className="text-2xl font-bold mb-4">My All Tickets</h1>
 
           {loading ? (
@@ -86,7 +156,7 @@ const TicketView = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {tickets.map((ticket) => (
+                  {currentTickets.map((ticket) => (
                     <tr
                       key={ticket.id}
                       onClick={() => {
@@ -101,10 +171,9 @@ const TicketView = () => {
                       </td>
                       <td className="px-6 py-2">
                         <span
-                          className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            statusColors[ticket.status?.toLowerCase()] ||
+                          className={`px-2 py-1 rounded-full text-xs font-medium ${statusColors[ticket.status?.toLowerCase()] ||
                             "bg-gray-200 text-gray-800"
-                          }`}
+                            }`}
                         >
                           {ticket.status}
                         </span>
@@ -124,6 +193,62 @@ const TicketView = () => {
             </div>
           )}
         </div>
+        {/* Pagination Controls at the bottom */}
+                  {tickets.length > 0 && (
+            <div className="flex flex-col sm:flex-row justify-end items-center mt-4 p-4 bg-white rounded-lg shadow">
+              <div className="flex items-center space-x-4">
+                <div className="flex items-center">
+                  <span className="text-gray-700 text-sm mr-2">Entries per page :</span>
+                  <select
+                    value={itemsPerPage}
+                    onChange={handleItemsPerPageChange}
+                    className="p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                  >
+                    <option value={5}>5</option>
+                    <option value={10}>10</option>
+                    <option value={20}>20</option>
+                    <option value={50}>50</option>
+                  </select>
+                </div>
+                <span className="text-gray-700 text-sm">
+                  {` ${indexOfFirstItem + 1}-${Math.min(indexOfLastItem, tickets.length)} of ${tickets.length}`}
+                </span>
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => paginate(1)}
+                    disabled={currentPage === 1}
+                    className="px-3 py-1 rounded-md bg-gray-200 text-gray-700 hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 text-sm"
+                  >
+                    &lt;&lt;
+                  </button>
+                  <button
+                    onClick={() => paginate(currentPage - 1)}
+                    disabled={currentPage === 1}
+                    className="px-3 py-1 rounded-md bg-gray-200 text-gray-700 hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 text-sm"
+                  >
+                    &lt;
+                  </button>
+                  <span className="text-gray-700 text-sm font-medium">
+                    {currentPage}
+                  </span>
+                  <button
+                    onClick={() => paginate(currentPage + 1)}
+                    disabled={currentPage === totalPages}
+                    className="px-3 py-1 rounded-md bg-gray-200 text-gray-700 hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 text-sm"
+                  >
+                    &gt;
+                  </button>
+                  <button
+                    onClick={() => paginate(totalPages)}
+                    disabled={currentPage === totalPages}
+                    className="px-3 py-1 rounded-md bg-gray-200 text-gray-700 hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 text-sm"
+                  >
+                    &gt;&gt;
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
         {isModalOpen && selectedTicket && (
           <div className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm">
@@ -133,21 +258,19 @@ const TicketView = () => {
             >
               <div className="flex border-b border-gray-300 relative">
                 <button
-                  className={`px-4 py-2 w-1/2 text-sm font-medium rounded-tl-lg ${
-                    activeTab === "details"
-                      ? "bg-gray-900 text-white"
-                      : "bg-purple-100 text-gray-900"
-                  }`}
+                  className={`px-4 py-2 w-1/2 text-sm font-medium rounded-tl-lg ${activeTab === "details"
+                    ? "bg-gray-900 text-white"
+                    : "bg-purple-100 text-gray-900"
+                    }`}
                   onClick={() => setActiveTab("details")}
                 >
                   Ticket Details
                 </button>
                 <button
-                  className={`px-4 py-2 w-1/2 text-sm font-medium rounded-tr-lg ${
-                    activeTab === "chat"
-                      ? "bg-gray-900 text-white"
-                      : "bg-purple-100 text-gray-900"
-                  }`}
+                  className={`px-4 py-2 w-1/2 text-sm font-medium rounded-tr-lg ${activeTab === "chat"
+                    ? "bg-gray-900 text-white"
+                    : "bg-purple-100 text-gray-900"
+                    }`}
                   onClick={() => setActiveTab("chat")}
                 >
                   Chat

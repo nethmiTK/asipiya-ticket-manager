@@ -2,10 +2,13 @@ import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { toast } from 'react-toastify';
 import { useAuth } from '../../App.jsx';
-import { AiOutlineUser } from 'react-icons/ai'; 
-import { MdClose } from 'react-icons/md'; 
-import { FaArrowLeft } from 'react-icons/fa'; 
-import { useNavigate } from 'react-router-dom'; 
+import { AiOutlineUser } from 'react-icons/ai';
+import { MdClose } from 'react-icons/md';
+import { FaArrowLeft } from 'react-icons/fa';
+import { useNavigate } from 'react-router-dom';
+import SideBar from "../../user_components/SideBar/SideBar";
+import NavBar from "../../user_components/NavBar/NavBar";     
+import NotificationPanel from "../components/NotificationPanel"; 
 
 const UserProfile = () => {
     const { loggedInUser: user, setLoggedInUser } = useAuth();
@@ -17,7 +20,7 @@ const UserProfile = () => {
         Email: '',
         Phone: '',
         Role: '',
-        ProfileImagePath: '' 
+        ProfileImagePath: ''
     });
 
     // formData will store the current input values from the user
@@ -32,10 +35,50 @@ const UserProfile = () => {
 
     const [loading, setLoading] = useState(true);
     const [errors, setErrors] = useState({});
-    const [selectedFile, setSelectedFile] = useState(null); 
-    const [imagePreview, setImagePreview] = useState(null); 
+    const [selectedFile, setSelectedFile] = useState(null);
+    const [imagePreview, setImagePreview] = useState(null);
 
-    const fileInputRef = useRef(null); 
+    const fileInputRef = useRef(null);
+    // const [isSidebarOpen, setIsSidebarOpen] = useState(true); 
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+    const [showNotifications, setShowNotifications] = useState(false);
+    const [unreadNotifications, setUnreadNotifications] = useState(0);
+    const notificationRef = useRef(null); 
+
+    // Effect for handling clicks outside the notification panel 
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (notificationRef.current && !notificationRef.current.contains(event.target)) {
+                setShowNotifications(false);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, []);
+
+    // Effect for fetching unread notifications 
+    useEffect(() => {
+        const fetchUnreadNotifications = async () => {
+            if (!user || !user.UserID) return; 
+            try {
+                const response = await axios.get(`http://localhost:5000/api/notifications/count/${user.UserID}`);
+                setUnreadNotifications(response.data.count);
+            } catch (error) {
+                console.error('Error fetching unread notifications:', error);
+            }
+        };
+
+        if (user?.UserID) {
+            fetchUnreadNotifications();
+            const interval = setInterval(fetchUnreadNotifications, 30000); // Check every 30 seconds
+            return () => clearInterval(interval); 
+        }
+    }, [user]);
+
 
     useEffect(() => {
         const fetchUserProfile = async () => {
@@ -45,7 +88,7 @@ const UserProfile = () => {
                     const response = await axios.get(`http://localhost:5000/api/user/profile/${user.UserID}`);
                     const fetchedData = response.data;
 
-                    setProfileData(fetchedData); 
+                    setProfileData(fetchedData);
 
                     setFormData({
                         FullName: fetchedData.FullName,
@@ -74,7 +117,7 @@ const UserProfile = () => {
             }
         };
         fetchUserProfile();
-    }, [user]); 
+    }, [user]);
 
     // Handles changes in form input fields
     const handleChange = (e) => {
@@ -137,7 +180,7 @@ const UserProfile = () => {
         const file = e.target.files[0];
         if (file) {
             setSelectedFile(file);
-            setImagePreview(URL.createObjectURL(file)); 
+            setImagePreview(URL.createObjectURL(file));
             toast.info("Image selected. Click 'Upload Image' to save it.");
         } else {
             setSelectedFile(null);
@@ -165,12 +208,12 @@ const UserProfile = () => {
         try {
             const response = await axios.post(`http://localhost:5000/api/user/profile/upload/${user.UserID}`, formDataPayload, {
                 headers: {
-                    'Content-Type': 'multipart/form-data', 
+                    'Content-Type': 'multipart/form-data',
                 },
             });
             toast.success(response.data.message || "Profile image uploaded successfully!");
 
-            
+
             setProfileData(prevData => ({
                 ...prevData,
                 ProfileImagePath: response.data.imagePath
@@ -179,8 +222,8 @@ const UserProfile = () => {
             // Update loggedInUser context and localStorage
             if (setLoggedInUser) {
                 const updatedUser = {
-                    ...user, 
-                    ProfileImagePath: response.data.imagePath, 
+                    ...user,
+                    ProfileImagePath: response.data.imagePath,
                 };
                 setLoggedInUser(updatedUser);
                 localStorage.setItem('user', JSON.stringify(updatedUser));
@@ -188,7 +231,7 @@ const UserProfile = () => {
 
             // Clear selected file state after successful upload
             setSelectedFile(null);
-           
+
         } catch (error) {
             console.error('Error uploading image:', error);
             if (error.response && error.response.data && error.response.data.message) {
@@ -217,7 +260,7 @@ const UserProfile = () => {
         if (selectedFile) {
             setSelectedFile(null);
             setImagePreview(null); // Clear local preview
-            setProfileData(prevData => ({ ...prevData, ProfileImagePath: null })); // Clear DB path
+            setProfileData(prevData => ({ ...prevData, ProfileImagePath: null })); 
             toast.info("Selected image cleared locally.");
             return;
         }
@@ -284,7 +327,7 @@ const UserProfile = () => {
         // If no changes in text fields and no password change attempt, stop here
         if (!hasTextChanges && !hasPasswordChanges) {
             toast.info('No changes detected to save.');
-           
+
             setFormData(prevData => ({
                 ...prevData,
                 CurrentPassword: '',
@@ -293,17 +336,17 @@ const UserProfile = () => {
             }));
             return; // Exit the function
         }
-       
+
         try {
-            setLoading(true); 
+            setLoading(true);
 
             const updatePayload = {
-                FullName: currentFullName, 
+                FullName: currentFullName,
                 Email: currentEmail,
                 Phone: currentPhone,
             };
 
-            if (hasPasswordChanges) { 
+            if (hasPasswordChanges) {
                 updatePayload.CurrentPassword = formData.CurrentPassword;
                 updatePayload.NewPassword = formData.NewPassword;
             }
@@ -311,12 +354,13 @@ const UserProfile = () => {
             const response = await axios.put(`http://localhost:5000/api/user/profile/${user.UserID}`, updatePayload);
             toast.success(response.data.message || 'Profile updated successfully!');
 
+
             setProfileData(prevData => ({
                 ...prevData,
                 FullName: currentFullName,
                 Email: currentEmail,
                 Phone: currentPhone,
-                
+
             }));
 
             // Also update loggedInUser context and localStorage
@@ -370,188 +414,214 @@ const UserProfile = () => {
 
     // --- Component Render ---
     return (
-        <div className="profile-container p-8 md:p-12 min-h-screen bg-gray-100">
-             <div className="max-w-4xl mx-auto mb-4">
-                <button
-                    onClick={() => navigate(-1)} // Navigate back to the previous page
-                    className="flex items-center text-blue-600 hover:text-blue-800 font-semibold text-lg transition duration-200 focus:outline-none"
-                    aria-label="Go back" // Accessibility
-                >
-                    <FaArrowLeft className="mr-2" /> Back
-                </button>
-            </div>
-            <div className="max-w-4xl mx-auto bg-white rounded-xl shadow-lg p-8">
-                <div className="flex items-center mb-8 pb-4 border-b border-gray-200">
-                    {/* User Avatar Section */}
-                    <div className="relative w-24 h-24 bg-gray-200 rounded-full flex items-center justify-center text-gray-500 text-6xl mr-6 cursor-pointer"
-                        onClick={() => fileInputRef.current.click()} // Make the entire circle clickable
-                        title="Click to change profile image"
-                    >
-                        
-                        {imagePreview ? (
-                            <>
-                                <img
-                                    src={imagePreview}
-                                    alt="Profile"
-                                    className="w-full h-full object-cover rounded-full border-2 border-black"
-                                />
-                                {/* Remove Image Button */}
-                                <button
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleImageRemove();
-                                    }}
-                                    className="absolute top-0 right-0 m-1 bg-red-500 text-white rounded-full p-1 text-xs hover:bg-red-600 focus:outline-none shadow-md z-10"
-                                    title="Remove profile image"
-                                >
-                                    <MdClose size={12} />
-                                </button>
+        <div className="flex">
+            <title>User Profile</title> 
+            <SideBar open={isSidebarOpen} setOpen={setIsSidebarOpen} />
 
-                            </>
-                        ) : (
-                            <AiOutlineUser />
-                        )}
-                    </div>
+            
+            <div className={`flex-1 ${isSidebarOpen ? 'ml-72' : 'ml-20'} flex flex-col h-screen overflow-y-auto transition-all duration-300`}>
+                <NavBar
+                    isSidebarOpen={isSidebarOpen}
+                    showNotifications={showNotifications}
+                    unreadNotifications={unreadNotifications}
+                    setShowNotifications={setShowNotifications}
+                    notificationRef={notificationRef}
+                />
 
-                    <div>
-                        <h2 className="text-3xl font-extrabold text-gray-900">
-                            {profileData.FullName || 'User Profile'}
-                        </h2>
-                        <p className="text-lg text-gray-600">
-                            {profileData.Email} - <span className="font-semibold">{profileData.Role || 'User'}</span>
-                        </p>
+                <div className="p-6 mt-[60px] flex-1"> 
+                    {showNotifications && (
+                        <div ref={notificationRef} className="absolute right-4 top-[70px] z-50">
+                            <NotificationPanel
+                                userId={user?.UserID} // Pass the user ID to the NotificationPanel
+                                role={user?.Role}
+                                onClose={() => setShowNotifications(false)}
+                            />
+                        </div>
+                    )}
 
-                        {/* Hidden file input */}
-                        <input
-                            type="file"
-                            ref={fileInputRef} 
-                            onChange={handleFileChange}
-                            accept="image/*" // Only accept image files
-                            style={{ display: 'none' }} 
-                        />
-
-                        {/* Upload Button - only show if a file is selected locally */}
-                        {selectedFile && (
-                            <button
-                                onClick={handleImageUpload}
-                                className="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg text-sm mt-2 transition duration-200"
-                            >
-                                Upload Image
-                            </button>
-                        )}
-                    </div>
-                </div>
-
-                <h3 className="text-2xl font-semibold text-gray-800 mb-6">Account Details</h3>
-                <form onSubmit={handleSave} className="space-y-6">
-                    {/* Full Name */}
-                    <div>
-                        <label htmlFor="FullName" className="block text-gray-700 text-sm font-bold mb-2">
-                            Full Name
-                        </label>
-                        <input
-                            type="text"
-                            id="FullName"
-                            name="FullName"
-                            value={formData.FullName}
-                            onChange={handleChange}
-                            required
-                            className={`shadow appearance-none border rounded w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.FullName ? 'border-red-500' : 'border-gray-300'}`}
-                        />
-                        {errors.FullName && <p className="text-red-500 text-xs italic mt-1">{errors.FullName}</p>}
-                    </div>
-
-                    {/* Email */}
-                    <div>
-                        <label htmlFor="Email" className="block text-gray-700 text-sm font-bold mb-2">
-                            Email
-                        </label>
-                        <input
-                            type="email"
-                            id="Email"
-                            name="Email"
-                            value={formData.Email}
-                            onChange={handleChange}
-                            required
-                            className={`shadow appearance-none border rounded w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.Email ? 'border-red-500' : 'border-gray-300'}`}
-                        />
-                        {errors.Email && <p className="text-red-500 text-xs italic mt-1">{errors.Email}</p>}
-                    </div>
-
-                    {/* Phone */}
-                    <div>
-                        <label htmlFor="Phone" className="block text-gray-700 text-sm font-bold mb-2">
-                            Phone
-                        </label>
-                        <input
-                            type="text"
-                            id="Phone"
-                            name="Phone"
-                            value={formData.Phone}
-                            onChange={handleChange}
-                            required
-                            className={`shadow appearance-none border rounded w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.Phone ? 'border-red-500' : 'border-gray-300'}`}
-                        />
-                        {errors.Phone && <p className="text-red-500 text-xs italic mt-1">{errors.Phone}</p>}
-                    </div>
-
-                    {/* Current Password (for changing password) */}
-                    <div>
-                        <label htmlFor="CurrentPassword" className="block text-gray-700 text-sm font-bold mb-2">
-                            Current Password (Leave blank if not changing)
-                        </label>
-                        <input
-                            type="password"
-                            id="CurrentPassword"
-                            name="CurrentPassword"
-                            value={formData.CurrentPassword}
-                            onChange={handleChange}
-                            className={`shadow appearance-none border rounded w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.CurrentPassword ? 'border-red-500' : 'border-gray-300'}`}
-                        />
-                        {errors.CurrentPassword && <p className="text-red-500 text-xs italic mt-1">{errors.CurrentPassword}</p>}
-                    </div>
-
-                    {/* New Password */}
-                    <div>
-                        <label htmlFor="NewPassword" className="block text-gray-700 text-sm font-bold mb-2">
-                            New Password (Leave blank if not changing)
-                        </label>
-                        <input
-                            type="password"
-                            id="NewPassword"
-                            name="NewPassword"
-                            value={formData.NewPassword}
-                            onChange={handleChange}
-                            className={`shadow appearance-none border rounded w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.NewPassword ? 'border-red-500' : 'border-gray-300'}`}
-                        />
-                        {errors.NewPassword && <p className="text-red-500 text-xs italic mt-1">{errors.NewPassword}</p>}
-                    </div>
-
-                    {/* Confirm New Password */}
-                    <div>
-                        <label htmlFor="ConfirmNewPassword" className="block text-gray-700 text-sm font-bold mb-2">
-                            Confirm New Password
-                        </label>
-                        <input
-                            type="password"
-                            id="ConfirmNewPassword"
-                            name="ConfirmNewPassword"
-                            value={formData.ConfirmNewPassword}
-                            onChange={handleChange}
-                            className={`shadow appearance-none border rounded w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.ConfirmNewPassword ? 'border-red-500' : 'border-gray-300'}`}
-                        />
-                        {errors.ConfirmNewPassword && <p className="text-red-500 text-xs italic mt-1">{errors.ConfirmNewPassword}</p>}
-                    </div>
-
-                    <div className="flex justify-end pt-4">
+                    <div className="max-w-4xl mx-auto mb-4">
                         <button
-                            type="submit"
-                            className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg focus:outline-none focus:shadow-outline transition duration-200"
+                            onClick={() => navigate(-1)} // Navigate back to the previous page
+                            className="flex items-center text-blue-600 hover:text-blue-800 font-semibold text-lg transition duration-200 focus:outline-none"
+                            aria-label="Go back" 
                         >
-                            Save Changes
+                            <FaArrowLeft className="mr-2" /> Back
                         </button>
                     </div>
-                </form>
+                    <div className="max-w-4xl mx-auto bg-white rounded-xl shadow-lg p-8">
+                        <div className="flex items-center mb-8 pb-4 border-b border-gray-200">
+                            {/* User Avatar Section */}
+                            <div className="relative w-24 h-24 bg-gray-200 rounded-full flex items-center justify-center text-gray-500 text-6xl mr-6 cursor-pointer"
+                                onClick={() => fileInputRef.current.click()} // Make the entire circle clickable
+                                title="Click to change profile image"
+                            >
+
+                                {imagePreview ? (
+                                    <>
+                                        <img
+                                            src={imagePreview}
+                                            alt="Profile"
+                                            className="w-full h-full object-cover rounded-full border-2 border-black"
+                                        />
+                                        {/* Remove Image Button */}
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleImageRemove();
+                                            }}
+                                            className="absolute top-0 right-0 m-1 bg-red-500 text-white rounded-full p-1 text-xs hover:bg-red-600 focus:outline-none shadow-md z-10"
+                                            title="Remove profile image"
+                                        >
+                                            <MdClose size={12} />
+                                        </button>
+
+                                    </>
+                                ) : (
+                                    <AiOutlineUser />
+                                )}
+                            </div>
+
+                            <div>
+                                <h2 className="text-3xl font-extrabold text-gray-900">
+                                    {profileData.FullName || 'User Profile'}
+                                </h2>
+                                <p className="text-lg text-gray-600">
+                                    {profileData.Email} - <span className="font-semibold">{profileData.Role || 'User'}</span>
+                                </p>
+
+                                {/* Hidden file input */}
+                                <input
+                                    type="file"
+                                    ref={fileInputRef}
+                                    onChange={handleFileChange}
+                                    accept="image/*" // Only accept image files
+                                    style={{ display: 'none' }}
+                                />
+
+                                {/* Upload Button - only show if a file is selected locally */}
+                                {selectedFile && (
+                                    <button
+                                        onClick={handleImageUpload}
+                                        className="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg text-sm mt-2 transition duration-200"
+                                    >
+                                        Upload Image
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+
+                        <h3 className="text-2xl font-semibold text-gray-800 mb-6">Account Details</h3>
+                        <form onSubmit={handleSave} className="space-y-6">
+                            {/* Full Name */}
+                            <div>
+                                <label htmlFor="FullName" className="block text-gray-700 text-sm font-bold mb-2">
+                                    Full Name
+                                </label>
+                                <input
+                                    type="text"
+                                    id="FullName"
+                                    name="FullName"
+                                    value={formData.FullName}
+                                    onChange={handleChange}
+                                    required
+                                    className={`shadow appearance-none border rounded w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.FullName ? 'border-red-500' : 'border-gray-300'}`}
+                                />
+                                {errors.FullName && <p className="text-red-500 text-xs italic mt-1">{errors.FullName}</p>}
+                            </div>
+
+                            {/* Email */}
+                            <div>
+                                <label htmlFor="Email" className="block text-gray-700 text-sm font-bold mb-2">
+                                    Email
+                                </label>
+                                <input
+                                    type="email"
+                                    id="Email"
+                                    name="Email"
+                                    value={formData.Email}
+                                    onChange={handleChange}
+                                    required
+                                    className={`shadow appearance-none border rounded w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.Email ? 'border-red-500' : 'border-gray-300'}`}
+                                />
+                                {errors.Email && <p className="text-red-500 text-xs italic mt-1">{errors.Email}</p>}
+                            </div>
+
+                            {/* Phone */}
+                            <div>
+                                <label htmlFor="Phone" className="block text-gray-700 text-sm font-bold mb-2">
+                                    Phone
+                                </label>
+                                <input
+                                    type="text"
+                                    id="Phone"
+                                    name="Phone"
+                                    value={formData.Phone}
+                                    onChange={handleChange}
+                                    required
+                                    className={`shadow appearance-none border rounded w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.Phone ? 'border-red-500' : 'border-gray-300'}`}
+                                />
+                                {errors.Phone && <p className="text-red-500 text-xs italic mt-1">{errors.Phone}</p>}
+                            </div>
+
+                            {/* Current Password (for changing password) */}
+                            <div>
+                                <label htmlFor="CurrentPassword" className="block text-gray-700 text-sm font-bold mb-2">
+                                    Current Password (Leave blank if not changing)
+                                </label>
+                                <input
+                                    type="password"
+                                    id="CurrentPassword"
+                                    name="CurrentPassword"
+                                    value={formData.CurrentPassword}
+                                    onChange={handleChange}
+                                    className={`shadow appearance-none border rounded w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.CurrentPassword ? 'border-red-500' : 'border-gray-300'}`}
+                                />
+                                {errors.CurrentPassword && <p className="text-red-500 text-xs italic mt-1">{errors.CurrentPassword}</p>}
+                            </div>
+
+                            {/* New Password */}
+                            <div>
+                                <label htmlFor="NewPassword" className="block text-gray-700 text-sm font-bold mb-2">
+                                    New Password (Leave blank if not changing)
+                                </label>
+                                <input
+                                    type="password"
+                                    id="NewPassword"
+                                    name="NewPassword"
+                                    value={formData.NewPassword}
+                                    onChange={handleChange}
+                                    className={`shadow appearance-none border rounded w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.NewPassword ? 'border-red-500' : 'border-gray-300'}`}
+                                />
+                                {errors.NewPassword && <p className="text-red-500 text-xs italic mt-1">{errors.NewPassword}</p>}
+                            </div>
+
+                            {/* Confirm New Password */}
+                            <div>
+                                <label htmlFor="ConfirmNewPassword" className="block text-gray-700 text-sm font-bold mb-2">
+                                    Confirm New Password
+                                </label>
+                                <input
+                                    type="password"
+                                    id="ConfirmNewPassword"
+                                    name="ConfirmNewPassword"
+                                    value={formData.ConfirmNewPassword}
+                                    onChange={handleChange}
+                                    className={`shadow appearance-none border rounded w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.ConfirmNewPassword ? 'border-red-500' : 'border-gray-300'}`}
+                                />
+                                {errors.ConfirmNewPassword && <p className="text-red-500 text-xs italic mt-1">{errors.ConfirmNewPassword}</p>}
+                            </div>
+
+                            <div className="flex justify-end pt-4">
+                                <button
+                                    type="submit"
+                                    className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg focus:outline-none focus:shadow-outline transition duration-200"
+                                >
+                                    Save Changes
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
             </div>
         </div>
     );

@@ -1,15 +1,16 @@
 import React, { useState, useEffect, useRef } from "react";
 import SideBar from "../../user_components/SideBar/SideBar";
+import NavBar from "../../user_components/NavBar/NavBar";
 import { useAuth } from '../../App';
 import axios from 'axios';
 import { LuTicketCheck, LuTicketX, LuTicket, LuStar } from "react-icons/lu";
 import { FaHistory } from "react-icons/fa";
 import { toast } from 'react-toastify';
-import { IoNotificationsOutline } from "react-icons/io5";
+import { IoNotificationsOutline } from "react-icons/io5"; 
 import NotificationPanel from "../components/NotificationPanel";
 import { useNavigate } from "react-router-dom";
 
-const UsersDashboard = () => {
+const usersDashboard = () => {
     const navigate = useNavigate();
     const { loggedInUser } = useAuth();
     const [ticketCounts, setTicketCounts] = useState({ total: 0, pending: 0, resolved: 0, ongoing: 0 });
@@ -17,9 +18,13 @@ const UsersDashboard = () => {
     const [loadingCounts, setLoadingCounts] = useState(true);
     const [loadingRecent, setLoadingRecent] = useState(true);
     const [error, setError] = useState(null);
+
     const [showNotifications, setShowNotifications] = useState(false);
     const [unreadNotifications, setUnreadNotifications] = useState(0);
     const notificationRef = useRef(null);
+
+    // const [isSidebarOpen, setIsSidebarOpen] = useState(true); 
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false); 
 
     useEffect(() => {
         const handleClickOutside = (event) => {
@@ -34,15 +39,17 @@ const UsersDashboard = () => {
         };
     }, []);
 
+    // Effect for fetching unread notifications and initial ticket counts/recent tickets
     useEffect(() => {
         if (loggedInUser?.UserID) {
             fetchUserTicketCounts();
             fetchUserRecentTickets();
-            fetchUnreadNotifications();
+            fetchUnreadNotifications(); 
         }
     }, [loggedInUser]);
 
     const fetchUnreadNotifications = async () => {
+        if (!loggedInUser || !loggedInUser.UserID) return; // Ensure user is logged in
         try {
             const response = await axios.get(`http://localhost:5000/api/notifications/count/${loggedInUser.UserID}`);
             setUnreadNotifications(response.data.count);
@@ -53,9 +60,8 @@ const UsersDashboard = () => {
 
     useEffect(() => {
         if (loggedInUser?.UserID) {
-            fetchUnreadNotifications();
             const interval = setInterval(fetchUnreadNotifications, 30000); // Check every 30 seconds
-            return () => clearInterval(interval);
+            return () => clearInterval(interval); 
         }
     }, [loggedInUser]);
 
@@ -125,59 +131,22 @@ const UsersDashboard = () => {
     return (
         <div className="flex">
             <title>User Dashboard</title>
-            <SideBar />
+            <SideBar open={isSidebarOpen} setOpen={setIsSidebarOpen} />
 
-            <div className="flex-1 ml-72 flex flex-col h-screen overflow-y-auto">
-                <div className="fixed top-0 right-0 left-72 bg-white z-10 shadow-sm">
-                    <div className="flex justify-between items-center px-6 py-4">
-                        <h1 className="text-2xl font-bold text-gray-800">Dashboard</h1>
+            <div className={`flex-1 ${isSidebarOpen ? 'ml-72' : 'ml-20'} flex flex-col h-screen overflow-y-auto transition-all duration-300`}>
 
-                        <div className="flex items-center gap-4">
-                            <div
-                                className="flex items-center gap-3 cursor-pointer hover:bg-gray-50 p-2 rounded-lg transition-colors"
-                                onClick={handleProfileClick}
-                            >
-                                <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-200">
-                                    {loggedInUser?.ProfileImagePath ? (
-                                        <img
-                                            src={`http://localhost:5000/uploads/${loggedInUser.ProfileImagePath}`}
-                                            alt="Profile"
-                                            className="w-full h-full object-cover"
-                                        />
-                                    ) : (
-                                        <div className="w-full h-full flex items-center justify-center bg-blue-500 text-white">
-                                            {loggedInUser?.FullName?.charAt(0)}
-                                        </div>
-                                    )}
-                                </div>
-                                <div className="text-right">
-                                    <p className="font-semibold text-gray-800">{loggedInUser?.FullName}</p>
-                                    <p className="text-sm text-gray-500">{loggedInUser?.Role}</p>
-                                </div>
+                <NavBar
+                    isSidebarOpen={isSidebarOpen}
+                    showNotifications={showNotifications}
+                    unreadNotifications={unreadNotifications}
+                    setShowNotifications={setShowNotifications}
+                    notificationRef={notificationRef}
+                />
 
-                                <button
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        setShowNotifications(!showNotifications);
-                                    }}
-                                    className="relative p-2 hover:bg-gray-100 rounded-full transition-colors ml-2"
-                                >
-                                    <IoNotificationsOutline className="text-2xl text-gray-600" />
-                                    {unreadNotifications > 0 && (
-                                        <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                                            {unreadNotifications}
-                                        </span>
-                                    )}
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="p-6 mt-[80px] flex-1">
+                <div className="p-6 mt-[60px] flex-1">
                     {/* Notification Panel */}
                     {showNotifications && (
-                        <div ref={notificationRef} className="absolute right-4 top-32 z-50">
+                        <div ref={notificationRef} className="absolute right-4 top-[70px] z-50">
                             <NotificationPanel
                                 userId={loggedInUser?.UserID}
                                 role={loggedInUser?.Role}
@@ -193,7 +162,7 @@ const UsersDashboard = () => {
                     {/* Cards Section */}
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
                         {loadingCounts ? (
-                            <div className="col-span-3 text-center text-gray-600">Loading counts...</div>
+                            <div className="col-span-4 text-center text-gray-600">Loading counts...</div>
                         ) : (
                             <>
                                 {/* Total Tickets Card */}
@@ -228,7 +197,7 @@ const UsersDashboard = () => {
                                         <h3 className="text-lg font-semibold text-gray-700">Ongoing Tickets</h3>
                                         <p className="text-4xl font-bold text-purple-600">{ticketCounts.ongoing}</p>
                                     </div>
-                                    <LuStar className="text-5xl text-purple-400" /> 
+                                    <LuStar className="text-5xl text-purple-400" />
                                 </div>
                             </>
                         )}
@@ -283,4 +252,4 @@ const UsersDashboard = () => {
     );
 };
 
-export default UsersDashboard;
+export default usersDashboard;
