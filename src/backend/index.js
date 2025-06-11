@@ -692,7 +692,7 @@ app.put('/tickets/:id', (req, res) => {
 app.get("/evidence/:ticketId", (req, res) => {
   const { ticketId } = req.params;
 
-  const sql = "SELECT * FROM evidence WHERE TicketID = ?";
+  const sql = "SELECT FilePath FROM evidence WHERE ComplaintID = ?";
   db.query(sql, [ticketId], (err, result) => {
     if (err) {
       console.error("Error fetching evidence:", err);

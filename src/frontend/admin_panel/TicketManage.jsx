@@ -35,21 +35,22 @@ export default function TicketManage() {
   const [evidenceList, setEvidenceList] = useState([]);
 
   useEffect(() => {
-  if (!selectedTicket?.id) return;
+    if (!selectedTicket?.id) return;
 
-  const fetchEvidence = async () => {
-    try {
-      const res = await fetch(`http://localhost:5000/evidence/${selectedTicket.id}`);
-      const data = await res.json();
-      setEvidenceList(data);
-    } catch (err) {
-      console.error("Failed to load evidence", err);
-    }
-  };
+    const fetchEvidence = async () => {
+      try {
+        const res = await fetch(
+          `http://localhost:5000/evidence/${selectedTicket.id}`
+        );
+        const data = await res.json();
+        setEvidenceList(data);
+      } catch (err) {
+        console.error("Failed to load evidence", err);
+      }
+    };
 
-  fetchEvidence();
-}, [selectedTicket?.id]);
-
+    fetchEvidence();
+  }, [selectedTicket?.id]);
 
   useEffect(() => {
     const fetchTickets = async () => {
@@ -227,7 +228,7 @@ export default function TicketManage() {
       >
         <div className="min-h-screen bg-gray-50">
           {/* Top Navigation */}
-          <nav className="bg-white shadow-md px-6 py-4 flex justify-between items-center">
+          <nav className="bg-white shadow-md px-6 py-4 flex justify-between rounded  items-center">
             <h1 className="text-xl sm:text-2xl font-bold text-gray-700">
               Ticket Management
             </h1>
@@ -342,12 +343,21 @@ export default function TicketManage() {
                       className="w-full p-2 border rounded-md"
                     />
                   </div>
-                  <button
-                    onClick={handleUpdateTicket}
-                    className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 mt-4"
-                  >
-                    Save Changes
-                  </button>
+                  <div className="flex justify-between p-0">
+                    <button
+                      onClick={handleUpdateTicket}
+                      className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-green-700 mt-4"
+                    >
+                      Save Changes
+                    </button>
+                    <button
+                      onClick={() => setChatMode(!chatMode)}
+                      className="mt-4 p-2 bg-green-600 text-white rounded flex items-center gap-2"
+                    >
+                      <MessageCircle size={20} />
+                      {chatMode ? "Close Chat" : "Open Chat"}
+                    </button>
+                  </div>
                 </div>
 
                 {/* RIGHT: Logs & Chat */}
@@ -366,19 +376,19 @@ export default function TicketManage() {
                     </ul>
                   </div>
 
-                  <textarea
-                    value={comment}
-                    onChange={(e) => setComment(e.target.value)}
-                    placeholder="Add a comment..."
-                    className="w-full p-2 border rounded-md"
-                  />
-
-                  <div className="flex justify-between">
+                  <div className="flex justify-between gap-1">
+                    <textarea
+                      value={comment}
+                      onChange={(e) => setComment(e.target.value)}
+                      placeholder="Add a comment..."
+                      className="w-full p-2 border rounded-md"
+                    />
                     <button
                       onClick={handleAddComment}
-                      className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+                      className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 text-lg"
+                      title="Send Comment"
                     >
-                      Send
+                      ⬆
                     </button>
                   </div>
 
@@ -389,31 +399,56 @@ export default function TicketManage() {
                         No evidence files available.
                       </p>
                     ) : (
-                      <ul className="list-disc list-inside text-blue-600 text-sm">
-                        {evidenceList.map((evi) => (
-                          <li >
-                           <a
-  href={`http://localhost:5000/uploads/${evi.fileName}`} // Assuming static folder
-  target="_blank"
-  rel="noopener noreferrer"
-  className="hover:underline"
->
-  {evi.fileName}
-</a>
-                              
-                          </li>
-                        ))}
-                      </ul>
+                      <div className="max-h-60 overflow-y-auto grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 p-2 border rounded bg-gray-50">
+                        {evidenceList.map((evi, index) => {
+                          const fileUrl = `http://localhost:5000/${evi.FilePath}`;
+                          const fileName = evi.FilePath.split("/").pop();
+                          const isImage =
+                            /\.(jpg|jpeg|png|gif|bmp|webp)$/i.test(fileName);
+                          const isPDF = /\.pdf$/i.test(fileName);
+
+                          return (
+                            <div
+                              key={index}
+                              className="border rounded p-2 bg-white shadow-sm flex flex-col items-center text-center"
+                            >
+                              {isImage ? (
+                                <a
+                                  href={fileUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                >
+                                  <img
+                                    src={fileUrl}
+                                    alt={fileName}
+                                    className="w-32 h-32 object-cover rounded hover:opacity-90 transition"
+                                  />
+                                </a>
+                              ) : isPDF ? (
+                                <a
+                                  href={fileUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-red-600 hover:underline"
+                                >
+                                  📄 {fileName}
+                                </a>
+                              ) : (
+                                <a
+                                  href={fileUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-blue-600 hover:underline"
+                                >
+                                  📎 {fileName}
+                                </a>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
                     )}
                   </div>
-
-                  <button
-                    onClick={() => setChatMode(!chatMode)}
-                    className="mt-4 p-2 bg-green-600 text-white rounded flex items-center gap-2"
-                  >
-                    <MessageCircle size={20} />
-                    {chatMode ? "Close Chat" : "Open Chat"}
-                  </button>
                 </div>
               </div>
 
