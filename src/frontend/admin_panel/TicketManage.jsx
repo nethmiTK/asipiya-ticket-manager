@@ -6,6 +6,7 @@ import TicketCard from "./TicketCard";
 import ChatSection from "./ChatSection";
 import { useAuth } from "../../App";
 import AdminSideBar from "../../user_components/SideBar/AdminSideBar";
+import { toast } from "react-toastify";
 
 const USER = {
   id: "user1",
@@ -31,6 +32,24 @@ export default function TicketManage() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
   const handleNotificationClick = () => navigate("/ticket-request");
+  const [evidenceList, setEvidenceList] = useState([]);
+
+  useEffect(() => {
+  if (!selectedTicket?.id) return;
+
+  const fetchEvidence = async () => {
+    try {
+      const res = await fetch(`http://localhost:5000/evidence/${selectedTicket.id}`);
+      const data = await res.json();
+      setEvidenceList(data);
+    } catch (err) {
+      console.error("Failed to load evidence", err);
+    }
+  };
+
+  fetchEvidence();
+}, [selectedTicket?.id]);
+
 
   useEffect(() => {
     const fetchTickets = async () => {
@@ -51,7 +70,7 @@ export default function TicketManage() {
           assignedBy: ticket.SupervisorID,
           dueDate: ticket.DueDate ? ticket.DueDate.split("T")[0] : "",
           resolution: ticket.Resolution,
-          user:ticket.UserId,
+          user: ticket.UserId,
         }));
         setTickets(mappedTickets);
       } catch (err) {
@@ -106,8 +125,6 @@ export default function TicketManage() {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            status: selectedTicket.status,
-            dueDate: selectedTicket.dueDate || null,
             resolution: selectedTicket.resolution || "",
           }),
         }
@@ -115,7 +132,7 @@ export default function TicketManage() {
 
       if (!res.ok) throw new Error("Failed to update ticket");
 
-      alert("Ticket updated successfully!");
+      toast.success("Ticket updated successfully!");
       closeModal();
 
       // Optional: refresh tickets
@@ -124,8 +141,6 @@ export default function TicketManage() {
           t.id === selectedTicket.id
             ? {
                 ...t,
-                status: selectedTicket.status,
-                dueDate: selectedTicket.dueDate,
                 resolution: selectedTicket.resolution,
               }
             : t
@@ -134,6 +149,71 @@ export default function TicketManage() {
     } catch (err) {
       console.error(err);
       alert("Failed to update ticket");
+    }
+  };
+
+  const handleStatusChange = async (e) => {
+    const newStatus = e.target.value;
+    setSelectedTicket((prev) => ({
+      ...prev,
+      status: newStatus,
+    }));
+
+    try {
+      const res = await fetch(
+        `http://localhost:5000/tickets/${selectedTicket.id}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: newStatus }),
+        }
+      );
+
+      if (!res.ok) throw new Error("Failed to update status");
+
+      toast.success("Status updated successfully!");
+      setTickets((prevTickets) =>
+        prevTickets.map((t) =>
+          t.id === selectedTicket.id ? { ...t, status: newStatus } : t
+        )
+      );
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to update status");
+    }
+  };
+
+  const handleDueDateChange = async (e) => {
+    const newDueDate = e.target.value;
+    setSelectedTicket((prev) => ({
+      ...prev,
+      dueDate: newDueDate,
+    }));
+
+    try {
+      const res = await fetch(
+        `http://localhost:5000/tickets/${selectedTicket.id}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ dueDate: newDueDate }),
+        }
+      );
+
+      if (!res.ok) throw new Error("Failed to update due date");
+
+      setTickets((prevTickets) =>
+        prevTickets.map((ticket) =>
+          ticket.id === selectedTicket.id
+            ? { ...ticket, dueDate: newDueDate }
+            : ticket
+        )
+      );
+
+      toast.success("Due date updated successfully!");
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to update due date");
     }
   };
 
@@ -224,12 +304,7 @@ export default function TicketManage() {
                     </label>
                     <select
                       value={selectedTicket.status}
-                      onChange={(e) =>
-                        setSelectedTicket({
-                          ...selectedTicket,
-                          status: e.target.value,
-                        })
-                      }
+                      onChange={handleStatusChange}
                       className="w-full px-3 py-2 border rounded-md"
                     >
                       <option>Open</option>
@@ -245,12 +320,7 @@ export default function TicketManage() {
                     <input
                       type="date"
                       value={selectedTicket.dueDate || ""}
-                      onChange={(e) =>
-                        setSelectedTicket({
-                          ...selectedTicket,
-                          dueDate: e.target.value,
-                        })
-                      }
+                      onChange={handleDueDateChange}
                       className="w-full px-3 py-2 border rounded-md"
                     />
                   </div>
@@ -310,6 +380,31 @@ export default function TicketManage() {
                     >
                       Send
                     </button>
+                  </div>
+
+                  <div className="mt-4">
+                    <h4 className="font-semibold mb-2">Evidence Files</h4>
+                    {evidenceList.length === 0 ? (
+                      <p className="text-sm text-gray-500">
+                        No evidence files available.
+                      </p>
+                    ) : (
+                      <ul className="list-disc list-inside text-blue-600 text-sm">
+                        {evidenceList.map((evi) => (
+                          <li >
+                           <a
+  href={`http://localhost:5000/uploads/${evi.fileName}`} // Assuming static folder
+  target="_blank"
+  rel="noopener noreferrer"
+  className="hover:underline"
+>
+  {evi.fileName}
+</a>
+                              
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                   </div>
 
                   <button

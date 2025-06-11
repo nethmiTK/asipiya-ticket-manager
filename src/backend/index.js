@@ -579,7 +579,7 @@ app.get("/messages/:ticketId", (req, res) => {
 
   db.query(
     `SELECT TicketChatID as id, TicketID, Type, Note as content,
-      UserCustomerID, UserID, Path, Role, CreatedAt as timestamp
+      UserID, Path, Role, CreatedAt as timestamp
       FROM ticketchat WHERE TicketID = ? ORDER BY CreatedAt ASC`,
     [ticketId],
     (err, rows) => {
@@ -593,7 +593,6 @@ app.get("/messages/:ticketId", (req, res) => {
         ticketid: r.TicketID,
         type: r.Type,
         content: r.content,
-        usercustomerid: r.UserCustomerID,
         userid: r.UserID,
         role: r.Role,
         timestamp: r.timestamp,
@@ -615,15 +614,14 @@ app.get("/messages/:ticketId", (req, res) => {
 // POST a new chat message without file upload
 app.post("/ticketchat", async (req, res) => {
   try {
-    const { TicketID, Note, Type, UserCustomerID, UserID, Role } = req.body;
+    const { TicketID, Note, Type, UserID, Role } = req.body;
 
     // Insert only text messages
     const [result] = await db.execute(
-      `INSERT INTO ticketchat (TicketID, Type, Note, UserCustomerID, UserID, Path, Role)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [TicketID, Type, Note, UserCustomerID, UserID, null, Role || "customer"]
+      `INSERT INTO ticketchat (TicketID, Type, Note, UserID, Path, Role)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [TicketID, Type, Note, UserID, null, Role ]
     );
-
     res.json({ chatId: result.insertId });
   } catch (error) {
     console.error(error);
@@ -656,12 +654,33 @@ app.put('/tickets/:id', (req, res) => {
   const { id } = req.params;
   const { status, dueDate, resolution } = req.body;
 
-  const sql = `
-    UPDATE ticket 
-    SET Status = ?, DueDate = ?, Resolution = ? 
-    WHERE TicketID = ?
-  `;
-  db.query(sql, [status, dueDate, resolution, id], (err, result) => {
+  // Build the SET clause dynamically
+  const fields = [];
+  const values = [];
+
+  if (status !== undefined) {
+    fields.push("Status = ?");
+    values.push(status);
+  }
+
+  if (dueDate !== undefined) {
+    fields.push("DueDate = ?");
+    values.push(dueDate);
+  }
+
+  if (resolution !== undefined) {
+    fields.push("Resolution = ?");
+    values.push(resolution);
+  }
+
+  if (fields.length === 0) {
+    return res.status(400).json({ message: "No fields provided to update." });
+  }
+
+  const sql = `UPDATE ticket SET ${fields.join(', ')} WHERE TicketID = ?`;
+  values.push(id); // Add id to the end of values array for WHERE clause
+
+  db.query(sql, values, (err, result) => {
     if (err) {
       console.error("Failed to update ticket:", err);
       return res.status(500).json({ message: "Server error" });
@@ -670,6 +689,18 @@ app.put('/tickets/:id', (req, res) => {
   });
 });
 
+app.get("/evidence/:ticketId", (req, res) => {
+  const { ticketId } = req.params;
+
+  const sql = "SELECT * FROM evidence WHERE TicketID = ?";
+  db.query(sql, [ticketId], (err, result) => {
+    if (err) {
+      console.error("Error fetching evidence:", err);
+      return res.status(500).json({ error: "Failed to fetch evidence" });
+    }
+    res.json(result);
+  });
+});
 
 
 //nope
