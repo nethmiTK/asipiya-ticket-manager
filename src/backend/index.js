@@ -1850,6 +1850,58 @@ app.post('/api/upload_evidence', upload_evidence.array('evidenceFiles'), async (
   }
 });
 
+
+//UserChat
+app.post("/api/ticketchat", upload.single("file"), (req, res) => {
+  const { TicketID, Type, Note, UserID, Role } = req.body;
+  const filePath = req.file ? req.file.path : null;
+
+  console.log("Received from frontend:", { TicketID, Type, Note, UserID, Role });
+
+  const sql = `
+    INSERT INTO ticketchat (TicketID, Type, Note, UserID, Path, Role) 
+    VALUES (?, ?, ?, ?, ?, ?)
+  `;
+  const values = [TicketID, Type, Note, UserID, filePath, Role];
+
+  db.query(sql, values, (err, result) => {
+    if (err) {
+      console.error("Error inserting chat message:", err);
+      return res.status(500).json({ error: err.message });
+    }
+    res.status(200).json({ message: "Message sent", filePath });
+  });
+});
+
+app.get("/api/ticketchat/:ticketID", (req, res) => {
+  const ticketID = req.params.ticketID;
+
+  const sql = `
+    SELECT 
+      tc.*, 
+      au.FullName, 
+      au.Role, 
+      au.ProfileImagePath 
+    FROM 
+      ticketchat tc
+    JOIN 
+      appuser au ON tc.UserID = au.UserID
+    WHERE 
+      tc.TicketID = ?
+    ORDER BY 
+      tc.CreatedAt ASC
+  `;
+
+  db.query(sql, [ticketID], (err, result) => {
+    if (err) {
+      console.error("Error retrieving messages:", err);
+      return res.status(500).json({ error: "Failed to fetch chat messages." });
+    }
+    res.status(200).json(result);
+  });
+});
+
+
 // Start the server
 app.listen(5000, () => {
     console.log('Server is running on port 5000');
