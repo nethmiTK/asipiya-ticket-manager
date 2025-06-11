@@ -19,14 +19,21 @@ const Tickets = () => {
   useEffect(() => {
     const fetchTickets = async () => {
       try {
-        const response = await axios.get(
-          `http://localhost:5000/api/tickets/filter?type=${type || ''}`
-        );
-        setTickets(response.data);
+        let url = 'http://localhost:5000/api/tickets/filter';
+        if (type) {
+          url += `?type=${type}`;
+        }
+        const response = await axios.get(url);
         
-        // If there's a specific ticket ID in the URL, find and select that ticket
+        // If type is 'resolved', filter only resolved tickets
+        const filteredTickets = type === 'resolved' 
+          ? response.data.filter(ticket => ticket.Status.toLowerCase() === 'resolved')
+          : response.data;
+        
+        setTickets(filteredTickets);
+        
         if (ticketId) {
-          const ticket = response.data.find(t => t.TicketID.toString() === ticketId);
+          const ticket = filteredTickets.find(t => t.TicketID.toString() === ticketId);
           if (ticket) {
             setSelectedTicket(ticket);
           }
@@ -45,15 +52,17 @@ const Tickets = () => {
   const getStatusColor = (status) => {
     switch (status?.toLowerCase()) {
       case "open":
-        return "text-red-500";
+        return "text-blue-500";
       case "in progress":
         return "text-yellow-500";
-      case "closed":
+      case "resolved":
         return "text-green-500";
       case "reject":
         return "text-purple-500";
       case "accept":
         return "text-blue-500";
+      case "closed":
+        return "text-green-500";
       default:
         return "text-gray-500";
     }
@@ -147,12 +156,12 @@ const Tickets = () => {
                 High Priority
               </button>
               <button
-                onClick={() => navigate('/tickets?type=closed')}
+                onClick={() => navigate('/tickets?type=resolved')}
                 className={`px-4 sm:px-6 py-2 rounded-lg transition-colors text-sm sm:text-base ${
-                  type === 'closed' ? 'bg-blue-500 text-white' : 'bg-gray-200 hover:bg-gray-300'
+                  type === 'resolved' ? 'bg-blue-500 text-white' : 'bg-gray-200 hover:bg-gray-300'
                 }`}
               >
-                Closed Tickets
+                Resolved Tickets
               </button>
             </div>
           </header>
@@ -233,7 +242,7 @@ const Tickets = () => {
                   ×
                 </button>
                 {type === 'pending' ? (
-                  <TicketViewPage ticketId={selectedTicket.TicketID} popupMode={true} />
+                  <TicketViewPage ticketId={selectedTicket.TicketID} popupMode={true} onClose={() => setSelectedTicket(null)} />
                 ) : (
                   <Ticket_secret ticket={selectedTicket} onClose={() => setSelectedTicket(null)} />
                 )}

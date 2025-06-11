@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { FaTicketAlt, FaExclamationCircle, FaCalendarDay, FaTasks, FaHome, FaEye, FaClock } from "react-icons/fa";
 import { Link, useNavigate } from "react-router-dom";
 import { BsChevronLeft } from "react-icons/bs";
@@ -7,6 +7,7 @@ import { IoIosArrowBack } from "react-icons/io";
 import { VscNotebook } from "react-icons/vsc";
 import { CiLogout } from "react-icons/ci";
 import { GrSystem } from "react-icons/gr";
+import { IoNotificationsOutline } from "react-icons/io5";
 import AdminSideBar from "../../user_components/SideBar/AdminSideBar";
 import axios from "axios";
 import { Pie, Bar } from "react-chartjs-2";
@@ -20,11 +21,10 @@ import {
   BarElement,
   Title
 } from "chart.js";
-import RecentlyActivity from "./RecentlyActivity"; // Import the RecentlyActivity component
+import RecentlyActivity from "./RecentlyActivity";
 import { useAuth } from '../../App.jsx';
-import { IoNotificationsOutline } from 'react-icons/io5';
-import NotificationPanel from './NotificationPanel';
 import Ticket_secret from "./Ticket_secret";
+import NotificationPanel from "../components/NotificationPanel";
 
 ChartJS.register(
   ArcElement,
@@ -277,7 +277,7 @@ const Dashboard = () => {
         return "text-blue-500";
       case "in progress":
         return "text-yellow-500";
-      case "closed":
+      case "resolved":
         return "text-green-500";
       case "rejected":
         return "text-red-500";
@@ -348,6 +348,11 @@ const Dashboard = () => {
     setIsNotificationOpen(!isNotificationOpen);
   };
 
+  // Add this new function
+  const handleUserClick = (userId) => {
+    navigate(`/user-details/${userId}`);
+  };
+
   return (
     <div className="space-y-8">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-6">
@@ -392,12 +397,12 @@ const Dashboard = () => {
           <p>High Priority</p>
         </div>
         <div
-          onClick={() => handleNavigation('closed')}
+          onClick={() => handleNavigation('resolved')}
           className="bg-green-600 text-white p-4 rounded shadow text-center cursor-pointer hover:bg-green-700 transition-colors"
         >
           <FaTicketAlt className="text-3xl mb-2 mx-auto" />
-          <h2 className="text-lg font-semibold">{counts.closed}</h2>
-          <p>Closed Tickets</p>
+          <h2 className="text-lg font-semibold">{counts.resolved}</h2>
+          <p>Resolved Tickets</p>
         </div>
       </div>
 
@@ -446,7 +451,8 @@ const Dashboard = () => {
             {recentUsers.map((user) => (
               <div 
                 key={user.UserID} 
-                className="flex flex-col items-center"
+                className="flex flex-col items-center cursor-pointer hover:opacity-80 transition-opacity"
+                onClick={() => handleUserClick(user.UserID)}
               >
                 <div className="relative">
                   <div className={`w-16 h-16 rounded-full overflow-hidden relative ${
@@ -490,12 +496,40 @@ const Dashboard = () => {
 
 const DashboardLayout = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
   const { loggedInUser: user } = useAuth();
   const navigate = useNavigate();
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
+  const notificationRef = useRef(null);
 
-  const toggleNotifications = () => {
-    setIsNotificationOpen(!isNotificationOpen);
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (notificationRef.current && !notificationRef.current.contains(event.target)) {
+        setShowNotifications(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (user?.UserID) {
+      fetchUnreadNotifications();
+      const interval = setInterval(fetchUnreadNotifications, 30000);
+      return () => clearInterval(interval);
+    }
+  }, [user]);
+
+  const fetchUnreadNotifications = async () => {
+    try {
+      const response = await axios.get(`http://localhost:5000/api/notifications/count/${user.UserID}`);
+      setUnreadNotifications(response.data.count);
+    } catch (error) {
+      console.error('Error fetching unread notifications:', error);
+    }
   };
 
   const handleProfileClick = () => {
@@ -506,41 +540,16 @@ const DashboardLayout = () => {
     <div className="flex">
       <AdminSideBar open={isSidebarOpen} setOpen={setIsSidebarOpen} />
 
-      <main
-        className={`flex-1 min-h-screen bg-gray-100 transition-all duration-300 ${
-          isSidebarOpen ? "ml-80" : "ml-24"
-        }`}
-      >
+      <main className={`flex-1 min-h-screen bg-gray-100 transition-all duration-300 ${isSidebarOpen ? "ml-72" : "ml-20"}`}>
         <div className="p-4 sm:p-6 lg:p-8">
           <header className="flex flex-col md:flex-row justify-between items-center bg-white p-6 rounded-lg shadow-sm mb-8">
             <h1 className="text-2xl font-bold mb-4 md:mb-0">Dashboard</h1>
             
             <div className="flex items-center gap-4">
-              <div className="relative">
-                <button 
-                  className="relative p-2 hover:bg-gray-100 rounded-full transition-colors"
-                  onClick={toggleNotifications}
-                >
-                  <IoNotificationsOutline className="text-2xl" />
-                  <span className="absolute top-0 right-0 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                    3
-                  </span>
-                </button>
-                <NotificationPanel 
-                  isOpen={isNotificationOpen} 
-                  onClose={() => setIsNotificationOpen(false)} 
-                />
-              </div>
-              
               <div 
                 className="flex items-center gap-3 cursor-pointer hover:bg-gray-50 p-2 rounded-lg transition-colors"
                 onClick={handleProfileClick}
               >
-                <div className="text-right hidden sm:block">
-                  <p className="font-semibold text-gray-800">{user?.FullName}</p>
-                  <p className="text-sm text-gray-500">{user?.Role}</p>
-                </div>
-                
                 <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-200 flex-shrink-0">
                   {user?.ProfileImagePath ? (
                     <img 
@@ -554,9 +563,39 @@ const DashboardLayout = () => {
                     </div>
                   )}
                 </div>
+                <div className="text-right hidden sm:block">
+                  <p className="font-semibold text-gray-800">{user?.FullName}</p>
+                  <p className="text-sm text-gray-500">{user?.Role}</p>
+                </div>
+
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowNotifications(!showNotifications);
+                  }}
+                  className="relative p-2 hover:bg-gray-100 rounded-full transition-colors ml-2"
+                >
+                  <IoNotificationsOutline className="text-2xl text-gray-600" />
+                  {unreadNotifications > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                      {unreadNotifications}
+                    </span>
+                  )}
+                </button>
               </div>
             </div>
           </header>
+
+          {/* Notification Panel */}
+          {showNotifications && (
+            <div ref={notificationRef} className="absolute right-4 top-32 z-50">
+              <NotificationPanel
+                userId={user?.UserID}
+                role={user?.Role}
+                onClose={() => setShowNotifications(false)}
+              />
+            </div>
+          )}
 
           <Dashboard />
         </div>
