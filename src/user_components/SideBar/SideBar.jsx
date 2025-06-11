@@ -21,9 +21,9 @@ const SideBar = ({ open, setOpen }) => {
   const location = useLocation();
 
   // Auto-collapse on route change
-  useEffect(() => {
-    setOpen(false);
-  }, [location.pathname]);
+  // useEffect(() => {
+  //   setOpen(false);
+  // }, [location.pathname]);
 
   // Modal state
   const [showLogoutModal, setShowLogoutModal] = useState(false);

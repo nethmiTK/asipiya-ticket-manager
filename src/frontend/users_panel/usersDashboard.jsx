@@ -23,7 +23,8 @@ const usersDashboard = () => {
     const [unreadNotifications, setUnreadNotifications] = useState(0);
     const notificationRef = useRef(null);
 
-    const [isSidebarOpen, setIsSidebarOpen] = useState(true); 
+    // const [isSidebarOpen, setIsSidebarOpen] = useState(true); 
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false); 
 
     useEffect(() => {
         const handleClickOutside = (event) => {

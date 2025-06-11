@@ -21,7 +21,7 @@ const NavBar = ({ isSidebarOpen, showNotifications, unreadNotifications, setShow
         <div className={`fixed top-0 ${isSidebarOpen ? 'left-72' : 'left-20'} right-0 h-[60px] bg-zinc-50 shadow-md flex items-center justify-between px-6 transition-all duration-300 z-40`}>
 
             {/* Dashboard Title */}
-            <h1 className="text-2xl font-bold text-gray-800">Dashboard</h1>
+            <h1 className="text-2xl font-bold text-gray-800"></h1>
 
             {/* Search bar */}
             <div className="w-96 border border-zinc-300 rounded-full h-9 flex items-center px-2">

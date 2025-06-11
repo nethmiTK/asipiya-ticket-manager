@@ -39,7 +39,8 @@ const UserProfile = () => {
     const [imagePreview, setImagePreview] = useState(null);
 
     const fileInputRef = useRef(null);
-    const [isSidebarOpen, setIsSidebarOpen] = useState(true); 
+    // const [isSidebarOpen, setIsSidebarOpen] = useState(true); 
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
     const [showNotifications, setShowNotifications] = useState(false);
     const [unreadNotifications, setUnreadNotifications] = useState(0);

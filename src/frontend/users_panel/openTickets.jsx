@@ -15,7 +15,8 @@ const enhanceFilesWithPreview = (acceptedFiles) =>
   );
 
 const OpenTickets = () => {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  // const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [files, setFiles] = useState([]);
   const [systemNames, setSystemNames] = useState([]);
   const [categoryName, setCategoryName] = useState([]);
