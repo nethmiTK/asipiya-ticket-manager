@@ -6,6 +6,7 @@ import TicketCard from "./TicketCard";
 import ChatSection from "./ChatSection";
 import { useAuth } from "../../App";
 import AdminSideBar from "../../user_components/SideBar/AdminSideBar";
+import { toast } from "react-toastify";
 
 const USER = {
   id: "user1",
@@ -31,6 +32,25 @@ export default function TicketManage() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
   const handleNotificationClick = () => navigate("/ticket-request");
+  const [evidenceList, setEvidenceList] = useState([]);
+
+  useEffect(() => {
+    if (!selectedTicket?.id) return;
+
+    const fetchEvidence = async () => {
+      try {
+        const res = await fetch(
+          `http://localhost:5000/evidence/${selectedTicket.id}`
+        );
+        const data = await res.json();
+        setEvidenceList(data);
+      } catch (err) {
+        console.error("Failed to load evidence", err);
+      }
+    };
+
+    fetchEvidence();
+  }, [selectedTicket?.id]);
 
   useEffect(() => {
     const fetchTickets = async () => {
@@ -51,7 +71,7 @@ export default function TicketManage() {
           assignedBy: ticket.SupervisorID,
           dueDate: ticket.DueDate ? ticket.DueDate.split("T")[0] : "",
           resolution: ticket.Resolution,
-          user:ticket.UserId,
+          user: ticket.UserId,
         }));
         setTickets(mappedTickets);
       } catch (err) {
@@ -106,8 +126,6 @@ export default function TicketManage() {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            status: selectedTicket.status,
-            dueDate: selectedTicket.dueDate || null,
             resolution: selectedTicket.resolution || "",
           }),
         }
@@ -115,7 +133,7 @@ export default function TicketManage() {
 
       if (!res.ok) throw new Error("Failed to update ticket");
 
-      alert("Ticket updated successfully!");
+      toast.success("Ticket updated successfully!");
       closeModal();
 
       // Optional: refresh tickets
@@ -124,8 +142,6 @@ export default function TicketManage() {
           t.id === selectedTicket.id
             ? {
                 ...t,
-                status: selectedTicket.status,
-                dueDate: selectedTicket.dueDate,
                 resolution: selectedTicket.resolution,
               }
             : t
@@ -134,6 +150,71 @@ export default function TicketManage() {
     } catch (err) {
       console.error(err);
       alert("Failed to update ticket");
+    }
+  };
+
+  const handleStatusChange = async (e) => {
+    const newStatus = e.target.value;
+    setSelectedTicket((prev) => ({
+      ...prev,
+      status: newStatus,
+    }));
+
+    try {
+      const res = await fetch(
+        `http://localhost:5000/tickets/${selectedTicket.id}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: newStatus }),
+        }
+      );
+
+      if (!res.ok) throw new Error("Failed to update status");
+
+      toast.success("Status updated successfully!");
+      setTickets((prevTickets) =>
+        prevTickets.map((t) =>
+          t.id === selectedTicket.id ? { ...t, status: newStatus } : t
+        )
+      );
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to update status");
+    }
+  };
+
+  const handleDueDateChange = async (e) => {
+    const newDueDate = e.target.value;
+    setSelectedTicket((prev) => ({
+      ...prev,
+      dueDate: newDueDate,
+    }));
+
+    try {
+      const res = await fetch(
+        `http://localhost:5000/tickets/${selectedTicket.id}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ dueDate: newDueDate }),
+        }
+      );
+
+      if (!res.ok) throw new Error("Failed to update due date");
+
+      setTickets((prevTickets) =>
+        prevTickets.map((ticket) =>
+          ticket.id === selectedTicket.id
+            ? { ...ticket, dueDate: newDueDate }
+            : ticket
+        )
+      );
+
+      toast.success("Due date updated successfully!");
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to update due date");
     }
   };
 
@@ -147,7 +228,7 @@ export default function TicketManage() {
       >
         <div className="min-h-screen bg-gray-50">
           {/* Top Navigation */}
-          <nav className="bg-white shadow-md px-6 py-4 flex justify-between items-center">
+          <nav className="bg-white shadow-md px-6 py-4 flex justify-between rounded  items-center">
             <h1 className="text-xl sm:text-2xl font-bold text-gray-700">
               Ticket Management
             </h1>
@@ -224,12 +305,7 @@ export default function TicketManage() {
                     </label>
                     <select
                       value={selectedTicket.status}
-                      onChange={(e) =>
-                        setSelectedTicket({
-                          ...selectedTicket,
-                          status: e.target.value,
-                        })
-                      }
+                      onChange={handleStatusChange}
                       className="w-full px-3 py-2 border rounded-md"
                     >
                       <option>Open</option>
@@ -245,12 +321,7 @@ export default function TicketManage() {
                     <input
                       type="date"
                       value={selectedTicket.dueDate || ""}
-                      onChange={(e) =>
-                        setSelectedTicket({
-                          ...selectedTicket,
-                          dueDate: e.target.value,
-                        })
-                      }
+                      onChange={handleDueDateChange}
                       className="w-full px-3 py-2 border rounded-md"
                     />
                   </div>
@@ -272,12 +343,21 @@ export default function TicketManage() {
                       className="w-full p-2 border rounded-md"
                     />
                   </div>
-                  <button
-                    onClick={handleUpdateTicket}
-                    className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 mt-4"
-                  >
-                    Save Changes
-                  </button>
+                  <div className="flex justify-between p-0">
+                    <button
+                      onClick={handleUpdateTicket}
+                      className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-green-700 mt-4"
+                    >
+                      Save Changes
+                    </button>
+                    <button
+                      onClick={() => setChatMode(!chatMode)}
+                      className="mt-4 p-2 bg-green-600 text-white rounded flex items-center gap-2"
+                    >
+                      <MessageCircle size={20} />
+                      {chatMode ? "Close Chat" : "Open Chat"}
+                    </button>
+                  </div>
                 </div>
 
                 {/* RIGHT: Logs & Chat */}
@@ -296,29 +376,79 @@ export default function TicketManage() {
                     </ul>
                   </div>
 
-                  <textarea
-                    value={comment}
-                    onChange={(e) => setComment(e.target.value)}
-                    placeholder="Add a comment..."
-                    className="w-full p-2 border rounded-md"
-                  />
-
-                  <div className="flex justify-between">
+                  <div className="flex justify-between gap-1">
+                    <textarea
+                      value={comment}
+                      onChange={(e) => setComment(e.target.value)}
+                      placeholder="Add a comment..."
+                      className="w-full p-2 border rounded-md"
+                    />
                     <button
                       onClick={handleAddComment}
-                      className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+                      className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 text-lg"
+                      title="Send Comment"
                     >
-                      Send
+                      ⬆
                     </button>
                   </div>
 
-                  <button
-                    onClick={() => setChatMode(!chatMode)}
-                    className="mt-4 p-2 bg-green-600 text-white rounded flex items-center gap-2"
-                  >
-                    <MessageCircle size={20} />
-                    {chatMode ? "Close Chat" : "Open Chat"}
-                  </button>
+                  <div className="mt-4">
+                    <h4 className="font-semibold mb-2">Evidence Files</h4>
+                    {evidenceList.length === 0 ? (
+                      <p className="text-sm text-gray-500">
+                        No evidence files available.
+                      </p>
+                    ) : (
+                      <div className="max-h-60 overflow-y-auto grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 p-2 border rounded bg-gray-50">
+                        {evidenceList.map((evi, index) => {
+                          const fileUrl = `http://localhost:5000/${evi.FilePath}`;
+                          const fileName = evi.FilePath.split("/").pop();
+                          const isImage =
+                            /\.(jpg|jpeg|png|gif|bmp|webp)$/i.test(fileName);
+                          const isPDF = /\.pdf$/i.test(fileName);
+
+                          return (
+                            <div
+                              key={index}
+                              className="border rounded p-2 bg-white shadow-sm flex flex-col items-center text-center"
+                            >
+                              {isImage ? (
+                                <a
+                                  href={fileUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                >
+                                  <img
+                                    src={fileUrl}
+                                    alt={fileName}
+                                    className="w-32 h-32 object-cover rounded hover:opacity-90 transition"
+                                  />
+                                </a>
+                              ) : isPDF ? (
+                                <a
+                                  href={fileUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-red-600 hover:underline"
+                                >
+                                  📄 {fileName}
+                                </a>
+                              ) : (
+                                <a
+                                  href={fileUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-blue-600 hover:underline"
+                                >
+                                  📎 {fileName}
+                                </a>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 

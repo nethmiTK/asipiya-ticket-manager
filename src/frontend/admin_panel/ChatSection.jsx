@@ -30,9 +30,8 @@ export default function ChatSection({ user, supportUser, ticketId, ticket, role 
     const newMsg = {
       id: optimisticId,
       ticketid: ticketId,
-      usercustomerid: user || null,
       userid: supportUser || null,
-      role: role,
+      role: role || "Supervisor",
       content: chatInput,
       timestamp: new Date().toISOString(),
       type: "text",
@@ -47,9 +46,8 @@ export default function ChatSection({ user, supportUser, ticketId, ticket, role 
         TicketID: ticketId,
         Note: chatInput,
         Type: "text",
-        UserCustomerID: user || "",
         UserID: supportUser || "",
-        Role:role,
+        Role: role || "Supervisor",
       });
 
       const newId = res.data.chatId;
@@ -92,14 +90,12 @@ export default function ChatSection({ user, supportUser, ticketId, ticket, role 
         )}
 
         {chatMessages.map((msg) => {
-          const isClient = msg.usercustomerid === user?.usercustomerid;
+          const isClient = msg.role === "User";
 
           return (
             <div
               key={msg.id}
-              className={`flex mb-3 ${
-                !isClient ? "justify-end" : "justify-start"
-              }`}
+              className={`flex mb-3 ${!isClient ? "justify-end" : "justify-start"}`}
             >
               {isClient && (
                 <img
