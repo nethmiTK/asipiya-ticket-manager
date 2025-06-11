@@ -712,17 +712,31 @@ app.post('/system_registration', (req, res) => {
     });
 });
 
-//View systems
 app.get('/system_registration', (req, res) => {
-    const sql = 'SELECT * FROM asipiyasystem';
-    db.query(sql, (err, results) => {
-        if (err) {
-            console.error('Error fetching systems:', err);
-            return res.status(500).json({ message: 'Error fetching systems' });
-        }
-        res.status(200).json(results);
-    });
+  const sql = `
+    SELECT
+      s.*,
+      CASE
+        WHEN COUNT(t.TicketID) > 0 THEN 'Active'
+        ELSE 'Inactive'
+      END AS Status
+    FROM asipiyasystem s
+    LEFT JOIN ticket t
+      ON s.AsipiyaSystemID = t.AsipiyaSystemID
+    GROUP BY
+      s.AsipiyaSystemID, s.SystemName, s.Description
+    ORDER BY s.AsipiyaSystemID;
+  `;
+
+  db.query(sql, (err, results) => {
+    if (err) {
+      console.error('Error fetching system status:', err);
+      return res.status(500).json({ message: 'Database error during status fetch' });
+    }
+    res.status(200).json(results);
+  });
 });
+
 
 app.put('/api/system_registration_update/:id', (req, res) => {
   const { id } = req.params;
@@ -799,16 +813,30 @@ app.post('/ticket_category', (req, res) => {
     });
 });
 
-//View Categories
+
 app.get('/ticket_category', (req, res) => {
-    const sql = 'SELECT TicketCategoryID, CategoryName, Description FROM ticketcategory ORDER BY TicketCategoryID DESC';
-    db.query(sql, (err, results) => {
-        if (err) {
-            console.error('Error fetching categories:', err);
-            return res.status(500).json({ message: 'Error fetching categories' });
-        }
-        res.status(200).json(results);
-    });
+  const sql = `
+    SELECT
+      c.*,
+      CASE
+        WHEN COUNT(t.TicketID) > 0 THEN 'Active'
+        ELSE 'Inactive'
+      END AS Status
+    FROM ticketcategory c
+    LEFT JOIN ticket t
+      ON c.TicketCategoryID = t.TicketCategoryID
+    GROUP BY
+      c.TicketCategoryID, c.CategoryName, c.Description
+    ORDER BY c.TicketCategoryID;
+  `;
+
+  db.query(sql, (err, results) => {
+    if (err) {
+      console.error('Error fetching categories with status:', err);
+      return res.status(500).json({ message: 'Database error during fetch' });
+    }
+    res.status(200).json(results);
+  });
 });
 
 app.put('/api/ticket_category_update/:id', (req, res) => {
@@ -911,7 +939,7 @@ app.get('/api/supervisors', (req, res) => {
 });
 
 
-app.put('/api/tickets/:id/assign', (req, res) => {
+app.put('/api/ticket/:id/supervisor_assign', (req, res) => {
   const ticketId = req.params.id;
   const { status, priority, supervisorId } = req.body;
 

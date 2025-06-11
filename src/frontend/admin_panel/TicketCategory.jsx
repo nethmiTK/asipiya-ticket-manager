@@ -111,6 +111,7 @@ const TicketCategory = () => {
                 <th className="p-2">Category ID</th>
                 <th className="p-2">Category Name</th>
                 <th className="p-2">Description</th>
+                <th className="p-2">Status</th>
                 <th className="p-2">Actions</th>
               </tr>
             </thead>
@@ -120,6 +121,11 @@ const TicketCategory = () => {
                   <td className="p-2">{category.TicketCategoryID}</td>
                   <td className="p-2">{category.CategoryName}</td>
                   <td className="p-2">{category.Description}</td>
+                  <td className="p-2">
+                    <span className={`px-2 py-1 text-sm font-semibold rounded ${category.Status === 'Active' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
+                      {category.Status}
+                    </span>
+                  </td>
                   <td className="p-2">
                     <button
                       onClick={() => handleEdit(category)}

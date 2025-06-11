@@ -55,7 +55,7 @@ const SupervisorAssignPage = ({ ticketId }) => {
       return;
     }
 
-    axios.put(`http://localhost:5000/api/tickets/${id}/assign`, {
+    axios.put(`http://localhost:5000/api/ticket/${id}/supervisor_assign'`, {
       supervisorId: selectedSupervisor,
       status,
       priority,
