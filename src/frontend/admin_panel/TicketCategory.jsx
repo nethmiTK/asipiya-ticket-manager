@@ -105,21 +105,27 @@ const TicketCategory = () => {
             <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">{error}</div>
           )}
 
-          <table className="w-full table-auto border">
-            <thead className="bg-gray-100 text-left">
+          <table className="w-full table-auto">
+            <thead className="bg-gray-200">
               <tr>
                 <th className="p-2">Category ID</th>
                 <th className="p-2">Category Name</th>
                 <th className="p-2">Description</th>
+                <th className="p-2">Status</th>
                 <th className="p-2">Actions</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className='bg-white divide-y divide-gray-200'>
               {categories.map((category) => (
                 <tr key={category.TicketCategoryID} className="border-t">
                   <td className="p-2">{category.TicketCategoryID}</td>
                   <td className="p-2">{category.CategoryName}</td>
                   <td className="p-2">{category.Description}</td>
+                  <td className="p-2">
+                    <span className={`px-2 py-1 text-sm font-semibold rounded ${category.Status === 'Active' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
+                      {category.Status}
+                    </span>
+                  </td>
                   <td className="p-2">
                     <button
                       onClick={() => handleEdit(category)}

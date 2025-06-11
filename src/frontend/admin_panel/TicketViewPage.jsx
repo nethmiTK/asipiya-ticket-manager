@@ -83,17 +83,21 @@ const TicketViewPage = ({ ticketId, popupMode = false, onClose }) => {
         <button
           onClick={async () => {
             try {
-              await axios.put(`http://localhost:5000/api/ticket_status/${id}`, {
+              const response = await axios.put(`http://localhost:5000/api/ticket_status/${id}`, {
                 status: 'Reject',
               });
-              toast.success('Ticket rejected successfully');
-              if (popupMode) {
-                onClose();
+
+              if (response.status === 200 || response.status === 204) {
+                toast.success('Ticket rejected successfully');
+                if (popupMode) {
+                  onClose();
+                } else {
+                  navigate(-1);
+                }
               } else {
-                navigate(-1);
+                toast.error('Failed to reject the ticket');
               }
             } catch (err) {
-              toast.error('Failed to reject the ticket');
               console.error(err);
             }
           }}
