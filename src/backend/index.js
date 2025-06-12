@@ -1867,9 +1867,7 @@ app.post('/api/upload_evidence', upload_evidence.array('evidenceFiles'), async (
 //UserChat
 app.post("/api/ticketchat", upload.single("file"), (req, res) => {
   const { TicketID, Type, Note, UserID, Role } = req.body;
-  const filePath = req.file ? req.file.path : null;
-
-  console.log("Received from frontend:", { TicketID, Type, Note, UserID, Role });
+  const filePath = req.file ? `uploads/${req.file.filename}` : null;
 
   const sql = `
     INSERT INTO ticketchat (TicketID, Type, Note, UserID, Path, Role) 
@@ -1882,7 +1880,10 @@ app.post("/api/ticketchat", upload.single("file"), (req, res) => {
       console.error("Error inserting chat message:", err);
       return res.status(500).json({ error: err.message });
     }
-    res.status(200).json({ message: "Message sent", filePath });
+    res.status(200).json({ 
+      message: "Message sent", 
+      filePath: filePath ? `http://localhost:5000/${filePath}` : null 
+    });
   });
 });
 
@@ -1893,8 +1894,7 @@ app.get("/api/ticketchat/:ticketID", (req, res) => {
     SELECT 
       tc.*, 
       au.FullName, 
-      au.Role, 
-      au.ProfileImagePath 
+      au.Role
     FROM 
       ticketchat tc
     JOIN 
