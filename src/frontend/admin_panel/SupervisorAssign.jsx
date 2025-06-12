@@ -3,7 +3,7 @@ import axios from 'axios';
 import { useParams, useNavigate } from 'react-router-dom';
 import AdminSideBar from '../../user_components/SideBar/AdminSideBar';
 import { toast } from 'react-toastify';
-import { IoArrowBack} from 'react-icons/io5';
+import { IoArrowBack } from 'react-icons/io5';
 
 const SupervisorAssignPage = ({ ticketId }) => {
   const params = useParams();
@@ -12,23 +12,21 @@ const SupervisorAssignPage = ({ ticketId }) => {
   const [ticketData, setTicketData] = useState(null);
   const [supervisors, setSupervisors] = useState([]);
   const [selectedSupervisor, setSelectedSupervisor] = useState('');
-  const [status, setStatus] = useState('Pending');
+  const [status, setStatus] = useState('Open');
   const [priority, setPriority] = useState('Low');
 
   const id = ticketId || params.id;
 
   useEffect(() => {
-    // Fetch ticket data
     axios.get(`http://localhost:5000/api/ticket_view/${id}`)
       .then(res => {
         setTicketData(res.data);
-        setStatus(res.data.Status || 'Pending');
+        setStatus(res.data.Status || 'Open');
         setPriority(res.data.Priority || 'Low');
         setSelectedSupervisor(res.data.SupervisorName || '');
       })
       .catch(err => console.error('Error fetching ticket:', err));
 
-    // Fetch supervisors
     axios.get('http://localhost:5000/api/supervisors')
       .then(res => {
         if (Array.isArray(res.data)) {
@@ -46,31 +44,29 @@ const SupervisorAssignPage = ({ ticketId }) => {
       return;
     }
 
-    // Find the selected supervisor's name
     const supervisor = supervisors.find(s => s.UserID.toString() === selectedSupervisor.toString());
     if (!supervisor) {
       alert("Selected supervisor not found.");
       return;
     }
+    const finalStatus = ['Open', 'In Progress', 'Resolved'].includes(status) ? status : 'Open';
 
     axios.put(`http://localhost:5000/api/tickets/${id}/assign`, {
       supervisorId: selectedSupervisor,
-      status,
+      status: finalStatus,
       priority,
       supervisorName: supervisor.FullName
     })
       .then(() => {
-        // After successful assignment, update the ticket status
         return axios.put(`http://localhost:5000/api/tickets/${id}/status`, {
-          status: 'Open',
+          status: finalStatus,
           userId: selectedSupervisor,
           supervisorName: supervisor.FullName
         });
       })
       .then(() => {
         toast.success('Supervisor assigned and ticket status updated successfully!');
-        // Optional: redirect or update state
-        if (!ticketId) { // Only navigate if not in popup mode
+        if (!ticketId) {
           navigate(-1);
         }
       })
@@ -163,12 +159,10 @@ const SupervisorAssignPage = ({ ticketId }) => {
     </div>
   );
 
-  // If ticketId is provided, we're in popup mode
   if (ticketId) {
     return content;
   }
 
-  // Otherwise, render the full page layout
   return (
     <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
       <AdminSideBar open={isSidebarOpen} setOpen={setIsSidebarOpen} />
