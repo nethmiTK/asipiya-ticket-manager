@@ -12,6 +12,17 @@ const statusColors = {
   rejected: "bg-red-100 text-red-800",
 };
 
+const truncateDescription = (text, maxLength = 80) => {
+  if (!text) return '';
+  if (text.length <= maxLength) return text;
+  let truncated = text.substring(0, maxLength);
+  const lastSpace = truncated.lastIndexOf(' ');
+  if (lastSpace > -1) {
+    truncated = truncated.substring(0, lastSpace);
+  }
+  return truncated + '...';
+};
+
 const TicketView = () => {
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -35,11 +46,11 @@ const TicketView = () => {
   //   )
   // );
   const filteredTickets = tickets.filter(ticket =>
-  String(ticket.id).toLowerCase().includes(searchQuery.toLowerCase()) ||
-  String(ticket.status).toLowerCase().includes(searchQuery.toLowerCase()) ||
-  String(ticket.category).toLowerCase().includes(searchQuery.toLowerCase()) ||
-  String(ticket.system_name).toLowerCase().includes(searchQuery.toLowerCase())
-);
+    String(ticket.id).toLowerCase().includes(searchQuery.toLowerCase()) ||
+    String(ticket.status).toLowerCase().includes(searchQuery.toLowerCase()) ||
+    String(ticket.category).toLowerCase().includes(searchQuery.toLowerCase()) ||
+    String(ticket.system_name).toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
@@ -173,16 +184,16 @@ const TicketView = () => {
           ) : currentTickets.length === 0 && searchQuery !== '' ? (
             <p>No matching tickets found for "{searchQuery}".</p>
           ) : (
-            <div className="overflow-x-auto rounded-lg shadow border border-gray-200">
-              <table className="min-w-full text-sm text-left">
+            <div className="overflow-x-auto rounded-lg shadow border border-gray-200 w-full">
+              <table className="min-w-full text-sm text-left table-fixed w-full">
                 <thead className="bg-gray-100 text-gray-700 uppercase">
                   <tr>
-                    <th className="px-4 py-3">ID</th>
-                    <th className="px-4 py-3 w-32">Status</th>
-                    <th className="px-4 py-3">Description</th>
-                    <th className="px-4 py-3">System Name</th>
-                    <th className="px-4 py-3">Category</th>
-                    <th className="px-4 py-3">Date & Time</th>
+                    <th className="px-4 py-3 w-[8%]">ID</th>
+                    <th className="px-4 py-3 w-[12%]">Status</th>
+                    <th className="px-4 py-3 w-[35%]">Description</th>
+                    <th className="px-4 py-3 w-[15%]">System Name</th>
+                    <th className="px-4 py-3 w-[15%]">Category</th>
+                    <th className="px-4 py-3 w-[15%]">Date & Time</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
@@ -208,9 +219,13 @@ const TicketView = () => {
                           {ticket.status}
                         </span>
                       </td>
-                      <td className="px-4 py-2 text-justify">
-                        {ticket.description}
+                      <td className="px-4 py-2 text-justify whitespace-normal overflow-hidden break-words" style={{
+                        maxHeight: '3.6em', 
+                        lineHeight: '1.2em'
+                      }}>
+                        {truncateDescription(ticket.description, 120)}
                       </td>
+
                       <td className="px-4 py-2">{ticket.system_name}</td>
                       <td className="px-4 py-2">{ticket.category}</td>
                       <td className="px-4 py-2 text-gray-500">
@@ -241,7 +256,7 @@ const TicketView = () => {
                 </select>
               </div>
               <span className="text-gray-700 text-sm">
-                 {` ${indexOfFirstItem + 1}-${Math.min(indexOfLastItem, filteredTickets.length)} of ${filteredTickets.length}`}
+                {` ${indexOfFirstItem + 1}-${Math.min(indexOfLastItem, filteredTickets.length)} of ${filteredTickets.length}`}
               </span>
               <div className="flex items-center space-x-2">
                 <button
