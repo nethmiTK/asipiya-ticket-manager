@@ -35,9 +35,12 @@ export default function AddSupervisor() {
   const confirmDelete = async () => {
     if (!selectedUser) return;
     try {
-      const res = await fetch(`http://localhost:5000/supervisor/${selectedUser.UserID}`, {
-        method: "DELETE",
-      });
+      const res = await fetch(
+        `http://localhost:5000/supervisor/${selectedUser.UserID}`,
+        {
+          method: "DELETE",
+        }
+      );
       if (res.ok) {
         setUsers(users.filter((u) => u.UserID !== selectedUser.UserID));
       } else {
@@ -62,7 +65,9 @@ export default function AddSupervisor() {
       >
         <div className="max-w-6xl mx-auto bg-white rounded-xl shadow-lg p-6 sm:p-8">
           <div className="flex flex-wrap justify-between items-center mb-6">
-            <h1 className="text-1xl sm:text-3xl font-bold text-gray-800">👥 Members</h1>
+            <h1 className="text-1xl sm:text-3xl font-bold text-gray-800">
+              👥 Members
+            </h1>
             <button
               data-tooltip-id="tooltip"
               data-tooltip-content="Add Member"
@@ -86,9 +91,16 @@ export default function AddSupervisor() {
               <tbody>
                 {users.length > 0 ? (
                   users.map((user) => (
-                    <tr key={user.UserID} className="border-b hover:bg-blue-50 transition">
-                      <td className="p-3 text-gray-800 font-medium text-center">{user.FullName}</td>
-                      <td className="p-3 text-gray-700 text-center">{user.Email}</td>
+                    <tr
+                      key={user.UserID}
+                      className="border-b hover:bg-blue-50 transition"
+                    >
+                      <td className="p-3 text-gray-800 font-medium text-center">
+                        {user.FullName}
+                      </td>
+                      <td className="p-3 text-gray-700 text-center">
+                        {user.Email}
+                      </td>
                       <td className="p-3 text-center">
                         <span
                           className={`px-3 py-1 rounded-full text-sm font-medium ${
@@ -103,10 +115,9 @@ export default function AddSupervisor() {
                           data-tooltip-id="tooltip"
                           data-tooltip-content="Edit Member"
                           onClick={() => {
-  setEditUserId(user.UserID);
-  setShowEditModal(true);
-}}
-
+                            setEditUserId(user.UserID);
+                            setShowEditModal(true);
+                          }}
                           className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded shadow-md font-medium"
                         >
                           ✏️
@@ -128,7 +139,10 @@ export default function AddSupervisor() {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan="4" className="text-center text-gray-500 italic py-4">
+                    <td
+                      colSpan="4"
+                      className="text-center text-gray-500 italic py-4"
+                    >
                       No users available.
                     </td>
                   </tr>
@@ -143,36 +157,35 @@ export default function AddSupervisor() {
       <Tooltip id="tooltip" place="top" />
 
       {showEditModal && (
-  <EditMemberModal
-    memberId={editUserId}
-    onClose={() => {
-      setShowEditModal(false);
-      setEditUserId(null);
-    }}
-    onUpdate={() => {
-      setShowEditModal(false);
-      setEditUserId(null);
-      // Refresh members
-      fetch("http://localhost:5000/supervisor")
-        .then((res) => res.json())
-        .then((data) => setUsers(data));
-    }}
-  />
-)}
-
+        <EditMemberModal
+          memberId={editUserId}
+          onClose={() => {
+            setShowEditModal(false);
+            setEditUserId(null);
+          }}
+          onUpdate={() => {
+            setShowEditModal(false);
+            setEditUserId(null);
+            // Refresh members
+            fetch("http://localhost:5000/supervisor")
+              .then((res) => res.json())
+              .then((data) => setUsers(data));
+          }}
+        />
+      )}
 
       {showAddModal && (
-  <AddMemberModal
-    onClose={() => setShowAddModal(false)}
-    onSuccess={() => {
-      setShowAddModal(false);
-      // Refresh users after successful addition
-      fetch("http://localhost:5000/supervisor")
-        .then((res) => res.json())
-        .then((data) => setUsers(data));
-    }}
-  />
-)}
+        <AddMemberModal
+          onClose={() => setShowAddModal(false)}
+          onSuccess={() => {
+            setShowAddModal(false);
+            // Refresh users after successful addition
+            fetch("http://localhost:5000/supervisor")
+              .then((res) => res.json())
+              .then((data) => setUsers(data));
+          }}
+        />
+      )}
 
       {/* Delete Confirmation Modal */}
       {showDeleteModal && (

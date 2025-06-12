@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { FaBell } from "react-icons/fa6";
+import { FaArrowUpLong, FaBell } from "react-icons/fa6";
 import { MessageCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import TicketCard from "./TicketCard";
@@ -420,7 +420,7 @@ export default function TicketManage() {
                       className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 text-lg"
                       title="Send Comment"
                     >
-                      ⬆
+                      <FaArrowUpLong />
                     </button>
                   </div>
 
