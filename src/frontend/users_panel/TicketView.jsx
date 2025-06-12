@@ -27,17 +27,32 @@ const TicketView = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
 
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // const filteredTickets = tickets.filter(ticket =>
+  //   Object.values(ticket).some(value =>
+  //     String(value).toLowerCase().includes(searchQuery.toLowerCase())
+  //   )
+  // );
+  const filteredTickets = tickets.filter(ticket =>
+  String(ticket.id).toLowerCase().includes(searchQuery.toLowerCase()) ||
+  String(ticket.status).toLowerCase().includes(searchQuery.toLowerCase()) ||
+  String(ticket.category).toLowerCase().includes(searchQuery.toLowerCase()) ||
+  String(ticket.system_name).toLowerCase().includes(searchQuery.toLowerCase())
+);
+
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentTickets = tickets.slice(indexOfFirstItem, indexOfLastItem); 
-  const totalPages = Math.ceil(tickets.length / itemsPerPage);
-
+  const currentTickets = filteredTickets.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(filteredTickets.length / itemsPerPage);
   const paginate = (pageNumber) => setCurrentPage(pageNumber);
 
   const handleItemsPerPageChange = (e) => {
     setItemsPerPage(Number(e.target.value));
     setCurrentPage(1); // Reset to first page when items per page changes
   };
+
+
 
   useEffect(() => {
     const fetchTickets = async () => {
@@ -137,11 +152,26 @@ const TicketView = () => {
             </div>
           )}
           <h1 className="text-2xl font-bold mb-4">My All Tickets</h1>
+          {/*Search Bar */}
+          <div className="mb-6">
+            <input
+              type="text"
+              placeholder="Search by ID, Status, Category, or System..."
+              className="p-2 border border-gray-300 rounded-md w-full focus:outline-none focus:ring-2 focus:ring-blue-500"
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setCurrentPage(1); // Reset page to 1 when search query changes
+              }}
+            />
+          </div>
 
           {loading ? (
             <p>Loading...</p>
           ) : tickets.length === 0 ? (
             <p>No tickets found.</p>
+          ) : currentTickets.length === 0 && searchQuery !== '' ? (
+            <p>No matching tickets found for "{searchQuery}".</p>
           ) : (
             <div className="overflow-x-auto rounded-lg shadow border border-gray-200">
               <table className="min-w-full text-sm text-left">
@@ -194,61 +224,61 @@ const TicketView = () => {
           )}
         </div>
         {/* Pagination Controls at the bottom */}
-                  {tickets.length > 0 && (
-            <div className="flex flex-col sm:flex-row justify-end items-center mt-4 p-4 bg-white rounded-lg shadow">
-              <div className="flex items-center space-x-4">
-                <div className="flex items-center">
-                  <span className="text-gray-700 text-sm mr-2">Entries per page :</span>
-                  <select
-                    value={itemsPerPage}
-                    onChange={handleItemsPerPageChange}
-                    className="p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                  >
-                    <option value={5}>5</option>
-                    <option value={10}>10</option>
-                    <option value={20}>20</option>
-                    <option value={50}>50</option>
-                  </select>
-                </div>
-                <span className="text-gray-700 text-sm">
-                  {` ${indexOfFirstItem + 1}-${Math.min(indexOfLastItem, tickets.length)} of ${tickets.length}`}
+        {filteredTickets.length > 0 && (
+          <div className="flex flex-col sm:flex-row justify-end items-center mt-4 p-4 bg-white rounded-lg shadow">
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center">
+                <span className="text-gray-700 text-sm mr-2">Entries per page :</span>
+                <select
+                  value={itemsPerPage}
+                  onChange={handleItemsPerPageChange}
+                  className="p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                >
+                  <option value={5}>5</option>
+                  <option value={10}>10</option>
+                  <option value={20}>20</option>
+                  <option value={50}>50</option>
+                </select>
+              </div>
+              <span className="text-gray-700 text-sm">
+                 {` ${indexOfFirstItem + 1}-${Math.min(indexOfLastItem, filteredTickets.length)} of ${filteredTickets.length}`}
+              </span>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => paginate(1)}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1 rounded-md bg-gray-200 text-gray-700 hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 text-sm"
+                >
+                  &lt;&lt;
+                </button>
+                <button
+                  onClick={() => paginate(currentPage - 1)}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1 rounded-md bg-gray-200 text-gray-700 hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 text-sm"
+                >
+                  &lt;
+                </button>
+                <span className="text-gray-700 text-sm font-medium">
+                  {currentPage}
                 </span>
-                <div className="flex items-center space-x-2">
-                  <button
-                    onClick={() => paginate(1)}
-                    disabled={currentPage === 1}
-                    className="px-3 py-1 rounded-md bg-gray-200 text-gray-700 hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 text-sm"
-                  >
-                    &lt;&lt;
-                  </button>
-                  <button
-                    onClick={() => paginate(currentPage - 1)}
-                    disabled={currentPage === 1}
-                    className="px-3 py-1 rounded-md bg-gray-200 text-gray-700 hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 text-sm"
-                  >
-                    &lt;
-                  </button>
-                  <span className="text-gray-700 text-sm font-medium">
-                    {currentPage}
-                  </span>
-                  <button
-                    onClick={() => paginate(currentPage + 1)}
-                    disabled={currentPage === totalPages}
-                    className="px-3 py-1 rounded-md bg-gray-200 text-gray-700 hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 text-sm"
-                  >
-                    &gt;
-                  </button>
-                  <button
-                    onClick={() => paginate(totalPages)}
-                    disabled={currentPage === totalPages}
-                    className="px-3 py-1 rounded-md bg-gray-200 text-gray-700 hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 text-sm"
-                  >
-                    &gt;&gt;
-                  </button>
-                </div>
+                <button
+                  onClick={() => paginate(currentPage + 1)}
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-1 rounded-md bg-gray-200 text-gray-700 hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 text-sm"
+                >
+                  &gt;
+                </button>
+                <button
+                  onClick={() => paginate(totalPages)}
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-1 rounded-md bg-gray-200 text-gray-700 hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 text-sm"
+                >
+                  &gt;&gt;
+                </button>
               </div>
             </div>
-          )}
+          </div>
+        )}
 
         {isModalOpen && selectedTicket && (
           <div className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm">
@@ -309,7 +339,7 @@ const TicketView = () => {
                 ) : (
                   <div className="space-y-2">
                     <h2 className="font-semibold mb-2">Chat</h2>
-                    <ChatUI ticketID={selectedTicket.id}/>
+                    <ChatUI ticketID={selectedTicket.id} />
                   </div>
                 )}
               </div>
