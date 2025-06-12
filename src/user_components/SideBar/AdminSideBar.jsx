@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { BsChevronLeft } from "react-icons/bs";
+import { BsChevronLeft, BsFillTicketDetailedFill } from "react-icons/bs";
 import { LuTicketCheck } from "react-icons/lu";
 import { IoIosArrowBack } from "react-icons/io";
-import { VscNotebook } from "react-icons/vsc";
 import { CiLogout } from "react-icons/ci";
 import { GrSystem } from "react-icons/gr";
 import { FaHome, FaUserCog } from "react-icons/fa";
 import { useAuth } from '../../App.jsx';
 import { toast } from "react-toastify";
+import { FaRegAddressBook } from "react-icons/fa6";
 
 const Menus = [
   { title: "Dashboard", icon: <FaHome />, path: "/admin-dashboard" },
@@ -27,8 +27,8 @@ const Menus = [
     ]
   },
   { title: "Pending Ticket", icon: <LuTicketCheck />, path: "/pending_ticket" },
-  { title: "Ticket Manage", icon: <LuTicketCheck />, path: "/ticket-manage" },
-  { title: "Supervisor Add", icon: <VscNotebook />, path: "/supervisor" },
+  { title: "Ticket Manage", icon: <BsFillTicketDetailedFill />, path: "/ticket-manage" },
+  { title: "Supervisor Add", icon: <FaRegAddressBook />, path: "/supervisor" },
   {
     title: "Asipiya Systems",
     icon: <GrSystem />,
