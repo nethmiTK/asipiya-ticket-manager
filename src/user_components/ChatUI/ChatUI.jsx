@@ -108,7 +108,7 @@ const ChatUI = ({ ticketID: propTicketID }) => {
   };
 
   return (
-    <div className="flex flex-col h-full border-none rounded-md bg-white">
+    <div className="flex flex-col h-97.5 border-none rounded-md bg-white">
       <div className="flex-1 overflow-y-auto space-y-2 p-2 mt-2">
         {messages.map((msg, idx) => (
           <div
