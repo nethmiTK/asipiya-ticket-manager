@@ -615,7 +615,7 @@ app.get("/messages/:ticketId", (req, res) => {
   );
 });
 
-
+//nope
 // POST a new chat message without file upload
 app.post("/ticketchat", async (req, res) => {
   try {

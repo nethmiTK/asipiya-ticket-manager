@@ -30,9 +30,8 @@ export default function TicketManage() {
   const [attachments, setAttachments] = useState([]);
   const [chatMode, setChatMode] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-
-  const handleNotificationClick = () => navigate("/ticket-request");
   const [evidenceList, setEvidenceList] = useState([]);
+  const [showProblemModal, setShowProblemModal] = useState(false);
 
   useEffect(() => {
     if (!selectedTicket?.id) return;
@@ -233,13 +232,12 @@ export default function TicketManage() {
               Ticket Management
             </h1>
             <div
-              onClick={handleNotificationClick}
               className="relative cursor-pointer"
             >
               <FaBell className="text-2xl text-gray-700" />
-              <span className="absolute -top-1 -right-1 bg-red-600 text-white text-xs rounded-full px-2">
+              {/*<span className="absolute -top-1 -right-1 bg-red-600 text-white text-xs rounded-full px-2">
                 3
-              </span>
+              </span>*/}
             </div>
           </nav>
 
@@ -289,9 +287,43 @@ export default function TicketManage() {
                   <p>
                     <strong>Date:</strong> {selectedTicket.date}
                   </p>
-                  <p>
-                    <strong>Problem:</strong> {selectedTicket.problem}
+                  <p className="text-sm">
+                    <strong>Problem:</strong>{" "}
+                    {selectedTicket.problem.length > 100 ? (
+                      <>
+                        {selectedTicket.problem.slice(0, 100)}...
+                        <button
+                          onClick={() => setShowProblemModal(true)}
+                          className="text-blue-600 hover:underline ml-1"
+                        >
+                          See More
+                        </button>
+                      </>
+                    ) : (
+                      selectedTicket.problem
+                    )}
                   </p>
+                  {showProblemModal && (
+                    <div className="fixed inset-0 z-50 bg-black/40 bg-opacity-40 flex justify-center items-center">
+                      <div className="bg-white rounded-lg shadow-lg p-6 max-w-lg w-full max-h-[80vh]">
+                        <h2 className="text-lg font-semibold mb-4">
+                          Full Problem Description
+                        </h2>
+                        <div className="text-gray-800 whitespace-pre-wrap overflow-y-auto max-h-60 pr-2">
+                          {selectedTicket.problem}
+                        </div>
+                        <div className="text-right mt-4">
+                          <button
+                            onClick={() => setShowProblemModal(false)}
+                            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                          >
+                            Close
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   <p>
                     <strong>Priority:</strong> {selectedTicket.priority}
                   </p>
@@ -399,7 +431,7 @@ export default function TicketManage() {
                         No evidence files available.
                       </p>
                     ) : (
-                      <div className="max-h-60 overflow-y-auto grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 p-2 border rounded bg-gray-50">
+                      <div className="max-h-50 overflow-y-auto grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 p-2 border rounded bg-gray-50">
                         {evidenceList.map((evi, index) => {
                           const fileUrl = `http://localhost:5000/${evi.FilePath}`;
                           const fileName = evi.FilePath.split("/").pop();

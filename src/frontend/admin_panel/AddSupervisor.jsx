@@ -34,10 +34,10 @@ export default function AddSupervisor() {
           isSidebarOpen ? "ml-72" : "ml-20"
         }`}
       >
-        <div className="min-h-screen p-4 sm:p-6 bg-gradient-to-br from-blue-50 to-white">
+        <div className="">
           <div className="max-w-6xl mx-auto bg-white rounded-xl shadow-lg p-6 sm:p-8">
             <div className="flex flex-wrap justify-between items-center mb-6">
-              <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">
+              <h1 className="text-1xl sm:text-3xl font-bold text-gray-800">
                 👥 Members
               </h1>
               <button
@@ -52,10 +52,10 @@ export default function AddSupervisor() {
               <table className="min-w-full bg-white rounded-lg shadow text-sm sm:text-base">
                 <thead className="bg-blue-100 text-gray-700 font-semibold">
                   <tr>
-                    <th className="text-left p-3">Name</th>
-                    <th className="text-left p-3">Email</th>
-                    <th className="text-left p-3">Role</th>
-                    <th className="text-left p-3">Actions</th>
+                    <th className=" p-3 text-center">Name</th>
+                    <th className="text-center p-3">Email</th>
+                    <th className="text-center p-3">Role</th>
+                    <th className="text-center p-3">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -65,11 +65,11 @@ export default function AddSupervisor() {
                         key={user.UserID}
                         className="border-b hover:bg-blue-50 transition"
                       >
-                        <td className="p-3 text-gray-800 font-medium">
+                        <td className="p-3 text-gray-800 text-center font-medium">
                           {user.FullName}
                         </td>
-                        <td className="p-3 text-gray-700">{user.Email}</td>
-                        <td className="p-3">
+                        <td className="p-3 text-gray-700 text-center">{user.Email}</td>
+                        <td className="p-3 text-center">
                           <span
                             className={`px-3 py-1 rounded-full text-sm font-medium ${
                               roleColors[user.Role] ||
@@ -79,14 +79,14 @@ export default function AddSupervisor() {
                             {user.Role}
                           </span>
                         </td>
-                        <td className="p-3 flex gap-2">
+                        <td className="p-3 flex gap-2 justify-center">
                           <button
                             onClick={() =>
                               navigate(`/edit-supervisor/${user.UserID}`)
                             }
                             className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded shadow-md font-medium transition duration-150"
                           >
-                            ✏️ Edit
+                            ✏️ 
                           </button>
 
                           <button
@@ -121,7 +121,7 @@ export default function AddSupervisor() {
                             }}
                             className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded shadow-md font-medium transition duration-150"
                           >
-                            🗑️ Delete
+                            🗑️ 
                           </button>
                         </td>
                       </tr>

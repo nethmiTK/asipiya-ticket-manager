@@ -77,9 +77,6 @@ export default function ChatSection({ user, supportUser, ticketId, ticket, role 
         <h2 className="text-lg font-bold">
           Chat for Ticket #{ticket?.id || ticketId}
         </h2>
-        <p className="text-sm text-gray-600">
-          {ticket?.problem || "Loading ticket..."}
-        </p>
       </header>
 
       <div className="flex-1 overflow-y-auto bg-gray-50 p-4">
