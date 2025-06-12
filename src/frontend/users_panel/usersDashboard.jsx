@@ -6,9 +6,20 @@ import axios from 'axios';
 import { LuTicketCheck, LuTicketX, LuTicket, LuStar } from "react-icons/lu";
 import { FaHistory } from "react-icons/fa";
 import { toast } from 'react-toastify';
-import { IoNotificationsOutline } from "react-icons/io5"; 
+import { IoNotificationsOutline } from "react-icons/io5";
 import NotificationPanel from "../components/NotificationPanel";
 import { useNavigate } from "react-router-dom";
+
+const truncateDescription = (text, maxLength = 80) => {
+    if (!text) return '';
+    if (text.length <= maxLength) return text;
+    let truncated = text.substring(0, maxLength);
+    const lastSpace = truncated.lastIndexOf(' ');
+    if (lastSpace > -1) {
+        truncated = truncated.substring(0, lastSpace);
+    }
+    return truncated + '...';
+};
 
 const usersDashboard = () => {
     const navigate = useNavigate();
@@ -24,7 +35,7 @@ const usersDashboard = () => {
     const notificationRef = useRef(null);
 
     // const [isSidebarOpen, setIsSidebarOpen] = useState(true); 
-    const [isSidebarOpen, setIsSidebarOpen] = useState(false); 
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
     useEffect(() => {
         const handleClickOutside = (event) => {
@@ -44,7 +55,7 @@ const usersDashboard = () => {
         if (loggedInUser?.UserID) {
             fetchUserTicketCounts();
             fetchUserRecentTickets();
-            fetchUnreadNotifications(); 
+            fetchUnreadNotifications();
         }
     }, [loggedInUser]);
 
@@ -61,7 +72,7 @@ const usersDashboard = () => {
     useEffect(() => {
         if (loggedInUser?.UserID) {
             const interval = setInterval(fetchUnreadNotifications, 30000); // Check every 30 seconds
-            return () => clearInterval(interval); 
+            return () => clearInterval(interval);
         }
     }, [loggedInUser]);
 
@@ -215,22 +226,27 @@ const usersDashboard = () => {
                             <p className="text-gray-600">No recent tickets found.</p>
                         ) : (
                             <div className="overflow-x-auto">
-                                <table className="min-w-full text-sm text-left border-collapse">
+                                <table className="min-w-full text-sm text-left border-collapse table-fixed w-full">
                                     <thead className="bg-gray-100 text-gray-700 uppercase">
                                         <tr>
-                                            <th className="px-4 py-3 border-b border-gray-200 rounded-tl-lg">ID</th>
-                                            <th className="px-4 py-3 border-b border-gray-200">Description</th>
-                                            <th className="px-4 py-3 border-b border-gray-200">System</th>
-                                            <th className="px-4 py-3 border-b border-gray-200">Category</th>
-                                            <th className="px-4 py-3 border-b border-gray-200">Status</th>
-                                            <th className="px-4 py-3 border-b border-gray-200 rounded-tr-lg">Date & Time</th>
+                                            <th className="px-4 py-3 border-b border-gray-200 rounded-tl-lg w-[10%]">ID</th>
+                                            <th className="px-4 py-3 border-b border-gray-200 w-[30%]">Description</th>
+                                            <th className="px-4 py-3 border-b border-gray-200 w-[15%]">System</th>
+                                            <th className="px-4 py-3 border-b border-gray-200 w-[15%]">Category</th>
+                                            <th className="px-4 py-3 border-b border-gray-200 w-[10%]">Status</th>
+                                            <th className="px-4 py-3 border-b border-gray-200 rounded-tr-lg w-[20%]">Date & Time</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-200">
                                         {recentTickets.map((ticket) => (
                                             <tr key={ticket.TicketID} className="hover:bg-gray-50">
                                                 <td className="px-4 py-2 font-medium text-gray-900">{ticket.TicketID}</td>
-                                                <td className="px-4 py-2 text-gray-700">{ticket.Description}</td>
+                                                <td className="px-4 py-2 text-gray-700 whitespace-normal overflow-hidden break-words" style={{
+                                                    maxHeight: '3.6em',
+                                                    lineHeight: '1.2em'
+                                                }}>
+                                                    {truncateDescription(ticket.Description, 120)}
+                                                </td>
                                                 <td className="px-4 py-2 text-gray-700">{ticket.SystemName}</td>
                                                 <td className="px-4 py-2 text-gray-700">{ticket.CategoryName}</td>
                                                 <td className="px-4 py-2">

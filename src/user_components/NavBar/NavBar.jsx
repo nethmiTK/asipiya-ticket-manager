@@ -24,14 +24,14 @@ const NavBar = ({ isSidebarOpen, showNotifications, unreadNotifications, setShow
             <h1 className="text-2xl font-bold text-gray-800"></h1>
 
             {/* Search bar */}
-            <div className="w-96 border border-zinc-300 rounded-full h-9 flex items-center px-2">
+            {/* <div className="w-96 border border-zinc-300 rounded-full h-9 flex items-center px-2">
                 <IoSearchSharp className="text-gray-500 mr-2" />
                 <input
                     type="text"
                     placeholder="Search in all tickets...."
                     className="w-full h-full rounded-full outline-none border-none bg-zinc-50 text-sm p-4"
                 />
-            </div>
+            </div> */}
 
             {/* User Profile and Notification Button */}
             <div className="flex items-center gap-4">
