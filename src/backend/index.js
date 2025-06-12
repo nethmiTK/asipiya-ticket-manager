@@ -1436,15 +1436,15 @@ app.get('/system_registration', (req, res) => {
     SELECT
       s.*,
       CASE
-        WHEN COUNT(t.TicketID) > 0 THEN 'Active'
-        ELSE 'Inactive'
-      END AS Status
+        WHEN COUNT(t.TicketID) > 0 THEN 1
+        ELSE 0
+      END AS IsUsed
     FROM asipiyasystem s
-    LEFT JOIN ticket t
-      ON s.AsipiyaSystemID = t.AsipiyaSystemID
+    LEFT JOIN ticket t ON s.AsipiyaSystemID = t.AsipiyaSystemID
     GROUP BY
-      s.AsipiyaSystemID, s.SystemName, s.Description
+      s.AsipiyaSystemID, s.SystemName, s.Description, s.Status
     ORDER BY s.AsipiyaSystemID;
+
   `;
 
   db.query(sql, (err, results) => {
@@ -1456,13 +1456,12 @@ app.get('/system_registration', (req, res) => {
   });
 });
 
-
 app.put('/api/system_registration_update/:id', (req, res) => {
   const { id } = req.params;
-  const { systemName, description } = req.body;
+  const { systemName, description, status } = req.body;
+  const sql = 'UPDATE asipiyasystem SET SystemName = ?, Description = ?, Status = ? WHERE AsipiyaSystemID = ?';
 
-  const sql = 'UPDATE asipiyasystem SET SystemName = ?, Description = ? WHERE AsipiyaSystemID = ?';
-  db.query(sql, [systemName, description, id], (err, result) => {
+  db.query(sql, [systemName, description, status, id], (err, result) => {
     if (err) {
       console.error('Update error:', err);
       return res.status(500).json({ error: 'Error updating system' });
@@ -1475,6 +1474,7 @@ app.put('/api/system_registration_update/:id', (req, res) => {
     res.status(200).json({ message: 'System updated successfully' });
   });
 });
+
 
 app.delete('/api/system_registration_delete/:id', (req, res) => {
   const { id } = req.params;
@@ -1541,14 +1541,14 @@ app.get('/ticket_category', (req, res) => {
     SELECT
       tc.*,
       CASE
-        WHEN COUNT(t.TicketID) > 0 THEN 'Active'
-        ELSE 'Inactive'
-      END AS Status
+        WHEN COUNT(t.TicketID) > 0 THEN 1
+        ELSE 0
+      END AS IsUsed
     FROM ticketcategory tc
     LEFT JOIN ticket t
       ON tc.TicketCategoryID = t.TicketCategoryID
     GROUP BY
-      tc.TicketCategoryID, tc.CategoryName, tc.Description
+      tc.TicketCategoryID, tc.CategoryName, tc.Description, tc.Status
     ORDER BY tc.TicketCategoryID;
   `;
     db.query(sql, (err, results) => {
@@ -1562,10 +1562,10 @@ app.get('/ticket_category', (req, res) => {
 
 app.put('/api/ticket_category_update/:id', (req, res) => {
   const { id } = req.params;
-  const { CategoryName, Description } = req.body;
+  const { CategoryName, Description, Status} = req.body;
 
-  const sql = 'UPDATE ticketcategory SET CategoryName = ?, Description = ? WHERE TicketCategoryID = ?';
-  db.query(sql, [CategoryName, Description, id], (err, result) => {
+  const sql = 'UPDATE ticketcategory SET CategoryName = ?, Description = ?, Status = ? WHERE TicketCategoryID = ?';
+  db.query(sql, [CategoryName, Description, Status, id], (err, result) => {
     if (err) {
       console.error('Update error:', err);
       return res.status(500).json({ error: 'Error updating category' });
@@ -1771,33 +1771,44 @@ app.post('/api/tickets', async (req, res) => {
     // Get system ID
     const getSystemId = "SELECT AsipiyaSystemID FROM asipiyasystem WHERE SystemName = ?";
     const [systemResult] = await db.promise().query(getSystemId, [systemName]);
-    
+
     if (systemResult.length === 0) {
       return res.status(400).json({ message: "Invalid system name" });
     }
-    
+
+    const systemID = systemResult[0].AsipiyaSystemID;
+
     // Get category ID
     const getCategoryId = "SELECT TicketCategoryID FROM ticketcategory WHERE CategoryName = ?";
     const [categoryResult] = await db.promise().query(getCategoryId, [ticketCategory]);
-    
+
     if (categoryResult.length === 0) {
       return res.status(400).json({ message: "Invalid ticket category" });
     }
+
+    const categoryID = categoryResult[0].TicketCategoryID;
 
     // Insert ticket
     const insertTicket = `
       INSERT INTO ticket (UserId, AsipiyaSystemID, TicketCategoryID, Description, Status, Priority)
       VALUES (?, ?, ?, ?, 'Pending', 'Medium')
     `;
-    
+
     const [result] = await db.promise().query(insertTicket, [
       userId,
-      systemResult[0].AsipiyaSystemID,
-      categoryResult[0].TicketCategoryID,
+      systemID,
+      categoryID,
       description
     ]);
 
-    // Send notification to admins about new ticket
+    const updateSql = `
+      UPDATE asipiyasystem
+      SET Status = 1
+      WHERE AsipiyaSystemID = ?
+    `;
+    await db.promise().query(updateSql, [systemID]);
+
+    // 🔔 Optional: Send notification
     try {
       await sendNotificationsByRoles(
         ['Admin'],
@@ -1812,11 +1823,13 @@ app.post('/api/tickets', async (req, res) => {
       message: 'Ticket created successfully',
       ticketId: result.insertId
     });
+
   } catch (error) {
     console.error('Error creating ticket:', error);
     res.status(500).json({ message: 'Error creating ticket' });
   }
 });
+
 
 // Upload evidence for a ticket
 app.post('/api/upload_evidence', upload_evidence.array('evidenceFiles'), async (req, res) => {
