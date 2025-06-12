@@ -16,7 +16,7 @@ const ChatUI = ({ ticketID: propTicketID }) => {
     const storedUser = JSON.parse(localStorage.getItem("user"));
     if (storedUser) {
       setUserID(storedUser.UserID || storedUser.id);
-      setRole(storedUser.Role || storedUser.role || ""); 
+      setRole(storedUser.Role || storedUser.role || "");
     }
   }, []);
 
@@ -68,16 +68,8 @@ const ChatUI = ({ ticketID: propTicketID }) => {
     formData.append("Type", selectedFile ? "file" : "text");
     formData.append("Note", input || "");
     formData.append("UserID", userID);
-    formData.append("Role", role); 
+    formData.append("Role", role);
     if (selectedFile) formData.append("file", selectedFile);
-
-    console.log("Sending chat message:", {
-      TicketID: ticketID,
-      Type: selectedFile ? "file" : "text",
-      Note: input || "",
-      UserID: userID,
-      Role: role,
-    });
 
     try {
       const res = await fetch("http://localhost:5000/api/ticketchat", {
@@ -108,7 +100,7 @@ const ChatUI = ({ ticketID: propTicketID }) => {
   };
 
   return (
-    <div className="flex flex-col h-97.5 border-none rounded-md bg-white">
+    <div className="flex flex-col h-full border-none rounded-md bg-white">
       <div className="flex-1 overflow-y-auto space-y-2 p-2 mt-2">
         {messages.map((msg, idx) => (
           <div
@@ -122,17 +114,30 @@ const ChatUI = ({ ticketID: propTicketID }) => {
             >
               <p className="text-xs text-gray-200 mb-1 font-semibold">{msg.role}</p>
               {msg.filePath ? (
-                <>
-                  <a
-                    href={`http://localhost:5000/${msg.filePath}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="underline block"
-                  >
-                    📎 File
-                  </a>
-                  {msg.text && <p>{msg.text}</p>}
-                </>
+                msg.filePath.includes("image") ? (
+                  <img
+                    src={msg.filePath}
+                    alt="Sent file"
+                    className="max-h-40 object-contain rounded"
+                  />
+                ) : (
+                  <div className="flex items-center space-x-2">
+                    <a
+                      href={msg.filePath}
+                      download={msg.filePath.split("/").pop()}
+                      className="underline block text-blue-500"
+                    >
+                      📎 {msg.filePath.split("/").pop()}
+                    </a>
+                    <a
+                      href={msg.filePath}
+                      download={msg.filePath.split("/").pop()}
+                      className="text-sm bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600"
+                    >
+                      Download
+                    </a>
+                  </div>
+                )
               ) : (
                 msg.text
               )}
@@ -142,13 +147,20 @@ const ChatUI = ({ ticketID: propTicketID }) => {
         <div ref={messagesEndRef} />
       </div>
 
-      {selectedFile && selectedFile.type.startsWith("image/") && (
+      {selectedFile && (
         <div className="flex items-center justify-between p-2 border rounded bg-zinc-50 m-2">
-          <img
-            src={URL.createObjectURL(selectedFile)}
-            alt="Preview"
-            className="h-20 object-contain rounded"
-          />
+          {selectedFile.type.startsWith("image/") ? (
+            <img
+              src={URL.createObjectURL(selectedFile)}
+              alt="Preview"
+              className="h-20 object-contain rounded"
+            />
+          ) : (
+            <div className="flex flex-col items-start">
+              <span className="text-sm font-medium">{selectedFile.name}</span>
+              <span className="text-xs text-gray-500">{selectedFile.type}</span>
+            </div>
+          )}
           <button
             onClick={() => setSelectedFile(null)}
             className="text-red-500 text-sm ml-4"
