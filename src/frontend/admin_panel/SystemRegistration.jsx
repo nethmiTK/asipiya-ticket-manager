@@ -107,21 +107,27 @@ const SystemRegistration = () => {
             </div>
           )}
 
-          <table className="w-full table-auto border">
-            <thead className="bg-gray-100 text-left">
+          <table className="w-full table-auto">
+            <thead className="bg-gray-200">
               <tr>
                 <th className="p-2">System ID</th>
                 <th className="p-2">System Name</th>
                 <th className="p-2">Description</th>
+                <th className="p-2">Status</th>
                 <th className="p-2">Actions</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className='bg-white divide-y divide-gray-200'>
               {systems.map((system) => (
                 <tr key={system.AsipiyaSystemID} className="border-t">
                   <td className="p-2">{system.AsipiyaSystemID}</td>
                   <td className="p-2">{system.SystemName}</td>
                   <td className="p-2">{system.Description}</td>
+                  <td className="p-2">
+                    <span className={`px-2 py-1 text-sm font-semibold rounded ${system.Status === 'Active' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
+                      {system.Status}
+                    </span>
+                  </td>
                   <td className="p-2">
                     <button
                       onClick={() => handleEdit(system)}

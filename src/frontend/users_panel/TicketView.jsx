@@ -309,7 +309,7 @@ const TicketView = () => {
                 ) : (
                   <div className="space-y-2">
                     <h2 className="font-semibold mb-2">Chat</h2>
-                    <ChatUI />
+                    <ChatUI ticketID={selectedTicket.id}/>
                   </div>
                 )}
               </div>
