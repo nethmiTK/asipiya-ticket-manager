@@ -6,13 +6,13 @@ import { FileText, AlignLeft, X } from 'lucide-react';
 import { toast } from 'react-toastify';
 
 const SystemRegistration = () => {
-  const [form, setForm] = useState({ systemName: '', description: '' });
+  const [form, setForm] = useState({ systemName: '', description: '', status: '1' });
   const [systems, setSystems] = useState([]);
   const [error, setError] = useState(null);
   const [editingId, setEditingId] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [confirmDeleteId, setConfirmDeleteId] = useState(null); // new state
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -29,7 +29,7 @@ const SystemRegistration = () => {
 
   useEffect(() => {
     fetchSystems();
-  }, []);
+  }, [editingId]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -37,17 +37,23 @@ const SystemRegistration = () => {
 
     try {
       if (editingId) {
-        await axios.put(`http://localhost:5000/api/system_registration_update/${editingId}`, form);
+        const res = await axios.put(`http://localhost:5000/api/system_registration_update/${editingId}`, form);
         toast.success('System updated successfully.');
-      } else {
+
+        setSystems((prevSystems) =>
+          prevSystems.map((sys) =>
+            sys.AsipiyaSystemID === editingId ? { ...sys, ...form } : sys
+          )
+        );
+      }else {
         await axios.post('http://localhost:5000/system_registration', form);
         toast.success('System added successfully.');
       }
 
-      setForm({ systemName: '', description: '' });
+      setForm({ systemName: '', description: '', status: '1' });
       setEditingId(null);
       setShowModal(false);
-      fetchSystems();
+      await fetchSystems();
     } catch (error) {
       setError('Submit Error: ' + (error.response?.data?.message || error.message));
     }
@@ -55,8 +61,9 @@ const SystemRegistration = () => {
 
   const handleEdit = (system) => {
     setForm({
-      systemName: system.SystemName,
-      description: system.Description,
+      systemName: system.SystemName || '',
+      description: system.Description || '',
+      status: system.Status !== undefined ? system.Status.toString() : '1'
     });
     setEditingId(system.AsipiyaSystemID);
     setShowModal(true);
@@ -70,7 +77,7 @@ const SystemRegistration = () => {
     try {
       const res = await axios.delete(`http://localhost:5000/api/system_registration_delete/${confirmDeleteId}`);
       toast.success(res.data.message || 'System deleted successfully.');
-      fetchSystems();
+      await fetchSystems();
     } catch (error) {
       if (error.response?.status === 409) {
         toast.error("This system is already in use and cannot be deleted.");
@@ -91,7 +98,7 @@ const SystemRegistration = () => {
             <h2 className="text-2xl font-bold">System Registration Management</h2>
             <button
               onClick={() => {
-                setForm({ systemName: '', description: '' });
+                setForm({ systemName: '', description: '', status: '1' });
                 setEditingId(null);
                 setShowModal(true);
               }}
@@ -107,28 +114,31 @@ const SystemRegistration = () => {
             </div>
           )}
 
-          <table className="w-full table-auto">
+          <table className="table-fixed w-full">
             <thead className="bg-gray-200">
               <tr>
-                <th className="p-2">System ID</th>
-                <th className="p-2">System Name</th>
-                <th className="p-2">Description</th>
-                <th className="p-2">Status</th>
-                <th className="p-2">Actions</th>
+                <th className="w-20 p-2 text-left">System ID</th>
+                <th className="w-64 p-2 text-left">System Name</th>
+                <th className="w-[500px] p-2 text-left">Description</th>
+                <th className="w-24 p-2 text-left">Status</th>
+                <th className="w-24 p-2 text-left">Actions</th>
               </tr>
             </thead>
             <tbody className='bg-white divide-y divide-gray-200'>
               {systems.map((system) => (
                 <tr key={system.AsipiyaSystemID} className="border-t">
-                  <td className="p-2">{system.AsipiyaSystemID}</td>
-                  <td className="p-2">{system.SystemName}</td>
-                  <td className="p-2">{system.Description}</td>
-                  <td className="p-2">
-                    <span className={`px-2 py-1 text-sm font-semibold rounded ${system.Status === 'Active' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
-                      {system.Status}
+                  <td className="p-2 w-20">{system.AsipiyaSystemID}</td>
+                  <td className="p-2 w-64">{system.SystemName}</td>
+                  <td className="p-2 w-[500px]">{system.Description}</td>
+                  <td className="p-2 w-24">
+                    <span className={`px-2 py-1 text-sm font-semibold rounded 
+                      ${parseInt(system.Status) === 1 
+                        ? 'bg-green-100 text-green-700' 
+                        : 'bg-red-100 text-red-600'}`}>
+                      {parseInt(system.Status) === 1 ? 'Active' : 'Inactive'}
                     </span>
                   </td>
-                  <td className="p-2">
+                  <td className="p-2 w-24">
                     <button
                       onClick={() => handleEdit(system)}
                       className="text-blue-600 hover:text-blue-800 mr-4"
@@ -178,6 +188,7 @@ const SystemRegistration = () => {
                     />
                   </div>
                 </div>
+
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
                   <div className="relative">
@@ -194,6 +205,21 @@ const SystemRegistration = () => {
                     />
                   </div>
                 </div>
+
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                  <select
+                    name="status"
+                    value={form.status}
+                    onChange={handleChange}
+                    className="border rounded px-4 py-2 w-full"
+                    required
+                  >
+                    <option value="1">Active</option>
+                    <option value="0">Inactive</option>
+                  </select>
+                </div>
+
                 <div className="flex justify-end">
                   <button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded">
                     {editingId ? 'Update' : 'Add'}
@@ -203,7 +229,7 @@ const SystemRegistration = () => {
                     onClick={() => {
                       setShowModal(false);
                       setEditingId(null);
-                      setForm({ systemName: '', description: '' });
+                      setForm({ systemName: '', description: '', status: '1' });
                     }}
                     className="ml-2 bg-gray-400 hover:bg-gray-500 text-white px-4 py-2 rounded"
                   >

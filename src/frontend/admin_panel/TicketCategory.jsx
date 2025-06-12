@@ -6,7 +6,7 @@ import { X, FileText, AlignLeft } from 'lucide-react';
 import { toast } from 'react-toastify';
 
 const TicketCategory = () => {
-  const [form, setForm] = useState({ CategoryName: '', Description: '' });
+  const [form, setForm] = useState({ CategoryName: '', Description: '' , Status: '1' });
   const [categories, setCategories] = useState([]);
   const [error, setError] = useState(null);
   const [editingId, setEditingId] = useState(null);
@@ -29,7 +29,7 @@ const TicketCategory = () => {
 
   useEffect(() => {
     fetchCategories();
-  }, []);
+  }, [editingId]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -39,15 +39,21 @@ const TicketCategory = () => {
       if (editingId) {
         await axios.put(`http://localhost:5000/api/ticket_category_update/${editingId}`, form);
         toast.success('Category updated successfully.');
+
+        setCategories((prevCategory) =>
+          prevCategory.map((cat) =>
+            cat.TicketCategoryID === editingId ? { ...cat, ...form } : cat
+          )
+        );
       } else {
         await axios.post('http://localhost:5000/ticket_category', form);
         toast.success('Category added successfully.');
       }
 
-      setForm({ CategoryName: '', Description: '' });
+      setForm({ CategoryName: '', Description: '' , Status: '1'});
       setEditingId(null);
       setIsModalOpen(false);
-      fetchCategories();
+      await fetchCategories();
     } catch (error) {
       setError('Submit Error: ' + (error.response?.data?.message || error.message));
     }
@@ -55,8 +61,9 @@ const TicketCategory = () => {
 
   const handleEdit = (category) => {
     setForm({
-      CategoryName: category.CategoryName,
-      Description: category.Description,
+      CategoryName: category.CategoryName || '',
+      Description: category.Description || '',
+      Status: category.Status !== undefined ? category.Status.toString() : '1'
     });
     setEditingId(category.TicketCategoryID);
     setIsModalOpen(true);
@@ -70,7 +77,7 @@ const TicketCategory = () => {
     try {
       const res = await axios.delete(`http://localhost:5000/api/ticket_category_delete/${confirmDeleteId}`);
       toast.success(res.data.message || 'Category deleted successfully.');
-      fetchCategories();
+      await fetchCategories();
     } catch (error) {
       if (error.response?.status === 409) {
         toast.error("This category is already in use and cannot be deleted.");
@@ -91,7 +98,7 @@ const TicketCategory = () => {
             <h2 className="text-2xl font-bold">Ticket Category Management</h2>
             <button
               onClick={() => {
-                setForm({ CategoryName: '', Description: '' });
+                setForm({ CategoryName: '', Description: '', Status: '1'});
                 setEditingId(null);
                 setIsModalOpen(true);
               }}
@@ -105,28 +112,31 @@ const TicketCategory = () => {
             <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">{error}</div>
           )}
 
-          <table className="w-full table-auto">
+          <table className="table-fixed w-full">
             <thead className="bg-gray-200">
               <tr>
-                <th className="p-2">Category ID</th>
-                <th className="p-2">Category Name</th>
-                <th className="p-2">Description</th>
-                <th className="p-2">Status</th>
-                <th className="p-2">Actions</th>
+                <th className="w-20 p-2 text-left">Category ID</th>
+                <th className="w-44 p-2 text-left">Category Name</th>
+                <th className="w-[500px] p-2 text-left">Description</th>
+                <th className="w-24 p-2 text-left">Status</th>
+                <th className="w-24 p-2 text-left">Actions</th>
               </tr>
             </thead>
             <tbody className='bg-white divide-y divide-gray-200'>
               {categories.map((category) => (
                 <tr key={category.TicketCategoryID} className="border-t">
-                  <td className="p-2">{category.TicketCategoryID}</td>
-                  <td className="p-2">{category.CategoryName}</td>
-                  <td className="p-2">{category.Description}</td>
-                  <td className="p-2">
-                    <span className={`px-2 py-1 text-sm font-semibold rounded ${category.Status === 'Active' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
-                      {category.Status}
+                  <td className="p-2 w-20">{category.TicketCategoryID}</td>
+                  <td className="p-2 w-44">{category.CategoryName}</td>
+                  <td className="p-2 w-[500px]">{category.Description}</td>
+                  <td className="p-2 w-24">
+                    <span className={`px-2 py-1 text-sm font-semibold rounded 
+                      ${parseInt(category.Status) === 1 
+                        ? 'bg-green-100 text-green-700' 
+                        : 'bg-red-100 text-red-600'}`}>
+                      {parseInt(category.Status) === 1 ? 'Active' : 'Inactive'}
                     </span>
                   </td>
-                  <td className="p-2">
+                  <td className="p-2 w-24">
                     <button
                       onClick={() => handleEdit(category)}
                       className="text-blue-600 hover:text-blue-800 mr-4"
@@ -192,6 +202,21 @@ const TicketCategory = () => {
                     />
                   </div>
                 </div>
+
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                  <select
+                    name="Status"
+                    value={form.Status}
+                    onChange={handleChange}
+                    className="border rounded px-4 py-2 w-full"
+                    required
+                  >
+                    <option value="1">Active</option>
+                    <option value="0">Inactive</option>
+                  </select>
+                </div>
+
                 <div className="flex justify-end">
                   <button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded">
                     {editingId ? 'Update' : 'Add'}
@@ -201,7 +226,7 @@ const TicketCategory = () => {
                     onClick={() => {
                       setIsModalOpen(false);
                       setEditingId(null);
-                      setForm({ CategoryName: '', Description: '' });
+                      setForm({ CategoryName: '', Description: '' , Status: '1'});
                     }}
                     className="ml-2 bg-gray-400 hover:bg-gray-500 text-white px-4 py-2 rounded"
                   >
