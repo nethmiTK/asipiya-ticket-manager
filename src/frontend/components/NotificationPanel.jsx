@@ -9,6 +9,40 @@ const NotificationPanel = ({ userId, role, onClose }) => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
+    const getStatusColor = (status) => {
+        switch (status.toLowerCase()) {
+            case 'pending':
+                return 'text-yellow-600';
+            case 'in progress':
+                return 'text-blue-600';
+            case 'resolved':
+                return 'text-green-600';
+            case 'rejected':
+                return 'text-red-600';
+            default:
+                return 'text-gray-600';
+        }
+    };
+
+    const formatNotificationMessage = (notification) => {
+        if (notification.Type === 'STATUS_UPDATE') {
+            // Extract old and new status from the message
+            const match = notification.Message.match(/status has been updated from (.*) to (.*)/);
+            if (match) {
+                const [, oldStatus, newStatus] = match;
+                return (
+                    <span>
+                        Ticket #{notification.TicketID} status: <br />
+                        <span className={`font-medium ${getStatusColor(oldStatus)}`}>{oldStatus}</span>
+                        <span className="mx-2">→</span>
+                        <span className={`font-medium ${getStatusColor(newStatus)}`}>{newStatus}</span>
+                    </span>
+                );
+            }
+        }
+        return notification.Message;
+    };
+
     const fetchNotifications = async () => {
         try {
             const response = await axios.get(`http://localhost:5000/api/notifications/${userId}`);
@@ -104,7 +138,7 @@ const NotificationPanel = ({ userId, role, onClose }) => {
                                 }`}
                                 onClick={() => !notification.IsRead && markAsRead(notification.NotificationID)}
                             >
-                                <p className="text-sm text-gray-800">{notification.Message}</p>
+                                <p className="text-sm text-gray-800">{formatNotificationMessage(notification)}</p>
                                 <div className="mt-2 flex justify-between items-center">
                                     <span className="text-xs text-gray-500">
                                         {formatDistanceToNow(new Date(notification.CreatedAt), { addSuffix: true })}

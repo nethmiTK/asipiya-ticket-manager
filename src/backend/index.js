@@ -795,7 +795,7 @@ app.get('/api/supervisors', (req, res) => {
 
 app.put('/api/tickets/:ticketId/status', async (req, res) => {
   const ticketId = req.params.ticketId;
-  const { status, userId, supervisorName } = req.body;
+  const { status, userId } = req.body;
 
   try {
     // First get the ticket details to know the user who created it and current status
@@ -837,37 +837,47 @@ app.put('/api/tickets/:ticketId/status', async (req, res) => {
         ], async (err, logResult) => {
           if (err) {
             console.error("Error creating ticket log:", err);
-          } else {
-            try {
-              // Create first notification for the ticket creator about supervisor assignment
+          }
+          try {
+            // Create notification for the ticket creator about status change
+            await createNotification(
+              ticketUserId,
+              `Your ticket #${ticketId} status has been updated from ${oldStatus} to ${status}`,
+              'STATUS_UPDATE',
+              logResult.insertId
+            );
+
+            // If status is rejected, create additional notification
+            if (status.toLowerCase() === 'rejected') {
               await createNotification(
                 ticketUserId,
-                `Your ticket #${ticketId} has been assigned to supervisor ${supervisorFullName}. They will be handling your ticket.`,
-                'SUPERVISOR_ASSIGNED',
+                `Your ticket #${ticketId} has been rejected. Please check the ticket details for more information.`,
+                'TICKET_REJECTED',
                 logResult.insertId
               );
+            }
 
-              // Create second notification for the ticket creator about status change
+            // If there's a supervisor assigned, notify them too
+            if (supervisorId) {
               await createNotification(
-                ticketUserId,
-                `Your ticket #${ticketId} status has been updated from ${oldStatus} to ${status}`,
+                supervisorId,
+                `Ticket #${ticketId} status has been changed from ${oldStatus} to ${status}`,
                 'STATUS_UPDATE',
                 logResult.insertId
               );
-
-              // Notify supervisor about the assignment
-              if (supervisorId) {
-                await createNotification(
-                  supervisorId,
-                  `You have been assigned to handle ticket #${ticketId}. The ticket status has been changed from ${oldStatus} to ${status}`,
-                  'TICKET_ASSIGNED',
-                  logResult.insertId
-                );
-              }
-
-            } catch (error) {
-              console.error("Error creating notifications:", error);
             }
+
+            // Notify admins about rejected tickets
+            if (status.toLowerCase() === 'rejected') {
+              await sendNotificationsByRoles(
+                ['Admin'],
+                `Ticket #${ticketId} has been rejected`,
+                'TICKET_REJECTED'
+              );
+            }
+
+          } catch (error) {
+            console.error("Error creating notifications:", error);
           }
         });
 

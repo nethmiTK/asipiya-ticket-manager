@@ -11,6 +11,7 @@
     "start": "nodemon src/backend/index.js"
   },
   "dependencies": {
+    "@hello-pangea/dnd": "^18.0.1",
     "@tailwindcss/vite": "^4.1.7",
     "axios": "^1.9.0",
     "bcrypt": "^6.0.0",
