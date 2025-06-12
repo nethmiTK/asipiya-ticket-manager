@@ -231,9 +231,7 @@ export default function TicketManage() {
             <h1 className="text-xl sm:text-2xl font-bold text-gray-700">
               Ticket Management
             </h1>
-            <div
-              className="relative cursor-pointer"
-            >
+            <div className="relative cursor-pointer">
               <FaBell className="text-2xl text-gray-700" />
               {/*<span className="absolute -top-1 -right-1 bg-red-600 text-white text-xs rounded-full px-2">
                 3
@@ -435,14 +433,18 @@ export default function TicketManage() {
                         {evidenceList.map((evi, index) => {
                           const fileUrl = `http://localhost:5000/${evi.FilePath}`;
                           const fileName = evi.FilePath.split("/").pop();
+
                           const isImage =
                             /\.(jpg|jpeg|png|gif|bmp|webp)$/i.test(fileName);
                           const isPDF = /\.pdf$/i.test(fileName);
+                          const isVideo = /\.(mp4|webm|ogg)$/i.test(fileName);
+                          const isAudio = /\.(mp3|wav|ogg)$/i.test(fileName);
+                          const isDoc = /\.(docx?|xlsx?)$/i.test(fileName);
 
                           return (
                             <div
                               key={index}
-                              className="border rounded p-2 bg-white shadow-sm flex flex-col items-center text-center"
+                              className="border rounded p-2 bg-white shadow-sm flex flex-col items-center text-center w-40"
                             >
                               {isImage ? (
                                 <a
@@ -462,6 +464,40 @@ export default function TicketManage() {
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   className="text-red-600 hover:underline"
+                                >
+                                  📄 {fileName}
+                                </a>
+                              ) : isVideo ? (
+                                <video
+                                  controls
+                                  className="w-32 h-32 rounded"
+                                  title={fileName}
+                                >
+                                  <source
+                                    src={fileUrl}
+                                    type={`video/${fileName.split(".").pop()}`}
+                                  />
+                                  Your browser does not support the video tag.
+                                </video>
+                              ) : isAudio ? (
+                                <audio
+                                  controls
+                                  className="w-full"
+                                  title={fileName}
+                                >
+                                  <source
+                                    src={fileUrl}
+                                    type={`audio/${fileName.split(".").pop()}`}
+                                  />
+                                  Your browser does not support the audio
+                                  element.
+                                </audio>
+                              ) : isDoc ? (
+                                <a
+                                  href={fileUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-purple-600 hover:underline"
                                 >
                                   📄 {fileName}
                                 </a>
@@ -493,7 +529,7 @@ export default function TicketManage() {
                       className="absolute top-2 right-2 text-gray-500 hover:text-red-600 text-xl"
                       aria-label="Close Chat"
                     >
-                     🗙
+                      🗙
                     </button>
                     <ChatSection
                       user={selectedTicket.user}
