@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import AdminSideBar from "../../user_components/SideBar/AdminSideBar";
+import { Tooltip } from "react-tooltip";
 
 export default function AddSupervisor() {
   const navigate = useNavigate();
@@ -60,82 +61,65 @@ export default function AddSupervisor() {
                 </thead>
                 <tbody>
                   {users.length > 0 ? (
-                    users.map((user) => (
-                      <tr
-                        key={user.UserID}
-                        className="border-b hover:bg-blue-50 transition"
-                      >
-                        <td className="p-3 text-gray-800 text-center font-medium">
-                          {user.FullName}
-                        </td>
-                        <td className="p-3 text-gray-700 text-center">{user.Email}</td>
-                        <td className="p-3 text-center">
-                          <span
-                            className={`px-3 py-1 rounded-full text-sm font-medium ${
-                              roleColors[user.Role] ||
-                              "bg-gray-300 text-gray-900"
-                            }`}
-                          >
-                            {user.Role}
-                          </span>
-                        </td>
-                        <td className="p-3 flex gap-2 justify-center">
-                          <button
-                            onClick={() =>
-                              navigate(`/edit-supervisor/${user.UserID}`)
-                            }
-                            className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded shadow-md font-medium transition duration-150"
-                          >
-                            ✏️ 
-                          </button>
+            users.map((user) => (
+              <tr key={user.UserID} className="border-b hover:bg-blue-50 transition">
+                <td className="p-3 text-gray-800 font-medium">{user.FullName}</td>
+                <td className="p-3 text-gray-700">{user.Email}</td>
+                <td className="p-3">
+                  <span
+                    className={`px-3 py-1 rounded-full text-sm font-medium ${
+                      roleColors[user.Role] || "bg-gray-300 text-gray-900"
+                    }`}
+                  >
+                    {user.Role}
+                  </span>
+                </td>
+                <td className="p-3 flex gap-2">
+                  <button
+                    data-tip="Edit Supervisor"
+                    onClick={() => navigate(`/edit-supervisor/${user.UserID}`)}
+                    className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded shadow-md font-medium"
+                  >
+                    ✏️
+                  </button>
+              <Tooltip place="top" type="dark" effect="solid" />
 
-                          <button
-                            onClick={async () => {
-                              if (
-                                window.confirm(
-                                  `Are you sure you want to delete ${user.FullName}?`
-                                )
-                              ) {
-                                try {
-                                  const res = await fetch(
-                                    `http://localhost:5000/supervisor/${user.UserID}`,
-                                    {
-                                      method: "DELETE",
-                                    }
-                                  );
-                                  if (res.ok) {
-                                    // ✅ Correctly filter by UserID
-                                    setUsers(
-                                      users.filter(
-                                        (u) => u.UserID !== user.UserID
-                                      )
-                                    );
-                                  } else {
-                                    alert("Failed to delete");
-                                  }
-                                } catch (err) {
-                                  console.error("Error deleting user:", err);
-                                  alert("Server error. Try again.");
-                                }
-                              }
-                            }}
-                            className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded shadow-md font-medium transition duration-150"
-                          >
-                            🗑️ 
-                          </button>
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td
-                        colSpan="4"
-                        className="text-center text-gray-500 italic py-4"
-                      >
-                        No users available.
-                      </td>
-                    </tr>
-                  )}
+                  <button
+                    data-tip="Delete Supervisor"
+                    onClick={async () => {
+                      if (window.confirm(`Are you sure you want to delete ${user.FullName}?`)) {
+                        try {
+                          const res = await fetch(
+                            `http://localhost:5000/supervisor/${user.UserID}`,
+                            { method: "DELETE" }
+                          );
+                          if (res.ok) {
+                            setUsers(users.filter((u) => u.UserID !== user.UserID));
+                          } else {
+                            alert("Failed to delete");
+                          }
+                        } catch (err) {
+                          console.error("Error deleting user:", err);
+                          alert("Server error. Try again.");
+                        }
+                      }
+                    }}
+                    className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded shadow-md font-medium"
+                  >
+                    🗑️
+                  </button>
+                  
+              <Tooltip place="top" type="dark" effect="solid" />
+                </td>
+              </tr>
+            ))
+          ) : (
+            <tr>
+              <td colSpan="4" className="text-center text-gray-500 italic py-4">
+                No users available.
+              </td>
+            </tr>
+          )}
                 </tbody>
               </table>
             </div>

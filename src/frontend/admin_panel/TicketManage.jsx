@@ -227,7 +227,7 @@ export default function TicketManage() {
       >
         <div className="min-h-screen bg-gray-50">
           {/* Top Navigation */}
-          <nav className="bg-white shadow-md px-6 py-4 flex justify-between rounded  items-center">
+          <nav className="bg-white shadow-md px-6 py-4 flex justify-between rounded-lg  items-center">
             <h1 className="text-xl sm:text-2xl font-bold text-gray-700">
               Ticket Management
             </h1>
@@ -273,7 +273,7 @@ export default function TicketManage() {
                   onClick={closeModal}
                   className="absolute top-2 right-3 text-gray-500 hover:text-red-600 text-xl font-bold"
                 >
-                  ×
+                  🗙
                 </button>
 
                 {/* LEFT: Ticket Info */}
@@ -493,7 +493,7 @@ export default function TicketManage() {
                       className="absolute top-2 right-2 text-gray-500 hover:text-red-600 text-xl"
                       aria-label="Close Chat"
                     >
-                      ❌
+                     🗙
                     </button>
                     <ChatSection
                       user={selectedTicket.user}
