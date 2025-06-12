@@ -559,17 +559,17 @@ app.get('/ticketchat/:ticketId', (req, res) => {
 
 // Add a new chat message for a ticket
 app.post('/ticketchat', (req, res) => {
-    const { TicketID, Type, Note, UserCustomerID, UserID, Path } = req.body;
+    const { TicketID, Type, Note, UserID, Path } = req.body;
 
     // Basic validation
     if (!TicketID || !Note) {
         return res.status(400).json({ error: 'TicketID and Note are required.' });
     }
 
-    const sql = `INSERT INTO ticketchat (TicketID, Type, Note, UserCustomerID, UserID, Path)
-                 VALUES (?, ?, ?, ?, ?, ?)`;
+    const sql = `INSERT INTO ticketchat (TicketID, Type, Note, UserID, Path)
+                 VALUES (?, ?, ?, ?, ?)`;
 
-    db.query(sql, [TicketID, Type || null, Note, UserCustomerID || null, UserID || null, Path || null], (err, result) => {
+    db.query(sql, [TicketID, Type || null, Note, UserID || null, Path || null], (err, result) => {
         if (err) {
             console.error('Error adding chat message:', err);
             return res.status(500).json({ error: 'Database error' });
