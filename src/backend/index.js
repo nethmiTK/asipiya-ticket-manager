@@ -1420,10 +1420,10 @@ app.get('/api/pending_ticket', (req, res) => {
 
 //Add systems
 app.post('/api/systems', async (req, res) => {
-  const { systemName, description } = req.body;
+  const { systemName, description, status } = req.body;
 
-  const sql = 'INSERT INTO asipiyasystem (SystemName, Description) VALUES (?, ?)';
-  db.query(sql, [systemName, description], async (err) => {
+  const sql = 'INSERT INTO asipiyasystem (SystemName, Description , Status) VALUES (?, ?, ?)';
+  db.query(sql, [systemName, description, status], async (err) => {
     if (err) {
       console.error("Database error:", err);
       return res.status(500).json({ message: "Database error" });
@@ -1458,7 +1458,6 @@ app.get('/system_registration', (req, res) => {
     GROUP BY
       s.AsipiyaSystemID, s.SystemName, s.Description, s.Status
     ORDER BY s.AsipiyaSystemID;
-
   `;
 
   db.query(sql, (err, results) => {
@@ -1493,15 +1492,20 @@ app.put('/api/system_registration_update/:id', (req, res) => {
 app.delete('/api/system_registration_delete/:id', (req, res) => {
   const { id } = req.params;
 
-  const checkSql = 'SELECT * FROM ticket WHERE AsipiyaSystemID = ?'; // if your ticket table uses this FK
-  db.query(checkSql, [id], (err, results) => {
+  const checkStatusSql = 'SELECT Status FROM asipiyasystem WHERE AsipiyaSystemID = ?';
+  db.query(checkStatusSql, [id], (err, results) => {
     if (err) {
-      console.error('Check usage error:', err);
-      return res.status(500).json({ error: 'Database error checking system usage' });
+      console.error('Status check error:', err);
+      return res.status(500).json({ error: 'Database error checking system status' });
     }
 
-    if (results.length > 0) {
-      return res.status(409).json({ message: 'System is in use and cannot be deleted' });
+    if (results.length === 0) {
+      return res.status(404).json({ message: 'System not found' });
+    }
+
+    const status = results[0].Status;
+    if (status === 1) {
+      return res.status(403).json({ message: 'Cannot delete active system (status = 1)' });
     }
 
     const deleteSql = 'DELETE FROM asipiyasystem WHERE AsipiyaSystemID = ?';
@@ -1521,12 +1525,13 @@ app.delete('/api/system_registration_delete/:id', (req, res) => {
 });
 
 
+
 //Adding Category
 app.post('/api/ticket_category', async (req, res) => {
-  const { CategoryName, Description } = req.body;
+  const { CategoryName, Description, Status } = req.body;
 
-  const sql = 'INSERT INTO ticketcategory (CategoryName, Description) VALUES (?, ?)';
-  db.query(sql, [CategoryName, Description], async (err, result) => {
+  const sql = 'INSERT INTO ticketcategory (CategoryName, Description, Status) VALUES (?, ?, ?)';
+  db.query(sql, [CategoryName, Description, Status], async (err, result) => {
     if (err) {
       console.error("Database error:", err);
       return res.status(500).json({ message: "Failed to add ticket category" });
@@ -1597,19 +1602,26 @@ app.put('/api/ticket_category_update/:id', (req, res) => {
 app.delete('/api/ticket_category_delete/:id', (req, res) => {
   const { id } = req.params;
 
-  const checkSql = 'SELECT * FROM ticket WHERE TicketCategoryID = ?';
+  const checkSql = 'SELECT Status FROM ticketcategory WHERE TicketCategoryID = ?';
   db.query(checkSql, [id], (err, results) => {
     if (err) {
+      console.error('Status check error:', err);
       return res.status(500).json({ error: 'Database error checking category usage' });
     }
 
-    if (results.length > 0) {
-      return res.status(409).json({ message: 'Category in use and cannot be deleted' });
+    if (results.length === 0) {
+      return res.status(404).json({ message: 'Category in use and cannot be deleted' });
+    }
+
+    const status = results[0].Status;
+    if (status === 1) {
+      return res.status(403).json({ message: 'Cannot delete active system (status = 1)' });
     }
 
     const deleteSql = 'DELETE FROM ticketcategory WHERE TicketCategoryID = ?';
     db.query(deleteSql, [id], (err, result) => {
       if (err) {
+        console.error('Delete error:', err);
         return res.status(500).json({ error: 'Error deleting category' });
       }
 
@@ -1822,7 +1834,6 @@ app.post('/api/tickets', async (req, res) => {
     `;
     await db.promise().query(updateSql, [systemID]);
 
-    // 🔔 Optional: Send notification
     try {
       await sendNotificationsByRoles(
         ['Admin'],
