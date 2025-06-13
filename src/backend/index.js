@@ -604,7 +604,7 @@ app.get("/messages/:ticketId", (req, res) => {
         file: r.Path
           ? {
               name: path.basename(r.Path),
-              url: `http://localhost:${PORT}/uploads/${r.Path}`,
+              url: `http://localhost:5000/uploads/profile_images/${r.Path}`,
             }
           : null,
         status: "delivered",
