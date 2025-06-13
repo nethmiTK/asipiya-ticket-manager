@@ -2,7 +2,13 @@
 import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
 
-export default function ChatSection({ user, supportUser, ticketId, ticket, role }) {
+export default function ChatSection({
+  user,
+  supportUser,
+  ticketId,
+  ticket,
+  role,
+}) {
   const [chatMessages, setChatMessages] = useState([]);
   const [chatInput, setChatInput] = useState("");
   const [sendingFile, setSendingFile] = useState(null);
@@ -23,44 +29,74 @@ export default function ChatSection({ user, supportUser, ticketId, ticket, role 
   }, [chatMessages]);
 
   const handleSendMessage = async () => {
-    if (!chatInput.trim()) return;
+    if (!chatInput.trim() && !sendingFile) return;
 
     const optimisticId = Date.now();
+
+    // Create local blob URL for preview if sendingFile is present
+    const localFileUrl = sendingFile ? URL.createObjectURL(sendingFile) : null;
 
     const newMsg = {
       id: optimisticId,
       ticketid: ticketId,
       userid: supportUser || null,
       role: role || "Supervisor",
-      content: chatInput,
+      content: chatInput || (sendingFile && sendingFile.name),
       timestamp: new Date().toISOString(),
-      type: "text",
-      file: null,
+      type: sendingFile ? "file" : "text",
+      file: sendingFile
+        ? {
+            name: sendingFile.name,
+            url: localFileUrl,
+          }
+        : null,
       status: "sending",
     };
 
     setChatMessages((prev) => [...prev, newMsg]);
 
     try {
-      const res = await axios.post("http://localhost:5000/ticketchat", {
-        TicketID: ticketId,
-        Note: chatInput,
-        Type: "text",
-        UserID: supportUser || "",
-        Role: role || "Supervisor",
-      });
+      const formData = new FormData();
+      formData.append("TicketID", ticketId);
+      formData.append("Type", sendingFile ? "file" : "text");
+      formData.append("Note", chatInput || sendingFile.name);
+      formData.append("UserID", supportUser || "");
+      formData.append("Role", role || "Supervisor");
+      if (sendingFile) {
+        formData.append("File", sendingFile);
+      }
+
+      const res = await axios.post(
+        "http://localhost:5000/ticketchat",
+        formData,
+        {
+          headers: { "Content-Type": "multipart/form-data" },
+        }
+      );
 
       const newId = res.data.chatId;
+      const uploadedFileUrl = res.data.fileUrl || localFileUrl;
 
       setChatMessages((msgs) =>
         msgs.map((msg) =>
           msg.id === optimisticId
-            ? { ...msg, id: newId, status: "delivered" }
+            ? {
+                ...msg,
+                id: newId,
+                status: "delivered",
+                file: sendingFile
+                  ? {
+                      name: sendingFile.name,
+                      url: uploadedFileUrl,
+                    }
+                  : null,
+              }
             : msg
         )
       );
 
       setChatInput("");
+      setSendingFile(null);
     } catch (error) {
       console.error("Send failed:", error);
       setChatMessages((msgs) =>
@@ -92,11 +128,15 @@ export default function ChatSection({ user, supportUser, ticketId, ticket, role 
           return (
             <div
               key={msg.id}
-              className={`flex mb-3 ${!isClient ? "justify-end" : "justify-start"}`}
+              className={`flex mb-3 ${
+                !isClient ? "justify-end" : "justify-start"
+              }`}
             >
               {isClient && (
                 <img
-                  src={supportUser?.avatar || "https://i.pravatar.cc/40?u=user1"}
+                  src={
+                    supportUser?.avatar || "https://i.pravatar.cc/40?u=user1"
+                  }
                   alt="avatar"
                   className="w-8 h-8 rounded-full mr-2 self-end"
                 />
@@ -109,21 +149,75 @@ export default function ChatSection({ user, supportUser, ticketId, ticket, role 
                     : "bg-gray-300 text-gray-800 rounded-bl-none"
                 }`}
               >
-                {msg.file ? (
-                  <>
-                    <strong>{msg.file.name}</strong>
-                    <a
-                      href={msg.file.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="block text-sm text-blue-200 underline mt-1"
-                    >
-                      View File
-                    </a>
-                  </>
-                ) : (
-                  msg.content
-                )}
+                {msg.file
+                  ? (() => {
+                      const fileUrl = msg.file.url;
+                      const fileName = msg.file.name.toLowerCase();
+
+                      if (fileName.match(/\.(jpg|jpeg|png|gif|bmp|webp)$/i)) {
+                        return (
+                          <div>
+                            <img
+                              src={fileUrl}
+                              alt={fileName}
+                              className="w-40 h-auto rounded-md mb-1"
+                            />
+                            <p className="text-sm break-words">
+                              {msg.file.name}
+                            </p>
+                          </div>
+                        );
+                      } else if (fileName.match(/\.(mp4|webm|ogg|mov)$/i)) {
+                        return (
+                          <div>
+                            <video
+                              controls
+                              src={fileUrl}
+                              className="w-40 h-auto rounded-md mb-1"
+                            />
+                            <p className="text-sm break-words">
+                              {msg.file.name}
+                            </p>
+                          </div>
+                        );
+                      } else if (fileName.match(/\.pdf$/i)) {
+                        return (
+                          <div>
+                            <iframe
+                              src={fileUrl}
+                              className="w-40 h-40 rounded-md mb-1"
+                              title="PDF Preview"
+                            />
+                            <a
+                              href={fileUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-200 underline text-xs"
+                            >
+                              Open PDF
+                            </a>
+                          </div>
+                        );
+                      } else {
+                        return (
+                          <div>
+                            <p className="text-sm break-words font-semibold">
+                              {msg.file.name}
+                            </p>
+                            <a
+                              href={fileUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-200 underline text-xs"
+                            >
+                              Download File
+                            </a>
+                          </div>
+                        );
+                      }
+                    })()
+                  : msg.content}
+
                 <div className="flex justify-between text-xs mt-1 opacity-70">
                   <span>{new Date(msg.timestamp).toLocaleString()}</span>
                   {!isClient && (
@@ -148,7 +242,65 @@ export default function ChatSection({ user, supportUser, ticketId, ticket, role 
             </div>
           );
         })}
+        {/* File preview before sending (centered bubble) */}
+        {sendingFile && (
+          <div className="flex justify-center mb-2">
+            <div className="relative bg-yellow-100 rounded-lg p-2 shadow-md max-w-[200px] max-h-[200px] overflow-hidden">
+              {/* Universal file preview */}
+              {(() => {
+                const fileUrl = URL.createObjectURL(sendingFile);
+                const fileName = sendingFile.name.toLowerCase();
 
+                if (sendingFile.type.startsWith("image/")) {
+                  return (
+                    <img
+                      src={fileUrl}
+                      alt="preview"
+                      className="w-full h-full object-cover rounded"
+                    />
+                  );
+                } else if (sendingFile.type.startsWith("video/")) {
+                  return (
+                    <video
+                      src={fileUrl}
+                      controls
+                      className="w-full h-full object-cover rounded"
+                    />
+                  );
+                } else if (fileName.endsWith(".pdf")) {
+                  return (
+                    <iframe
+                      src={fileUrl}
+                      title="PDF Preview"
+                      className="w-full h-full rounded"
+                    />
+                  );
+                } else {
+                  return (
+                    <div className="flex flex-col items-center justify-center h-full">
+                      <span className="text-sm font-medium text-gray-800 text-center break-words">
+                        {sendingFile.name}
+                      </span>
+                      <span className="text-xs text-blue-500">
+                        (File ready to send)
+                      </span>
+                    </div>
+                  );
+                }
+              })()}
+              {/* Remove Button */}
+              <button
+                onClick={() => setSendingFile(null)}
+                className="absolute top-1 right-2 text-red-600 hover:text-red-800 text-lg font-bold"
+                title="Remove file"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        )}
+
+        <div ref={chatEndRef} />
         {isTyping && (
           <div className="flex items-center space-x-2 ml-10 mb-2">
             <div className="w-3 h-3 bg-gray-500 rounded-full animate-bounce" />
@@ -157,7 +309,6 @@ export default function ChatSection({ user, supportUser, ticketId, ticket, role 
             <span className="text-gray-600 text-sm">Support is typing...</span>
           </div>
         )}
-        <div ref={chatEndRef} />
       </div>
 
       {/* Input area */}
@@ -169,12 +320,12 @@ export default function ChatSection({ user, supportUser, ticketId, ticket, role 
         >
           📎
         </label>
-        {/*<input
+        <input
           type="file"
           id="file-upload"
           className="hidden"
           onChange={(e) => setSendingFile(e.target.files[0])}
-        />*/}
+        />
         <input
           type="text"
           value={chatInput}
@@ -195,15 +346,6 @@ export default function ChatSection({ user, supportUser, ticketId, ticket, role 
         >
           Send
         </button>
-        {sendingFile && (
-          <button
-            onClick={() => setSendingFile(null)}
-            className="ml-1 text-red-600 hover:text-red-800"
-            title="Cancel file"
-          >
-            ✕
-          </button>
-        )}
       </div>
     </div>
   );
