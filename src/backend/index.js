@@ -543,7 +543,7 @@ app.post('/reset-password', (req, res) => {
 
 
 /*---------------------------------------------------------------------------------------*/
-//nope
+
 // Get all chat messages for a ticket
 app.get('/ticketchat/:ticketId', (req, res) => {
     const ticketId = req.params.ticketId;
@@ -557,39 +557,25 @@ app.get('/ticketchat/:ticketId', (req, res) => {
     });
 });
 
-// ✅ Add a new chat message for a ticket
-app.post('/ticketchat', upload.single('File'), (req, res) => {
-  const { TicketID, Type, Note, UserID, Role } = req.body;
-  const file = req.file;
+// Add a new chat message for a ticket
+app.post('/ticketchat', (req, res) => {
+    const { TicketID, Type, Note, UserID, Path } = req.body;
 
-  if (!TicketID || !Note) {
-    return res.status(400).json({ error: 'TicketID and Note are required.' });
-  }
-
-  const filePath = file ? file.filename : null;
-
-  const sql = `INSERT INTO ticketchat (TicketID, Type, Note, UserID, Role, Path)
-               VALUES (?, ?, ?, ?, ?, ?)`;
-
-  db.query(
-    sql,
-    [TicketID, Type || null, Note, UserID || null, Role || null, filePath],
-    (err, result) => {
-      if (err) {
-        console.error('Error adding chat message:', err);
-        return res.status(500).json({ error: 'Database error' });
-      }
-
-      // Build full file URL
-      const fileUrl = file ? `http://localhost:5000/uploads/profile_images/${file.filename}` : null;
-
-      res.status(201).json({
-        message: 'Chat message added',
-        chatId: result.insertId,
-        fileUrl, // <- Send full URL back to frontend
-      });
+    // Basic validation
+    if (!TicketID || !Note) {
+        return res.status(400).json({ error: 'TicketID and Note are required.' });
     }
-  );
+
+    const sql = `INSERT INTO ticketchat (TicketID, Type, Note, UserID, Path)
+                 VALUES (?, ?, ?, ?, ?)`;
+
+    db.query(sql, [TicketID, Type || null, Note, UserID || null, Path || null], (err, result) => {
+        if (err) {
+            console.error('Error adding chat message:', err);
+            return res.status(500).json({ error: 'Database error' });
+        }
+        res.status(201).json({ message: 'Chat message added', chatId: result.insertId });
+    });
 });
 
 // ✅ GET messages for a specific ticket
@@ -618,7 +604,7 @@ app.get("/messages/:ticketId", (req, res) => {
         file: r.Path
           ? {
               name: path.basename(r.Path),
-              url: `http://localhost:5000/uploads/profile_images/${r.Path}`,
+              url: `http://localhost:${PORT}/uploads/${r.Path}`,
             }
           : null,
         status: "delivered",
@@ -809,7 +795,7 @@ app.get('/api/supervisors', (req, res) => {
 
 app.put('/api/tickets/:ticketId/status', async (req, res) => {
   const ticketId = req.params.ticketId;
-  const { status, userId, supervisorName } = req.body;
+  const { status, userId } = req.body;
 
   try {
     // First get the ticket details to know the user who created it and current status
@@ -851,37 +837,47 @@ app.put('/api/tickets/:ticketId/status', async (req, res) => {
         ], async (err, logResult) => {
           if (err) {
             console.error("Error creating ticket log:", err);
-          } else {
-            try {
-              // Create first notification for the ticket creator about supervisor assignment
+          }
+          try {
+            // Create notification for the ticket creator about status change
+            await createNotification(
+              ticketUserId,
+              `Your ticket #${ticketId} status has been updated from ${oldStatus} to ${status}`,
+              'STATUS_UPDATE',
+              logResult.insertId
+            );
+
+            // If status is rejected, create additional notification
+            if (status.toLowerCase() === 'rejected') {
               await createNotification(
                 ticketUserId,
-                `Your ticket #${ticketId} has been assigned to supervisor ${supervisorFullName}. They will be handling your ticket.`,
-                'SUPERVISOR_ASSIGNED',
+                `Your ticket #${ticketId} has been rejected. Please check the ticket details for more information.`,
+                'TICKET_REJECTED',
                 logResult.insertId
               );
+            }
 
-              // Create second notification for the ticket creator about status change
+            // If there's a supervisor assigned, notify them too
+            if (supervisorId) {
               await createNotification(
-                ticketUserId,
-                `Your ticket #${ticketId} status has been updated from ${oldStatus} to ${status}`,
+                supervisorId,
+                `Ticket #${ticketId} status has been changed from ${oldStatus} to ${status}`,
                 'STATUS_UPDATE',
                 logResult.insertId
               );
-
-              // Notify supervisor about the assignment
-              if (supervisorId) {
-                await createNotification(
-                  supervisorId,
-                  `You have been assigned to handle ticket #${ticketId}. The ticket status has been changed from ${oldStatus} to ${status}`,
-                  'TICKET_ASSIGNED',
-                  logResult.insertId
-                );
-              }
-
-            } catch (error) {
-              console.error("Error creating notifications:", error);
             }
+
+            // Notify admins about rejected tickets
+            if (status.toLowerCase() === 'rejected') {
+              await sendNotificationsByRoles(
+                ['Admin'],
+                `Ticket #${ticketId} has been rejected`,
+                'TICKET_REJECTED'
+              );
+            }
+
+          } catch (error) {
+            console.error("Error creating notifications:", error);
           }
         });
 

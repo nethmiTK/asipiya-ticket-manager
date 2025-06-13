@@ -7,6 +7,8 @@ export default function TicketCard({ ticket, onClick }) {
         return "text-yellow-700";
       case "Resolved":
         return "text-blue-700";
+      case "Rejected":
+        return "text-red-700";
       default:
         return "text-gray-700";
     }

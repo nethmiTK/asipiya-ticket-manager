@@ -7,6 +7,8 @@ import ChatSection from "./ChatSection";
 import { useAuth } from "../../App";
 import AdminSideBar from "../../user_components/SideBar/AdminSideBar";
 import { toast } from "react-toastify";
+import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
+import axios from "axios";
 
 const USER = {
   id: "user1",
@@ -19,6 +21,56 @@ const SUPPORT = {
   name: "Support",
   avatar: "https://i.pravatar.cc/40?u=support",
 };
+
+// Status mapping for drag and drop
+const statusColumns = {
+  open: "Open",
+  inProcess: "In Process",
+  resolved: "Resolved",
+  rejected: "Rejected"
+};
+
+// Status colors for visual feedback
+const statusColors = {
+  Open: "text-green-700",
+  "In Process": "text-yellow-700",
+  Resolved: "text-blue-700",
+  Rejected: "text-red-700"
+};
+
+const Section = ({ title, tickets, onCardClick, color, droppableId }) => (
+  <div className="bg-gray-50 p-6 rounded-xl">
+    <h2 className={`text-xl font-semibold mb-4 ${color}`}>{title}</h2>
+    <Droppable droppableId={droppableId}>
+      {(provided) => (
+        <div
+          {...provided.droppableProps}
+          ref={provided.innerRef}
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
+        >
+          {tickets.map((ticket, index) => (
+            <Draggable
+              key={ticket.id.toString()}
+              draggableId={ticket.id.toString()}
+              index={index}
+            >
+              {(provided) => (
+                <div
+                  ref={provided.innerRef}
+                  {...provided.draggableProps}
+                  {...provided.dragHandleProps}
+                >
+                  <TicketCard ticket={ticket} onClick={onCardClick} />
+                </div>
+              )}
+            </Draggable>
+          ))}
+          {provided.placeholder}
+        </div>
+      )}
+    </Droppable>
+  </div>
+);
 
 export default function TicketManage() {
   const navigate = useNavigate();
@@ -103,9 +155,51 @@ export default function TicketManage() {
     setComment("");
   };
 
+  // Function to handle drag and drop
+  const handleDragEnd = async (result) => {
+    if (!result.destination) return;
+
+    const { source, destination, draggableId } = result;
+    
+    // If dropped in the same column and same position
+    if (
+      source.droppableId === destination.droppableId &&
+      source.index === destination.index
+    ) {
+      return;
+    }
+
+    // Get new status based on destination
+    const newStatus = statusColumns[destination.droppableId];
+    const ticketId = draggableId;
+
+    try {
+      // Update ticket status in backend
+      await axios.put(`http://localhost:5000/api/tickets/${ticketId}/status`, {
+        status: newStatus,
+        userId: user.UserID
+      });
+
+      // Update local state
+      const updatedTickets = tickets.map(ticket => {
+        if (ticket.id.toString() === ticketId) {
+          return { ...ticket, status: newStatus };
+        }
+        return ticket;
+      });
+
+      setTickets(updatedTickets);
+      toast.success(`Ticket #${ticketId} status updated to ${newStatus}`);
+    } catch (error) {
+      console.error('Error updating ticket status:', error);
+      toast.error('Failed to update ticket status');
+    }
+  };
+
   const open = tickets.filter((t) => t.status === "Open");
   const inProcess = tickets.filter((t) => t.status === "In Process");
   const resolved = tickets.filter((t) => t.status === "Resolved");
+  const rejected = tickets.filter((t) => t.status === "Rejected");
 
   const initialMessages = [
     {
@@ -220,48 +314,50 @@ export default function TicketManage() {
   return (
     <div className="flex">
       <AdminSideBar open={isSidebarOpen} setOpen={setIsSidebarOpen} />
-      <div
-        className={`flex-1 min-h-screen bg-gray-100 p-8 transition-all duration-300 ${
-          isSidebarOpen ? "ml-72" : "ml-20"
+      <main
+        className={`flex-1 min-h-screen bg-gray-100 transition-all duration-300 ${
+          isSidebarOpen ? "ml-80" : "ml-24"
         }`}
       >
-        <div className="min-h-screen bg-gray-50">
-          {/* Top Navigation */}
-          <nav className="bg-white shadow-md px-6 py-4 flex justify-between rounded-lg  items-center">
-            <h1 className="text-xl sm:text-2xl font-bold text-gray-700">
-              Ticket Management
-            </h1>
-            <div className="relative cursor-pointer">
-              <FaBell className="text-2xl text-gray-700" />
-              {/*<span className="absolute -top-1 -right-1 bg-red-600 text-white text-xs rounded-full px-2">
-                3
-              </span>*/}
-            </div>
-          </nav>
+        <div className="p-8">
+          <h1 className="text-2xl font-bold mb-6">Ticket Management</h1>
 
-          {/* Ticket Sections */}
-          <div className="max-w-7xl mx-auto px-4 py-6 space-y-10">
-            <Section
-              title="Open"
-              tickets={open}
-              onCardClick={handleCardClick}
-              color="text-green-700"
-            />
-            <hr className="border-t-2 border-gray-300" />
-            <Section
-              title="In Process"
-              tickets={inProcess}
-              onCardClick={handleCardClick}
-              color="text-yellow-700"
-            />
-            <hr className="border-t-2 border-gray-300" />
-            <Section
-              title="Resolved"
-              tickets={resolved}
-              onCardClick={handleCardClick}
-              color="text-blue-700"
-            />
-          </div>
+          {/* Ticket Sections with Drag and Drop */}
+          <DragDropContext onDragEnd={handleDragEnd}>
+            <div className="max-w-7xl mx-auto px-4 py-6 space-y-10">
+              <Section
+                title="Open"
+                tickets={open}
+                onCardClick={handleCardClick}
+                color="text-green-700"
+                droppableId="open"
+              />
+              <hr className="border-t-2 border-gray-300" />
+              <Section
+                title="In Process"
+                tickets={inProcess}
+                onCardClick={handleCardClick}
+                color="text-yellow-700"
+                droppableId="inProcess"
+              />
+              <hr className="border-t-2 border-gray-300" />
+              <Section
+                title="Resolved"
+                tickets={resolved}
+                onCardClick={handleCardClick}
+                color="text-blue-700"
+                droppableId="resolved"
+              />
+              <hr className="border-t-2 border-gray-300" />
+              <Section
+                title="Rejected"
+                tickets={rejected}
+                onCardClick={handleCardClick}
+                color="text-red-700"
+                droppableId="rejected"
+              />
+            </div>
+          </DragDropContext>
 
           {/* Modal View */}
           {selectedTicket && (
@@ -433,18 +529,14 @@ export default function TicketManage() {
                         {evidenceList.map((evi, index) => {
                           const fileUrl = `http://localhost:5000/${evi.FilePath}`;
                           const fileName = evi.FilePath.split("/").pop();
-
                           const isImage =
                             /\.(jpg|jpeg|png|gif|bmp|webp)$/i.test(fileName);
                           const isPDF = /\.pdf$/i.test(fileName);
-                          const isVideo = /\.(mp4|webm|ogg)$/i.test(fileName);
-                          const isAudio = /\.(mp3|wav|ogg)$/i.test(fileName);
-                          const isDoc = /\.(docx?|xlsx?)$/i.test(fileName);
 
                           return (
                             <div
                               key={index}
-                              className="border rounded p-2 bg-white shadow-sm flex flex-col items-center text-center w-40"
+                              className="border rounded p-2 bg-white shadow-sm flex flex-col items-center text-center"
                             >
                               {isImage ? (
                                 <a
@@ -464,40 +556,6 @@ export default function TicketManage() {
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   className="text-red-600 hover:underline"
-                                >
-                                  📄 {fileName}
-                                </a>
-                              ) : isVideo ? (
-                                <video
-                                  controls
-                                  className="w-32 h-32 rounded"
-                                  title={fileName}
-                                >
-                                  <source
-                                    src={fileUrl}
-                                    type={`video/${fileName.split(".").pop()}`}
-                                  />
-                                  Your browser does not support the video tag.
-                                </video>
-                              ) : isAudio ? (
-                                <audio
-                                  controls
-                                  className="w-full"
-                                  title={fileName}
-                                >
-                                  <source
-                                    src={fileUrl}
-                                    type={`audio/${fileName.split(".").pop()}`}
-                                  />
-                                  Your browser does not support the audio
-                                  element.
-                                </audio>
-                              ) : isDoc ? (
-                                <a
-                                  href={fileUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-purple-600 hover:underline"
                                 >
                                   📄 {fileName}
                                 </a>
@@ -529,7 +587,7 @@ export default function TicketManage() {
                       className="absolute top-2 right-2 text-gray-500 hover:text-red-600 text-xl"
                       aria-label="Close Chat"
                     >
-                      🗙
+                     🗙
                     </button>
                     <ChatSection
                       user={selectedTicket.user}
@@ -545,23 +603,7 @@ export default function TicketManage() {
             </div>
           )}
         </div>
-      </div>
+      </main>
     </div>
-  );
-}
-
-// Section Component
-function Section({ title, tickets, onCardClick, color }) {
-  return (
-    <section>
-      <h3 className={`text-lg sm:text-xl font-semibold ${color} mb-4`}>
-        {title}
-      </h3>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {tickets.map((ticket) => (
-          <TicketCard key={ticket.id} ticket={ticket} onClick={onCardClick} />
-        ))}
-      </div>
-    </section>
   );
 }
