@@ -72,7 +72,7 @@ export default function ChatSection({ user, supportUser, ticketId, ticket, role 
   };
 
   return (
-    <div className="flex flex-col h-full max-w-md mx-auto border rounded-lg shadow-lg">
+    <div className="flex flex-col h-full w-full max-w-md mx-auto border rounded-lg shadow-lg">
       <header className="p-4 border-b">
         <h2 className="text-lg font-bold">
           Chat for Ticket #{ticket?.id || ticketId}
@@ -105,25 +105,78 @@ export default function ChatSection({ user, supportUser, ticketId, ticket, role 
               <div
                 className={`max-w-xs px-4 py-2 rounded-lg break-words whitespace-pre-wrap ${
                   !isClient
-                    ? "bg-blue-600 text-white rounded-br-none"
-                    : "bg-gray-300 text-gray-800 rounded-bl-none"
+                    ? "bg-blue-200 text-gray-800 rounded-br-none"
+                    : "bg-gray-200 text-gray-800 rounded-bl-none"
                 }`}
               >
-                {msg.file ? (
-                  <>
-                    <strong>{msg.file.name}</strong>
-                    <a
-                      href={msg.file.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="block text-sm text-blue-200 underline mt-1"
-                    >
-                      View File
-                    </a>
-                  </>
-                ) : (
-                  msg.content
-                )}
+                {msg.file
+                  ? (() => {
+                      const fileUrl = msg.file.url;
+                      const fileName = msg.file.name.toLowerCase();
+
+                      if (fileName.match(/\.(jpg|jpeg|png|gif|bmp|webp)$/i)) {
+                        return (
+                          <div>
+                            <img
+                              src={fileUrl}
+                              alt={fileName}
+                              className="w-40 h-auto rounded-md mb-1"
+                            />
+                            <p className="text-sm break-words">
+                              {msg.file.name}
+                            </p>
+                          </div>
+                        );
+                      } else if (fileName.match(/\.(mp4|webm|ogg|mov)$/i)) {
+                        return (
+                          <div>
+                            <video
+                              controls
+                              src={fileUrl}
+                              className="w-40 h-auto rounded-md mb-1"
+                            />
+                            <p className="text-sm break-words">
+                              {msg.file.name}
+                            </p>
+                          </div>
+                        );
+                      } else if (fileName.match(/\.pdf$/i)) {
+                        return (
+                          <div>
+                            <iframe
+                              src={fileUrl}
+                              className="w-40 h-40 rounded-md mb-1"
+                              title="PDF Preview"
+                            />
+                            <a
+                              href={fileUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-gray-800 underline text-xs"
+                            >
+                              Open PDF
+                            </a>
+                          </div>
+                        );
+                      } else {
+                        return (
+                          <div>
+                            <p className="text-sm break-words font-semibold">
+                              {msg.file.name}
+                            </p>
+                            <a
+                              href={fileUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-gray-800 underline text-xs"
+                            >
+                              Download File
+                            </a>
+                          </div>
+                        );
+                      }
+                    })()
+                  : msg.content}
                 <div className="flex justify-between text-xs mt-1 opacity-70">
                   <span>{new Date(msg.timestamp).toLocaleString()}</span>
                   {!isClient && (
