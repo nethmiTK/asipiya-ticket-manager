@@ -108,7 +108,7 @@ export default function ChatSection({
   };
 
   return (
-    <div className="flex flex-col h-full max-w-md mx-auto border rounded-lg shadow-lg">
+    <div className="flex flex-col h-full w-full max-w-md mx-auto border rounded-lg shadow-lg">
       <header className="p-4 border-b">
         <h2 className="text-lg font-bold">
           Chat for Ticket #{ticket?.id || ticketId}
@@ -145,8 +145,8 @@ export default function ChatSection({
               <div
                 className={`max-w-xs px-4 py-2 rounded-lg break-words whitespace-pre-wrap ${
                   !isClient
-                    ? "bg-blue-600 text-white rounded-br-none"
-                    : "bg-gray-300 text-gray-800 rounded-bl-none"
+                    ? "bg-blue-200 text-gray-800 rounded-br-none"
+                    : "bg-gray-200 text-gray-800 rounded-bl-none"
                 }`}
               >
                 {msg.file
@@ -192,7 +192,7 @@ export default function ChatSection({
                               href={fileUrl}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="text-blue-200 underline text-xs"
+                              className="text-gray-800 underline text-xs"
                             >
                               Open PDF
                             </a>
@@ -208,7 +208,7 @@ export default function ChatSection({
                               href={fileUrl}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="text-blue-200 underline text-xs"
+                              className="text-gray-800 underline text-xs"
                             >
                               Download File
                             </a>
