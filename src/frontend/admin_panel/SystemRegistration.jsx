@@ -37,7 +37,7 @@ const SystemRegistration = () => {
 
     try {
       if (editingId) {
-        const res = await axios.put(`http://localhost:5000/api/system_registration_update/${editingId}`, form);
+        await axios.put(`http://localhost:5000/api/system_registration_update/${editingId}`, form);
         toast.success('System updated successfully.');
 
         setSystems((prevSystems) =>
@@ -45,8 +45,10 @@ const SystemRegistration = () => {
             sys.AsipiyaSystemID === editingId ? { ...sys, ...form } : sys
           )
         );
-      }else {
-        await axios.post('http://localhost:5000/system_registration', form);
+      } else {
+        // Always set status to '1' when adding new system
+        const newSystem = { ...form, status: '1' };
+        await axios.post('http://localhost:5000/api/systems', newSystem);
         toast.success('System added successfully.');
       }
 
@@ -79,7 +81,7 @@ const SystemRegistration = () => {
       toast.success(res.data.message || 'System deleted successfully.');
       await fetchSystems();
     } catch (error) {
-      if (error.response?.status === 409) {
+      if (error.response?.status === 403) {
         toast.error("This system is already in use and cannot be deleted.");
       } else {
         setError("Delete Error: " + (error.response?.data?.message || error.message));
@@ -124,7 +126,7 @@ const SystemRegistration = () => {
                 <th className="w-24 p-2 text-left">Actions</th>
               </tr>
             </thead>
-            <tbody className='bg-white divide-y divide-gray-200'>
+            <tbody className="bg-white divide-y divide-gray-200">
               {systems.map((system) => (
                 <tr key={system.AsipiyaSystemID} className="border-t">
                   <td className="p-2 w-20">{system.AsipiyaSystemID}</td>
@@ -206,19 +208,22 @@ const SystemRegistration = () => {
                   </div>
                 </div>
 
-                <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-                  <select
-                    name="status"
-                    value={form.status}
-                    onChange={handleChange}
-                    className="border rounded px-4 py-2 w-full"
-                    required
-                  >
-                    <option value="1">Active</option>
-                    <option value="0">Inactive</option>
-                  </select>
-                </div>
+                {/* Show status only in edit mode */}
+                {editingId !== null && (
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                    <select
+                      name="status"
+                      value={form.status}
+                      onChange={handleChange}
+                      className="border rounded px-4 py-2 w-full"
+                      required
+                    >
+                      <option value="1">Active</option>
+                      <option value="0">Inactive</option>
+                    </select>
+                  </div>
+                )}
 
                 <div className="flex justify-end">
                   <button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded">
