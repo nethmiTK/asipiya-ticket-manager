@@ -10,8 +10,8 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
 import bcrypt from 'bcryptjs';
-import { v4 as uuidv4 } from 'uuid'; 
-import moment from 'moment'; 
+import { v4 as uuidv4 } from 'uuid';
+import moment from 'moment';
 import crypto from 'crypto';
 
 // --- Database Connection ---
@@ -39,7 +39,7 @@ app.use(cors());
 app.use("/uploads", express.static("uploads"));
 const uploadDir = "uploads";
 if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir);
+    fs.mkdirSync(uploadDir);
 }
 
 // Get __dirname equivalent for ES Modules
@@ -198,7 +198,7 @@ app.put('/api/user/profile/:id', async (req, res) => {
         if (CurrentPassword && NewPassword) {
             // Verify current password
             const isPasswordValid = await bcrypt.compare(CurrentPassword, user[0].Password);
-            
+
             if (!isPasswordValid) {
                 return res.status(400).json({ message: 'Current password is incorrect' });
             }
@@ -317,7 +317,7 @@ app.post('/api/invite', (req, res) => {
     const checkQuery = 'SELECT * FROM appuser WHERE Email = ?';
     db.query(checkQuery, [email], async (err, results) => {
         if (err) {
-            console.error('Error checking existing user:', err); 
+            console.error('Error checking existing user:', err);
             return res.status(500).json({ message: 'Server error' });
         }
 
@@ -559,93 +559,93 @@ app.get('/ticketchat/:ticketId', (req, res) => {
 
 // ✅ Add a new chat message for a ticket
 app.post('/ticketchat', upload.single('File'), (req, res) => {
-  const { TicketID, Type, Note, UserID, Role } = req.body;
-  const file = req.file;
+    const { TicketID, Type, Note, UserID, Role } = req.body;
+    const file = req.file;
 
-  if (!TicketID || !Note) {
-    return res.status(400).json({ error: 'TicketID and Note are required.' });
-  }
+    if (!TicketID || !Note) {
+        return res.status(400).json({ error: 'TicketID and Note are required.' });
+    }
 
-  const filePath = file ? file.filename : null;
+    const filePath = file ? file.filename : null;
 
-  const sql = `INSERT INTO ticketchat (TicketID, Type, Note, UserID, Role, Path)
+    const sql = `INSERT INTO ticketchat (TicketID, Type, Note, UserID, Role, Path)
                VALUES (?, ?, ?, ?, ?, ?)`;
 
-  db.query(
-    sql,
-    [TicketID, Type || null, Note, UserID || null, Role || null, filePath],
-    (err, result) => {
-      if (err) {
-        console.error('Error adding chat message:', err);
-        return res.status(500).json({ error: 'Database error' });
-      }
+    db.query(
+        sql,
+        [TicketID, Type || null, Note, UserID || null, Role || null, filePath],
+        (err, result) => {
+            if (err) {
+                console.error('Error adding chat message:', err);
+                return res.status(500).json({ error: 'Database error' });
+            }
 
-      // Build full file URL
-      const fileUrl = file ? `http://localhost:5000/uploads/profile_images/${file.filename}` : null;
+            // Build full file URL
+            const fileUrl = file ? `http://localhost:5000/uploads/profile_images/${file.filename}` : null;
 
-      res.status(201).json({
-        message: 'Chat message added',
-        chatId: result.insertId,
-        fileUrl, // <- Send full URL back to frontend
-      });
-    }
-  );
+            res.status(201).json({
+                message: 'Chat message added',
+                chatId: result.insertId,
+                fileUrl, // <- Send full URL back to frontend
+            });
+        }
+    );
 });
 
 // ✅ GET messages for a specific ticket
 app.get("/messages/:ticketId", (req, res) => {
-  const ticketId = req.params.ticketId;
+    const ticketId = req.params.ticketId;
 
-  db.query(
-    `SELECT TicketChatID as id, TicketID, Type, Note as content,
+    db.query(
+        `SELECT TicketChatID as id, TicketID, Type, Note as content,
       UserID, Path, Role, CreatedAt as timestamp
       FROM ticketchat WHERE TicketID = ? ORDER BY CreatedAt ASC`,
-    [ticketId],
-    (err, rows) => {
-      if (err) {
-        console.error(err);
-        return res.status(500).json({ error: "Failed to fetch messages" });
-      }
-
-      const formatted = rows.map((r) => ({
-        id: r.id,
-        ticketid: r.TicketID,
-        type: r.Type,
-        content: r.content,
-        userid: r.UserID,
-        role: r.Role,
-        timestamp: r.timestamp,
-        file: r.Path
-          ? {
-              name: path.basename(r.Path),
-              url: `http://localhost:5000/uploads/profile_images/${r.Path}`,
+        [ticketId],
+        (err, rows) => {
+            if (err) {
+                console.error(err);
+                return res.status(500).json({ error: "Failed to fetch messages" });
             }
-          : null,
-        status: "delivered",
-      }));
 
-      res.json(formatted);
-    }
-  );
+            const formatted = rows.map((r) => ({
+                id: r.id,
+                ticketid: r.TicketID,
+                type: r.Type,
+                content: r.content,
+                userid: r.UserID,
+                role: r.Role,
+                timestamp: r.timestamp,
+                file: r.Path
+                    ? {
+                        name: path.basename(r.Path),
+                        url: `http://localhost:5000/uploads/profile_images/${r.Path}`,
+                    }
+                    : null,
+                status: "delivered",
+            }));
+
+            res.json(formatted);
+        }
+    );
 });
 
 //nope
 // POST a new chat message without file upload
 app.post("/ticketchat", async (req, res) => {
-  try {
-    const { TicketID, Note, Type, UserID, Role } = req.body;
+    try {
+        const { TicketID, Note, Type, UserID, Role } = req.body;
 
-    // Insert only text messages
-    const [result] = await db.execute(
-      `INSERT INTO ticketchat (TicketID, Type, Note, UserID, Path, Role)
+        // Insert only text messages
+        const [result] = await db.execute(
+            `INSERT INTO ticketchat (TicketID, Type, Note, UserID, Path, Role)
        VALUES (?, ?, ?, ?, ?, ?)`,
-      [TicketID, Type, Note, UserID, null, Role ]
-    );
-    res.json({ chatId: result.insertId });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Failed to send message" });
-  }
+            [TicketID, Type, Note, UserID, null, Role]
+        );
+        res.json({ chatId: result.insertId });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Failed to send message" });
+    }
 });
 
 /*-------------------------------Fetch Requests-----------------------------------------*/
@@ -653,103 +653,199 @@ app.post("/ticketchat", async (req, res) => {
 
 // Get tickets assigned to a specific supervisor (by UserID in appuser)
 app.get("/tickets", (req, res) => {
-  const { supervisorId } = req.query;
+    const { supervisorId, role } = req.query;
 
-  if (!supervisorId) {
-    return res.status(400).json({ error: "Supervisor ID is required" });
-  }
-
-  const sql = "SELECT * FROM ticket WHERE SupervisorID = ?";
-  db.query(sql, [supervisorId], (err, results) => {
-    if (err) {
-      console.error("Error fetching tickets:", err);
-      return res.status(500).json({ error: "Error fetching tickets" });
+    // Role is required
+    if (!role) {
+        return res.status(400).json({ error: "User role is required" });
     }
-    res.json(results);
-  });
+
+    // Admin: Return all tickets
+    if (role === "Admin") {
+        const sql = `SELECT 
+                    t.*, 
+                    asys.SystemName AS AsipiyaSystemName, 
+                    u.FullName AS UserName
+                    FROM ticket t
+                    LEFT JOIN asipiyasystem asys ON t.AsipiyaSystemID = asys.AsipiyaSystemID
+                    LEFT JOIN appuser u ON t.UserId = u.UserID`;
+
+        db.query(sql, (err, results) => {
+            if (err) {
+                console.error("Error fetching all tickets:", err);
+                return res.status(500).json({ error: "Error fetching tickets" });
+            }
+            return res.json(results);
+        });
+    }
+
+    // Supervisor: Return only their tickets
+    else if (role === "Supervisor") {
+        if (!supervisorId) {
+            return res.status(400).json({ error: "Supervisor ID is required for supervisors" });
+        }
+
+        const sql = `SELECT 
+                        t.*, 
+                        asys.SystemName AS AsipiyaSystemName, 
+                        u.FullName AS UserName
+                        FROM ticket t
+                        LEFT JOIN asipiyasystem asys ON t.AsipiyaSystemID = asys.AsipiyaSystemID
+                        LEFT JOIN appuser u ON t.UserId = u.UserID
+                        WHERE t.SupervisorID = ?`;
+
+        db.query(sql, [supervisorId], (err, results) => {
+            if (err) {
+                console.error("Error fetching supervisor's tickets:", err);
+                return res.status(500).json({ error: "Error fetching tickets" });
+            }
+            return res.json(results);
+        });
+    }
+
+    // If the role is invalid
+    else {
+        return res.status(400).json({ error: "Invalid role specified" });
+    }
+});
+
+app.get("/getting/tickets", (req, res) => {
+    const { supervisorId, systemId } = req.query;
+
+    let sql = `
+    SELECT 
+      t.*, 
+      asys.SystemName AS AsipiyaSystemName, 
+      u.FullName AS UserName
+    FROM ticket t
+    LEFT JOIN asipiyasystem asys ON t.AsipiyaSystemID = asys.AsipiyaSystemID
+    LEFT JOIN appuser u ON t.UserId = u.UserID
+    WHERE 1 = 1
+  `;
+
+    const params = [];
+
+    if (supervisorId && supervisorId !== "all") {
+        sql += " AND t.SupervisorID = ?";
+        params.push(supervisorId);
+    }
+
+    if (systemId && systemId !== "all") {
+        sql += " AND t.AsipiyaSystemID = ?";
+        params.push(systemId);
+    }
+
+    db.query(sql, params, (err, results) => {
+        if (err) {
+            console.error("Error fetching tickets:", err);
+            return res.status(500).json({ error: "Error fetching tickets" });
+        }
+        res.json(results);
+    });
 });
 
 app.put('/tickets/:id', (req, res) => {
-  const { id } = req.params;
-  const { status, dueDate, resolution } = req.body;
+    const { id } = req.params;
+    const { status, dueDate, resolution } = req.body;
 
-  // Build the SET clause dynamically
-  const fields = [];
-  const values = [];
+    // Build the SET clause dynamically
+    const fields = [];
+    const values = [];
 
-  if (status !== undefined) {
-    fields.push("Status = ?");
-    values.push(status);
-  }
-
-  if (dueDate !== undefined) {
-    fields.push("DueDate = ?");
-    values.push(dueDate);
-  }
-
-  if (resolution !== undefined) {
-    fields.push("Resolution = ?");
-    values.push(resolution);
-  }
-
-  if (fields.length === 0) {
-    return res.status(400).json({ message: "No fields provided to update." });
-  }
-
-  const sql = `UPDATE ticket SET ${fields.join(', ')} WHERE TicketID = ?`;
-  values.push(id); // Add id to the end of values array for WHERE clause
-
-  db.query(sql, values, (err, result) => {
-    if (err) {
-      console.error("Failed to update ticket:", err);
-      return res.status(500).json({ message: "Server error" });
+    if (status !== undefined) {
+        fields.push("Status = ?");
+        values.push(status);
     }
-    res.json({ message: "Ticket updated successfully" });
-  });
+
+    if (dueDate !== undefined) {
+        fields.push("DueDate = ?");
+        values.push(dueDate);
+    }
+
+    if (resolution !== undefined) {
+        fields.push("Resolution = ?");
+        values.push(resolution);
+    }
+
+    if (fields.length === 0) {
+        return res.status(400).json({ message: "No fields provided to update." });
+    }
+
+    const sql = `UPDATE ticket SET ${fields.join(', ')} WHERE TicketID = ?`;
+    values.push(id); // Add id to the end of values array for WHERE clause
+
+    db.query(sql, values, (err, result) => {
+        if (err) {
+            console.error("Failed to update ticket:", err);
+            return res.status(500).json({ message: "Server error" });
+        }
+        res.json({ message: "Ticket updated successfully" });
+    });
 });
 
 app.get("/evidence/:ticketId", (req, res) => {
-  const { ticketId } = req.params;
+    const { ticketId } = req.params;
 
-  const sql = "SELECT FilePath FROM evidence WHERE ComplaintID = ?";
-  db.query(sql, [ticketId], (err, result) => {
-    if (err) {
-      console.error("Error fetching evidence:", err);
-      return res.status(500).json({ error: "Failed to fetch evidence" });
-    }
-    res.json(result);
-  });
+    const sql = "SELECT FilePath FROM evidence WHERE ComplaintID = ?";
+    db.query(sql, [ticketId], (err, result) => {
+        if (err) {
+            console.error("Error fetching evidence:", err);
+            return res.status(500).json({ error: "Failed to fetch evidence" });
+        }
+        res.json(result);
+    });
 });
 
+app.get("/supervisors", (req, res) => {
+    const sql = "SELECT UserID, FullName FROM appuser WHERE Role = 'supervisor'";
+    db.query(sql, (err, results) => {
+        if (err) {
+            console.error("Error fetching supervisors:", err);
+            return res.status(500).json({ error: "Error fetching supervisors" });
+        }
+        res.json(results);
+    });
+});
+
+app.get("/asipiyasystems", (req, res) => {
+    const sql = "SELECT AsipiyaSystemID, SystemName FROM asipiyasystem";
+    db.query(sql, (err, results) => {
+        if (err) {
+            console.error("Error fetching systems:", err);
+            return res.status(500).json({ error: "Error fetching systems" });
+        }
+        res.json(results);
+    });
+});
 
 //nope
 app.get("/tickets", (req, res) => {
-  const query = `
+    const query = `
     SELECT * 
     FROM ticket 
   `;
 
-  db.query(query, (err, results) => {
-    if (err) {
-      console.error("Error fetching tickets for supervisor:", err);
-      return res.status(500).json({ error: "Internal server error" });
-    }
+    db.query(query, (err, results) => {
+        if (err) {
+            console.error("Error fetching tickets for supervisor:", err);
+            return res.status(500).json({ error: "Internal server error" });
+        }
 
-    res.json(results);
-  });
+        res.json(results);
+    });
 });
 
 // Add this to your existing Node.js/Express backend
 app.put('/tickets/accept/:ticketID', (req, res) => {
-  const { ticketID } = req.params;
-  
-  db.query('UPDATE ticket SET Status = "Accepted" WHERE TicketID = ?', [ticketID], (err, result) => {
-    if (err) {
-      console.error(err);
-      return res.status(500).json({ error: "Database error" });
-    }
-    return res.json({ message: "Ticket accepted successfully" });
-  });
+    const { ticketID } = req.params;
+
+    db.query('UPDATE ticket SET Status = "Accepted" WHERE TicketID = ?', [ticketID], (err, result) => {
+        if (err) {
+            console.error(err);
+            return res.status(500).json({ error: "Database error" });
+        }
+        return res.json({ message: "Ticket accepted successfully" });
+    });
 });
 
 /*---------------------------------------------------------------------------------------*/
@@ -791,164 +887,164 @@ app.get('/api/ticket_view/:id', (req, res) => {
 });
 
 app.get('/api/supervisors', (req, res) => {
-  const query = `
+    const query = `
     SELECT UserID, FullName FROM appuser 
     WHERE Role IN ('supervisor')
   `;
-  
-  db.query(query, (err, results) => {
-    if (err) {
-      console.error("Error fetching supervisors:", err);
-      return res.status(500).json({ error: "Database error" });
-    }
-    console.log("Supervisor result:", results); // Add this
-    res.json(results); // Make sure it's just `results`, not wrapped in an object
-  });
+
+    db.query(query, (err, results) => {
+        if (err) {
+            console.error("Error fetching supervisors:", err);
+            return res.status(500).json({ error: "Database error" });
+        }
+        console.log("Supervisor result:", results); // Add this
+        res.json(results); // Make sure it's just `results`, not wrapped in an object
+    });
 });
 
 
 app.put('/api/tickets/:ticketId/status', async (req, res) => {
-  const ticketId = req.params.ticketId;
-  const { status, userId, supervisorName } = req.body;
+    const ticketId = req.params.ticketId;
+    const { status, userId, supervisorName } = req.body;
 
-  try {
-    // First get the ticket details to know the user who created it and current status
-    const getTicket = "SELECT t.UserId, t.Status, t.SupervisorID, u.FullName as SupervisorName FROM ticket t LEFT JOIN appuser u ON t.SupervisorID = u.UserID WHERE t.TicketID = ?";
-    db.query(getTicket, [ticketId], async (err, results) => {
-      if (err) {
-        console.error("Error fetching ticket:", err);
-        return res.status(500).json({ message: "Server error" });
-      }
+    try {
+        // First get the ticket details to know the user who created it and current status
+        const getTicket = "SELECT t.UserId, t.Status, t.SupervisorID, u.FullName as SupervisorName FROM ticket t LEFT JOIN appuser u ON t.SupervisorID = u.UserID WHERE t.TicketID = ?";
+        db.query(getTicket, [ticketId], async (err, results) => {
+            if (err) {
+                console.error("Error fetching ticket:", err);
+                return res.status(500).json({ message: "Server error" });
+            }
 
-      if (results.length === 0) {
-        return res.status(404).json({ message: "Ticket not found" });
-      }
+            if (results.length === 0) {
+                return res.status(404).json({ message: "Ticket not found" });
+            }
 
-      const ticketUserId = results[0].UserId;
-      const oldStatus = results[0].Status;
-      const supervisorId = results[0].SupervisorID;
-      const supervisorFullName = results[0].SupervisorName;
+            const ticketUserId = results[0].UserId;
+            const oldStatus = results[0].Status;
+            const supervisorId = results[0].SupervisorID;
+            const supervisorFullName = results[0].SupervisorName;
 
-      // Update the ticket status
-      const updateQuery = "UPDATE ticket SET Status = ?, LastRespondedTime = NOW() WHERE TicketID = ?";
-      db.query(updateQuery, [status, ticketId], async (err, result) => {
-        if (err) {
-          console.error("Error updating ticket status:", err);
-          return res.status(500).json({ message: "Server error" });
-        }
+            // Update the ticket status
+            const updateQuery = "UPDATE ticket SET Status = ?, LastRespondedTime = NOW() WHERE TicketID = ?";
+            db.query(updateQuery, [status, ticketId], async (err, result) => {
+                if (err) {
+                    console.error("Error updating ticket status:", err);
+                    return res.status(500).json({ message: "Server error" });
+                }
 
-        // Create a ticket log entry with old and new values
-        const logQuery = `
+                // Create a ticket log entry with old and new values
+                const logQuery = `
           INSERT INTO ticketlog (TicketID, DateTime, Type, Description, UserID, OldValue, NewValue)
           VALUES (?, NOW(), 'STATUS_CHANGE', ?, ?, ?, ?)
         `;
-        db.query(logQuery, [
-          ticketId, 
-          `Status changed from ${oldStatus} to ${status}`, 
-          userId,
-          oldStatus,
-          status
-        ], async (err, logResult) => {
-          if (err) {
-            console.error("Error creating ticket log:", err);
-          } else {
-            try {
-              // Create first notification for the ticket creator about supervisor assignment
-              await createNotification(
-                ticketUserId,
-                `Your ticket #${ticketId} has been assigned to supervisor ${supervisorFullName}. They will be handling your ticket.`,
-                'SUPERVISOR_ASSIGNED',
-                logResult.insertId
-              );
+                db.query(logQuery, [
+                    ticketId,
+                    `Status changed from ${oldStatus} to ${status}`,
+                    userId,
+                    oldStatus,
+                    status
+                ], async (err, logResult) => {
+                    if (err) {
+                        console.error("Error creating ticket log:", err);
+                    } else {
+                        try {
+                            // Create first notification for the ticket creator about supervisor assignment
+                            await createNotification(
+                                ticketUserId,
+                                `Your ticket #${ticketId} has been assigned to supervisor ${supervisorFullName}. They will be handling your ticket.`,
+                                'SUPERVISOR_ASSIGNED',
+                                logResult.insertId
+                            );
 
-              // Create second notification for the ticket creator about status change
-              await createNotification(
-                ticketUserId,
-                `Your ticket #${ticketId} status has been updated from ${oldStatus} to ${status}`,
-                'STATUS_UPDATE',
-                logResult.insertId
-              );
+                            // Create second notification for the ticket creator about status change
+                            await createNotification(
+                                ticketUserId,
+                                `Your ticket #${ticketId} status has been updated from ${oldStatus} to ${status}`,
+                                'STATUS_UPDATE',
+                                logResult.insertId
+                            );
 
-              // Notify supervisor about the assignment
-              if (supervisorId) {
-                await createNotification(
-                  supervisorId,
-                  `You have been assigned to handle ticket #${ticketId}. The ticket status has been changed from ${oldStatus} to ${status}`,
-                  'TICKET_ASSIGNED',
-                  logResult.insertId
-                );
-              }
+                            // Notify supervisor about the assignment
+                            if (supervisorId) {
+                                await createNotification(
+                                    supervisorId,
+                                    `You have been assigned to handle ticket #${ticketId}. The ticket status has been changed from ${oldStatus} to ${status}`,
+                                    'TICKET_ASSIGNED',
+                                    logResult.insertId
+                                );
+                            }
 
-            } catch (error) {
-              console.error("Error creating notifications:", error);
-            }
-          }
+                        } catch (error) {
+                            console.error("Error creating notifications:", error);
+                        }
+                    }
+                });
+
+                res.json({ message: "Ticket status updated successfully" });
+            });
         });
-
-        res.json({ message: "Ticket status updated successfully" });
-      });
-    });
-  } catch (error) {
-    console.error("Error:", error);
-    res.status(500).json({ message: "Server error" });
-  }
+    } catch (error) {
+        console.error("Error:", error);
+        res.status(500).json({ message: "Server error" });
+    }
 });
 
 const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, "uploads/");
-  },
-  filename: function (req, file, cb) {
-    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    cb(
-      null,
-      file.fieldname + "-" + uniqueSuffix + path.extname(file.originalname)
-    );
-  },
+    destination: function (req, file, cb) {
+        cb(null, "uploads/");
+    },
+    filename: function (req, file, cb) {
+        const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+        cb(
+            null,
+            file.fieldname + "-" + uniqueSuffix + path.extname(file.originalname)
+        );
+    },
 });
 
 const upload_evidence = multer({ storage: storage });
 
 app.post("/upload_evidence", upload_evidence.array("evidenceFiles"), (req, res) => {
-  const { ticketId, description } = req.body;
+    const { ticketId, description } = req.body;
 
-  if (!req.files || req.files.length === 0) {
-    return res.status(400).json({ message: "No files uploaded" });
-  }
+    if (!req.files || req.files.length === 0) {
+        return res.status(400).json({ message: "No files uploaded" });
+    }
 
-  if (!ticketId) {
-    return res.status(400).json({ message: "Ticket ID is required" });
-  }
+    if (!ticketId) {
+        return res.status(400).json({ message: "Ticket ID is required" });
+    }
 
-  const values = req.files.map((file) => [ticketId, file.path, description]);
+    const values = req.files.map((file) => [ticketId, file.path, description]);
 
-  const insertEvidenceQuery = `
+    const insertEvidenceQuery = `
     INSERT INTO evidence (ComplaintID, FilePath, Description) VALUES ?
   `;
 
-  db.query(insertEvidenceQuery, [values], (err, result) => {
-    if (err) {
-      console.error("Error inserting evidence:", err);
-      return res.status(500).json({ message: "Error saving evidence" });
-    }
-    res
-      .status(200)
-      .json({
-        message: "Evidence files uploaded",
-        inserted: result.affectedRows,
-      });
-  });
+    db.query(insertEvidenceQuery, [values], (err, result) => {
+        if (err) {
+            console.error("Error inserting evidence:", err);
+            return res.status(500).json({ message: "Error saving evidence" });
+        }
+        res
+            .status(200)
+            .json({
+                message: "Evidence files uploaded",
+                inserted: result.affectedRows,
+            });
+    });
 });
 
 //user ticket view
 app.get("/userTickets", (req, res) => {
-  const { userId } = req.query;
+    const { userId } = req.query;
 
-  if (!userId) {
-    return res.status(400).json({ message: "User ID is required" });
-  }
+    if (!userId) {
+        return res.status(400).json({ message: "User ID is required" });
+    }
 
-  const sql = `
+    const sql = `
     SELECT 
       t.TicketID AS id,
       t.Description AS description,
@@ -966,13 +1062,13 @@ app.get("/userTickets", (req, res) => {
     ORDER BY t.DateTime DESC
   `;
 
-  db.query(sql, [userId], (err, results) => {
-    if (err) {
-      console.error("Error fetching tickets:", err);
-      return res.status(500).json({ message: "Error fetching tickets" });
-    }
-    res.status(200).json(results);
-  });
+    db.query(sql, [userId], (err, results) => {
+        if (err) {
+            console.error("Error fetching tickets:", err);
+            return res.status(500).json({ message: "Error fetching tickets" });
+        }
+        res.status(200).json(results);
+    });
 });
 
 
@@ -1025,7 +1121,7 @@ app.get('/api/tickets/filter', (req, res) => {
 
     let whereClause = '';
     let orderClause = 'ORDER BY t.DateTime DESC';
-    
+
     switch (type) {
         case 'pending':
             whereClause = "WHERE t.Status = 'Pending'";
@@ -1317,8 +1413,8 @@ app.get('/api/user/tickets/recent/:userId', (req, res) => {
 
 // Get user details by ID
 app.get('/api/users/:userId', (req, res) => {
-  const userId = req.params.userId;
-  const query = `
+    const userId = req.params.userId;
+    const query = `
     SELECT 
       u.UserID,
       u.FullName,
@@ -1334,22 +1430,22 @@ app.get('/api/users/:userId', (req, res) => {
     GROUP BY u.UserID
   `;
 
-  db.query(query, [userId], (err, results) => {
-    if (err) {
-      console.error('Error fetching user details:', err);
-      return res.status(500).json({ error: 'Database error' });
-    }
-    if (results.length === 0) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-    res.json(results[0]);
-  });
+    db.query(query, [userId], (err, results) => {
+        if (err) {
+            console.error('Error fetching user details:', err);
+            return res.status(500).json({ error: 'Database error' });
+        }
+        if (results.length === 0) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+        res.json(results[0]);
+    });
 });
 
 // Get user's tickets
 app.get('/api/tickets/user/:userId', (req, res) => {
-  const userId = req.params.userId;
-  const query = `
+    const userId = req.params.userId;
+    const query = `
     SELECT 
       t.TicketID,
       t.Description,
@@ -1366,13 +1462,13 @@ app.get('/api/tickets/user/:userId', (req, res) => {
     ORDER BY t.DateTime DESC
   `;
 
-  db.query(query, [userId], (err, results) => {
-    if (err) {
-      console.error('Error fetching user tickets:', err);
-      return res.status(500).json({ error: 'Database error' });
-    }
-    res.json(results);
-  });
+    db.query(query, [userId], (err, results) => {
+        if (err) {
+            console.error('Error fetching user tickets:', err);
+            return res.status(500).json({ error: 'Database error' });
+        }
+        res.json(results);
+    });
 });
 
 /* ----------------------------------------------------------------------------------------------*/
@@ -1399,7 +1495,7 @@ app.get('/api/tickets', (req, res) => {
 });
 
 app.get('/api/pending_ticket', (req, res) => {
-  const query = `
+    const query = `
     SELECT t.TicketID, s.SystemName AS SystemName, tc.CategoryName AS CategoryName, u.FullName AS UserName, t.Status
     FROM ticket t
     LEFT JOIN asipiyasystem s ON t.AsipiyaSystemID = s.AsipiyaSystemID
@@ -1407,46 +1503,46 @@ app.get('/api/pending_ticket', (req, res) => {
     LEFT JOIN appuser u ON t.UserId = u.UserID ORDER BY TicketID ASC
   `;
 
-  db.query(query, (err, results) => {
-    if (err) {
-      console.error('Error fetching tickets:', err);
-      res.status(500).json({ error: 'Failed to fetch tickets' });
-      return;
-    }
-    res.json(results);
-  });
+    db.query(query, (err, results) => {
+        if (err) {
+            console.error('Error fetching tickets:', err);
+            res.status(500).json({ error: 'Failed to fetch tickets' });
+            return;
+        }
+        res.json(results);
+    });
 });
 
 
 //Add systems
 app.post('/api/systems', async (req, res) => {
-  const { systemName, description } = req.body;
+    const { systemName, description } = req.body;
 
-  const sql = 'INSERT INTO asipiyasystem (SystemName, Description) VALUES (?, ?)';
-  db.query(sql, [systemName, description], async (err) => {
-    if (err) {
-      console.error("Database error:", err);
-      return res.status(500).json({ message: "Database error" });
-    }
+    const sql = 'INSERT INTO asipiyasystem (SystemName, Description) VALUES (?, ?)';
+    db.query(sql, [systemName, description], async (err) => {
+        if (err) {
+            console.error("Database error:", err);
+            return res.status(500).json({ message: "Database error" });
+        }
 
-    // Send notification to supervisors, developers, and admins
-    try {
-      await sendNotificationsByRoles(
-        ['Supervisor', 'Developer', 'Admin'],
-        `New system added: ${systemName}`,
-        'NEW_SYSTEM_ADDED'
-      );
-    } catch (error) {
-      console.error('Error sending system registration notifications:', error);
-    }
+        // Send notification to supervisors, developers, and admins
+        try {
+            await sendNotificationsByRoles(
+                ['Supervisor', 'Developer', 'Admin'],
+                `New system added: ${systemName}`,
+                'NEW_SYSTEM_ADDED'
+            );
+        } catch (error) {
+            console.error('Error sending system registration notifications:', error);
+        }
 
-    res.status(200).json({ message: 'System registered successfully' });
-  });
+        res.status(200).json({ message: 'System registered successfully' });
+    });
 });
 
 //View systems
 app.get('/system_registration', (req, res) => {
-  const sql = `
+    const sql = `
     SELECT
       s.*,
       CASE
@@ -1461,92 +1557,92 @@ app.get('/system_registration', (req, res) => {
 
   `;
 
-  db.query(sql, (err, results) => {
-    if (err) {
-      console.error('Error fetching system status:', err);
-      return res.status(500).json({ message: 'Database error during status fetch' });
-    }
-    res.status(200).json(results);
-  });
+    db.query(sql, (err, results) => {
+        if (err) {
+            console.error('Error fetching system status:', err);
+            return res.status(500).json({ message: 'Database error during status fetch' });
+        }
+        res.status(200).json(results);
+    });
 });
 
 app.put('/api/system_registration_update/:id', (req, res) => {
-  const { id } = req.params;
-  const { systemName, description, status } = req.body;
-  const sql = 'UPDATE asipiyasystem SET SystemName = ?, Description = ?, Status = ? WHERE AsipiyaSystemID = ?';
+    const { id } = req.params;
+    const { systemName, description, status } = req.body;
+    const sql = 'UPDATE asipiyasystem SET SystemName = ?, Description = ?, Status = ? WHERE AsipiyaSystemID = ?';
 
-  db.query(sql, [systemName, description, status, id], (err, result) => {
-    if (err) {
-      console.error('Update error:', err);
-      return res.status(500).json({ error: 'Error updating system' });
-    }
+    db.query(sql, [systemName, description, status, id], (err, result) => {
+        if (err) {
+            console.error('Update error:', err);
+            return res.status(500).json({ error: 'Error updating system' });
+        }
 
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ message: 'System not found' });
-    }
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ message: 'System not found' });
+        }
 
-    res.status(200).json({ message: 'System updated successfully' });
-  });
+        res.status(200).json({ message: 'System updated successfully' });
+    });
 });
 
 
 app.delete('/api/system_registration_delete/:id', (req, res) => {
-  const { id } = req.params;
+    const { id } = req.params;
 
-  const checkSql = 'SELECT * FROM ticket WHERE AsipiyaSystemID = ?'; // if your ticket table uses this FK
-  db.query(checkSql, [id], (err, results) => {
-    if (err) {
-      console.error('Check usage error:', err);
-      return res.status(500).json({ error: 'Database error checking system usage' });
-    }
+    const checkSql = 'SELECT * FROM ticket WHERE AsipiyaSystemID = ?'; // if your ticket table uses this FK
+    db.query(checkSql, [id], (err, results) => {
+        if (err) {
+            console.error('Check usage error:', err);
+            return res.status(500).json({ error: 'Database error checking system usage' });
+        }
 
-    if (results.length > 0) {
-      return res.status(409).json({ message: 'System is in use and cannot be deleted' });
-    }
+        if (results.length > 0) {
+            return res.status(409).json({ message: 'System is in use and cannot be deleted' });
+        }
 
-    const deleteSql = 'DELETE FROM asipiyasystem WHERE AsipiyaSystemID = ?';
-    db.query(deleteSql, [id], (err, result) => {
-      if (err) {
-        console.error('Delete error:', err);
-        return res.status(500).json({ error: 'Error deleting system' });
-      }
+        const deleteSql = 'DELETE FROM asipiyasystem WHERE AsipiyaSystemID = ?';
+        db.query(deleteSql, [id], (err, result) => {
+            if (err) {
+                console.error('Delete error:', err);
+                return res.status(500).json({ error: 'Error deleting system' });
+            }
 
-      if (result.affectedRows === 0) {
-        return res.status(404).json({ message: 'System not found' });
-      }
+            if (result.affectedRows === 0) {
+                return res.status(404).json({ message: 'System not found' });
+            }
 
-      res.status(200).json({ message: 'System deleted successfully' });
+            res.status(200).json({ message: 'System deleted successfully' });
+        });
     });
-  });
 });
 
 
 //Adding Category
 app.post('/api/ticket_category', async (req, res) => {
-  const { CategoryName, Description } = req.body;
+    const { CategoryName, Description } = req.body;
 
-  const sql = 'INSERT INTO ticketcategory (CategoryName, Description) VALUES (?, ?)';
-  db.query(sql, [CategoryName, Description], async (err, result) => {
-    if (err) {
-      console.error("Database error:", err);
-      return res.status(500).json({ message: "Failed to add ticket category" });
-    }
+    const sql = 'INSERT INTO ticketcategory (CategoryName, Description) VALUES (?, ?)';
+    db.query(sql, [CategoryName, Description], async (err, result) => {
+        if (err) {
+            console.error("Database error:", err);
+            return res.status(500).json({ message: "Failed to add ticket category" });
+        }
 
-    try {
-      await sendNotificationsByRoles(
-        ['Supervisor', 'Developer', 'Admin'],
-        `New ticket category added: ${CategoryName}`,
-        'NEW_CATEGORY_ADDED'
-      );
-    } catch (error) {
-      console.error('Error sending category addition notifications:', error);
-    }
+        try {
+            await sendNotificationsByRoles(
+                ['Supervisor', 'Developer', 'Admin'],
+                `New ticket category added: ${CategoryName}`,
+                'NEW_CATEGORY_ADDED'
+            );
+        } catch (error) {
+            console.error('Error sending category addition notifications:', error);
+        }
 
-    res.status(200).json({
-      message: 'Ticket category added successfully',
-      categoryId: result.insertId
+        res.status(200).json({
+            message: 'Ticket category added successfully',
+            categoryId: result.insertId
+        });
     });
-  });
 });
 
 //View Categories
@@ -1575,336 +1671,336 @@ app.get('/ticket_category', (req, res) => {
 });
 
 app.put('/api/ticket_category_update/:id', (req, res) => {
-  const { id } = req.params;
-  const { CategoryName, Description, Status} = req.body;
+    const { id } = req.params;
+    const { CategoryName, Description, Status } = req.body;
 
-  const sql = 'UPDATE ticketcategory SET CategoryName = ?, Description = ?, Status = ? WHERE TicketCategoryID = ?';
-  db.query(sql, [CategoryName, Description, Status, id], (err, result) => {
-    if (err) {
-      console.error('Update error:', err);
-      return res.status(500).json({ error: 'Error updating category' });
-    }
+    const sql = 'UPDATE ticketcategory SET CategoryName = ?, Description = ?, Status = ? WHERE TicketCategoryID = ?';
+    db.query(sql, [CategoryName, Description, Status, id], (err, result) => {
+        if (err) {
+            console.error('Update error:', err);
+            return res.status(500).json({ error: 'Error updating category' });
+        }
 
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ message: 'Category not found' });
-    }
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ message: 'Category not found' });
+        }
 
-    res.status(200).json({ message: 'Category updated successfully' });
-  });
+        res.status(200).json({ message: 'Category updated successfully' });
+    });
 });
 
 
 app.delete('/api/ticket_category_delete/:id', (req, res) => {
-  const { id } = req.params;
+    const { id } = req.params;
 
-  const checkSql = 'SELECT * FROM ticket WHERE TicketCategoryID = ?';
-  db.query(checkSql, [id], (err, results) => {
-    if (err) {
-      return res.status(500).json({ error: 'Database error checking category usage' });
-    }
+    const checkSql = 'SELECT * FROM ticket WHERE TicketCategoryID = ?';
+    db.query(checkSql, [id], (err, results) => {
+        if (err) {
+            return res.status(500).json({ error: 'Database error checking category usage' });
+        }
 
-    if (results.length > 0) {
-      return res.status(409).json({ message: 'Category in use and cannot be deleted' });
-    }
+        if (results.length > 0) {
+            return res.status(409).json({ message: 'Category in use and cannot be deleted' });
+        }
 
-    const deleteSql = 'DELETE FROM ticketcategory WHERE TicketCategoryID = ?';
-    db.query(deleteSql, [id], (err, result) => {
-      if (err) {
-        return res.status(500).json({ error: 'Error deleting category' });
-      }
+        const deleteSql = 'DELETE FROM ticketcategory WHERE TicketCategoryID = ?';
+        db.query(deleteSql, [id], (err, result) => {
+            if (err) {
+                return res.status(500).json({ error: 'Error deleting category' });
+            }
 
-      if (result.affectedRows === 0) {
-        return res.status(404).json({ message: 'Category not found' });
-      }
+            if (result.affectedRows === 0) {
+                return res.status(404).json({ message: 'Category not found' });
+            }
 
-      res.status(200).json({ message: 'Category deleted successfully' });
+            res.status(200).json({ message: 'Category deleted successfully' });
+        });
     });
-  });
 });
 
 app.put('/api/ticket_status/:id', (req, res) => {
-  const { id } = req.params;
-  const { status } = req.body;
+    const { id } = req.params;
+    const { status } = req.body;
 
-  const sql = 'UPDATE ticket SET Status = ? WHERE TicketID = ?';
-  db.query(sql, [status, id], (err, result) => {
-    if (err) {
-      console.error('Update error:', err);
-      return res.status(500).json({ error: 'Error Reject the Ticket' });
-    }
-    res.status(200).json({ message: 'Ticket rejected successfully' });
-  });
+    const sql = 'UPDATE ticket SET Status = ? WHERE TicketID = ?';
+    db.query(sql, [status, id], (err, result) => {
+        if (err) {
+            console.error('Update error:', err);
+            return res.status(500).json({ error: 'Error Reject the Ticket' });
+        }
+        res.status(200).json({ message: 'Ticket rejected successfully' });
+    });
 });
 
 /* ----------------------------------------------------------------------------------------------*/
 
 // Helper function to create a notification
 const createNotification = async (userId, message, type, ticketLogId = null) => {
-  return new Promise((resolve, reject) => {
-    const query = `
+    return new Promise((resolve, reject) => {
+        const query = `
       INSERT INTO notifications (UserID, Message, Type, TicketLogID)
       VALUES (?, ?, ?, ?)
     `;
-    db.query(query, [userId, message, type, ticketLogId], (err, result) => {
-      if (err) {
-        console.error('Error creating notification:', err);
-        reject(err);
-      } else {
-        resolve(result);
-      }
+        db.query(query, [userId, message, type, ticketLogId], (err, result) => {
+            if (err) {
+                console.error('Error creating notification:', err);
+                reject(err);
+            } else {
+                resolve(result);
+            }
+        });
     });
-  });
 };
 
 // Helper function to get users by roles
 const getUsersByRoles = async (roles) => {
-  return new Promise((resolve, reject) => {
-    const query = 'SELECT UserID FROM appuser WHERE Role IN (?)';
-    db.query(query, [roles], (err, results) => {
-      if (err) {
-        console.error('Error fetching users by roles:', err);
-        reject(err);
-      } else {
-        resolve(results);
-      }
+    return new Promise((resolve, reject) => {
+        const query = 'SELECT UserID FROM appuser WHERE Role IN (?)';
+        db.query(query, [roles], (err, results) => {
+            if (err) {
+                console.error('Error fetching users by roles:', err);
+                reject(err);
+            } else {
+                resolve(results);
+            }
+        });
     });
-  });
 };
 
 // Helper function to send notifications to users by roles
 const sendNotificationsByRoles = async (roles, message, type, ticketLogId = null) => {
-  try {
-    const users = await getUsersByRoles(roles);
-    const notifications = users.map(user => 
-      createNotification(user.UserID, message, type, ticketLogId)
-    );
-    await Promise.all(notifications);
-  } catch (error) {
-    console.error('Error sending notifications by roles:', error);
-  }
+    try {
+        const users = await getUsersByRoles(roles);
+        const notifications = users.map(user =>
+            createNotification(user.UserID, message, type, ticketLogId)
+        );
+        await Promise.all(notifications);
+    } catch (error) {
+        console.error('Error sending notifications by roles:', error);
+    }
 };
 
 // Invite supervisor endpoint
 app.post('/api/invite-supervisor', async (req, res) => {
-  const { email, role } = req.body;
+    const { email, role } = req.body;
 
-  // Generate invitation token
-  const token = crypto.randomBytes(32).toString('hex');
-  const mailOptions = {
-    from: process.env.EMAIL_USER,
-    to: email,
-    subject: 'Invitation to Join as Supervisor',
-    html: `
+    // Generate invitation token
+    const token = crypto.randomBytes(32).toString('hex');
+    const mailOptions = {
+        from: process.env.EMAIL_USER,
+        to: email,
+        subject: 'Invitation to Join as Supervisor',
+        html: `
       <h2>You've been invited to join as a Supervisor</h2>
       <p>Please click the link below to complete your registration:</p>
       <a href="${process.env.FRONTEND_URL}/register?token=${token}&role=${role}">Complete Registration</a>
     `
-  };
+    };
 
-  try {
-    await transporter.sendMail(mailOptions);
+    try {
+        await transporter.sendMail(mailOptions);
 
-    // If inviting a supervisor, notify admins and existing supervisors
-    if (role === 'Supervisor') {
-      await sendNotificationsByRoles(
-        ['Admin', 'Supervisor'],
-        `New supervisor invitation sent to ${email}`,
-        'NEW_SUPERVISOR_INVITED'
-      );
+        // If inviting a supervisor, notify admins and existing supervisors
+        if (role === 'Supervisor') {
+            await sendNotificationsByRoles(
+                ['Admin', 'Supervisor'],
+                `New supervisor invitation sent to ${email}`,
+                'NEW_SUPERVISOR_INVITED'
+            );
+        }
+
+        res.json({ message: 'Invitation email sent successfully.' });
+    } catch (mailErr) {
+        console.error('Error sending invitation email:', mailErr);
+        res.status(500).json({ message: 'Failed to send invitation email.' });
     }
-
-    res.json({ message: 'Invitation email sent successfully.' });
-  } catch (mailErr) {
-    console.error('Error sending invitation email:', mailErr);
-    res.status(500).json({ message: 'Failed to send invitation email.' });
-  }
 });
 
 // Assign supervisor to ticket endpoint
 app.put('/api/tickets/:id/assign', async (req, res) => {
-  const ticketId = req.params.id;
-  const { status, priority, supervisorId } = req.body;
+    const ticketId = req.params.id;
+    const { status, priority, supervisorId } = req.body;
 
-  // First get the ticket details to know the user who created it
-  const getTicketQuery = 'SELECT UserId FROM ticket WHERE TicketID = ?';
-  db.query(getTicketQuery, [ticketId], async (err, ticketResults) => {
-    if (err) {
-      console.error('Error fetching ticket:', err);
-      return res.status(500).json({ error: 'Database error' });
-    }
+    // First get the ticket details to know the user who created it
+    const getTicketQuery = 'SELECT UserId FROM ticket WHERE TicketID = ?';
+    db.query(getTicketQuery, [ticketId], async (err, ticketResults) => {
+        if (err) {
+            console.error('Error fetching ticket:', err);
+            return res.status(500).json({ error: 'Database error' });
+        }
 
-    if (ticketResults.length === 0) {
-      return res.status(404).json({ message: 'Ticket not found' });
-    }
+        if (ticketResults.length === 0) {
+            return res.status(404).json({ message: 'Ticket not found' });
+        }
 
-    const userId = ticketResults[0].UserId;
+        const userId = ticketResults[0].UserId;
 
-    const sql = `UPDATE ticket SET Status = ?, Priority = ?, SupervisorID = ? WHERE TicketID = ?`;
+        const sql = `UPDATE ticket SET Status = ?, Priority = ?, SupervisorID = ? WHERE TicketID = ?`;
 
-    db.query(sql, [status, priority, supervisorId, ticketId], async (err, result) => {
-      if (err) {
-        console.error('Error assigning supervisor:', err);
-        return res.status(500).json({ error: 'Database error' });
-      }
+        db.query(sql, [status, priority, supervisorId, ticketId], async (err, result) => {
+            if (err) {
+                console.error('Error assigning supervisor:', err);
+                return res.status(500).json({ error: 'Database error' });
+            }
 
-      try {
-        // Notify the assigned supervisor
-        await createNotification(
-          supervisorId,
-          `You have been assigned to ticket #${ticketId}`,
-          'SUPERVISOR_ASSIGNED'
-        );
+            try {
+                // Notify the assigned supervisor
+                await createNotification(
+                    supervisorId,
+                    `You have been assigned to ticket #${ticketId}`,
+                    'SUPERVISOR_ASSIGNED'
+                );
 
-        // Notify the ticket creator
-        await createNotification(
-          userId,
-          `A supervisor has been assigned to your ticket #${ticketId}`,
-          'TICKET_UPDATED'
-        );
+                // Notify the ticket creator
+                await createNotification(
+                    userId,
+                    `A supervisor has been assigned to your ticket #${ticketId}`,
+                    'TICKET_UPDATED'
+                );
 
-        // Notify admins
-        await sendNotificationsByRoles(
-          ['Admin'],
-          `Supervisor assigned to ticket #${ticketId}`,
-          'SUPERVISOR_ASSIGNMENT'
-        );
-      } catch (error) {
-        console.error('Error sending supervisor assignment notifications:', error);
-      }
+                // Notify admins
+                await sendNotificationsByRoles(
+                    ['Admin'],
+                    `Supervisor assigned to ticket #${ticketId}`,
+                    'SUPERVISOR_ASSIGNMENT'
+                );
+            } catch (error) {
+                console.error('Error sending supervisor assignment notifications:', error);
+            }
 
-      res.json({ message: 'Supervisor assigned successfully' });
+            res.json({ message: 'Supervisor assigned successfully' });
+        });
     });
-  });
 });
 
 // Create new ticket
 app.post('/api/tickets', async (req, res) => {
-  const { userId, systemName, ticketCategory, description } = req.body;
+    const { userId, systemName, ticketCategory, description } = req.body;
 
-  try {
-    // Get system ID
-    const getSystemId = "SELECT AsipiyaSystemID FROM asipiyasystem WHERE SystemName = ?";
-    const [systemResult] = await db.promise().query(getSystemId, [systemName]);
+    try {
+        // Get system ID
+        const getSystemId = "SELECT AsipiyaSystemID FROM asipiyasystem WHERE SystemName = ?";
+        const [systemResult] = await db.promise().query(getSystemId, [systemName]);
 
-    if (systemResult.length === 0) {
-      return res.status(400).json({ message: "Invalid system name" });
-    }
+        if (systemResult.length === 0) {
+            return res.status(400).json({ message: "Invalid system name" });
+        }
 
-    const systemID = systemResult[0].AsipiyaSystemID;
+        const systemID = systemResult[0].AsipiyaSystemID;
 
-    // Get category ID
-    const getCategoryId = "SELECT TicketCategoryID FROM ticketcategory WHERE CategoryName = ?";
-    const [categoryResult] = await db.promise().query(getCategoryId, [ticketCategory]);
+        // Get category ID
+        const getCategoryId = "SELECT TicketCategoryID FROM ticketcategory WHERE CategoryName = ?";
+        const [categoryResult] = await db.promise().query(getCategoryId, [ticketCategory]);
 
-    if (categoryResult.length === 0) {
-      return res.status(400).json({ message: "Invalid ticket category" });
-    }
+        if (categoryResult.length === 0) {
+            return res.status(400).json({ message: "Invalid ticket category" });
+        }
 
-    const categoryID = categoryResult[0].TicketCategoryID;
+        const categoryID = categoryResult[0].TicketCategoryID;
 
-    // Insert ticket
-    const insertTicket = `
+        // Insert ticket
+        const insertTicket = `
       INSERT INTO ticket (UserId, AsipiyaSystemID, TicketCategoryID, Description, Status, Priority)
       VALUES (?, ?, ?, ?, 'Pending', 'Medium')
     `;
 
-    const [result] = await db.promise().query(insertTicket, [
-      userId,
-      systemID,
-      categoryID,
-      description
-    ]);
+        const [result] = await db.promise().query(insertTicket, [
+            userId,
+            systemID,
+            categoryID,
+            description
+        ]);
 
-    const updateSql = `
+        const updateSql = `
       UPDATE asipiyasystem
       SET Status = 1
       WHERE AsipiyaSystemID = ?
     `;
-    await db.promise().query(updateSql, [systemID]);
+        await db.promise().query(updateSql, [systemID]);
 
-    // 🔔 Optional: Send notification
-    try {
-      await sendNotificationsByRoles(
-        ['Admin'],
-        `New ticket created by User #${userId}: ${description.substring(0, 50)}...`,
-        'NEW_TICKET'
-      );
+        // 🔔 Optional: Send notification
+        try {
+            await sendNotificationsByRoles(
+                ['Admin'],
+                `New ticket created by User #${userId}: ${description.substring(0, 50)}...`,
+                'NEW_TICKET'
+            );
+        } catch (error) {
+            console.error('Error sending ticket creation notifications:', error);
+        }
+
+        res.status(201).json({
+            message: 'Ticket created successfully',
+            ticketId: result.insertId
+        });
+
     } catch (error) {
-      console.error('Error sending ticket creation notifications:', error);
+        console.error('Error creating ticket:', error);
+        res.status(500).json({ message: 'Error creating ticket' });
     }
-
-    res.status(201).json({
-      message: 'Ticket created successfully',
-      ticketId: result.insertId
-    });
-
-  } catch (error) {
-    console.error('Error creating ticket:', error);
-    res.status(500).json({ message: 'Error creating ticket' });
-  }
 });
 
 
 // Upload evidence for a ticket
 app.post('/api/upload_evidence', upload_evidence.array('evidenceFiles'), async (req, res) => {
-  const { ticketId, description } = req.body;
+    const { ticketId, description } = req.body;
 
-  if (!req.files || req.files.length === 0) {
-    return res.status(400).json({ message: 'No files uploaded' });
-  }
+    if (!req.files || req.files.length === 0) {
+        return res.status(400).json({ message: 'No files uploaded' });
+    }
 
-  if (!ticketId) {
-    return res.status(400).json({ message: 'Ticket ID is required' });
-  }
+    if (!ticketId) {
+        return res.status(400).json({ message: 'Ticket ID is required' });
+    }
 
-  try {
-    const values = req.files.map(file => [ticketId, file.path, description]);
-    
-    const insertEvidenceQuery = `
+    try {
+        const values = req.files.map(file => [ticketId, file.path, description]);
+
+        const insertEvidenceQuery = `
       INSERT INTO evidence (ComplaintID, FilePath, Description)
       VALUES ?
     `;
 
-    await db.promise().query(insertEvidenceQuery, [values]);
+        await db.promise().query(insertEvidenceQuery, [values]);
 
-    res.status(200).json({
-      message: 'Evidence files uploaded successfully',
-      count: req.files.length
-    });
-  } catch (error) {
-    console.error('Error uploading evidence:', error);
-    res.status(500).json({ message: 'Error uploading evidence' });
-  }
+        res.status(200).json({
+            message: 'Evidence files uploaded successfully',
+            count: req.files.length
+        });
+    } catch (error) {
+        console.error('Error uploading evidence:', error);
+        res.status(500).json({ message: 'Error uploading evidence' });
+    }
 });
 
 
 //UserChat
 app.post("/api/ticketchat", upload.single("file"), (req, res) => {
-  const { TicketID, Type, Note, UserID, Role } = req.body;
-  const filePath = req.file ? `uploads/${req.file.filename}` : null;
+    const { TicketID, Type, Note, UserID, Role } = req.body;
+    const filePath = req.file ? `uploads/${req.file.filename}` : null;
 
-  const sql = `
+    const sql = `
     INSERT INTO ticketchat (TicketID, Type, Note, UserID, Path, Role) 
     VALUES (?, ?, ?, ?, ?, ?)
   `;
-  const values = [TicketID, Type, Note, UserID, filePath, Role];
+    const values = [TicketID, Type, Note, UserID, filePath, Role];
 
-  db.query(sql, values, (err, result) => {
-    if (err) {
-      console.error("Error inserting chat message:", err);
-      return res.status(500).json({ error: err.message });
-    }
-    res.status(200).json({ 
-      message: "Message sent", 
-      filePath: filePath ? `http://localhost:5000/${filePath}` : null 
+    db.query(sql, values, (err, result) => {
+        if (err) {
+            console.error("Error inserting chat message:", err);
+            return res.status(500).json({ error: err.message });
+        }
+        res.status(200).json({
+            message: "Message sent",
+            filePath: filePath ? `http://localhost:5000/${filePath}` : null
+        });
     });
-  });
 });
 
 app.get("/api/ticketchat/:ticketID", (req, res) => {
-  const ticketID = req.params.ticketID;
+    const ticketID = req.params.ticketID;
 
-  const sql = `
+    const sql = `
     SELECT 
       tc.*, 
       au.FullName, 
@@ -1919,13 +2015,13 @@ app.get("/api/ticketchat/:ticketID", (req, res) => {
       tc.CreatedAt ASC
   `;
 
-  db.query(sql, [ticketID], (err, result) => {
-    if (err) {
-      console.error("Error retrieving messages:", err);
-      return res.status(500).json({ error: "Failed to fetch chat messages." });
-    }
-    res.status(200).json(result);
-  });
+    db.query(sql, [ticketID], (err, result) => {
+        if (err) {
+            console.error("Error retrieving messages:", err);
+            return res.status(500).json({ error: "Failed to fetch chat messages." });
+        }
+        res.status(200).json(result);
+    });
 });
 
 

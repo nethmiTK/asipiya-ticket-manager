@@ -32,6 +32,64 @@ export default function TicketManage() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [evidenceList, setEvidenceList] = useState([]);
   const [showProblemModal, setShowProblemModal] = useState(false);
+  const [supervisors, setSupervisors] = useState([]);
+  const [systems, setSystems] = useState([]);
+  const [selectedSupervisorId, setSelectedSupervisorId] = useState("");
+  const [selectedSystem, setSelectedSystem] = useState("");
+
+  // This computes which supervisorId to use based on user role and selection
+  const supervisorIdToUse =
+    user.Role === "Admin" && selectedSupervisorId
+      ? selectedSupervisorId
+      : user.UserID;
+
+  // Fetch tickets for the current supervisorIdToUse whenever it changes
+  useEffect(() => {
+    const fetchTickets = async () => {
+      try {
+        const url = `http://localhost:5000/getting/tickets?supervisorId=${supervisorIdToUse}&systemId=${selectedSystem}`;
+        const res = await fetch(url);
+        const data = await res.json();
+
+        const mappedTickets = data.map((ticket) => ({
+          id: ticket.TicketID,
+          date: ticket.DateTime,
+          problem: ticket.Description,
+          priority: ticket.Priority,
+          status: ticket.Status,
+          assignedBy: ticket.SupervisorID,
+          dueDate: ticket.DueDate
+            ? new Date(ticket.DueDate).toISOString().split("T")[0]
+            : "",
+          resolution: ticket.Resolution,
+          user: ticket.UserId,
+          systemName: ticket.AsipiyaSystemName || "N/A",
+          userName: ticket.UserName,
+        }));
+        setTickets(mappedTickets);
+      } catch (err) {
+        console.error("Error loading tickets", err);
+      }
+    };
+
+    fetchTickets();
+  }, [selectedSupervisorId, selectedSystem]);
+
+  useEffect(() => {
+    // Fetch asipiya systems
+    fetch("http://localhost:5000/asipiyasystems")
+      .then((res) => res.json())
+      .then((data) => setSystems(data))
+      .catch((err) => console.error("Error fetching systems", err));
+
+    // Fetch supervisors if user is admin
+    if (user.Role === "Admin") {
+      fetch("http://localhost:5000/supervisors")
+        .then((res) => res.json())
+        .then((data) => setSupervisors(data))
+        .catch((err) => console.error("Error fetching supervisors", err));
+    }
+  }, [user.Role]);
 
   useEffect(() => {
     if (!selectedTicket?.id) return;
@@ -54,9 +112,12 @@ export default function TicketManage() {
   useEffect(() => {
     const fetchTickets = async () => {
       try {
-        const res = await fetch(
-          `http://localhost:5000/tickets?supervisorId=${user.UserID}`
-        );
+        const url =
+          selectedSupervisorId === "all"
+            ? `http://localhost:5000/tickets?role=${user.Role}`
+            : `http://localhost:5000/tickets?supervisorId=${selectedSupervisorId}&role=${user.Role}`;
+
+        const res = await fetch(url);
         if (!res.ok) throw new Error("Failed to fetch");
         const data = await res.json();
 
@@ -68,9 +129,13 @@ export default function TicketManage() {
           priority: ticket.Priority,
           status: ticket.Status,
           assignedBy: ticket.SupervisorID,
-          dueDate: ticket.DueDate ? ticket.DueDate.split("T")[0] : "",
+          dueDate: ticket.DueDate
+            ? new Date(ticket.DueDate).toISOString().split("T")[0]
+            : "",
           resolution: ticket.Resolution,
           user: ticket.UserId,
+          systemName: ticket.AsipiyaSystemName || "N/A",
+          userName: ticket.UserName,
         }));
         setTickets(mappedTickets);
       } catch (err) {
@@ -184,10 +249,12 @@ export default function TicketManage() {
   };
 
   const handleDueDateChange = async (e) => {
-    const newDueDate = e.target.value;
+    const rawDate = e.target.value;
+    const newDueDate = new Date(rawDate).toISOString(); // ISO format with time
+
     setSelectedTicket((prev) => ({
       ...prev,
-      dueDate: newDueDate,
+      dueDate: rawDate, // keep local viewable date
     }));
 
     try {
@@ -196,7 +263,7 @@ export default function TicketManage() {
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ dueDate: newDueDate }),
+          body: JSON.stringify({ dueDate: newDueDate }), // send ISO date
         }
       );
 
@@ -205,7 +272,7 @@ export default function TicketManage() {
       setTickets((prevTickets) =>
         prevTickets.map((ticket) =>
           ticket.id === selectedTicket.id
-            ? { ...ticket, dueDate: newDueDate }
+            ? { ...ticket, dueDate: rawDate }
             : ticket
         )
       );
@@ -227,20 +294,50 @@ export default function TicketManage() {
       >
         <div className="min-h-screen bg-gray-50">
           {/* Top Navigation */}
-          <nav className="bg-white shadow-md px-6 py-4 flex justify-between rounded-lg  items-center">
+          <nav className="bg-white shadow-md px-6 py-4 flex flex-col sm:flex-row sm:justify-between gap-4 sm:gap-0 rounded-lg items-center">
             <h1 className="text-xl sm:text-2xl font-bold text-gray-700">
               Ticket Management
             </h1>
-            <div className="relative cursor-pointer">
-              <FaBell className="text-2xl text-gray-700" />
-              {/*<span className="absolute -top-1 -right-1 bg-red-600 text-white text-xs rounded-full px-2">
-                3
-              </span>*/}
+
+            <div className="flex gap-4 items-center">
+              {/* Only for Admin: Supervisor Dropdown */}
+              {user.Role === "Admin" && (
+                <select
+                  value={selectedSupervisorId}
+                  onChange={(e) => setSelectedSupervisorId(e.target.value)}
+                >
+                  <option value={"all"}>All Supervisors</option>
+                  {supervisors.map((sup) => (
+                    <option key={sup.UserID} value={sup.UserID}>
+                      {sup.FullName}
+                    </option>
+                  ))}
+                </select>
+              )}
+
+              {/* Asipiya System Dropdown */}
+              <select
+                value={selectedSystem}
+                onChange={(e) => setSelectedSystem(e.target.value)}
+              >
+                <option value="all">All Systems</option>
+                {systems.map((sys) => (
+                  <option key={sys.AsipiyaSystemID} value={sys.AsipiyaSystemID}>
+                    {sys.SystemName}
+                  </option>
+                ))}
+              </select>
+
+              <div className="relative cursor-pointer">
+                <FaBell className="text-2xl text-gray-700" />
+                {/* Uncomment if you want notification badge */}
+                {/* <span className="absolute -top-1 -right-1 bg-red-600 text-white text-xs rounded-full px-2">3</span> */}
+              </div>
             </div>
           </nav>
 
           {/* Ticket Sections */}
-          <div className="max-w-7xl mx-auto px-4 py-6 space-y-10">
+          <div className="max-w-7xl mx-auto px-4 py-6 space-y-10 ">
             <Section
               title="Open"
               tickets={open}
@@ -325,8 +422,14 @@ export default function TicketManage() {
                   <p>
                     <strong>Priority:</strong> {selectedTicket.priority}
                   </p>
-                  <p>
+                  {/*<p>
                     <strong>Assigned By:</strong> {selectedTicket.assignedBy}
+                  </p>*/}
+                  <p>
+                    <strong>System Name:</strong> {selectedTicket.systemName}
+                  </p>
+                  <p>
+                    <strong>User Name:</strong> {selectedTicket.userName}
                   </p>
 
                   <div>
@@ -523,7 +626,7 @@ export default function TicketManage() {
               {/* Chat Modal */}
               {chatMode && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-                  <div className="relative w-full max-w-lg h-[600px] p-4 bg-white rounded-lg shadow-lg flex flex-col">
+                  <div className="relative max-w-lg h-[600px] p-4 bg-white rounded-lg shadow-lg flex flex-col">
                     <button
                       onClick={() => setChatMode(false)}
                       className="absolute top-2 right-2 text-gray-500 hover:text-red-600 text-xl"
