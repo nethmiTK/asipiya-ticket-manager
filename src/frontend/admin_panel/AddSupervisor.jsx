@@ -6,6 +6,7 @@ import "react-tooltip/dist/react-tooltip.css";
 import { GrUserAdd } from "react-icons/gr";
 import AddMemberModal from "./AddMember";
 import EditMemberModal from "./EditMember";
+import { FaEdit, FaTrash } from "react-icons/fa";
 
 export default function AddSupervisor() {
   const navigate = useNavigate();
@@ -118,9 +119,9 @@ export default function AddSupervisor() {
                             setEditUserId(user.UserID);
                             setShowEditModal(true);
                           }}
-                          className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded shadow-md font-medium"
+                          className="text-blue-600 hover:text-blue-800 mr-4"
                         >
-                          ✏️
+                          <FaEdit size={18} />
                         </button>
 
                         <button
@@ -130,9 +131,9 @@ export default function AddSupervisor() {
                             setSelectedUser(user);
                             setShowDeleteModal(true);
                           }}
-                          className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded shadow-md font-medium"
+                          className="text-red-600 hover:text-red-800 "
                         >
-                          🗑️
+                          <FaTrash size={18} />
                         </button>
                       </td>
                     </tr>
