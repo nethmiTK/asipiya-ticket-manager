@@ -45,24 +45,74 @@ const TicketView = () => {
   //     String(value).toLowerCase().includes(searchQuery.toLowerCase())
   //   )
   // );
+
+  // States for custom dropdown visibility
+  const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
+  const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
+  const [isSystemDropdownOpen, setIsSystemDropdownOpen] = useState(false);
+
+  // state variables for filter selections
+  const [selectedStatus, setSelectedStatus] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('');
+  const [selectedSystem, setSelectedSystem] = useState('');
+
+  // state variables for unique filter options 
+  const [uniqueStatuses, setUniqueStatuses] = useState([]);
+  const [uniqueCategories, setUniqueCategories] = useState([]);
+  const [uniqueSystems, setUniqueSystems] = useState([]);
+
+  // useEffect to extract unique filter options whenever tickets data changes
+  useEffect(() => {
+    const statuses = new Set();
+    const categories = new Set();
+    const systems = new Set();
+
+    tickets.forEach(ticket => {
+      if (ticket.status) statuses.add(ticket.status);
+      if (ticket.category) categories.add(ticket.category);
+      if (ticket.system_name) systems.add(ticket.system_name);
+    });
+
+    // Add empty string for "All" option and sort
+    setUniqueStatuses(['', ...Array.from(statuses).sort()]);
+    setUniqueCategories(['', ...Array.from(categories).sort()]);
+    setUniqueSystems(['', ...Array.from(systems).sort()]);
+  }, [tickets]);
+
+  // only filters by ID and Description
   const filteredTickets = tickets.filter(ticket =>
+    // String(ticket.id).toLowerCase().includes(searchQuery.toLowerCase()) ||
+    // String(ticket.status).toLowerCase().includes(searchQuery.toLowerCase()) ||
+    // String(ticket.category).toLowerCase().includes(searchQuery.toLowerCase()) ||
+    // String(ticket.system_name).toLowerCase().(searchQuery.toLowerCase())
     String(ticket.id).toLowerCase().includes(searchQuery.toLowerCase()) ||
-    String(ticket.status).toLowerCase().includes(searchQuery.toLowerCase()) ||
-    String(ticket.category).toLowerCase().includes(searchQuery.toLowerCase()) ||
-    String(ticket.system_name).toLowerCase().includes(searchQuery.toLowerCase())
+    String(ticket.description).toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentTickets = filteredTickets.slice(indexOfFirstItem, indexOfLastItem);
-  const totalPages = Math.ceil(filteredTickets.length / itemsPerPage);
+
+  const finalFilteredTickets = filteredTickets.filter(ticket => {
+    if (selectedStatus && ticket.status !== selectedStatus) return false;
+    if (selectedCategory && ticket.category !== selectedCategory) return false;
+    if (selectedSystem && ticket.system_name !== selectedSystem) return false;
+    return true;
+  });
+
+  const currentTickets = finalFilteredTickets.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(finalFilteredTickets.length / itemsPerPage);
   const paginate = (pageNumber) => setCurrentPage(pageNumber);
+
 
   const handleItemsPerPageChange = (e) => {
     setItemsPerPage(Number(e.target.value));
     setCurrentPage(1); // Reset to first page when items per page changes
   };
 
+  // Refs for custom dropdowns for click-outside detection
+  const statusDropdownRef = useRef(null);
+  const categoryDropdownRef = useRef(null);
+  const systemDropdownRef = useRef(null);
 
 
   useEffect(() => {
@@ -105,7 +155,35 @@ const TicketView = () => {
     };
   }, [isModalOpen]);
 
-  //useEffect for closing notification panel when clicked outside
+  // useEffect for closing custom dropdowns when clicked outside
+  useEffect(() => {
+    const handleStatusDropdownClickOutside = (event) => {
+        if (statusDropdownRef.current && !statusDropdownRef.current.contains(event.target)) {
+            setIsStatusDropdownOpen(false);
+        }
+    };
+    const handleCategoryDropdownClickOutside = (event) => {
+        if (categoryDropdownRef.current && !categoryDropdownRef.current.contains(event.target)) {
+            setIsCategoryDropdownOpen(false);
+        }
+    };
+    const handleSystemDropdownClickOutside = (event) => {
+        if (systemDropdownRef.current && !systemDropdownRef.current.contains(event.target)) {
+            setIsSystemDropdownOpen(false);
+        }
+    };
+
+    document.addEventListener('mousedown', handleStatusDropdownClickOutside);
+    document.addEventListener('mousedown', handleCategoryDropdownClickOutside);
+    document.addEventListener('mousedown', handleSystemDropdownClickOutside);
+    return () => {
+        document.removeEventListener('mousedown', handleStatusDropdownClickOutside);
+        document.removeEventListener('mousedown', handleCategoryDropdownClickOutside);
+        document.removeEventListener('mousedown', handleSystemDropdownClickOutside);
+    };
+ }, []);
+
+  // useEffect for closing notification panel when clicked outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (notificationRef.current && !notificationRef.current.contains(event.target)) {
@@ -163,11 +241,145 @@ const TicketView = () => {
             </div>
           )}
           <h1 className="text-2xl font-bold mb-4">My All Tickets</h1>
+          {/* Filter Options Section */}
+          <div className="mb-6 flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4">
+            {/* Status Filter*/}
+            <div className="flex flex-col flex-1 relative" ref={statusDropdownRef}>
+              <label htmlFor="statusFilterCustom" className="text-sm font-medium text-gray-700 mb-1">
+                Filter by Status:
+              </label>
+              <button
+                id="statusFilterCustom"
+                onClick={() => setIsStatusDropdownOpen(!isStatusDropdownOpen)}
+                className="flex justify-between items-center p-2 border border-gray-300 rounded-md w-full focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-left cursor-pointer"
+              >
+                {selectedStatus || "All Statuses"}
+                <svg
+                  className={`w-4 h-4 transition-transform duration-200 ${
+                    isStatusDropdownOpen ? 'rotate-180' : 'rotate-0'
+                  }`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
+                </svg>
+              </button>
+              {isStatusDropdownOpen && (
+                <div className="absolute z-10 w-full bg-white border border-gray-300 rounded-md shadow-lg mt-1 max-h-60 overflow-y-auto">
+                  {uniqueStatuses.map((statusOption) => (
+                    <div
+                      key={statusOption || 'all-status'} 
+                      className={`p-2 cursor-pointer hover:bg-gray-100 ${
+                        selectedStatus === statusOption ? 'bg-blue-100 font-semibold' : ''
+                      }`}
+                      onClick={() => {
+                        setSelectedStatus(statusOption);
+                        setIsStatusDropdownOpen(false);
+                        setCurrentPage(1); // Reset page on filter change
+                      }}
+                    >
+                      {statusOption || "All Statuses"}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Category Filter */}
+            <div className="flex flex-col flex-1 relative" ref={categoryDropdownRef}>
+              <label htmlFor="categoryFilterCustom" className="text-sm font-medium text-gray-700 mb-1">
+                Filter by Category:
+              </label>
+              <button
+                id="categoryFilterCustom"
+                onClick={() => setIsCategoryDropdownOpen(!isCategoryDropdownOpen)}
+                className="flex justify-between items-center p-2 border border-gray-300 rounded-md w-full focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-left cursor-pointer"
+              >
+                {selectedCategory || "All Categories"}
+                <svg
+                  className={`w-4 h-4 transition-transform duration-200 ${
+                    isCategoryDropdownOpen ? 'rotate-180' : 'rotate-0'
+                  }`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
+                </svg>
+              </button>
+              {isCategoryDropdownOpen && (
+                <div className="absolute z-10 w-full bg-white border border-gray-300 rounded-md shadow-lg mt-1 max-h-60 overflow-y-auto">
+                  {uniqueCategories.map((categoryOption) => (
+                    <div
+                      key={categoryOption || 'all-category'} // Added unique key for "All" option
+                      className={`p-2 cursor-pointer hover:bg-gray-100 ${
+                        selectedCategory === categoryOption ? 'bg-blue-100 font-semibold' : ''
+                      }`}
+                      onClick={() => {
+                        setSelectedCategory(categoryOption);
+                        setIsCategoryDropdownOpen(false);
+                        setCurrentPage(1); // Reset page on filter change
+                      }}
+                    >
+                      {categoryOption || "All Categories"}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* System Filter */}
+            <div className="flex flex-col flex-1 relative" ref={systemDropdownRef}>
+              <label htmlFor="systemFilterCustom" className="text-sm font-medium text-gray-700 mb-1">
+                Filter by System:
+              </label>
+              <button
+                id="systemFilterCustom"
+                onClick={() => setIsSystemDropdownOpen(!isSystemDropdownOpen)}
+                className="flex justify-between items-center p-2 border border-gray-300 rounded-md w-full focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-left cursor-pointer"
+              >
+                {selectedSystem || "All Systems"}
+                <svg
+                  className={`w-4 h-4 transition-transform duration-200 ${
+                    isSystemDropdownOpen ? 'rotate-180' : 'rotate-0'
+                  }`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
+                </svg>
+              </button>
+              {isSystemDropdownOpen && (
+                <div className="absolute z-10 w-full bg-white border border-gray-300 rounded-md shadow-lg mt-1 max-h-60 overflow-y-auto">
+                  {uniqueSystems.map((systemOption) => (
+                    <div
+                      key={systemOption || 'all-system'} // Added unique key for "All" option
+                      className={`p-2 cursor-pointer hover:bg-gray-100 ${
+                        selectedSystem === systemOption ? 'bg-blue-100 font-semibold' : ''
+                      }`}
+                      onClick={() => {
+                        setSelectedSystem(systemOption);
+                        setIsSystemDropdownOpen(false);
+                        setCurrentPage(1); // Reset page on filter change
+                      }}
+                    >
+                      {systemOption || "All Systems"}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
           {/*Search Bar */}
           <div className="mb-6">
             <input
               type="text"
-              placeholder="Search by ID, Status, Category, or System..."
+              placeholder="Search by ID or Description..."
               className="p-2 border border-gray-300 rounded-md w-full focus:outline-none focus:ring-2 focus:ring-blue-500"
               value={searchQuery}
               onChange={(e) => {
@@ -220,7 +432,7 @@ const TicketView = () => {
                         </span>
                       </td>
                       <td className="px-4 py-2 text-justify whitespace-normal overflow-hidden break-words" style={{
-                        maxHeight: '3.6em', 
+                        maxHeight: '3.6em',
                         lineHeight: '1.2em'
                       }}>
                         {truncateDescription(ticket.description, 120)}
@@ -239,7 +451,7 @@ const TicketView = () => {
           )}
         </div>
         {/* Pagination Controls at the bottom */}
-        {filteredTickets.length > 0 && (
+        {finalFilteredTickets.length > 0 && ( // Changed from filteredTickets.length
           <div className="flex flex-col sm:flex-row justify-end items-center mt-4 p-4 bg-white rounded-lg shadow">
             <div className="flex items-center space-x-4">
               <div className="flex items-center">
@@ -256,7 +468,7 @@ const TicketView = () => {
                 </select>
               </div>
               <span className="text-gray-700 text-sm">
-                {` ${indexOfFirstItem + 1}-${Math.min(indexOfLastItem, filteredTickets.length)} of ${filteredTickets.length}`}
+                {` ${indexOfFirstItem + 1}-${Math.min(indexOfLastItem, finalFilteredTickets.length)} of ${finalFilteredTickets.length}`}
               </span>
               <div className="flex items-center space-x-2">
                 <button
@@ -333,7 +545,7 @@ const TicketView = () => {
                       <strong>Status:</strong> {selectedTicket.status}
                     </p>
                     <p>
-                      <strong className="text-justify">Description:</strong>{" "}
+                      <strong>Description:</strong>{" "}
                       {selectedTicket.description}
                     </p>
                     <p>
