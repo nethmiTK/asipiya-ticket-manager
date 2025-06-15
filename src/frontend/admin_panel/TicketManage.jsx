@@ -113,9 +113,9 @@ export default function TicketManage() {
     const fetchTickets = async () => {
       try {
         const url =
-          selectedSupervisorId === "all"
+          supervisorIdToUse === "all"
             ? `http://localhost:5000/tickets?role=${user.Role}`
-            : `http://localhost:5000/tickets?supervisorId=${selectedSupervisorId}&role=${user.Role}`;
+            : `http://localhost:5000/tickets?supervisorId=${supervisorIdToUse}&role=${user.Role}`;
 
         const res = await fetch(url);
         if (!res.ok) throw new Error("Failed to fetch");
