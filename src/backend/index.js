@@ -1516,14 +1516,14 @@ app.get('/api/pending_ticket', (req, res) => {
 
 //Add systems
 app.post('/api/systems', async (req, res) => {
-    const { systemName, description } = req.body;
+  const { systemName, description, status } = req.body;
 
-    const sql = 'INSERT INTO asipiyasystem (SystemName, Description) VALUES (?, ?)';
-    db.query(sql, [systemName, description], async (err) => {
-        if (err) {
-            console.error("Database error:", err);
-            return res.status(500).json({ message: "Database error" });
-        }
+  const sql = 'INSERT INTO asipiyasystem (SystemName, Description , Status) VALUES (?, ?, ?)';
+  db.query(sql, [systemName, description, status], async (err) => {
+    if (err) {
+      console.error("Database error:", err);
+      return res.status(500).json({ message: "Database error" });
+    }
 
         // Send notification to supervisors, developers, and admins
         try {
@@ -1554,7 +1554,6 @@ app.get('/system_registration', (req, res) => {
     GROUP BY
       s.AsipiyaSystemID, s.SystemName, s.Description, s.Status
     ORDER BY s.AsipiyaSystemID;
-
   `;
 
     db.query(sql, (err, results) => {
@@ -1589,16 +1588,21 @@ app.put('/api/system_registration_update/:id', (req, res) => {
 app.delete('/api/system_registration_delete/:id', (req, res) => {
     const { id } = req.params;
 
-    const checkSql = 'SELECT * FROM ticket WHERE AsipiyaSystemID = ?'; // if your ticket table uses this FK
-    db.query(checkSql, [id], (err, results) => {
-        if (err) {
-            console.error('Check usage error:', err);
-            return res.status(500).json({ error: 'Database error checking system usage' });
-        }
+  const checkStatusSql = 'SELECT Status FROM asipiyasystem WHERE AsipiyaSystemID = ?';
+  db.query(checkStatusSql, [id], (err, results) => {
+    if (err) {
+      console.error('Status check error:', err);
+      return res.status(500).json({ error: 'Database error checking system status' });
+    }
 
-        if (results.length > 0) {
-            return res.status(409).json({ message: 'System is in use and cannot be deleted' });
-        }
+    if (results.length === 0) {
+      return res.status(404).json({ message: 'System not found' });
+    }
+
+    const status = results[0].Status;
+    if (status === 1) {
+      return res.status(403).json({ message: 'Cannot delete active system (status = 1)' });
+    }
 
         const deleteSql = 'DELETE FROM asipiyasystem WHERE AsipiyaSystemID = ?';
         db.query(deleteSql, [id], (err, result) => {
@@ -1617,16 +1621,17 @@ app.delete('/api/system_registration_delete/:id', (req, res) => {
 });
 
 
+
 //Adding Category
 app.post('/api/ticket_category', async (req, res) => {
-    const { CategoryName, Description } = req.body;
+  const { CategoryName, Description, Status } = req.body;
 
-    const sql = 'INSERT INTO ticketcategory (CategoryName, Description) VALUES (?, ?)';
-    db.query(sql, [CategoryName, Description], async (err, result) => {
-        if (err) {
-            console.error("Database error:", err);
-            return res.status(500).json({ message: "Failed to add ticket category" });
-        }
+  const sql = 'INSERT INTO ticketcategory (CategoryName, Description, Status) VALUES (?, ?, ?)';
+  db.query(sql, [CategoryName, Description, Status], async (err, result) => {
+    if (err) {
+      console.error("Database error:", err);
+      return res.status(500).json({ message: "Failed to add ticket category" });
+    }
 
         try {
             await sendNotificationsByRoles(
@@ -1693,21 +1698,28 @@ app.put('/api/ticket_category_update/:id', (req, res) => {
 app.delete('/api/ticket_category_delete/:id', (req, res) => {
     const { id } = req.params;
 
-    const checkSql = 'SELECT * FROM ticket WHERE TicketCategoryID = ?';
-    db.query(checkSql, [id], (err, results) => {
-        if (err) {
-            return res.status(500).json({ error: 'Database error checking category usage' });
-        }
+  const checkSql = 'SELECT Status FROM ticketcategory WHERE TicketCategoryID = ?';
+  db.query(checkSql, [id], (err, results) => {
+    if (err) {
+      console.error('Status check error:', err);
+      return res.status(500).json({ error: 'Database error checking category usage' });
+    }
 
-        if (results.length > 0) {
-            return res.status(409).json({ message: 'Category in use and cannot be deleted' });
-        }
+    if (results.length === 0) {
+      return res.status(404).json({ message: 'Category in use and cannot be deleted' });
+    }
 
-        const deleteSql = 'DELETE FROM ticketcategory WHERE TicketCategoryID = ?';
-        db.query(deleteSql, [id], (err, result) => {
-            if (err) {
-                return res.status(500).json({ error: 'Error deleting category' });
-            }
+    const status = results[0].Status;
+    if (status === 1) {
+      return res.status(403).json({ message: 'Cannot delete active system (status = 1)' });
+    }
+
+    const deleteSql = 'DELETE FROM ticketcategory WHERE TicketCategoryID = ?';
+    db.query(deleteSql, [id], (err, result) => {
+      if (err) {
+        console.error('Delete error:', err);
+        return res.status(500).json({ error: 'Error deleting category' });
+      }
 
             if (result.affectedRows === 0) {
                 return res.status(404).json({ message: 'Category not found' });
@@ -1875,71 +1887,69 @@ app.put('/api/tickets/:id/assign', async (req, res) => {
 
 // Create new ticket
 app.post('/api/tickets', async (req, res) => {
-    const { userId, systemName, ticketCategory, description } = req.body;
+  const { userId, systemName, ticketCategory, description } = req.body;
 
-    try {
-        // Get system ID
-        const getSystemId = "SELECT AsipiyaSystemID FROM asipiyasystem WHERE SystemName = ?";
-        const [systemResult] = await db.promise().query(getSystemId, [systemName]);
+  try {
+    // Get system ID
+    const getSystemId = "SELECT AsipiyaSystemID FROM asipiyasystem WHERE SystemName = ?";
+    const [systemResult] = await db.promise().query(getSystemId, [systemName]);
 
-        if (systemResult.length === 0) {
-            return res.status(400).json({ message: "Invalid system name" });
-        }
+    if (systemResult.length === 0) {
+      return res.status(400).json({ message: "Invalid system name" });
+    }
 
-        const systemID = systemResult[0].AsipiyaSystemID;
+    const systemID = systemResult[0].AsipiyaSystemID;
 
-        // Get category ID
-        const getCategoryId = "SELECT TicketCategoryID FROM ticketcategory WHERE CategoryName = ?";
-        const [categoryResult] = await db.promise().query(getCategoryId, [ticketCategory]);
+    // Get category ID
+    const getCategoryId = "SELECT TicketCategoryID FROM ticketcategory WHERE CategoryName = ?";
+    const [categoryResult] = await db.promise().query(getCategoryId, [ticketCategory]);
 
-        if (categoryResult.length === 0) {
-            return res.status(400).json({ message: "Invalid ticket category" });
-        }
+    if (categoryResult.length === 0) {
+      return res.status(400).json({ message: "Invalid ticket category" });
+    }
 
-        const categoryID = categoryResult[0].TicketCategoryID;
+    const categoryID = categoryResult[0].TicketCategoryID;
 
-        // Insert ticket
-        const insertTicket = `
+    // Insert ticket
+    const insertTicket = `
       INSERT INTO ticket (UserId, AsipiyaSystemID, TicketCategoryID, Description, Status, Priority)
       VALUES (?, ?, ?, ?, 'Pending', 'Medium')
     `;
 
-        const [result] = await db.promise().query(insertTicket, [
-            userId,
-            systemID,
-            categoryID,
-            description
-        ]);
+    const [result] = await db.promise().query(insertTicket, [
+      userId,
+      systemID,
+      categoryID,
+      description
+    ]);
 
-        const updateSql = `
+    const updateSql = `
       UPDATE asipiyasystem
       SET Status = 1
       WHERE AsipiyaSystemID = ?
     `;
-        await db.promise().query(updateSql, [systemID]);
+    await db.promise().query(updateSql, [systemID]);
 
-        // 🔔 Optional: Send notification
-        try {
-            await sendNotificationsByRoles(
-                ['Admin'],
-                `New ticket created by User #${userId}: ${description.substring(0, 50)}...`,
-                'NEW_TICKET'
-            );
-        } catch (error) {
-            console.error('Error sending ticket creation notifications:', error);
-        }
-
-        res.status(201).json({
-            message: 'Ticket created successfully',
-            ticketId: result.insertId
-        });
-
+    try {
+      await sendNotificationsByRoles(
+        ['Admin'],
+        `New ticket created by User #${userId}: ${description.substring(0, 50)}...`,
+        'NEW_TICKET'
+      );
     } catch (error) {
-        console.error('Error creating ticket:', error);
-        res.status(500).json({ message: 'Error creating ticket' });
+      console.error('Error sending ticket creation notifications:', error);
     }
-});
 
+    res.status(201).json({
+      message: 'Ticket created successfully',
+      ticketId: result.insertId
+    });
+
+  } catch (error) {
+    console.error('Error creating ticket:', error);
+    res.status(500).json({ message: 'Error creating ticket' });
+  }
+});
 
 // Upload evidence for a ticket
 app.post('/api/upload_evidence', upload_evidence.array('evidenceFiles'), async (req, res) => {

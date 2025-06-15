@@ -100,7 +100,7 @@ const ChatUI = ({ ticketID: propTicketID }) => {
   };
 
   return (
-    <div className="flex flex-col h-full border-none rounded-md bg-white">
+    <div className="flex flex-col h-97.5 border-none rounded-md bg-white">
       <div className="flex-1 overflow-y-auto space-y-2 p-2 mt-2">
         {messages.map((msg, idx) => (
           <div
@@ -109,7 +109,7 @@ const ChatUI = ({ ticketID: propTicketID }) => {
           >
             <div
               className={`px-4 py-2 rounded-2xl text-sm max-w-xs break-words ${
-                msg.sender === "user" ? "bg-blue-600 text-white" : "bg-gray-400 text-white"
+                msg.sender === "user" ? "bg-blue-400 text-white" : "bg-gray-400 text-white"
               }`}
             >
               <p className="text-xs text-gray-200 mb-1 font-semibold">{msg.role}</p>
