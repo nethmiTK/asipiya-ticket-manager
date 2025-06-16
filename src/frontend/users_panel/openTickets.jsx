@@ -178,7 +178,7 @@ const OpenTickets = () => {
                   try {
                     const user = JSON.parse(localStorage.getItem("user"));
                     if (!user || !user.UserID) {
-                      alert("User not logged in. Please login first.");
+                      toast.error("User not logged in. Please login first.");
                       return;
                     }
 
@@ -213,12 +213,12 @@ const OpenTickets = () => {
                       );
                     }
 
-                    alert("Ticket and evidence submitted successfully");
+                    toast.success("Ticket and evidence submitted successfully");
                     resetForm();
                     setFiles([]);
                   } catch (err) {
                     console.error("Error submitting ticket and evidence:", err);
-                    alert("Failed to submit ticket or evidence");
+                    toast.error("Failed to submit ticket or evidence");
                   }
                 }}
               >
