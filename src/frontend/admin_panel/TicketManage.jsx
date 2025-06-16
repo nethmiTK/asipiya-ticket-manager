@@ -10,13 +10,13 @@ import { toast } from "react-toastify";
 import TicketLogView from "./TicketLogView";
 import axios from "axios";
 
-const USER = {
+export const USER = {
   id: "user1",
   name: "You",
   avatar: "https://i.pravatar.cc/40?u=user1",
 };
 
-const SUPPORT = {
+export const SUPPORT = {
   id: "support",
   name: "Support",
   avatar: "https://i.pravatar.cc/40?u=support",
@@ -464,6 +464,16 @@ export default function TicketManage() {
                     >
                       Activity Log
                     </button>
+                    <button
+                      onClick={() => setActiveTab('comments')}
+                      className={`pb-2 text-base font-medium ${
+                        activeTab === 'comments'
+                          ? 'text-blue-600 border-b-2 border-blue-600'
+                          : 'text-gray-500 hover:text-gray-700'
+                      }`}
+                    >
+                      Comments
+                    </button>
                   </nav>
                 </div>
 
@@ -483,9 +493,6 @@ export default function TicketManage() {
                         </p>
                         <p>
                           <strong>Problem:</strong> {selectedTicket.problem}
-                        </p>
-                        <p>
-                          <strong>Priority:</strong> {selectedTicket.priority}
                         </p>
                         <p>
                           <strong>System Name:</strong> {selectedTicket.systemName}
@@ -537,56 +544,6 @@ export default function TicketManage() {
                             placeholder="Add summary..."
                             className="w-full p-2 border rounded-md"
                           />
-                        </div>
-
-                        <div className="mt-4 space-y-4">
-                          {/* Priority Selection */}
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700">Priority</label>
-                            <select
-                              value={selectedTicket.priority}
-                              onChange={(e) => handlePriorityChange(e.target.value)}
-                              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                            >
-                              <option value="Low">Low</option>
-                              <option value="Medium">Medium</option>
-                              <option value="High">High</option>
-                              <option value="Critical">Critical</option>
-                            </select>
-                          </div>
-
-                          {/* Comment Section */}
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700">Add Comment</label>
-                            <div className="mt-1">
-                              <textarea
-                                rows={3}
-                                value={comment}
-                                onChange={(e) => setComment(e.target.value)}
-                                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                                placeholder="Type your comment here..."
-                              />
-                            </div>
-                            <button
-                              onClick={handleAddComment}
-                              disabled={!comment.trim()}
-                              className="mt-2 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-gray-400"
-                            >
-                              Add Comment
-                            </button>
-                          </div>
-
-                          {/* File Upload */}
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700">Attachments</label>
-                            <div className="mt-1 flex items-center">
-                              <input
-                                type="file"
-                                onChange={handleFileUpload}
-                                className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-                              />
-                            </div>
-                          </div>
                         </div>
 
                         <div className="flex justify-between pt-2">
@@ -668,9 +625,33 @@ export default function TicketManage() {
                         )}
                       </div>
                     </div>
-                  ) : (
+                  ) : activeTab === 'activity' ? (
                     <div className="space-y-4">
                       {selectedTicket && <TicketLogView ticketId={selectedTicket.id} />}
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {/* Comments Section */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Add Comment</label>
+                        <div className="mt-1">
+                          <textarea
+                            rows={3}
+                            value={comment}
+                            onChange={(e) => setComment(e.target.value)}
+                            className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                            placeholder="Type your comment here..."
+                          />
+                        </div>
+                        <button
+                          onClick={handleAddComment}
+                          disabled={!comment.trim()}
+                          className="mt-2 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-gray-400"
+                        >
+                          Add Comment
+                        </button>
+                      </div>
+                      {/* Here you can add the list of existing comments */}
                     </div>
                   )}
                 </div>
