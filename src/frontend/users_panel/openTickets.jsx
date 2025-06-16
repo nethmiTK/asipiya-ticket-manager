@@ -6,6 +6,7 @@ import SideBar from "../../user_components/SideBar/SideBar";
 import NavBar from "../../user_components/NavBar/NavBar";
 import { useRef } from "react";
 import NotificationPanel from "../components/NotificationPanel";
+import { toast } from 'react-toastify';
 
 const enhanceFilesWithPreview = (acceptedFiles) =>
   acceptedFiles.map((file) =>
