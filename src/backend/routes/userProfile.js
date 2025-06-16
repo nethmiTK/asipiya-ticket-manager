@@ -1,6 +1,5 @@
-const express = require('express');
+import express from 'express';
 const router = express.Router();
-const db = require('../db');
 
 // Get user profile data
 router.get('/api/user-profile/:userId', async (req, res) => {
@@ -26,7 +25,7 @@ router.get('/api/user-profile/:userId', async (req, res) => {
       WHERE a.UserID = ?
       GROUP BY a.UserID`;
 
-    const [userData] = await db.query(query, [userId]);
+    const [userData] = await req.db.query(query, [userId]);
 
     if (!userData || userData.length === 0) {
       return res.status(404).json({ message: 'User not found' });
@@ -47,7 +46,7 @@ router.get('/api/user-profile/:userId', async (req, res) => {
       ORDER BY t.CreatedAt DESC
       LIMIT 5`;
 
-    const recentTickets = await db.query(recentTicketsQuery, [userId]);
+    const recentTickets = await req.db.query(recentTicketsQuery, [userId]);
 
     res.json({
       user: userData[0],
@@ -60,4 +59,4 @@ router.get('/api/user-profile/:userId', async (req, res) => {
   }
 });
 
-module.exports = router; 
+export default router; 

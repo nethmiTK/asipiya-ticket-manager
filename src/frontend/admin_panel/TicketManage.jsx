@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { FaArrowUpLong, FaBell } from "react-icons/fa6";
+import { FaArrowUpLong, FaBell, FaEye } from "react-icons/fa6";
 import { MessageCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import TicketCard from "./TicketCard";
@@ -7,6 +7,8 @@ import ChatSection from "./ChatSection";
 import { useAuth } from "../../App";
 import AdminSideBar from "../../user_components/SideBar/AdminSideBar";
 import { toast } from "react-toastify";
+import TicketLogView from "./TicketLogView";
+import axios from "axios";
 
 const USER = {
   id: "user1",
@@ -159,14 +161,81 @@ export default function TicketManage() {
     setAttachments([]);
   };
 
-  const handleAddComment = () => {
-    if (!comment.trim()) return;
-    const newLog = `${new Date().toLocaleString()} - ${comment}`;
-    setSelectedTicket((prev) => ({
-      ...prev,
-      logs: [...(prev.logs || []), newLog],
-    }));
-    setComment("");
+  const handleAddComment = async () => {
+    if (!selectedTicket || !comment.trim()) return;
+
+    try {
+      await axios.post(`http://localhost:5000/api/tickets/${selectedTicket.id}/comments`, {
+        comment: comment.trim(),
+        userId: user.UserID
+      });
+
+      setComment('');
+      toast.success('Comment added successfully');
+    } catch (error) {
+      console.error('Error adding comment:', error);
+      toast.error('Failed to add comment');
+    }
+  };
+
+  const handlePriorityChange = async (newPriority) => {
+    if (!selectedTicket) return;
+
+    try {
+      await axios.put(`http://localhost:5000/api/tickets/${selectedTicket.id}/priority`, {
+        priority: newPriority,
+        userId: user.UserID
+      });
+
+      // Update local state
+      setSelectedTicket(prev => ({
+        ...prev,
+        priority: newPriority
+      }));
+
+      // Update tickets list
+      setTickets(prev =>
+        prev.map(t =>
+          t.id === selectedTicket.id
+            ? { ...t, priority: newPriority }
+            : t
+        )
+      );
+
+      toast.success('Priority updated successfully');
+    } catch (error) {
+      console.error('Error updating priority:', error);
+      toast.error('Failed to update priority');
+    }
+  };
+
+  const handleFileUpload = async (event) => {
+    const file = event.target.files[0];
+    if (!file || !selectedTicket) return;
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      // First upload the file
+      const uploadResponse = await axios.post('http://localhost:5000/api/upload', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+
+      // Then create the attachment log
+      await axios.post(`http://localhost:5000/api/tickets/${selectedTicket.id}/attachments`, {
+        fileName: file.name,
+        fileUrl: uploadResponse.data.fileUrl,
+        userId: user.UserID
+      });
+
+      toast.success('File uploaded successfully');
+    } catch (error) {
+      console.error('Error uploading file:', error);
+      toast.error('Failed to upload file');
+    }
   };
 
   const open = tickets.filter((t) => t.status === "Open");
@@ -470,6 +539,56 @@ export default function TicketManage() {
                           />
                         </div>
 
+                        <div className="mt-4 space-y-4">
+                          {/* Priority Selection */}
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700">Priority</label>
+                            <select
+                              value={selectedTicket.priority}
+                              onChange={(e) => handlePriorityChange(e.target.value)}
+                              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                            >
+                              <option value="Low">Low</option>
+                              <option value="Medium">Medium</option>
+                              <option value="High">High</option>
+                              <option value="Critical">Critical</option>
+                            </select>
+                          </div>
+
+                          {/* Comment Section */}
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700">Add Comment</label>
+                            <div className="mt-1">
+                              <textarea
+                                rows={3}
+                                value={comment}
+                                onChange={(e) => setComment(e.target.value)}
+                                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                placeholder="Type your comment here..."
+                              />
+                            </div>
+                            <button
+                              onClick={handleAddComment}
+                              disabled={!comment.trim()}
+                              className="mt-2 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-gray-400"
+                            >
+                              Add Comment
+                            </button>
+                          </div>
+
+                          {/* File Upload */}
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700">Attachments</label>
+                            <div className="mt-1 flex items-center">
+                              <input
+                                type="file"
+                                onChange={handleFileUpload}
+                                className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                              />
+                            </div>
+                          </div>
+                        </div>
+
                         <div className="flex justify-between pt-2">
                           <button
                             onClick={handleUpdateTicket}
@@ -551,33 +670,7 @@ export default function TicketManage() {
                     </div>
                   ) : (
                     <div className="space-y-4">
-                      <div className="bg-white p-4 rounded-lg shadow-sm">
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <p className="font-medium">Status Updated</p>
-                            <p className="text-gray-600">Changed from Open to In Process</p>
-                          </div>
-                          <span className="text-sm text-gray-500">2024-03-21 14:30</span>
-                        </div>
-                      </div>
-                      <div className="bg-white p-4 rounded-lg shadow-sm">
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <p className="font-medium">Due Date Set</p>
-                            <p className="text-gray-600">Due date set to 2024-05-29</p>
-                          </div>
-                          <span className="text-sm text-gray-500">2024-03-21 14:25</span>
-                        </div>
-                      </div>
-                      <div className="bg-white p-4 rounded-lg shadow-sm">
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <p className="font-medium">Ticket Created</p>
-                            <p className="text-gray-600">New ticket opened</p>
-                          </div>
-                          <span className="text-sm text-gray-500">2024-03-21 14:20</span>
-                        </div>
-                      </div>
+                      {selectedTicket && <TicketLogView ticketId={selectedTicket.id} />}
                     </div>
                   )}
                 </div>
