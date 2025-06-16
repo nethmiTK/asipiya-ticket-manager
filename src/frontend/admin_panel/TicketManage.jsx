@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { FaArrowUpLong, FaBell } from "react-icons/fa6";
+import { FaArrowUpLong, FaBell, FaEye } from "react-icons/fa6";
 import { MessageCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import TicketCard from "./TicketCard";
@@ -7,14 +7,16 @@ import ChatSection from "./ChatSection";
 import { useAuth } from "../../App";
 import AdminSideBar from "../../user_components/SideBar/AdminSideBar";
 import { toast } from "react-toastify";
+import TicketLogView from "./TicketLogView";
+import axios from "axios";
 
-const USER = {
+export const USER = {
   id: "user1",
   name: "You",
   avatar: "https://i.pravatar.cc/40?u=user1",
 };
 
-const SUPPORT = {
+export const SUPPORT = {
   id: "support",
   name: "Support",
   avatar: "https://i.pravatar.cc/40?u=support",
@@ -36,6 +38,7 @@ export default function TicketManage() {
   const [systems, setSystems] = useState([]);
   const [selectedSupervisorId, setSelectedSupervisorId] = useState("");
   const [selectedSystem, setSelectedSystem] = useState("");
+  const [activeTab, setActiveTab] = useState('details');
 
   // This computes which supervisorId to use based on user role and selection
   const supervisorIdToUse =
@@ -158,14 +161,81 @@ export default function TicketManage() {
     setAttachments([]);
   };
 
-  const handleAddComment = () => {
-    if (!comment.trim()) return;
-    const newLog = `${new Date().toLocaleString()} - ${comment}`;
-    setSelectedTicket((prev) => ({
-      ...prev,
-      logs: [...(prev.logs || []), newLog],
-    }));
-    setComment("");
+  const handleAddComment = async () => {
+    if (!selectedTicket || !comment.trim()) return;
+
+    try {
+      await axios.post(`http://localhost:5000/api/tickets/${selectedTicket.id}/comments`, {
+        comment: comment.trim(),
+        userId: user.UserID
+      });
+
+      setComment('');
+      toast.success('Comment added successfully');
+    } catch (error) {
+      console.error('Error adding comment:', error);
+      toast.error('Failed to add comment');
+    }
+  };
+
+  const handlePriorityChange = async (newPriority) => {
+    if (!selectedTicket) return;
+
+    try {
+      await axios.put(`http://localhost:5000/api/tickets/${selectedTicket.id}/priority`, {
+        priority: newPriority,
+        userId: user.UserID
+      });
+
+      // Update local state
+      setSelectedTicket(prev => ({
+        ...prev,
+        priority: newPriority
+      }));
+
+      // Update tickets list
+      setTickets(prev =>
+        prev.map(t =>
+          t.id === selectedTicket.id
+            ? { ...t, priority: newPriority }
+            : t
+        )
+      );
+
+      toast.success('Priority updated successfully');
+    } catch (error) {
+      console.error('Error updating priority:', error);
+      toast.error('Failed to update priority');
+    }
+  };
+
+  const handleFileUpload = async (event) => {
+    const file = event.target.files[0];
+    if (!file || !selectedTicket) return;
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      // First upload the file
+      const uploadResponse = await axios.post('http://localhost:5000/api/upload', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+
+      // Then create the attachment log
+      await axios.post(`http://localhost:5000/api/tickets/${selectedTicket.id}/attachments`, {
+        fileName: file.name,
+        fileUrl: uploadResponse.data.fileUrl,
+        userId: user.UserID
+      });
+
+      toast.success('File uploaded successfully');
+    } catch (error) {
+      console.error('Error uploading file:', error);
+      toast.error('Failed to upload file');
+    }
   };
 
   const open = tickets.filter((t) => t.status === "Open");
@@ -363,7 +433,7 @@ export default function TicketManage() {
           {/* Modal View */}
           {selectedTicket && (
             <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
-              <div className="bg-white rounded-xl p-6 w-[95%] max-w-5xl shadow-lg relative grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div className="bg-white rounded-xl p-4 w-[800px] shadow-lg relative">
                 <button
                   onClick={closeModal}
                   className="absolute top-2 right-3 text-gray-500 hover:text-red-600 text-xl font-bold"
@@ -371,280 +441,244 @@ export default function TicketManage() {
                   🗙
                 </button>
 
-                {/* LEFT: Ticket Info */}
-                <div className="space-y-3">
-                  <h2 className="text-xl font-bold text-gray-800 mb-2">
-                    Ticket #{selectedTicket.id} Details
-                  </h2>
-                  <p>
-                    <strong>Status:</strong> {selectedTicket.status}
-                  </p>
-                  <p>
-                    <strong>Date:</strong> {selectedTicket.date}
-                  </p>
-                  <p className="text-sm">
-                    <strong>Problem:</strong>{" "}
-                    {selectedTicket.problem.length > 100 ? (
-                      <>
-                        {selectedTicket.problem.slice(0, 100)}...
-                        <button
-                          onClick={() => setShowProblemModal(true)}
-                          className="text-blue-600 hover:underline ml-1"
-                        >
-                          See More
-                        </button>
-                      </>
-                    ) : (
-                      selectedTicket.problem
-                    )}
-                  </p>
-                  {showProblemModal && (
-                    <div className="fixed inset-0 z-50 bg-black/40 bg-opacity-40 flex justify-center items-center">
-                      <div className="bg-white rounded-lg shadow-lg p-6 max-w-lg w-full max-h-[80vh]">
-                        <h2 className="text-lg font-semibold mb-4">
-                          Full Problem Description
+                {/* Navigation Tabs */}
+                <div className="border-b mb-4">
+                  <nav className="flex gap-8">
+                    <button
+                      onClick={() => setActiveTab('details')}
+                      className={`pb-2 text-base font-medium ${
+                        activeTab === 'details'
+                          ? 'text-blue-600 border-b-2 border-blue-600'
+                          : 'text-gray-500 hover:text-gray-700'
+                      }`}
+                    >
+                      Details
+                    </button>
+                    <button
+                      onClick={() => setActiveTab('activity')}
+                      className={`pb-2 text-base font-medium ${
+                        activeTab === 'activity'
+                          ? 'text-blue-600 border-b-2 border-blue-600'
+                          : 'text-gray-500 hover:text-gray-700'
+                      }`}
+                    >
+                      Activity Log
+                    </button>
+                    <button
+                      onClick={() => setActiveTab('comments')}
+                      className={`pb-2 text-base font-medium ${
+                        activeTab === 'comments'
+                          ? 'text-blue-600 border-b-2 border-blue-600'
+                          : 'text-gray-500 hover:text-gray-700'
+                      }`}
+                    >
+                      Comments
+                    </button>
+                  </nav>
+                </div>
+
+                <div className="h-[600px] overflow-y-auto">
+                  {activeTab === 'details' ? (
+                    <div className="grid grid-cols-2 gap-6">
+                      {/* LEFT: Ticket Info */}
+                      <div className="space-y-3">
+                        <h2 className="text-xl font-bold text-gray-800 mb-4">
+                          Ticket #{selectedTicket.id} Details
                         </h2>
-                        <div className="text-gray-800 whitespace-pre-wrap overflow-y-auto max-h-60 pr-2">
-                          {selectedTicket.problem}
-                        </div>
-                        <div className="text-right mt-4">
-                          <button
-                            onClick={() => setShowProblemModal(false)}
-                            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                        <p>
+                          <strong>Status:</strong> {selectedTicket.status}
+                        </p>
+                        <p>
+                          <strong>Date:</strong> {selectedTicket.date}
+                        </p>
+                        <p>
+                          <strong>Problem:</strong> {selectedTicket.problem}
+                        </p>
+                        <p>
+                          <strong>System Name:</strong> {selectedTicket.systemName}
+                        </p>
+                        <p>
+                          <strong>User Name:</strong> {selectedTicket.userName}
+                        </p>
+
+                        <div>
+                          <label className="block text-sm font-medium mb-1">
+                            Change Status
+                          </label>
+                          <select
+                            value={selectedTicket.status}
+                            onChange={handleStatusChange}
+                            className="w-full px-3 py-2 border rounded-md"
                           >
-                            Close
+                            <option>Open</option>
+                            <option>In Process</option>
+                            <option>Resolved</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium mb-1">
+                            Due Date
+                          </label>
+                          <input
+                            type="date"
+                            value={selectedTicket.dueDate || ""}
+                            onChange={handleDueDateChange}
+                            className="w-full px-3 py-2 border rounded-md"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium mb-1">
+                            Resolution Summary
+                          </label>
+                          <textarea
+                            rows={3}
+                            value={selectedTicket.resolution || ""}
+                            onChange={(e) =>
+                              setSelectedTicket({
+                                ...selectedTicket,
+                                resolution: e.target.value,
+                              })
+                            }
+                            placeholder="Add summary..."
+                            className="w-full p-2 border rounded-md"
+                          />
+                        </div>
+
+                        <div className="flex justify-between pt-2">
+                          <button
+                            onClick={handleUpdateTicket}
+                            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+                          >
+                            Save Changes
+                          </button>
+                          <button
+                            onClick={() => setChatMode(!chatMode)}
+                            className="bg-green-600 text-white px-4 py-2 rounded flex items-center gap-2"
+                          >
+                            <MessageCircle size={20} />
+                            {chatMode ? "Close Chat" : "Open Chat"}
                           </button>
                         </div>
                       </div>
+
+                      {/* RIGHT: Evidence Files */}
+                      <div className="space-y-4">
+                        <h4 className="font-semibold mb-2">Evidence Files</h4>
+                        {evidenceList.length === 0 ? (
+                          <p className="text-sm text-gray-500">
+                            No evidence files available.
+                          </p>
+                        ) : (
+                          <div className="h-[450px] overflow-y-auto grid grid-cols-2 gap-4 p-2 border rounded bg-gray-50">
+                            {evidenceList.map((evi, index) => {
+                              const fileUrl = `http://localhost:5000/${evi.FilePath}`;
+                              const fileName = evi.FilePath.split("/").pop();
+
+                              const isImage = /\.(jpg|jpeg|png|gif|bmp|webp)$/i.test(fileName);
+                              const isPDF = /\.pdf$/i.test(fileName);
+                              const isVideo = /\.(mp4|webm|ogg)$/i.test(fileName);
+                              const isAudio = /\.(mp3|wav|ogg)$/i.test(fileName);
+                              const isDoc = /\.(docx?|xlsx?)$/i.test(fileName);
+
+                              return (
+                                <div
+                                  key={index}
+                                  className="border rounded p-2 bg-white shadow-sm flex flex-col items-center text-center"
+                                >
+                                  {isImage ? (
+                                    <a href={fileUrl} target="_blank" rel="noopener noreferrer">
+                                      <img
+                                        src={fileUrl}
+                                        alt={fileName}
+                                        className="w-24 h-24 object-cover rounded hover:opacity-90 transition"
+                                      />
+                                    </a>
+                                  ) : isPDF ? (
+                                    <a href={fileUrl} target="_blank" rel="noopener noreferrer" className="text-red-600 hover:underline">
+                                      📄 {fileName}
+                                    </a>
+                                  ) : isVideo ? (
+                                    <video controls className="w-24 h-24 rounded" title={fileName}>
+                                      <source src={fileUrl} type={`video/${fileName.split(".").pop()}`} />
+                                      Your browser does not support the video tag.
+                                    </video>
+                                  ) : isAudio ? (
+                                    <audio controls className="w-full" title={fileName}>
+                                      <source src={fileUrl} type={`audio/${fileName.split(".").pop()}`} />
+                                      Your browser does not support the audio element.
+                                    </audio>
+                                  ) : isDoc ? (
+                                    <a href={fileUrl} target="_blank" rel="noopener noreferrer" className="text-purple-600 hover:underline">
+                                      📄 {fileName}
+                                    </a>
+                                  ) : (
+                                    <a href={fileUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                                      📎 {fileName}
+                                    </a>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ) : activeTab === 'activity' ? (
+                    <div className="space-y-4">
+                      {selectedTicket && <TicketLogView ticketId={selectedTicket.id} />}
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {/* Comments Section */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Add Comment</label>
+                        <div className="mt-1">
+                          <textarea
+                            rows={3}
+                            value={comment}
+                            onChange={(e) => setComment(e.target.value)}
+                            className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                            placeholder="Type your comment here..."
+                          />
+                        </div>
+                        <button
+                          onClick={handleAddComment}
+                          disabled={!comment.trim()}
+                          className="mt-2 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-gray-400"
+                        >
+                          Add Comment
+                        </button>
+                      </div>
+                      {/* Here you can add the list of existing comments */}
                     </div>
                   )}
-
-                  <p>
-                    <strong>Priority:</strong> {selectedTicket.priority}
-                  </p>
-                  {/*<p>
-                    <strong>Assigned By:</strong> {selectedTicket.assignedBy}
-                  </p>*/}
-                  <p>
-                    <strong>System Name:</strong> {selectedTicket.systemName}
-                  </p>
-                  <p>
-                    <strong>User Name:</strong> {selectedTicket.userName}
-                  </p>
-
-                  <div>
-                    <label className="block text-sm font-medium mb-1">
-                      Change Status
-                    </label>
-                    <select
-                      value={selectedTicket.status}
-                      onChange={handleStatusChange}
-                      className="w-full px-3 py-2 border rounded-md"
-                    >
-                      <option>Open</option>
-                      <option>In Process</option>
-                      <option>Resolved</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium mb-1">
-                      Due Date
-                    </label>
-                    <input
-                      type="date"
-                      value={selectedTicket.dueDate || ""}
-                      onChange={handleDueDateChange}
-                      className="w-full px-3 py-2 border rounded-md"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium mb-1">
-                      Resolution Summary
-                    </label>
-                    <textarea
-                      rows={3}
-                      value={selectedTicket.resolution || ""}
-                      onChange={(e) =>
-                        setSelectedTicket({
-                          ...selectedTicket,
-                          resolution: e.target.value,
-                        })
-                      }
-                      placeholder="Add summary..."
-                      className="w-full p-2 border rounded-md"
-                    />
-                  </div>
-                  <div className="flex justify-between p-0">
-                    <button
-                      onClick={handleUpdateTicket}
-                      className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-green-700 mt-4"
-                    >
-                      Save Changes
-                    </button>
-                    <button
-                      onClick={() => setChatMode(!chatMode)}
-                      className="mt-4 p-2 bg-green-600 text-white rounded flex items-center gap-2"
-                    >
-                      <MessageCircle size={20} />
-                      {chatMode ? "Close Chat" : "Open Chat"}
-                    </button>
-                  </div>
-                </div>
-
-                {/* RIGHT: Logs & Chat */}
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold text-gray-800">
-                    Logs & Comments
-                  </h3>
-
-                  <div className="bg-gray-100 p-3 rounded-lg h-48 overflow-y-auto">
-                    <ul className="text-sm text-gray-700 space-y-2">
-                      {selectedTicket.logs?.map((log, index) => (
-                        <li key={index} className="bg-white p-2 rounded shadow">
-                          {log}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-
-                  <div className="flex justify-between gap-1">
-                    <textarea
-                      value={comment}
-                      onChange={(e) => setComment(e.target.value)}
-                      placeholder="Add a comment..."
-                      className="w-full p-2 border rounded-md"
-                    />
-                    <button
-                      onClick={handleAddComment}
-                      className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 text-lg"
-                      title="Send Comment"
-                    >
-                      <FaArrowUpLong />
-                    </button>
-                  </div>
-
-                  <div className="mt-4">
-                    <h4 className="font-semibold mb-2">Evidence Files</h4>
-                    {evidenceList.length === 0 ? (
-                      <p className="text-sm text-gray-500">
-                        No evidence files available.
-                      </p>
-                    ) : (
-                      <div className="max-h-50 overflow-y-auto grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 p-2 border rounded bg-gray-50">
-                        {evidenceList.map((evi, index) => {
-                          const fileUrl = `http://localhost:5000/${evi.FilePath}`;
-                          const fileName = evi.FilePath.split("/").pop();
-
-                          const isImage =
-                            /\.(jpg|jpeg|png|gif|bmp|webp)$/i.test(fileName);
-                          const isPDF = /\.pdf$/i.test(fileName);
-                          const isVideo = /\.(mp4|webm|ogg)$/i.test(fileName);
-                          const isAudio = /\.(mp3|wav|ogg)$/i.test(fileName);
-                          const isDoc = /\.(docx?|xlsx?)$/i.test(fileName);
-
-                          return (
-                            <div
-                              key={index}
-                              className="border rounded p-2 bg-white shadow-sm flex flex-col items-center text-center w-40"
-                            >
-                              {isImage ? (
-                                <a
-                                  href={fileUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                >
-                                  <img
-                                    src={fileUrl}
-                                    alt={fileName}
-                                    className="w-32 h-32 object-cover rounded hover:opacity-90 transition"
-                                  />
-                                </a>
-                              ) : isPDF ? (
-                                <a
-                                  href={fileUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-red-600 hover:underline"
-                                >
-                                  📄 {fileName}
-                                </a>
-                              ) : isVideo ? (
-                                <video
-                                  controls
-                                  className="w-32 h-32 rounded"
-                                  title={fileName}
-                                >
-                                  <source
-                                    src={fileUrl}
-                                    type={`video/${fileName.split(".").pop()}`}
-                                  />
-                                  Your browser does not support the video tag.
-                                </video>
-                              ) : isAudio ? (
-                                <audio
-                                  controls
-                                  className="w-full"
-                                  title={fileName}
-                                >
-                                  <source
-                                    src={fileUrl}
-                                    type={`audio/${fileName.split(".").pop()}`}
-                                  />
-                                  Your browser does not support the audio
-                                  element.
-                                </audio>
-                              ) : isDoc ? (
-                                <a
-                                  href={fileUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-purple-600 hover:underline"
-                                >
-                                  📄 {fileName}
-                                </a>
-                              ) : (
-                                <a
-                                  href={fileUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-blue-600 hover:underline"
-                                >
-                                  📎 {fileName}
-                                </a>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
                 </div>
               </div>
+            </div>
+          )}
 
-              {/* Chat Modal */}
-              {chatMode && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-                  <div className="relative max-w-lg h-[600px] p-4 bg-white rounded-lg shadow-lg flex flex-col">
-                    <button
-                      onClick={() => setChatMode(false)}
-                      className="absolute top-2 right-2 text-gray-500 hover:text-red-600 text-xl"
-                      aria-label="Close Chat"
-                    >
-                      🗙
-                    </button>
-                    <ChatSection
-                      user={selectedTicket.user}
-                      supportUser={selectedTicket.assignedBy}
-                      initialMessages={initialMessages}
-                      ticket={selectedTicket}
-                      ticketId={selectedTicket.id}
-                      role={"Supervisor"}
-                    />
-                  </div>
-                </div>
-              )}
+          {/* Chat Modal */}
+          {chatMode && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+              <div className="relative max-w-lg h-[600px] p-4 bg-white rounded-lg shadow-lg flex flex-col">
+                <button
+                  onClick={() => setChatMode(false)}
+                  className="absolute top-2 right-2 text-gray-500 hover:text-red-600 text-xl"
+                  aria-label="Close Chat"
+                >
+                  🗙
+                </button>
+                <ChatSection
+                  user={selectedTicket.user}
+                  supportUser={selectedTicket.assignedBy}
+                  initialMessages={initialMessages}
+                  ticket={selectedTicket}
+                  ticketId={selectedTicket.id}
+                  role={"Supervisor"}
+                />
+              </div>
             </div>
           )}
         </div>
