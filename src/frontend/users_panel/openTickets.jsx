@@ -299,7 +299,7 @@ const OpenTickets = () => {
                   <div className="flex justify-end">
                     <button
                       type="submit"
-                      className="px-4 py-2 bg-green-700 text-white rounded-md text-base font-medium hover:scale-105 transition-transform"
+                      className="px-4 py-2 bg-blue-600 text-white rounded-md text-base font-medium hover:scale-105 transition-transform"
                     >
                       Submit
                     </button>
