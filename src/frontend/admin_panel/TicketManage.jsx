@@ -364,7 +364,7 @@ export default function TicketManage() {
           {/* Modal View */}
           {selectedTicket && (
             <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
-              <div className="bg-white rounded-xl p-6 w-[95%] max-w-5xl shadow-lg relative grid grid-cols-1 gap-8">
+              <div className="bg-white rounded-xl p-4 w-[800px] shadow-lg relative">
                 <button
                   onClick={closeModal}
                   className="absolute top-2 right-3 text-gray-500 hover:text-red-600 text-xl font-bold"
@@ -373,11 +373,11 @@ export default function TicketManage() {
                 </button>
 
                 {/* Navigation Tabs */}
-                <div className="border-b">
+                <div className="border-b mb-4">
                   <nav className="flex gap-8">
                     <button
                       onClick={() => setActiveTab('details')}
-                      className={`pb-4 text-base font-medium ${
+                      className={`pb-2 text-base font-medium ${
                         activeTab === 'details'
                           ? 'text-blue-600 border-b-2 border-blue-600'
                           : 'text-gray-500 hover:text-gray-700'
@@ -387,7 +387,7 @@ export default function TicketManage() {
                     </button>
                     <button
                       onClick={() => setActiveTab('activity')}
-                      className={`pb-4 text-base font-medium ${
+                      className={`pb-2 text-base font-medium ${
                         activeTab === 'activity'
                           ? 'text-blue-600 border-b-2 border-blue-600'
                           : 'text-gray-500 hover:text-gray-700'
@@ -398,146 +398,109 @@ export default function TicketManage() {
                   </nav>
                 </div>
 
-                {activeTab === 'details' ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    {/* LEFT: Ticket Info */}
-                    <div className="space-y-3">
-                      <h2 className="text-xl font-bold text-gray-800 mb-2">
-                        Ticket #{selectedTicket.id} Details
-                      </h2>
-                      <p>
-                        <strong>Status:</strong> {selectedTicket.status}
-                      </p>
-                      <p>
-                        <strong>Date:</strong> {selectedTicket.date}
-                      </p>
-                      <p className="text-sm">
-                        <strong>Problem:</strong>{" "}
-                        {selectedTicket.problem.length > 100 ? (
-                          <>
-                            {selectedTicket.problem.slice(0, 100)}...
-                            <button
-                              onClick={() => setShowProblemModal(true)}
-                              className="text-blue-600 hover:underline ml-1"
-                            >
-                              See More
-                            </button>
-                          </>
-                        ) : (
-                          selectedTicket.problem
-                        )}
-                      </p>
-                      {showProblemModal && (
-                        <div className="fixed inset-0 z-50 bg-black/40 bg-opacity-40 flex justify-center items-center">
-                          <div className="bg-white rounded-lg shadow-lg p-6 max-w-lg w-full max-h-[80vh]">
-                            <h2 className="text-lg font-semibold mb-4">
-                              Full Problem Description
-                            </h2>
-                            <div className="text-gray-800 whitespace-pre-wrap overflow-y-auto max-h-60 pr-2">
-                              {selectedTicket.problem}
-                            </div>
-                            <div className="text-right mt-4">
-                              <button
-                                onClick={() => setShowProblemModal(false)}
-                                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-                              >
-                                Close
-                              </button>
-                            </div>
-                          </div>
+                <div className="h-[600px] overflow-y-auto">
+                  {activeTab === 'details' ? (
+                    <div className="grid grid-cols-2 gap-6">
+                      {/* LEFT: Ticket Info */}
+                      <div className="space-y-3">
+                        <h2 className="text-xl font-bold text-gray-800 mb-4">
+                          Ticket #{selectedTicket.id} Details
+                        </h2>
+                        <p>
+                          <strong>Status:</strong> {selectedTicket.status}
+                        </p>
+                        <p>
+                          <strong>Date:</strong> {selectedTicket.date}
+                        </p>
+                        <p>
+                          <strong>Problem:</strong> {selectedTicket.problem}
+                        </p>
+                        <p>
+                          <strong>Priority:</strong> {selectedTicket.priority}
+                        </p>
+                        <p>
+                          <strong>System Name:</strong> {selectedTicket.systemName}
+                        </p>
+                        <p>
+                          <strong>User Name:</strong> {selectedTicket.userName}
+                        </p>
+
+                        <div>
+                          <label className="block text-sm font-medium mb-1">
+                            Change Status
+                          </label>
+                          <select
+                            value={selectedTicket.status}
+                            onChange={handleStatusChange}
+                            className="w-full px-3 py-2 border rounded-md"
+                          >
+                            <option>Open</option>
+                            <option>In Process</option>
+                            <option>Resolved</option>
+                          </select>
                         </div>
-                      )}
 
-                      <p>
-                        <strong>Priority:</strong> {selectedTicket.priority}
-                      </p>
-                      {/*<p>
-                        <strong>Assigned By:</strong> {selectedTicket.assignedBy}
-                      </p>*/}
-                      <p>
-                        <strong>System Name:</strong> {selectedTicket.systemName}
-                      </p>
-                      <p>
-                        <strong>User Name:</strong> {selectedTicket.userName}
-                      </p>
+                        <div>
+                          <label className="block text-sm font-medium mb-1">
+                            Due Date
+                          </label>
+                          <input
+                            type="date"
+                            value={selectedTicket.dueDate || ""}
+                            onChange={handleDueDateChange}
+                            className="w-full px-3 py-2 border rounded-md"
+                          />
+                        </div>
 
-                      <div>
-                        <label className="block text-sm font-medium mb-1">
-                          Change Status
-                        </label>
-                        <select
-                          value={selectedTicket.status}
-                          onChange={handleStatusChange}
-                          className="w-full px-3 py-2 border rounded-md"
-                        >
-                          <option>Open</option>
-                          <option>In Process</option>
-                          <option>Resolved</option>
-                        </select>
+                        <div>
+                          <label className="block text-sm font-medium mb-1">
+                            Resolution Summary
+                          </label>
+                          <textarea
+                            rows={3}
+                            value={selectedTicket.resolution || ""}
+                            onChange={(e) =>
+                              setSelectedTicket({
+                                ...selectedTicket,
+                                resolution: e.target.value,
+                              })
+                            }
+                            placeholder="Add summary..."
+                            className="w-full p-2 border rounded-md"
+                          />
+                        </div>
+
+                        <div className="flex justify-between pt-2">
+                          <button
+                            onClick={handleUpdateTicket}
+                            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+                          >
+                            Save Changes
+                          </button>
+                          <button
+                            onClick={() => setChatMode(!chatMode)}
+                            className="bg-green-600 text-white px-4 py-2 rounded flex items-center gap-2"
+                          >
+                            <MessageCircle size={20} />
+                            {chatMode ? "Close Chat" : "Open Chat"}
+                          </button>
+                        </div>
                       </div>
 
-                      <div>
-                        <label className="block text-sm font-medium mb-1">
-                          Due Date
-                        </label>
-                        <input
-                          type="date"
-                          value={selectedTicket.dueDate || ""}
-                          onChange={handleDueDateChange}
-                          className="w-full px-3 py-2 border rounded-md"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium mb-1">
-                          Resolution Summary
-                        </label>
-                        <textarea
-                          rows={3}
-                          value={selectedTicket.resolution || ""}
-                          onChange={(e) =>
-                            setSelectedTicket({
-                              ...selectedTicket,
-                              resolution: e.target.value,
-                            })
-                          }
-                          placeholder="Add summary..."
-                          className="w-full p-2 border rounded-md"
-                        />
-                      </div>
-                      <div className="flex justify-between p-0">
-                        <button
-                          onClick={handleUpdateTicket}
-                          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-green-700 mt-4"
-                        >
-                          Save Changes
-                        </button>
-                        <button
-                          onClick={() => setChatMode(!chatMode)}
-                          className="mt-4 p-2 bg-green-600 text-white rounded flex items-center gap-2"
-                        >
-                          <MessageCircle size={20} />
-                          {chatMode ? "Close Chat" : "Open Chat"}
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* RIGHT: Evidence Files */}
-                    <div className="space-y-4">
-                      <div className="mt-4">
+                      {/* RIGHT: Evidence Files */}
+                      <div className="space-y-4">
                         <h4 className="font-semibold mb-2">Evidence Files</h4>
                         {evidenceList.length === 0 ? (
                           <p className="text-sm text-gray-500">
                             No evidence files available.
                           </p>
                         ) : (
-                          <div className="max-h-50 overflow-y-auto grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 p-2 border rounded bg-gray-50">
+                          <div className="h-[450px] overflow-y-auto grid grid-cols-2 gap-4 p-2 border rounded bg-gray-50">
                             {evidenceList.map((evi, index) => {
                               const fileUrl = `http://localhost:5000/${evi.FilePath}`;
                               const fileName = evi.FilePath.split("/").pop();
 
-                              const isImage =
-                                /\.(jpg|jpeg|png|gif|bmp|webp)$/i.test(fileName);
+                              const isImage = /\.(jpg|jpeg|png|gif|bmp|webp)$/i.test(fileName);
                               const isPDF = /\.pdf$/i.test(fileName);
                               const isVideo = /\.(mp4|webm|ogg)$/i.test(fileName);
                               const isAudio = /\.(mp3|wav|ogg)$/i.test(fileName);
@@ -546,70 +509,36 @@ export default function TicketManage() {
                               return (
                                 <div
                                   key={index}
-                                  className="border rounded p-2 bg-white shadow-sm flex flex-col items-center text-center w-40"
+                                  className="border rounded p-2 bg-white shadow-sm flex flex-col items-center text-center"
                                 >
                                   {isImage ? (
-                                    <a
-                                      href={fileUrl}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                    >
+                                    <a href={fileUrl} target="_blank" rel="noopener noreferrer">
                                       <img
                                         src={fileUrl}
                                         alt={fileName}
-                                        className="w-32 h-32 object-cover rounded hover:opacity-90 transition"
+                                        className="w-24 h-24 object-cover rounded hover:opacity-90 transition"
                                       />
                                     </a>
                                   ) : isPDF ? (
-                                    <a
-                                      href={fileUrl}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="text-red-600 hover:underline"
-                                    >
+                                    <a href={fileUrl} target="_blank" rel="noopener noreferrer" className="text-red-600 hover:underline">
                                       📄 {fileName}
                                     </a>
                                   ) : isVideo ? (
-                                    <video
-                                      controls
-                                      className="w-32 h-32 rounded"
-                                      title={fileName}
-                                    >
-                                      <source
-                                        src={fileUrl}
-                                        type={`video/${fileName.split(".").pop()}`}
-                                      />
+                                    <video controls className="w-24 h-24 rounded" title={fileName}>
+                                      <source src={fileUrl} type={`video/${fileName.split(".").pop()}`} />
                                       Your browser does not support the video tag.
                                     </video>
                                   ) : isAudio ? (
-                                    <audio
-                                      controls
-                                      className="w-full"
-                                      title={fileName}
-                                    >
-                                      <source
-                                        src={fileUrl}
-                                        type={`audio/${fileName.split(".").pop()}`}
-                                      />
-                                      Your browser does not support the audio
-                                      element.
+                                    <audio controls className="w-full" title={fileName}>
+                                      <source src={fileUrl} type={`audio/${fileName.split(".").pop()}`} />
+                                      Your browser does not support the audio element.
                                     </audio>
                                   ) : isDoc ? (
-                                    <a
-                                      href={fileUrl}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="text-purple-600 hover:underline"
-                                    >
+                                    <a href={fileUrl} target="_blank" rel="noopener noreferrer" className="text-purple-600 hover:underline">
                                       📄 {fileName}
                                     </a>
                                   ) : (
-                                    <a
-                                      href={fileUrl}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="text-blue-600 hover:underline"
-                                    >
+                                    <a href={fileUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
                                       📎 {fileName}
                                     </a>
                                   )}
@@ -620,58 +549,62 @@ export default function TicketManage() {
                         )}
                       </div>
                     </div>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    <div className="bg-gray-50 p-4 rounded-lg">
-                      <h3 className="text-lg font-semibold mb-4">Activity History</h3>
-                      <div className="space-y-4">
-                        <div className="bg-white p-4 rounded-lg shadow-sm">
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <p className="font-medium">Status Updated</p>
-                              <p className="text-gray-600">Changed from Open to In Process</p>
-                            </div>
-                            <span className="text-sm text-gray-500">2024-03-21 14:30</span>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="bg-white p-4 rounded-lg shadow-sm">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <p className="font-medium">Status Updated</p>
+                            <p className="text-gray-600">Changed from Open to In Process</p>
                           </div>
+                          <span className="text-sm text-gray-500">2024-03-21 14:30</span>
                         </div>
-                        <div className="bg-white p-4 rounded-lg shadow-sm">
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <p className="font-medium">Due Date Set</p>
-                              <p className="text-gray-600">Due date set to 2024-05-29</p>
-                            </div>
-                            <span className="text-sm text-gray-500">2024-03-21 14:25</span>
+                      </div>
+                      <div className="bg-white p-4 rounded-lg shadow-sm">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <p className="font-medium">Due Date Set</p>
+                            <p className="text-gray-600">Due date set to 2024-05-29</p>
                           </div>
+                          <span className="text-sm text-gray-500">2024-03-21 14:25</span>
+                        </div>
+                      </div>
+                      <div className="bg-white p-4 rounded-lg shadow-sm">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <p className="font-medium">Ticket Created</p>
+                            <p className="text-gray-600">New ticket opened</p>
+                          </div>
+                          <span className="text-sm text-gray-500">2024-03-21 14:20</span>
                         </div>
                       </div>
                     </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Chat Modal */}
-              {chatMode && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-                  <div className="relative max-w-lg h-[600px] p-4 bg-white rounded-lg shadow-lg flex flex-col">
-                    <button
-                      onClick={() => setChatMode(false)}
-                      className="absolute top-2 right-2 text-gray-500 hover:text-red-600 text-xl"
-                      aria-label="Close Chat"
-                    >
-                      🗙
-                    </button>
-                    <ChatSection
-                      user={selectedTicket.user}
-                      supportUser={selectedTicket.assignedBy}
-                      initialMessages={initialMessages}
-                      ticket={selectedTicket}
-                      ticketId={selectedTicket.id}
-                      role={"Supervisor"}
-                    />
-                  </div>
+                  )}
                 </div>
-              )}
+              </div>
+            </div>
+          )}
+
+          {/* Chat Modal */}
+          {chatMode && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+              <div className="relative max-w-lg h-[600px] p-4 bg-white rounded-lg shadow-lg flex flex-col">
+                <button
+                  onClick={() => setChatMode(false)}
+                  className="absolute top-2 right-2 text-gray-500 hover:text-red-600 text-xl"
+                  aria-label="Close Chat"
+                >
+                  🗙
+                </button>
+                <ChatSection
+                  user={selectedTicket.user}
+                  supportUser={selectedTicket.assignedBy}
+                  initialMessages={initialMessages}
+                  ticket={selectedTicket}
+                  ticketId={selectedTicket.id}
+                  role={"Supervisor"}
+                />
+              </div>
             </div>
           )}
         </div>
