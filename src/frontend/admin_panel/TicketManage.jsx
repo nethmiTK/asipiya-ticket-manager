@@ -477,7 +477,7 @@ export default function TicketManage() {
                   </nav>
                 </div>
 
-                <div className="h-[600px] overflow-y-auto">
+                <div className="h-[550px] overflow-y-auto">
                   {activeTab === 'details' ? (
                     <div className="grid grid-cols-2 gap-6">
                       {/* LEFT: Ticket Info */}
@@ -491,9 +491,42 @@ export default function TicketManage() {
                         <p>
                           <strong>Date:</strong> {selectedTicket.date}
                         </p>
-                        <p>
-                          <strong>Problem:</strong> {selectedTicket.problem}
-                        </p>
+                        <p className="text-sm">
+                    <strong>Problem:</strong>{" "}
+                    {selectedTicket.problem.length > 100 ? (
+                      <>
+                        {selectedTicket.problem.slice(0, 100)}...
+                        <button
+                          onClick={() => setShowProblemModal(true)}
+                          className="text-blue-600 hover:underline ml-1"
+                        >
+                          See More
+                        </button>
+                      </>
+                    ) : (
+                      selectedTicket.problem
+                    )}
+                  </p>
+                  {showProblemModal && (
+                    <div className="fixed inset-0 z-50 bg-black/40 bg-opacity-40 flex justify-center items-center">
+                      <div className="bg-white rounded-lg shadow-lg p-6 max-w-lg w-full max-h-[80vh]">
+                        <h2 className="text-lg font-semibold mb-4">
+                          Full Problem Description
+                        </h2>
+                        <div className="text-gray-800 whitespace-pre-wrap overflow-y-auto max-h-60 pr-2">
+                          {selectedTicket.problem}
+                        </div>
+                        <div className="text-right mt-4">
+                          <button
+                            onClick={() => setShowProblemModal(false)}
+                            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                          >
+                            Close
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                         <p>
                           <strong>System Name:</strong> {selectedTicket.systemName}
                         </p>
@@ -545,22 +578,6 @@ export default function TicketManage() {
                             className="w-full p-2 border rounded-md"
                           />
                         </div>
-
-                        <div className="flex justify-between pt-2">
-                          <button
-                            onClick={handleUpdateTicket}
-                            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-                          >
-                            Save Changes
-                          </button>
-                          <button
-                            onClick={() => setChatMode(!chatMode)}
-                            className="bg-green-600 text-white px-4 py-2 rounded flex items-center gap-2"
-                          >
-                            <MessageCircle size={20} />
-                            {chatMode ? "Close Chat" : "Open Chat"}
-                          </button>
-                        </div>
                       </div>
 
                       {/* RIGHT: Evidence Files */}
@@ -571,7 +588,7 @@ export default function TicketManage() {
                             No evidence files available.
                           </p>
                         ) : (
-                          <div className="h-[450px] overflow-y-auto grid grid-cols-2 gap-4 p-2 border rounded bg-gray-50">
+                          <div className="h-[430px] overflow-y-auto grid grid-cols-2 gap-4 p-2 border rounded bg-gray-50">
                             {evidenceList.map((evi, index) => {
                               const fileUrl = `http://localhost:5000/${evi.FilePath}`;
                               const fileName = evi.FilePath.split("/").pop();
@@ -623,6 +640,21 @@ export default function TicketManage() {
                             })}
                           </div>
                         )}
+                        <div className="flex justify-between pt-2">
+                          <button
+                            onClick={handleUpdateTicket}
+                            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+                          >
+                            Save Changes
+                          </button>
+                          <button
+                            onClick={() => setChatMode(!chatMode)}
+                            className="bg-green-600 text-white px-4 py-2 rounded flex items-center gap-2"
+                          >
+                            <MessageCircle size={20} />
+                            {chatMode ? "Close Chat" : "Open Chat"}
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ) : activeTab === 'activity' ? (
@@ -662,7 +694,7 @@ export default function TicketManage() {
           {/* Chat Modal */}
           {chatMode && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-              <div className="relative max-w-lg h-[600px] p-4 bg-white rounded-lg shadow-lg flex flex-col">
+              <div className="relative max-w-lg h-[600px] p-4 bg-gray-200 rounded-lg shadow-lg flex flex-col">
                 <button
                   onClick={() => setChatMode(false)}
                   className="absolute top-2 right-2 text-gray-500 hover:text-red-600 text-xl"
