@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { FaArrowUpLong, FaBell, FaEye } from "react-icons/fa6";
+import { FaBell } from "react-icons/fa6";
 import { MessageCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import TicketCard from "./TicketCard";
@@ -178,69 +178,41 @@ export default function TicketManage() {
     }
   };
 
-  const handlePriorityChange = async (newPriority) => {
-    if (!selectedTicket) return;
+  // Helper: Convert priority to a number for sorting
+const getPriorityValue = (priority) => {
+  switch (priority) {
+    case "High": return 1;
+    case "Medium": return 2;
+    case "Low": return 3;
+    default: return 4;
+  }
+};
 
-    try {
-      await axios.put(`http://localhost:5000/api/tickets/${selectedTicket.id}/priority`, {
-        priority: newPriority,
-        userId: user.UserID
-      });
+// Helper: Check if due date is more than 2 days ago
+const isExpired = (dueDateStr) => {
+  if (!dueDateStr) return false;
+  const dueDate = new Date(dueDateStr);
+  const today = new Date();
+  const diffInTime = today - dueDate;
+  const diffInDays = diffInTime / (1000 * 3600 * 24);
+  return diffInDays > 2;
+};
 
-      // Update local state
-      setSelectedTicket(prev => ({
-        ...prev,
-        priority: newPriority
-      }));
+// Filter & Sort: Open
+const open = tickets
+  .filter((t) => t.status === "Open")
+  .sort((a, b) => getPriorityValue(a.priority) - getPriorityValue(b.priority));
 
-      // Update tickets list
-      setTickets(prev =>
-        prev.map(t =>
-          t.id === selectedTicket.id
-            ? { ...t, priority: newPriority }
-            : t
-        )
-      );
+// In Process
+const inProcess = tickets
+  .filter((t) => t.status === "In Process")
+  .sort((a, b) => getPriorityValue(a.priority) - getPriorityValue(b.priority));
 
-      toast.success('Priority updated successfully');
-    } catch (error) {
-      console.error('Error updating priority:', error);
-      toast.error('Failed to update priority');
-    }
-  };
+// Resolved (show all even if overdue)
+const resolved = tickets
+  .filter((t) => t.status === "Resolved" && (!isExpired(t.dueDate)))
+  .sort((a, b) => getPriorityValue(a.priority) - getPriorityValue(b.priority));
 
-  const handleFileUpload = async (event) => {
-    const file = event.target.files[0];
-    if (!file || !selectedTicket) return;
-
-    const formData = new FormData();
-    formData.append('file', file);
-
-    try {
-      // First upload the file
-      const uploadResponse = await axios.post('http://localhost:5000/api/upload', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        }
-      });
-
-      // Then create the attachment log
-      await axios.post(`http://localhost:5000/api/tickets/${selectedTicket.id}/attachments`, {
-        fileName: file.name,
-        fileUrl: uploadResponse.data.fileUrl,
-        userId: user.UserID
-      });
-
-      toast.success('File uploaded successfully');
-    } catch (error) {
-      console.error('Error uploading file:', error);
-      toast.error('Failed to upload file');
-    }
-  };
-
-  const open = tickets.filter((t) => t.status === "Open");
-  const inProcess = tickets.filter((t) => t.status === "In Process");
-  const resolved = tickets.filter((t) => t.status === "Resolved");
 
   const initialMessages = [
     {
@@ -491,6 +463,9 @@ export default function TicketManage() {
                         <p>
                           <strong>Date:</strong> {selectedTicket.date}
                         </p>
+                        <p>
+                          <strong>Priority:</strong> {selectedTicket.priority}
+                        </p>
                         <p className="text-sm">
                     <strong>Problem:</strong>{" "}
                     {selectedTicket.problem.length > 100 ? (
@@ -581,14 +556,14 @@ export default function TicketManage() {
                       </div>
 
                       {/* RIGHT: Evidence Files */}
-                      <div className="space-y-4">
+                      <div className="space-y-4 h-[430px]">
                         <h4 className="font-semibold mb-2">Evidence Files</h4>
                         {evidenceList.length === 0 ? (
                           <p className="text-sm text-gray-500">
                             No evidence files available.
                           </p>
                         ) : (
-                          <div className="h-[430px] overflow-y-auto grid grid-cols-2 gap-4 p-2 border rounded bg-gray-50">
+                          <div className=" overflow-y-auto grid grid-cols-2 gap-4 p-2 border rounded bg-gray-50">
                             {evidenceList.map((evi, index) => {
                               const fileUrl = `http://localhost:5000/${evi.FilePath}`;
                               const fileName = evi.FilePath.split("/").pop();
