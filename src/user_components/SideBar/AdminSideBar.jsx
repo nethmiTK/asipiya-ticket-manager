@@ -9,6 +9,7 @@ import { FaHome, FaUserCog } from "react-icons/fa";
 import { useAuth } from '../../App.jsx';
 import { toast } from "react-toastify";
 import { FaRegAddressBook } from "react-icons/fa6";
+import { BiUserPlus } from "react-icons/bi";
 
 const Menus = [
   { title: "Dashboard", icon: <FaHome />, path: "/admin-dashboard" },
@@ -29,6 +30,7 @@ const Menus = [
   { title: "Pending Ticket", icon: <LuTicketCheck />, path: "/pending_ticket" },
   { title: "Ticket Manage", icon: <BsFillTicketDetailedFill />, path: "/ticket-manage" },
   { title: "Supervisor Add", icon: <FaRegAddressBook />, path: "/supervisor" },
+  { title: "Client Registration", icon: <BiUserPlus />, path: "/client_registration" },
   {
     title: "Asipiya Systems",
     icon: <GrSystem />,
