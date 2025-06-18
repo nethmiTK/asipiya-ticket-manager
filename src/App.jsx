@@ -36,6 +36,7 @@ import PendingTicket from "./frontend/admin_panel/PendingTicket"
 import SupervisorAssign from "./frontend/admin_panel/SupervisorAssign"
 import TicketView from "./frontend/users_panel/TicketView";
 import UserDetails from "./frontend/admin_panel/UserDetails";
+import ClientRegistration from "./frontend/admin_panel/ClientRegistration";
 
 // Create Auth Context - loggedInUser and setLoggedInUser
 const AuthContext = createContext(null);
@@ -268,25 +269,27 @@ const AppRoutes = ({
                     <ProtectedRoute>
                         <PendingTicket />
                     </ProtectedRoute>
-                } />
-                <Route path='supervisor_assign/:id' element={[<SupervisorAssign />]} />
-                       
-                <Route path="/ticket_view_page/:id" element={[<TicketViewPage />]} />
-            </Routes>
-            <ToastContainer
-                position="top-right"
-                autoClose={3000}
-                hideProgressBar={false}
-                newestOnTop
-                closeOnClick
-                rtl={false}
-                pauseOnFocusLoss
-                draggable
-                pauseOnHover
-                theme="colored"
-            />
-        </AuthContext.Provider>
-    );
+                }/>
+                <Route path='supervisor_assign/:id' element={[<SupervisorAssign/>]}/>
+
+                <Route path='/client_registration' element={[<ClientRegistration />]}/>
+
+        <Route path="/ticket_view_page/:id" element={[<TicketViewPage />]} />
+      </Routes>
+      <ToastContainer
+        position="top-right"
+        autoClose={3000}
+        hideProgressBar={false}
+        newestOnTop
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="colored"
+      />
+    </AuthContext.Provider>
+  );
 };
 
 // Component to render sidebar conditionally based on route and role

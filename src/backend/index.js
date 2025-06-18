@@ -13,6 +13,7 @@ import bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
 import moment from 'moment';
 import crypto from 'crypto';
+import util from 'util'; 
 import ticketLogRoutes from './routes/ticketLog.js';
 import userProfileRoutes from './routes/userProfile.js';
 
@@ -54,11 +55,13 @@ if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir);
 }
 
+const query = util.promisify(db.query).bind(db);
+
 // Get __dirname equivalent for ES Modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+const uploadPath = path.join(__dirname, 'uploads');
+app.use('/uploads', express.static(uploadPath));
 
 // --- Multer Configuration for Profile Images ---
 const profileImageStorage = multer.diskStorage({
@@ -81,33 +84,58 @@ const upload = multer({ storage: profileImageStorage });
 const saltRounds = 10;
 
 // -------Register endpoint------- //
-app.post("/register", async (req, res) => {
-    const { FullName, Email, Password, Role, Phone } = req.body;
 
+app.post("/register", async (req, res) => {
+  const { FullName, Email, Password, Role, Phone } = req.body;
+
+  try {
     // Hash the password
     const hashedPassword = await bcrypt.hash(Password, 10);
 
-    // Insert the user
+    // Insert the user into appuser
     const query = 'INSERT INTO appuser (FullName, Email, Password, Role, Phone) VALUES (?, ?, ?, ?, ?)';
 
     db.query(query, [FullName, Email, hashedPassword, Role, Phone], async (err, result) => {
-        if (err) {
-            console.error('Error inserting user:', err);
-            res.status(500).send('Error registering user');
+      if (err) {
+        console.error('Error inserting user:', err);
+        return res.status(500).send('Error registering user');
+      }
+
+      const newUserID = result.insertId;
+
+      // Optional: Link the user to an existing client with matching email
+      const updateClientQuery = `
+        UPDATE client 
+        SET UserID = ? 
+        WHERE ContactPersonEmail = ? AND UserID IS NULL
+      `;
+
+      db.query(updateClientQuery, [newUserID, Email], async (updateErr, updateResult) => {
+        if (updateErr) {
+          console.error('Error updating client with UserID:', updateErr);
+          // Not fatal — continue registration
         } else {
-            // Send notification to admins about new user registration
-            try {
-                await sendNotificationsByRoles(
-                    ['Admin'],
-                    `New ${Role} registered: ${FullName} (${Email})`,
-                    'NEW_USER_REGISTRATION'
-                );
-            } catch (error) {
-                console.error('Error sending registration notifications:', error);
-            }
-            res.status(200).send('User registered successfully');
+          console.log(`Client records updated with UserID: ${newUserID}`);
         }
+
+        // Send notification to admins
+        try {
+          await sendNotificationsByRoles(
+            ['Admin'],
+            `New ${Role} registered: ${FullName} (${Email})`,
+            'NEW_USER_REGISTRATION'
+          );
+        } catch (notificationError) {
+          console.error('Error sending registration notifications:', notificationError);
+        }
+
+        return res.status(200).send('User registered successfully');
+      });
     });
+  } catch (error) {
+    console.error('Registration error:', error);
+    return res.status(500).send('Internal server error');
+  }
 });
 
 // API endpoint to fetch tickets
@@ -794,7 +822,7 @@ app.put('/tickets/:id', (req, res) => {
         res.json({ message: "Ticket updated successfully" });
     });
 });
-
+//--------------------------------
 app.get("/evidence/:ticketId", (req, res) => {
     const { ticketId } = req.params;
 
@@ -897,6 +925,7 @@ app.get('/api/ticket_view/:id', (req, res) => {
         res.json(results[0]);
     });
 });
+
 
 app.get('/api/supervisors', (req, res) => {
     const query = `
@@ -1775,22 +1804,29 @@ app.get('/api/tickets', (req, res) => {
 });
 
 app.get('/api/pending_ticket', (req, res) => {
-    const query = `
-    SELECT t.TicketID, s.SystemName AS SystemName, tc.CategoryName AS CategoryName, u.FullName AS UserName, t.Status
+  const query = `
+    SELECT 
+      t.TicketID,
+      s.SystemName AS SystemName,
+      c.CompanyName AS CompanyName,
+      u.FullName AS UserName,
+      t.Status,
+      t.DateTime
     FROM ticket t
     LEFT JOIN asipiyasystem s ON t.AsipiyaSystemID = s.AsipiyaSystemID
-    LEFT JOIN ticketcategory tc ON t.TicketCategoryID = tc.TicketCategoryID
-    LEFT JOIN appuser u ON t.UserId = u.UserID ORDER BY TicketID ASC
+    LEFT JOIN appuser u ON t.UserId = u.UserID
+    LEFT JOIN client c ON u.Email = c.ContactPersonEmail
+    ORDER BY t.TicketID ASC
   `;
 
-    db.query(query, (err, results) => {
-        if (err) {
-            console.error('Error fetching tickets:', err);
-            res.status(500).json({ error: 'Failed to fetch tickets' });
-            return;
-        }
-        res.json(results);
-    });
+  db.query(query, (err, results) => {
+    if (err) {
+      console.error('Error fetching tickets:', err);
+      res.status(500).json({ error: 'Failed to fetch tickets' });
+      return;
+    }
+    res.json(results);
+  });
 });
 
 
@@ -2013,9 +2049,11 @@ app.delete('/api/ticket_category_delete/:id', (req, res) => {
 app.put('/api/ticket_status/:id', (req, res) => {
     const { id } = req.params;
     const { status } = req.body;
+    const now = new Date();
+    const firstRespondedTimeValue = now;
 
-    const sql = 'UPDATE ticket SET Status = ? WHERE TicketID = ?';
-    db.query(sql, [status, id], (err, result) => {
+    const sql = 'UPDATE ticket SET Status = ?, FirstRespondedTime = ? WHERE TicketID = ?';
+    db.query(sql, [status, firstRespondedTimeValue, id], (err, result) => {
         if (err) {
             console.error('Update error:', err);
             return res.status(500).json({ error: 'Error Reject the Ticket' });
@@ -2112,9 +2150,10 @@ app.post('/api/invite-supervisor', async (req, res) => {
 app.put('/api/tickets/:id/assign', async (req, res) => {
     const ticketId = req.params.id;
     const { status, priority, supervisorId } = req.body;
+    const now = new Date();
+    const firstRespondedTimeValue = now;
 
-    // First get the ticket details to know the user who created it
-    const getTicketQuery = 'SELECT UserId FROM ticket WHERE TicketID = ?';
+    const getTicketQuery = 'SELECT UserId, FirstRespondedTime FROM ticket WHERE TicketID = ?';
     db.query(getTicketQuery, [ticketId], async (err, ticketResults) => {
         if (err) {
             console.error('Error fetching ticket:', err);
@@ -2127,9 +2166,9 @@ app.put('/api/tickets/:id/assign', async (req, res) => {
 
         const userId = ticketResults[0].UserId;
 
-        const sql = `UPDATE ticket SET Status = ?, Priority = ?, SupervisorID = ? WHERE TicketID = ?`;
+        const sql = `UPDATE ticket SET Status = ?, Priority = ?,FirstRespondedTime = ?, SupervisorID = ?  WHERE TicketID = ?`;
 
-        db.query(sql, [status, priority, supervisorId, ticketId], async (err, result) => {
+        db.query(sql, [status, priority, firstRespondedTimeValue, supervisorId, ticketId], async (err, result) => {
             if (err) {
                 console.error('Error assigning supervisor:', err);
                 return res.status(500).json({ error: 'Database error' });
@@ -2164,6 +2203,8 @@ app.put('/api/tickets/:id/assign', async (req, res) => {
         });
     });
 });
+
+
 
 // Create new ticket
 app.post('/api/tickets', async (req, res) => {
@@ -2231,88 +2272,197 @@ app.post('/api/tickets', async (req, res) => {
   }
 });
 
-// Upload evidence for a ticket
 app.post('/api/upload_evidence', upload_evidence.array('evidenceFiles'), async (req, res) => {
-    const { ticketId, description } = req.body;
+  const { ticketId, description } = req.body;
 
-    if (!req.files || req.files.length === 0) {
-        return res.status(400).json({ message: 'No files uploaded' });
-    }
+  if (!req.files || req.files.length === 0) {
+    return res.status(400).json({ message: 'No files uploaded' });
+  }
 
-    if (!ticketId) {
-        return res.status(400).json({ message: 'Ticket ID is required' });
-    }
+  if (!ticketId) {
+    return res.status(400).json({ message: 'Ticket ID is required' });
+  }
 
-    try {
-        const values = req.files.map(file => [ticketId, file.path, description]);
+  try {
+    const values = req.files.map(file => [
+      ticketId,
+      file.path.replace(/\\/g, '/'), // ✅ Fix path before storing
+      description
+    ]);
 
-        const insertEvidenceQuery = `
+    const insertEvidenceQuery = `
       INSERT INTO evidence (ComplaintID, FilePath, Description)
       VALUES ?
     `;
 
-        await db.promise().query(insertEvidenceQuery, [values]);
+    await db.promise().query(insertEvidenceQuery, [values]);
 
-        res.status(200).json({
-            message: 'Evidence files uploaded successfully',
-            count: req.files.length
-        });
-    } catch (error) {
-        console.error('Error uploading evidence:', error);
-        res.status(500).json({ message: 'Error uploading evidence' });
-    }
+    res.status(200).json({
+      message: 'Evidence files uploaded successfully',
+      count: req.files.length
+    });
+  } catch (error) {
+    console.error('Error uploading evidence:', error);
+    res.status(500).json({ message: 'Error uploading evidence' });
+  }
 });
+
 
 
 //UserChat
-app.post("/api/ticketchat", upload.single("file"), (req, res) => {
-    const { TicketID, Type, Note, UserID, Role } = req.body;
-    const filePath = req.file ? `uploads/${req.file.filename}` : null;
+function isImageFile(filename) {
+  const ext = path.extname(filename).toLowerCase();
+  return [".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".svg"].includes(
+    ext
+  );
+}
 
-    const sql = `
+app.post("/api/ticketchatUser", upload.single("file"), (req, res) => {
+  const { TicketID, Type, Note, UserID, Role } = req.body;
+  const filePath = req.file ? req.file.filename : null;
+
+  if (!TicketID || !Note) {
+    return res.status(400).json({ error: "TicketID and Note are required." });
+  }
+
+  const sql = `
     INSERT INTO ticketchat (TicketID, Type, Note, UserID, Path, Role) 
     VALUES (?, ?, ?, ?, ?, ?)
   `;
-    const values = [TicketID, Type, Note, UserID, filePath, Role];
+  const values = [
+    TicketID,
+    Type || "text",
+    Note,
+    UserID || null,
+    filePath,
+    Role || "User",
+  ];
 
-    db.query(sql, values, (err, result) => {
-        if (err) {
-            console.error("Error inserting chat message:", err);
-            return res.status(500).json({ error: err.message });
-        }
-        res.status(200).json({
-            message: "Message sent",
-            filePath: filePath ? `http://localhost:5000/${filePath}` : null
-        });
+  db.query(sql, values, (err, result) => {
+    if (err) {
+      console.error("DB insert error:", err);
+      return res.status(500).json({ error: "Failed to save message." });
+    }
+    const fileUrl = filePath
+      ? `${req.protocol}://${req.get(
+          "host"
+        )}/uploads/profile_images/${filePath}`
+      : null;
+
+    res.status(201).json({
+      message: "Message saved",
+      chatId: result.insertId,
+      file: fileUrl
+        ? {
+            url: fileUrl,
+            isImage: isImageFile(filePath),
+            name: req.file.originalname,
+          }
+        : null,
     });
+  });
 });
 
-app.get("/api/ticketchat/:ticketID", (req, res) => {
-    const ticketID = req.params.ticketID;
+app.get("/api/ticketchatUser/:ticketID", (req, res) => {
+  const ticketID = req.params.ticketID;
 
-    const sql = `
-    SELECT 
-      tc.*, 
-      au.FullName, 
-      au.Role
-    FROM 
-      ticketchat tc
-    JOIN 
-      appuser au ON tc.UserID = au.UserID
-    WHERE 
-      tc.TicketID = ?
-    ORDER BY 
-      tc.CreatedAt ASC
+  if (!ticketID) {
+    return res.status(400).json({ error: "TicketID is required." });
+  }
+
+  const sql = `
+    SELECT TicketChatID AS id, TicketID, Type, Note AS content, 
+           UserID, Path, Role, CreatedAt AS timestamp
+    FROM ticketchat
+    WHERE TicketID = ?
+    ORDER BY CreatedAt ASC
   `;
 
-    db.query(sql, [ticketID], (err, result) => {
-        if (err) {
-            console.error("Error retrieving messages:", err);
-            return res.status(500).json({ error: "Failed to fetch chat messages." });
-        }
-        res.status(200).json(result);
-    });
+  db.query(sql, [ticketID], (err, results) => {
+    if (err) {
+      console.error("DB fetch error:", err);
+      return res.status(500).json({ error: "Failed to fetch messages." });
+    }
+
+    const formatted = results.map((msg) => ({
+      id: msg.id,
+      ticketid: msg.TicketID,
+      type: msg.Type,
+      content: msg.content,
+      userid: msg.UserID,
+      role: msg.Role,
+      timestamp: msg.timestamp,
+      file: msg.Path
+        ? {
+            url: `${req.protocol}://${req.get("host")}/uploads/profile_images/${msg.Path}`,
+            isImage: isImageFile(msg.Path),
+            name: path.basename(msg.Path),
+          }
+        : null,
+    }));
+
+    res.status(200).json(formatted);
+  });
 });
+
+app.get("/download/:filename", (req, res) => {
+  const filename = req.params.filename;
+  const filePath = path.join(__dirname, "/uploads/profile_images/", filename);
+  res.download(filePath, filename, (err) => {
+    if (err) {
+      console.error("Download error:", err);
+      res.status(500).send("File not found.");
+    }
+  });
+});
+
+/*-------------------------------------------------------------------------------------------------------------------------------*/
+
+//Client side
+
+app.get('/api/clients', (req, res) => {
+  const sql = "SELECT * FROM client";
+  db.query(sql, (err, results) => {
+    if (err) return res.status(500).json({ message: "Error fetching clients", error: err });
+    res.json(results);
+  });
+});
+
+// POST add new client
+
+
+app.post('/api/clients', async (req, res) => {
+  const { CompanyName, ContactNo, ContactPersonEmail, MobileNo } = req.body;
+
+  try {
+    // 1. Check if the email exists in appuser
+    const userResults = await query(
+      'SELECT UserID FROM appuser WHERE Email = ? LIMIT 1',
+      [ContactPersonEmail]
+    );
+
+    const matchedUserID = userResults.length > 0 ? userResults[0].UserID : null;
+
+    // 2. Insert into client table
+    const insertResult = await query(
+      `INSERT INTO client (CompanyName, ContactNo, ContactPersonEmail, MobileNo, UserID) VALUES (?, ?, ?, ?, ?)`,
+      [CompanyName, ContactNo, ContactPersonEmail, MobileNo, matchedUserID]
+    );
+
+    // 3. Fetch inserted client
+    const insertedClientID = insertResult.insertId;
+    const clientRows = await query('SELECT * FROM client WHERE ClientID = ?', [insertedClientID]);
+
+    res.status(200).json({
+      message: 'Client registered successfully',
+      client: clientRows[0],
+    });
+  } catch (err) {
+    console.error('Client registration error:', err);
+    res.status(500).json({ message: 'Server error', error: err });
+  }
+});
+
 
 // Add ticket log routes
 app.use('/api/ticket-logs', ticketLogRoutes);
