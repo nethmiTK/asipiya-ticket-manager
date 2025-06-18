@@ -449,7 +449,7 @@ const resolved = tickets
                   </nav>
                 </div>
 
-                <div className="h-[550px] overflow-y-auto">
+                <div className="h-[580px] overflow-y-auto">
                   {activeTab === 'details' ? (
                     <div className="grid grid-cols-2 gap-6">
                       {/* LEFT: Ticket Info */}

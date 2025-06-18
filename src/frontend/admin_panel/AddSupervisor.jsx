@@ -60,7 +60,7 @@ export default function AddSupervisor() {
     <div className="flex">
       <AdminSideBar open={isSidebarOpen} setOpen={setIsSidebarOpen} />
       <div
-        className={`flex-1 min-h-screen bg-gray-100 p-8 transition-all duration-300 ${
+        className={`flex-1 min-h-screen bg-gray-50 p-8 transition-all duration-300 ${
           isSidebarOpen ? "ml-72" : "ml-20"
         }`}
       >
@@ -81,7 +81,7 @@ export default function AddSupervisor() {
 
           <div className="overflow-x-auto">
             <table className="min-w-full bg-white rounded-lg shadow text-sm sm:text-base">
-              <thead className="bg-blue-100 text-gray-700 font-semibold">
+              <thead className="bg-gray-100 text-gray-700 font-normal">
                 <tr>
                   <th className="p-3 text-center">Name</th>
                   <th className="text-center p-3">Email</th>
@@ -94,18 +94,18 @@ export default function AddSupervisor() {
                   users.map((user) => (
                     <tr
                       key={user.UserID}
-                      className="border-b hover:bg-blue-50 transition"
+                      className="border-b border-gray-100 hover:bg-gray-50 transition"
                     >
-                      <td className="p-3 text-gray-800 font-medium text-center">
+                      <td className="p-3 text-gray-500 text-center text-sm">
                         {user.FullName}
                       </td>
-                      <td className="p-3 text-gray-700 text-center">
+                      <td className="p-3 text-gray-500 text-center text-sm">
                         {user.Email}
                       </td>
                       <td className="p-3 text-center">
                         <span
-                          className={`px-3 py-1 rounded-full text-sm font-medium ${
-                            roleColors[user.Role] || "bg-gray-300 text-gray-900"
+                          className={`px-3 py-1 rounded-full text-sm ${
+                            roleColors[user.Role] || "bg-gray-300 text-gray-500"
                           }`}
                         >
                           {user.Role}
