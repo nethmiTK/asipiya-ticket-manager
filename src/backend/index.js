@@ -2405,6 +2405,17 @@ app.get("/api/ticketchatUser/:ticketID", (req, res) => {
   });
 });
 
+app.get("/download/:filename", (req, res) => {
+  const filename = req.params.filename;
+  const filePath = path.join(__dirname, "/uploads/profile_images/", filename);
+  res.download(filePath, filename, (err) => {
+    if (err) {
+      console.error("Download error:", err);
+      res.status(500).send("File not found.");
+    }
+  });
+});
+
 /*-------------------------------------------------------------------------------------------------------------------------------*/
 
 //Client side

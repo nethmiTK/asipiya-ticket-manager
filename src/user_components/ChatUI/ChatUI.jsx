@@ -3,8 +3,10 @@ import { IoMdAttach } from "react-icons/io";
 import { MdSend } from "react-icons/md";
 import * as pdfjsLib from "pdfjs-dist";
 
-// Set PDF.js worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+  "pdfjs-dist/build/pdf.worker.min.js",
+  import.meta.url
+).toString();
 
 const ChatUI = ({ ticketID: propTicketID }) => {
   const [ticketID, setTicketID] = useState(null);
@@ -96,6 +98,28 @@ const ChatUI = ({ ticketID: propTicketID }) => {
     }
   }, [selectedFile]);
 
+  const handleFileDownload = async (fileUrl) => {
+    try {
+      const response = await fetch(fileUrl, { mode: "cors" });
+      if (!response.ok) throw new Error("Network response was not ok");
+
+      const blob = await response.blob();
+      const downloadUrl = window.URL.createObjectURL(blob);
+
+      const a = document.createElement("a");
+      a.href = downloadUrl;
+      const filename = fileUrl.split("/").pop() || "download";
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(downloadUrl);
+    } catch (error) {
+      console.error("Download failed:", error);
+      alert("File download failed.");
+    }
+  };
+
   const handleSend = async () => {
     if (!input.trim() && !selectedFile) return;
 
@@ -146,49 +170,80 @@ const ChatUI = ({ ticketID: propTicketID }) => {
                     : "bg-gray-400 text-white rounded-bl-none"
                 }`}
               >
-                {msg.role && (
-                  <p className="text-xs text-white mb-1 font-semibold">{msg.role}</p>
-                )}
+                {msg.role && <p className="text-xs text-white mb-1 font-semibold">{msg.role}</p>}
 
                 {msg.filePath ? (
                   <>
-                    {isImage ? (
-                      <img
-                        src={msg.filePath}
-                        alt="Sent"
-                        className="rounded mb-2 border shadow-sm object-contain max-h-30 max-w-full cursor-pointer hover:opacity-90 transition-all duration-200"
-                        onClick={() => window.open(msg.filePath, "_blank")}
-                      />
-                    ) : isVideo ? (
-                      <video controls className="rounded mb-2 max-w-full max-h-40">
-                        <source src={msg.filePath} />
-                        Your browser does not support video playback.
-                      </video>
-                    ) : isPDF ? (
-                      <a
-                        href={msg.filePath}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="block"
-                      >
+                    {isImage && (
+                      <>
                         <img
-                          src="https://upload.wikimedia.org/wikipedia/commons/8/87/PDF_file_icon.svg"
-                          alt="PDF"
-                          className="w-20 h-20 object-contain border mb-1 cursor-pointer hover:opacity-90 transition-all"
+                          src={msg.filePath}
+                          alt="Sent"
+                          className="rounded mb-2 border shadow-sm object-contain max-h-30 max-w-full"
                         />
-                        <p className="text-xs underline">{msg.fileName || "Open PDF"}</p>
-                      </a>
-                    ) : (
-                      <a
-                        href={msg.filePath}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className={`text-sm underline ${
-                          msg.sender === "user" ? "text-white" : "text-black"
-                        }`}
-                      >
-                        📎 {msg.fileName || msg.text}
-                      </a>
+                        <button
+                          onClick={() => handleFileDownload(msg.filePath)}
+                          className="text-xs text-black bg-white px-1 rounded mt-1 block"
+                        >
+                          ⬇ Download Image
+                        </button>
+                      </>
+                    )}
+
+                    {isVideo && (
+                      <>
+                        <video controls className="rounded mb-2 max-w-full max-h-40">
+                          <source src={msg.filePath} />
+                        </video>
+                        <button
+                          onClick={() => handleFileDownload(msg.filePath)}
+                          className="text-xs text-black bg-white px-1 rounded mt-1 block"
+                        >
+                          ⬇ Download Video
+                        </button>
+                      </>
+                    )}
+
+                    {isPDF && (
+                      <>
+                        <a
+                          href={msg.filePath}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="block"
+                        >
+                          <img
+                            src="https://upload.wikimedia.org/wikipedia/commons/8/87/PDF_file_icon.svg"
+                            alt="PDF"
+                            className="w-20 h-20 object-contain border mb-1"
+                          />
+                        </a>
+                        <button
+                          onClick={() => handleFileDownload(msg.filePath)}
+                          className="text-xs text-black bg-white px-1 rounded mt-1 block"
+                        >
+                          ⬇ Download PDF
+                        </button>
+                      </>
+                    )}
+
+                    {!isImage && !isVideo && !isPDF && (
+                      <>
+                        <a
+                          href={msg.filePath}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm underline text-white"
+                        >
+                          📎 {msg.fileName || msg.text}
+                        </a>
+                        <button
+                          onClick={() => handleFileDownload(msg.filePath)}
+                          className="text-xs text-black bg-white px-1 rounded mt-1 block"
+                        >
+                          ⬇ Download File
+                        </button>
+                      </>
                     )}
                   </>
                 ) : (
@@ -233,9 +288,7 @@ const ChatUI = ({ ticketID: propTicketID }) => {
             </div>
           )}
           <button
-            onClick={() => {
-              setSelectedFile(null);
-            }}
+            onClick={() => setSelectedFile(null)}
             className="text-red-500 text-sm ml-4"
           >
             Remove
