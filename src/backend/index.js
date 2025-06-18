@@ -60,8 +60,8 @@ const query = util.promisify(db.query).bind(db);
 // Get __dirname equivalent for ES Modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+const uploadPath = path.join(__dirname, 'uploads');
+app.use('/uploads', express.static(uploadPath));
 
 // --- Multer Configuration for Profile Images ---
 const profileImageStorage = multer.diskStorage({
@@ -822,7 +822,7 @@ app.put('/tickets/:id', (req, res) => {
         res.json({ message: "Ticket updated successfully" });
     });
 });
-
+//--------------------------------
 app.get("/evidence/:ticketId", (req, res) => {
     const { ticketId } = req.params;
 
@@ -925,6 +925,7 @@ app.get('/api/ticket_view/:id', (req, res) => {
         res.json(results[0]);
     });
 });
+
 
 app.get('/api/supervisors', (req, res) => {
     const query = `
@@ -2271,37 +2272,41 @@ app.post('/api/tickets', async (req, res) => {
   }
 });
 
-// Upload evidence for a ticket
 app.post('/api/upload_evidence', upload_evidence.array('evidenceFiles'), async (req, res) => {
-    const { ticketId, description } = req.body;
+  const { ticketId, description } = req.body;
 
-    if (!req.files || req.files.length === 0) {
-        return res.status(400).json({ message: 'No files uploaded' });
-    }
+  if (!req.files || req.files.length === 0) {
+    return res.status(400).json({ message: 'No files uploaded' });
+  }
 
-    if (!ticketId) {
-        return res.status(400).json({ message: 'Ticket ID is required' });
-    }
+  if (!ticketId) {
+    return res.status(400).json({ message: 'Ticket ID is required' });
+  }
 
-    try {
-        const values = req.files.map(file => [ticketId, file.path, description]);
+  try {
+    const values = req.files.map(file => [
+      ticketId,
+      file.path.replace(/\\/g, '/'), // ✅ Fix path before storing
+      description
+    ]);
 
-        const insertEvidenceQuery = `
+    const insertEvidenceQuery = `
       INSERT INTO evidence (ComplaintID, FilePath, Description)
       VALUES ?
     `;
 
-        await db.promise().query(insertEvidenceQuery, [values]);
+    await db.promise().query(insertEvidenceQuery, [values]);
 
-        res.status(200).json({
-            message: 'Evidence files uploaded successfully',
-            count: req.files.length
-        });
-    } catch (error) {
-        console.error('Error uploading evidence:', error);
-        res.status(500).json({ message: 'Error uploading evidence' });
-    }
+    res.status(200).json({
+      message: 'Evidence files uploaded successfully',
+      count: req.files.length
+    });
+  } catch (error) {
+    console.error('Error uploading evidence:', error);
+    res.status(500).json({ message: 'Error uploading evidence' });
+  }
 });
+
 
 
 //UserChat

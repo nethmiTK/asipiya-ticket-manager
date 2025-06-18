@@ -25,7 +25,6 @@ const ClientRegistration = () => {
       const res = await axios.get('http://localhost:5000/api/clients');
       setClients(res.data);
 
-      // ✅ Save all client data in localStorage
       localStorage.setItem('clients', JSON.stringify(res.data));
     } catch (err) {
       setError('Failed to fetch clients: ' + err.message);
@@ -38,7 +37,7 @@ const ClientRegistration = () => {
     if (storedClients) {
       setClients(JSON.parse(storedClients));
     }
-    fetchClients(); // always fetch fresh data
+    fetchClients();
   }, []);
 
 
