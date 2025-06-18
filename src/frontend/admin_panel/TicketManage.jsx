@@ -31,7 +31,7 @@ export default function TicketManage() {
   const [comment, setComment] = useState("");
   const [attachments, setAttachments] = useState([]);
   const [chatMode, setChatMode] = useState(false);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [evidenceList, setEvidenceList] = useState([]);
   const [showProblemModal, setShowProblemModal] = useState(false);
   const [supervisors, setSupervisors] = useState([]);

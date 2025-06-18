@@ -11,7 +11,7 @@ import { FaEdit, FaTrash } from "react-icons/fa";
 export default function AddSupervisor() {
   const navigate = useNavigate();
   const [users, setUsers] = useState([]);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
   const [showAddModal, setShowAddModal] = useState(false);

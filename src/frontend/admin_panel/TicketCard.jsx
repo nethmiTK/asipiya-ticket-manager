@@ -49,7 +49,7 @@ export default function TicketCard({ ticket, onClick }) {
           const h = Math.floor((diff / (1000 * 60 * 60)) % 24);
           const m = Math.floor((diff / (1000 * 60)) % 60);
           const s = Math.floor((diff / 1000) % 60);
-          output = `⏳ ${d}d ${h}h ${m}m ${s}s left`;
+          output = `⏳ ${d}d ${h}h ${m}m left`;
         }
       } else if (ticket.status === "Open" && ticket.date) {
         const created = new Date(ticket.date);
@@ -58,7 +58,7 @@ export default function TicketCard({ ticket, onClick }) {
         const h = Math.floor((diff / (1000 * 60 * 60)) % 24);
         const m = Math.floor((diff / (1000 * 60)) % 60);
         const s = Math.floor((diff / 1000) % 60);
-        output = `🕒 Opened: ${d}d ${h}h ${m}m ${s}s ago`;
+        output = `🕒 Opened: ${d}d ${h}h ${m}m ago`;
       }
 
       setTimeText(output);
@@ -78,7 +78,7 @@ export default function TicketCard({ ticket, onClick }) {
     <div
       onClick={() => onClick(ticket)}
       className={`relative bg-white p-4 rounded-lg shadow cursor-pointer hover:shadow-lg transition duration-300 ${
-        isOverdue ? "border-2 border-red-500" : ""
+        isOverdue ? "border-2 border-red-500 " : ""
       }`}
     >
       {/* Header with Ticket ID and Status */}
@@ -115,7 +115,9 @@ export default function TicketCard({ ticket, onClick }) {
 
       {/* Timer */}
       {timeText && (
-        <div className="absolute bottom-2 right-3 text-xs text-gray-600 font-semibold">
+        <div className={`absolute bottom-2 right-3 text-xs text-green-600 font-semibold ${
+        isOverdue ? " text-red-500 " : ""
+      }`}>
           {timeText}
         </div>
       )}
