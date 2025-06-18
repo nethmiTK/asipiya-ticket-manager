@@ -1,6 +1,10 @@
 import React, { useState, useEffect, useRef } from "react";
 import { IoMdAttach } from "react-icons/io";
 import { MdSend } from "react-icons/md";
+import * as pdfjsLib from "pdfjs-dist";
+
+// Set PDF.js worker
+pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
 const ChatUI = ({ ticketID: propTicketID }) => {
   const [ticketID, setTicketID] = useState(null);
@@ -9,8 +13,10 @@ const ChatUI = ({ ticketID: propTicketID }) => {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [selectedFile, setSelectedFile] = useState(null);
+
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
+  const canvasRef = useRef(null);
 
   useEffect(() => {
     const storedUser = JSON.parse(localStorage.getItem("user"));
@@ -30,18 +36,22 @@ const ChatUI = ({ ticketID: propTicketID }) => {
 
   const fetchMessages = async () => {
     if (!userID || !ticketID) return;
-
     try {
-      const res = await fetch(`http://localhost:5000/api/ticketchat/${ticketID}`);
+      const res = await fetch(`http://localhost:5000/api/ticketchatUser/${ticketID}`);
       const data = await res.json();
-
       if (Array.isArray(data)) {
         setMessages(
           data.map((msg) => ({
-            sender: msg.UserID === userID ? "user" : "agent",
-            text: msg.Note,
-            filePath: msg.Path || null,
-            role: msg.Role || "",
+            id: msg.id,
+            ticketid: msg.ticketid,
+            sender: msg.userid === userID ? "user" : "agent",
+            text: msg.content,
+            filePath: msg.file?.url ?? null,
+            type: msg.type || "text",
+            role: msg.role || "",
+            timestamp: msg.timestamp || new Date().toISOString(),
+            status: "delivered",
+            fileName: msg.file?.name || "",
           }))
         );
       }
@@ -51,99 +61,152 @@ const ChatUI = ({ ticketID: propTicketID }) => {
   };
 
   useEffect(() => {
-    if (userID && ticketID) {
-      fetchMessages();
-    }
+    if (userID && ticketID) fetchMessages();
   }, [ticketID, userID]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  const generatePdfPreview = async (file) => {
+    if (!file || !canvasRef.current) return;
+    const reader = new FileReader();
+    reader.onload = async function () {
+      try {
+        const pdf = await pdfjsLib.getDocument({ data: reader.result }).promise;
+        const page = await pdf.getPage(1);
+        const viewport = page.getViewport({ scale: 1.5 });
+
+        const canvas = canvasRef.current;
+        const context = canvas.getContext("2d");
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+
+        await page.render({ canvasContext: context, viewport }).promise;
+      } catch (err) {
+        console.error("PDF render error:", err);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
+  useEffect(() => {
+    if (selectedFile?.type === "application/pdf") {
+      generatePdfPreview(selectedFile);
+    }
+  }, [selectedFile]);
+
   const handleSend = async () => {
     if (!input.trim() && !selectedFile) return;
 
-    const formData = new FormData();
-    formData.append("TicketID", ticketID);
-    formData.append("Type", selectedFile ? "file" : "text");
-    formData.append("Note", input || "");
-    formData.append("UserID", userID);
-    formData.append("Role", role);
-    if (selectedFile) formData.append("file", selectedFile);
-
     try {
-      const res = await fetch("http://localhost:5000/api/ticketchat", {
+      const formData = new FormData();
+      formData.append("TicketID", ticketID);
+      formData.append("Type", selectedFile ? "file" : "text");
+      formData.append("Note", input || selectedFile?.name || "");
+      formData.append("UserID", userID);
+      formData.append("Role", role);
+      if (selectedFile) formData.append("file", selectedFile);
+
+      const res = await fetch("http://localhost:5000/api/ticketchatUser", {
         method: "POST",
         body: formData,
       });
 
-      const data = await res.json();
-
       if (res.ok) {
-        setMessages((prev) => [
-          ...prev,
-          {
-            sender: "user",
-            text: input || "📎 File sent",
-            filePath: data.filePath || null,
-            role: role,
-          },
-        ]);
+        fetchMessages();
         setInput("");
         setSelectedFile(null);
       } else {
-        console.error(data.error);
+        throw new Error("Failed to send message");
       }
-    } catch (err) {
-      console.error("Failed to send message", err);
+    } catch (error) {
+      console.error("Send message failed:", error);
+      alert("Message sending failed!");
     }
   };
 
   return (
     <div className="flex flex-col h-97.5 border-none rounded-md bg-white">
       <div className="flex-1 overflow-y-auto space-y-2 p-2 mt-2">
-        {messages.map((msg, idx) => (
-          <div
-            key={idx}
-            className={`flex ${msg.sender === "user" ? "justify-end" : "justify-start"}`}
-          >
+        {messages.map((msg, idx) => {
+          const isImage = msg.type === "file" && msg.filePath?.match(/\.(jpeg|jpg|png|gif|webp|bmp|svg)$/i);
+          const isVideo = msg.type === "file" && msg.filePath?.match(/\.(mp4|webm|ogg)$/i);
+          const isPDF = msg.type === "file" && msg.filePath?.match(/\.pdf$/i);
+
+          return (
             <div
-              className={`px-4 py-2 rounded-2xl text-sm max-w-xs break-words ${
-                msg.sender === "user" ? "bg-blue-400 text-white" : "bg-gray-400 text-white"
-              }`}
+              key={msg.id || idx}
+              className={`flex ${msg.sender === "user" ? "justify-end" : "justify-start"}`}
             >
-              <p className="text-xs text-gray-200 mb-1 font-semibold">{msg.role}</p>
-              {msg.filePath ? (
-                msg.filePath.includes("image") ? (
-                  <img
-                    src={msg.filePath}
-                    alt="Sent file"
-                    className="max-h-40 object-contain rounded"
-                  />
+              <div
+                className={`px-4 py-2 rounded-2xl text-sm max-w-xs break-words whitespace-pre-wrap ${
+                  msg.sender === "user"
+                    ? "bg-blue-400 text-white rounded-br-none"
+                    : "bg-gray-400 text-white rounded-bl-none"
+                }`}
+              >
+                {msg.role && (
+                  <p className="text-xs text-white mb-1 font-semibold">{msg.role}</p>
+                )}
+
+                {msg.filePath ? (
+                  <>
+                    {isImage ? (
+                      <img
+                        src={msg.filePath}
+                        alt="Sent"
+                        className="rounded mb-2 border shadow-sm object-contain max-h-30 max-w-full cursor-pointer hover:opacity-90 transition-all duration-200"
+                        onClick={() => window.open(msg.filePath, "_blank")}
+                      />
+                    ) : isVideo ? (
+                      <video controls className="rounded mb-2 max-w-full max-h-40">
+                        <source src={msg.filePath} />
+                        Your browser does not support video playback.
+                      </video>
+                    ) : isPDF ? (
+                      <a
+                        href={msg.filePath}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block"
+                      >
+                        <img
+                          src="https://upload.wikimedia.org/wikipedia/commons/8/87/PDF_file_icon.svg"
+                          alt="PDF"
+                          className="w-20 h-20 object-contain border mb-1 cursor-pointer hover:opacity-90 transition-all"
+                        />
+                        <p className="text-xs underline">{msg.fileName || "Open PDF"}</p>
+                      </a>
+                    ) : (
+                      <a
+                        href={msg.filePath}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={`text-sm underline ${
+                          msg.sender === "user" ? "text-white" : "text-black"
+                        }`}
+                      >
+                        📎 {msg.fileName || msg.text}
+                      </a>
+                    )}
+                  </>
                 ) : (
-                  <div className="flex items-center space-x-2">
-                    <a
-                      href={msg.filePath}
-                      download={msg.filePath.split("/").pop()}
-                      className="underline block text-blue-500"
-                    >
-                      📎 {msg.filePath.split("/").pop()}
-                    </a>
-                    <a
-                      href={msg.filePath}
-                      download={msg.filePath.split("/").pop()}
-                      className="text-sm bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600"
-                    >
-                      Download
-                    </a>
-                  </div>
-                )
-              ) : (
-                msg.text
-              )}
+                  <span>{msg.text}</span>
+                )}
+
+                <div className="text-xs text-white mt-1">
+                  {new Date(msg.timestamp).toLocaleString()} -{" "}
+                  {msg.status === "sending"
+                    ? "Sending"
+                    : msg.status === "failed"
+                    ? "Failed"
+                    : "Delivered"}
+                </div>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
         <div ref={messagesEndRef} />
       </div>
 
@@ -155,6 +218,14 @@ const ChatUI = ({ ticketID: propTicketID }) => {
               alt="Preview"
               className="h-20 object-contain rounded"
             />
+          ) : selectedFile.type.startsWith("video/") ? (
+            <video
+              className="h-20 object-contain rounded"
+              src={URL.createObjectURL(selectedFile)}
+              controls
+            />
+          ) : selectedFile.type === "application/pdf" ? (
+            <canvas ref={canvasRef} className="h-20 rounded border shadow" />
           ) : (
             <div className="flex flex-col items-start">
               <span className="text-sm font-medium">{selectedFile.name}</span>
@@ -162,7 +233,9 @@ const ChatUI = ({ ticketID: propTicketID }) => {
             </div>
           )}
           <button
-            onClick={() => setSelectedFile(null)}
+            onClick={() => {
+              setSelectedFile(null);
+            }}
             className="text-red-500 text-sm ml-4"
           >
             Remove
@@ -177,19 +250,42 @@ const ChatUI = ({ ticketID: propTicketID }) => {
           style={{ display: "none" }}
           onChange={(e) => setSelectedFile(e.target.files[0])}
         />
-        <IoMdAttach
-          className="text-gray-500 size-5 cursor-pointer"
-          onClick={() => fileInputRef.current.click()}
-        />
-        <input
-          type="text"
-          className="flex-1 border border-zinc-300 rounded-full px-4 py-2 text-sm bg-zinc-50"
-          placeholder="Type your message..."
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && handleSend()}
-        />
-        <button onClick={handleSend}>
+        <div
+          className="relative"
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={(e) => {
+            e.preventDefault();
+            const file = e.dataTransfer.files[0];
+            if (file) setSelectedFile(file);
+          }}
+        >
+          <IoMdAttach
+            className="text-gray-900 size-5 cursor-pointer hover:text-gray-700"
+            onClick={() => fileInputRef.current.click()}
+            title="Attach or drop file"
+          />
+        </div>
+
+        <div
+          className="flex-1 border border-zinc-300 rounded-full bg-zinc-50 px-4 py-2 text-sm"
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={(e) => {
+            e.preventDefault();
+            const file = e.dataTransfer.files[0];
+            if (file) setSelectedFile(file);
+          }}
+        >
+          <input
+            type="text"
+            className="w-full outline-none bg-transparent"
+            placeholder="Type your message or drop a file..."
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleSend()}
+          />
+        </div>
+
+        <button onClick={handleSend} disabled={!input.trim() && !selectedFile}>
           <MdSend className="text-gray-900 hover:text-gray-700 size-7" />
         </button>
       </div>

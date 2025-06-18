@@ -2305,53 +2305,99 @@ app.post('/api/upload_evidence', upload_evidence.array('evidenceFiles'), async (
 
 
 //UserChat
-app.post("/api/ticketchat", upload.single("file"), (req, res) => {
-    const { TicketID, Type, Note, UserID, Role } = req.body;
-    const filePath = req.file ? `uploads/${req.file.filename}` : null;
+function isImageFile(filename) {
+  const ext = path.extname(filename).toLowerCase();
+  return [".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".svg"].includes(
+    ext
+  );
+}
 
-    const sql = `
+app.post("/api/ticketchatUser", upload.single("file"), (req, res) => {
+  const { TicketID, Type, Note, UserID, Role } = req.body;
+  const filePath = req.file ? req.file.filename : null;
+
+  if (!TicketID || !Note) {
+    return res.status(400).json({ error: "TicketID and Note are required." });
+  }
+
+  const sql = `
     INSERT INTO ticketchat (TicketID, Type, Note, UserID, Path, Role) 
     VALUES (?, ?, ?, ?, ?, ?)
   `;
-    const values = [TicketID, Type, Note, UserID, filePath, Role];
+  const values = [
+    TicketID,
+    Type || "text",
+    Note,
+    UserID || null,
+    filePath,
+    Role || "User",
+  ];
 
-    db.query(sql, values, (err, result) => {
-        if (err) {
-            console.error("Error inserting chat message:", err);
-            return res.status(500).json({ error: err.message });
-        }
-        res.status(200).json({
-            message: "Message sent",
-            filePath: filePath ? `http://localhost:5000/${filePath}` : null
-        });
+  db.query(sql, values, (err, result) => {
+    if (err) {
+      console.error("DB insert error:", err);
+      return res.status(500).json({ error: "Failed to save message." });
+    }
+    const fileUrl = filePath
+      ? `${req.protocol}://${req.get(
+          "host"
+        )}/uploads/profile_images/${filePath}`
+      : null;
+
+    res.status(201).json({
+      message: "Message saved",
+      chatId: result.insertId,
+      file: fileUrl
+        ? {
+            url: fileUrl,
+            isImage: isImageFile(filePath),
+            name: req.file.originalname,
+          }
+        : null,
     });
+  });
 });
 
-app.get("/api/ticketchat/:ticketID", (req, res) => {
-    const ticketID = req.params.ticketID;
+app.get("/api/ticketchatUser/:ticketID", (req, res) => {
+  const ticketID = req.params.ticketID;
 
-    const sql = `
-    SELECT 
-      tc.*, 
-      au.FullName, 
-      au.Role
-    FROM 
-      ticketchat tc
-    JOIN 
-      appuser au ON tc.UserID = au.UserID
-    WHERE 
-      tc.TicketID = ?
-    ORDER BY 
-      tc.CreatedAt ASC
+  if (!ticketID) {
+    return res.status(400).json({ error: "TicketID is required." });
+  }
+
+  const sql = `
+    SELECT TicketChatID AS id, TicketID, Type, Note AS content, 
+           UserID, Path, Role, CreatedAt AS timestamp
+    FROM ticketchat
+    WHERE TicketID = ?
+    ORDER BY CreatedAt ASC
   `;
 
-    db.query(sql, [ticketID], (err, result) => {
-        if (err) {
-            console.error("Error retrieving messages:", err);
-            return res.status(500).json({ error: "Failed to fetch chat messages." });
-        }
-        res.status(200).json(result);
-    });
+  db.query(sql, [ticketID], (err, results) => {
+    if (err) {
+      console.error("DB fetch error:", err);
+      return res.status(500).json({ error: "Failed to fetch messages." });
+    }
+
+    const formatted = results.map((msg) => ({
+      id: msg.id,
+      ticketid: msg.TicketID,
+      type: msg.Type,
+      content: msg.content,
+      userid: msg.UserID,
+      role: msg.Role,
+      timestamp: msg.timestamp,
+      file: msg.Path
+        ? {
+            url: `${req.protocol}://${req.get("host")}/uploads/profile_images/${msg.Path}`,
+            isImage: isImageFile(msg.Path),
+            name: path.basename(msg.Path),
+          }
+        : null,
+    }));
+
+    res.status(200).json(formatted);
+  });
 });
 
 /*-------------------------------------------------------------------------------------------------------------------------------*/
