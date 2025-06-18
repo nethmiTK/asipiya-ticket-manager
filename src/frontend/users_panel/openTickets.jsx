@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react"; 
+import React, { useState, useEffect, useRef } from "react";
 import { useDropzone } from "react-dropzone";
 import { Formik, Form, Field } from "formik";
 import axios from "axios";
@@ -152,6 +152,18 @@ const OpenTickets = () => {
                 }}
                 onSubmit={async (values, { resetForm }) => {
                   try {
+                    if (!values.systemName) {
+                      toast.error("Please select a System Name.");
+                      return;
+                    }
+                    if (!values.ticketCategory) {
+                      toast.error("Please select a Ticket Category.");
+                      return;
+                    }
+                    if (!values.description) {
+                      toast.error("Please provide a Description.");
+                      return;
+                    }
                     const user = JSON.parse(localStorage.getItem("user"));
                     if (!user || !user.UserID) {
                       toast.error("User not logged in. Please login first.");
@@ -249,7 +261,7 @@ const OpenTickets = () => {
                       rows="4"
                       className="w-full h-50 p-3 border border-gray-300 rounded-md text-sm mt-1 focus:ring-2 focus:ring-gray-400"
                       placeholder="Provide details of your problem"
-                      required 
+                      // required
                     />
                   </div>
 
@@ -260,27 +272,27 @@ const OpenTickets = () => {
                     {/* Dropzone Area */}
                     <div
                       {...getRootProps()}
-                      className={`border-dashed border-2 border-gray-300 rounded-md p-6 text-center hover:border-gray-400 cursor-pointer mt-1
-                        ${files.length > 0 ? "h-auto" : "min-h-[10rem] flex flex-col justify-center items-center"}`} 
+                      className={`border-dashed border-2 border-gray-300 rounded-md p-6 hover:border-gray-400 cursor-pointer mt-1
+                                 flex flex-col justify-center items-center h-[10rem]`}
                     >
                       <input {...getInputProps()} />
                       {files.length === 0 ? (
                         <>
-                          <p className="text-gray-500 text-sm">
+                          <p className="text-gray-500 text-sm text-center">
                             Click to upload or drag and drop
                           </p>
-                          <p className="text-gray-400 text-xs">
+                          <p className="text-gray-400 text-xs text-center">
                             Supported formats: PDF, Images, Videos
                           </p>
                         </>
                       ) : (
-                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-2 mt-2 items-center justify-center">
+                        <div className="flex flex-row flex-nowrap overflow-x-auto gap-2 mt-2 py-1 items-center w-full justify-start">
                           {files.map((file, index) => {
                             const isImage = file.type.startsWith("image/");
                             const isVideo = file.type.startsWith("video/");
                             return (
                               <div
-                                key={file.name + file.size + index} 
+                                key={file.name + file.size + index}
                                 className="relative w-20 h-20 border rounded-md overflow-hidden flex-shrink-0"
                               >
                                 {isImage && (
@@ -304,7 +316,7 @@ const OpenTickets = () => {
                                 )}
                                 <button
                                   onClick={(e) => {
-                                    e.stopPropagation(); 
+                                    e.stopPropagation();
                                     handleRemoveFile(index);
                                   }}
                                   className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs cursor-pointer"
@@ -317,7 +329,7 @@ const OpenTickets = () => {
                           {/* "+ Add more" button*/}
                           <div
                             className="relative w-20 h-20 border-dashed border-2 border-gray-300 rounded-md flex flex-col items-center justify-center text-center text-gray-500 hover:border-gray-400 cursor-pointer text-xs"
-                            style={{ minWidth: '80px', minHeight: '80px' }} 
+                            style={{ minWidth: '80px', minHeight: '80px' }}
                           >
                             <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
                             <p className="mt-1">Add More</p>
