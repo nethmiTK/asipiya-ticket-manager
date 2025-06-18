@@ -4,6 +4,7 @@ import SideBar from "../../user_components/SideBar/SideBar";
 import NavBar from "../../user_components/NavBar/NavBar";
 import ChatUI from "../../user_components/ChatUI/ChatUI";
 import NotificationPanel from "../components/NotificationPanel";
+import { FaEye } from 'react-icons/fa';
 
 const statusColors = {
   pending: "bg-yellow-100 text-yellow-800",
@@ -158,30 +159,30 @@ const TicketView = () => {
   // useEffect for closing custom dropdowns when clicked outside
   useEffect(() => {
     const handleStatusDropdownClickOutside = (event) => {
-        if (statusDropdownRef.current && !statusDropdownRef.current.contains(event.target)) {
-            setIsStatusDropdownOpen(false);
-        }
+      if (statusDropdownRef.current && !statusDropdownRef.current.contains(event.target)) {
+        setIsStatusDropdownOpen(false);
+      }
     };
     const handleCategoryDropdownClickOutside = (event) => {
-        if (categoryDropdownRef.current && !categoryDropdownRef.current.contains(event.target)) {
-            setIsCategoryDropdownOpen(false);
-        }
+      if (categoryDropdownRef.current && !categoryDropdownRef.current.contains(event.target)) {
+        setIsCategoryDropdownOpen(false);
+      }
     };
     const handleSystemDropdownClickOutside = (event) => {
-        if (systemDropdownRef.current && !systemDropdownRef.current.contains(event.target)) {
-            setIsSystemDropdownOpen(false);
-        }
+      if (systemDropdownRef.current && !systemDropdownRef.current.contains(event.target)) {
+        setIsSystemDropdownOpen(false);
+      }
     };
 
     document.addEventListener('mousedown', handleStatusDropdownClickOutside);
     document.addEventListener('mousedown', handleCategoryDropdownClickOutside);
     document.addEventListener('mousedown', handleSystemDropdownClickOutside);
     return () => {
-        document.removeEventListener('mousedown', handleStatusDropdownClickOutside);
-        document.removeEventListener('mousedown', handleCategoryDropdownClickOutside);
-        document.removeEventListener('mousedown', handleSystemDropdownClickOutside);
+      document.removeEventListener('mousedown', handleStatusDropdownClickOutside);
+      document.removeEventListener('mousedown', handleCategoryDropdownClickOutside);
+      document.removeEventListener('mousedown', handleSystemDropdownClickOutside);
     };
- }, []);
+  }, []);
 
   // useEffect for closing notification panel when clicked outside
   useEffect(() => {
@@ -255,9 +256,8 @@ const TicketView = () => {
               >
                 {selectedStatus || "All Statuses"}
                 <svg
-                  className={`w-4 h-4 transition-transform duration-200 ${
-                    isStatusDropdownOpen ? 'rotate-180' : 'rotate-0'
-                  }`}
+                  className={`w-4 h-4 transition-transform duration-200 ${isStatusDropdownOpen ? 'rotate-180' : 'rotate-0'
+                    }`}
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -270,10 +270,9 @@ const TicketView = () => {
                 <div className="absolute z-10 w-full bg-white border border-gray-300 rounded-md shadow-lg mt-1 max-h-60 overflow-y-auto">
                   {uniqueStatuses.map((statusOption) => (
                     <div
-                      key={statusOption || 'all-status'} 
-                      className={`p-2 cursor-pointer hover:bg-gray-100 ${
-                        selectedStatus === statusOption ? 'bg-blue-100 font-semibold' : ''
-                      }`}
+                      key={statusOption || 'all-status'}
+                      className={`p-2 cursor-pointer hover:bg-gray-100 ${selectedStatus === statusOption ? 'bg-blue-100 font-semibold' : ''
+                        }`}
                       onClick={() => {
                         setSelectedStatus(statusOption);
                         setIsStatusDropdownOpen(false);
@@ -299,9 +298,8 @@ const TicketView = () => {
               >
                 {selectedCategory || "All Categories"}
                 <svg
-                  className={`w-4 h-4 transition-transform duration-200 ${
-                    isCategoryDropdownOpen ? 'rotate-180' : 'rotate-0'
-                  }`}
+                  className={`w-4 h-4 transition-transform duration-200 ${isCategoryDropdownOpen ? 'rotate-180' : 'rotate-0'
+                    }`}
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -315,9 +313,8 @@ const TicketView = () => {
                   {uniqueCategories.map((categoryOption) => (
                     <div
                       key={categoryOption || 'all-category'} // Added unique key for "All" option
-                      className={`p-2 cursor-pointer hover:bg-gray-100 ${
-                        selectedCategory === categoryOption ? 'bg-blue-100 font-semibold' : ''
-                      }`}
+                      className={`p-2 cursor-pointer hover:bg-gray-100 ${selectedCategory === categoryOption ? 'bg-blue-100 font-semibold' : ''
+                        }`}
                       onClick={() => {
                         setSelectedCategory(categoryOption);
                         setIsCategoryDropdownOpen(false);
@@ -343,9 +340,8 @@ const TicketView = () => {
               >
                 {selectedSystem || "All Systems"}
                 <svg
-                  className={`w-4 h-4 transition-transform duration-200 ${
-                    isSystemDropdownOpen ? 'rotate-180' : 'rotate-0'
-                  }`}
+                  className={`w-4 h-4 transition-transform duration-200 ${isSystemDropdownOpen ? 'rotate-180' : 'rotate-0'
+                    }`}
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -359,9 +355,8 @@ const TicketView = () => {
                   {uniqueSystems.map((systemOption) => (
                     <div
                       key={systemOption || 'all-system'} // Added unique key for "All" option
-                      className={`p-2 cursor-pointer hover:bg-gray-100 ${
-                        selectedSystem === systemOption ? 'bg-blue-100 font-semibold' : ''
-                      }`}
+                      className={`p-2 cursor-pointer hover:bg-gray-100 ${selectedSystem === systemOption ? 'bg-blue-100 font-semibold' : ''
+                        }`}
                       onClick={() => {
                         setSelectedSystem(systemOption);
                         setIsSystemDropdownOpen(false);
@@ -406,6 +401,7 @@ const TicketView = () => {
                     <th className="px-4 py-3 w-[15%]">System Name</th>
                     <th className="px-4 py-3 w-[15%]">Category</th>
                     <th className="px-4 py-3 w-[15%]">Date & Time</th>
+                    <th className="px-4 py-3 w-[10%] rounded-tr-lg text-center">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
@@ -443,8 +439,24 @@ const TicketView = () => {
                       <td className="px-4 py-2 text-gray-500">
                         {new Date(ticket.datetime).toLocaleString()}
                       </td>
+
+                      {/* Action Column */}
+                      <td className="px-4 py-2 flex justify-center items-center h-full">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedTicket(ticket);
+                            setActiveTab("details");
+                            setIsModalOpen(true);
+                          }}
+                          className="text-blue-600 hover:text-blue-800 transition-colors cursor-pointer"
+                        >
+                          <FaEye className="w-5 h-5" />
+                        </button>
+                      </td>
                     </tr>
                   ))}
+
                 </tbody>
               </table>
             </div>
@@ -574,7 +586,7 @@ const TicketView = () => {
           </div>
         )}
       </div>
-    </div>
+    </div >
   );
 };
 
