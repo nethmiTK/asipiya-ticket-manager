@@ -1,6 +1,48 @@
-// ChatSection.jsx
 import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
+
+// Helper to detect URLs in text and convert them to links
+function renderMessageWithLinks(text) {
+  if (typeof text !== "string") return text;
+
+  const urlRegex = /((https?:\/\/)?(www\.)?[\w\-]+\.[\w]{2,}([\/\w\-\.?=&%]*)?)/gi;
+
+  return text.split(urlRegex).map((part, i) => {
+    if (
+      part &&
+      typeof part === "string" &&
+      part.match(urlRegex) &&
+      !part.startsWith("http://") &&
+      !part.startsWith("https://")
+    ) {
+      return (
+        <a
+          key={i}
+          href={`https://${part}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-blue-600 underline"
+        >
+          {part}
+        </a>
+      );
+    } else if (typeof part === "string" && part.startsWith("http")) {
+      return (
+        <a
+          key={i}
+          href={part}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-blue-600 underline"
+        >
+          {part}
+        </a>
+      );
+    } else {
+      return part;
+    }
+  });
+}
 
 export default function ChatSection({
   user,
@@ -32,8 +74,6 @@ export default function ChatSection({
     if (!chatInput.trim() && !sendingFile) return;
 
     const optimisticId = Date.now();
-
-    // Create local blob URL for preview if sendingFile is present
     const localFileUrl = sendingFile ? URL.createObjectURL(sendingFile) : null;
 
     const newMsg = {
@@ -134,9 +174,7 @@ export default function ChatSection({
             >
               {isClient && (
                 <img
-                  src={
-                    supportUser?.avatar || "https://i.pravatar.cc/40?u=user1"
-                  }
+                  src={supportUser?.avatar || "https://i.pravatar.cc/40?u=user1"}
                   alt="avatar"
                   className="w-8 h-8 rounded-full mr-2 self-end"
                 />
@@ -149,74 +187,72 @@ export default function ChatSection({
                     : "bg-gray-300 text-gray-800 rounded-bl-none"
                 }`}
               >
-                {msg.file
-                  ? (() => {
-                      const fileUrl = msg.file.url;
-                      const fileName = msg.file.name.toLowerCase();
+                {msg.file ? (
+                  (() => {
+                    const fileUrl = msg.file.url;
+                    const fileName = msg.file.name.toLowerCase();
 
-                      if (fileName.match(/\.(jpg|jpeg|png|gif|bmp|webp)$/i)) {
-                        return (
-                          <div>
-                            <img
-                              src={fileUrl}
-                              alt={fileName}
-                              className="w-40 h-auto rounded-md mb-1"
-                            />
-                            <p className="text-sm break-words">
-                              {msg.file.name}
-                            </p>
-                          </div>
-                        );
-                      } else if (fileName.match(/\.(mp4|webm|ogg|mov)$/i)) {
-                        return (
-                          <div>
-                            <video
-                              controls
-                              src={fileUrl}
-                              className="w-40 h-auto rounded-md mb-1"
-                            />
-                            <p className="text-sm break-words">
-                              {msg.file.name}
-                            </p>
-                          </div>
-                        );
-                      } else if (fileName.match(/\.pdf$/i)) {
-                        return (
-                          <div>
-                            <iframe
-                              src={fileUrl}
-                              className="w-40 h-40 rounded-md mb-1"
-                              title="PDF Preview"
-                            />
-                            <a
-                              href={fileUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-gray-800 underline text-xs"
-                            >
-                              Open PDF
-                            </a>
-                          </div>
-                        );
-                      } else {
-                        return (
-                          <div>
-                            <p className="text-sm break-words font-semibold">
-                              {msg.file.name}
-                            </p>
-                            <a
-                              href={fileUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-gray-800 underline text-xs"
-                            >
-                              Download File
-                            </a>
-                          </div>
-                        );
-                      }
-                    })()
-                  : msg.content}
+                    if (fileName.match(/\.(jpg|jpeg|png|gif|bmp|webp)$/i)) {
+                      return (
+                        <div>
+                          <img
+                            src={fileUrl}
+                            alt={fileName}
+                            className="w-40 h-auto rounded-md mb-1"
+                          />
+                          <p className="text-sm break-words">{msg.file.name}</p>
+                        </div>
+                      );
+                    } else if (fileName.match(/\.(mp4|webm|ogg|mov)$/i)) {
+                      return (
+                        <div>
+                          <video
+                            controls
+                            src={fileUrl}
+                            className="w-40 h-auto rounded-md mb-1"
+                          />
+                          <p className="text-sm break-words">{msg.file.name}</p>
+                        </div>
+                      );
+                    } else if (fileName.match(/\.pdf$/i)) {
+                      return (
+                        <div>
+                          <iframe
+                            src={fileUrl}
+                            className="w-40 h-40 rounded-md mb-1"
+                            title="PDF Preview"
+                          />
+                          <a
+                            href={fileUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-gray-800 underline text-xs"
+                          >
+                            View Full PDF
+                          </a>
+                        </div>
+                      );
+                    } else {
+                      return (
+                        <div>
+                          <p className="text-sm break-words font-semibold">
+                            {msg.file.name}
+                          </p>
+                          <a
+                            href={fileUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-gray-800 underline text-xs"
+                          >
+                            Download File
+                          </a>
+                        </div>
+                      );
+                    }
+                  })()
+                ) : (
+                  renderMessageWithLinks(msg.content)
+                )}
 
                 <div className="flex justify-between text-xs mt-1 opacity-70">
                   <span>{new Date(msg.timestamp).toLocaleString()}</span>
@@ -242,11 +278,11 @@ export default function ChatSection({
             </div>
           );
         })}
-        {/* File preview before sending (centered bubble) */}
+
+        {/* Preview for file before sending */}
         {sendingFile && (
           <div className="flex justify-center mb-2">
             <div className="relative bg-yellow-100 rounded-lg p-2 shadow-md max-w-[200px] max-h-[200px] overflow-hidden">
-              {/* Universal file preview */}
               {(() => {
                 const fileUrl = URL.createObjectURL(sendingFile);
                 const fileName = sendingFile.name.toLowerCase();
@@ -288,7 +324,6 @@ export default function ChatSection({
                   );
                 }
               })()}
-              {/* Remove Button */}
               <button
                 onClick={() => setSendingFile(null)}
                 className="absolute top-1 right-2 text-red-600 hover:text-red-800 text-lg font-bold"
@@ -301,6 +336,7 @@ export default function ChatSection({
         )}
 
         <div ref={chatEndRef} />
+
         {isTyping && (
           <div className="flex items-center space-x-2 ml-10 mb-2">
             <div className="w-3 h-3 bg-gray-500 rounded-full animate-bounce" />
@@ -311,7 +347,7 @@ export default function ChatSection({
         )}
       </div>
 
-      {/* Input area */}
+      {/* Input Section */}
       <div className="mt-3 flex items-center space-x-2 p-3 border-t border-gray-300 bg-white rounded-b-lg">
         <label
           htmlFor="file-upload"
