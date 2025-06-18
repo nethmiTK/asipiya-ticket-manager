@@ -10,19 +10,26 @@ const TicketViewPage = ({ ticketId, popupMode = false, onClose }) => {
   const id = popupMode ? ticketId : routeId;
 
   const [ticketData, setTicketData] = useState(null);
+  const [evidenceList, setEvidenceList] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    axios
-      .get(`http://localhost:5000/api/ticket_view/${id}`)
-      .then((response) => {
-        setTicketData(response.data);
+    const fetchData = async () => {
+      try {
+        const ticketRes = await axios.get(`http://localhost:5000/api/ticket_view/${id}`);
+        setTicketData(ticketRes.data);
+
+        const evidenceRes = await axios.get(`http://localhost:5000/evidence/${id}`);
+        setEvidenceList(evidenceRes.data);
+
         setLoading(false);
-      })
-      .catch((error) => {
-        console.error(error);
+      } catch (error) {
+        console.error('Error fetching data:', error);
         setLoading(false);
-      });
+      }
+    };
+
+    fetchData();
   }, [id]);
 
   if (loading) {
@@ -37,11 +44,7 @@ const TicketViewPage = ({ ticketId, popupMode = false, onClose }) => {
 
       if (response.status === 200 || response.status === 204) {
         toast.success('Ticket rejected successfully');
-        if (popupMode) {
-          onClose();
-        } else {
-          navigate(-1);
-        }
+        popupMode ? onClose() : navigate(-1);
       } else {
         toast.error('Failed to reject the ticket');
       }
@@ -65,32 +68,90 @@ const TicketViewPage = ({ ticketId, popupMode = false, onClose }) => {
       <h2 className="text-2xl font-semibold text-center mb-8">Complain Details</h2>
 
       <div className="space-y-6">
-        <div className="flex">
-          <label className="w-1/3 font-medium">System Name</label>
-          <div className="w-2/3 bg-gray-100 p-2 rounded">{ticketData.SystemName}</div>
-        </div>
-
-        <div className="flex">
-          <label className="w-1/3 font-medium">User Email</label>
-          <div className="w-2/3 bg-gray-100 p-2 rounded">{ticketData.UserEmail}</div>
-        </div>
-
-        <div className="flex">
-          <label className="w-1/3 font-medium">Category</label>
-          <div className="w-2/3 bg-gray-100 p-2 rounded">{ticketData.CategoryName}</div>
-        </div>
-
-        <div className="flex">
-          <label className="w-1/3 font-medium">Description</label>
-          <div className="w-2/3 bg-gray-100 p-2 rounded">{ticketData.Description}</div>
-        </div>
-
-        <div className="flex">
-          <label className="w-1/3 font-medium">Date & Time</label>
-          <div className="w-2/3 bg-gray-100 p-2 rounded">
-            {new Date(ticketData.DateTime).toLocaleString()}
+        {[
+          ['System Name', ticketData.SystemName],
+          ['User Email', ticketData.UserEmail],
+          ['Category', ticketData.CategoryName],
+          ['Description', ticketData.Description],
+          ['Date & Time', new Date(ticketData.DateTime).toLocaleString()],
+        ].map(([label, value]) => (
+          <div key={label} className="flex">
+            <label className="w-1/3 font-medium">{label}</label>
+            <div className="w-2/3 bg-gray-100 p-2 rounded">{value}</div>
           </div>
-        </div>
+        ))}
+
+        {evidenceList.length > 0 && (
+          <div className="mt-8">
+            <h3 className="text-lg font-semibold mb-4">Evidence Files</h3>
+            <div className="flex flex-wrap gap-4">
+              {evidenceList.map((evi) => {
+                const filePath = evi.FilePath.replace(/\\/g, '/');
+                const fileName = filePath.split('/').pop();
+                const fileUrl = `http://localhost:5000/${filePath}`;
+                const isImage = /\.(jpg|jpeg|png|gif|bmp|webp)$/i.test(fileName);
+                const isPDF = /\.pdf$/i.test(fileName);
+                const isVideo = /\.(mp4|webm|ogg)$/i.test(fileName);
+                const isAudio = /\.(mp3|wav|ogg)$/i.test(fileName);
+                const isDoc = /\.(docx?|xlsx?)$/i.test(fileName);
+
+                return (
+                  <div
+                    key={evi.EvidenceID}
+                    className="w-28 h-28 border rounded-lg p-2 shadow-md bg-gray-100 flex flex-col items-center justify-center overflow-hidden"
+                  >
+                    {isImage ? (
+                      <a href={fileUrl} target="_blank" rel="noopener noreferrer">
+                        <img
+                          src={fileUrl}
+                          alt={fileName}
+                          className="w-full h-full object-cover rounded"
+                        />
+                      </a>
+                    ) : isVideo ? (
+                      <video controls className="w-full h-full rounded object-cover">
+                        <source src={fileUrl} type="video/mp4" />
+                        Your browser does not support the video tag.
+                      </video>
+                    ) : isAudio ? (
+                      <>
+                        <div className="text-xs text-center truncate w-full px-1 mb-1">{fileName}</div>
+                        <audio controls className="w-full">
+                          <source src={fileUrl} />
+                          Your browser does not support the audio element.
+                        </audio>
+                      </>
+                    ) : isPDF || isDoc ? (
+                      <>
+                        <div className="text-xs text-center truncate w-full px-1 mb-2">{fileName}</div>
+                        <a
+                          href={fileUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm text-blue-600 hover:underline"
+                        >
+                          View Document
+                        </a>
+                      </>
+                    ) : (
+                      <>
+                        <div className="text-xs text-center truncate w-full px-1 mb-2">{fileName}</div>
+                        <a
+                          href={fileUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm text-blue-600 hover:underline"
+                        >
+                          Download
+                        </a>
+                      </>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="flex justify-center gap-4 mt-8">
