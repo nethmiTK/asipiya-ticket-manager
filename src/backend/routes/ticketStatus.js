@@ -1,6 +1,64 @@
 import express from 'express';
 const router = express.Router();
 
+// Get filtered tickets
+router.get('/api/tickets/filter', async (req, res) => {
+  const { type } = req.query;
+  
+  let whereClause = '';
+  const today = new Date().toISOString().split('T')[0];
+  
+  switch (type) {
+    case 'open':
+      whereClause = "WHERE t.Status = 'Open'";
+      break;
+    case 'today':
+      whereClause = `WHERE DATE(t.DateTime) = '${today}'`;
+      break;
+    case 'pending':
+      whereClause = "WHERE t.Status = 'Pending'";
+      break;
+    case 'high':
+      whereClause = "WHERE t.Priority = 'High'";
+      break;
+    case 'resolved':
+      whereClause = "WHERE t.Status = 'Resolved'";
+      break;
+    default:
+      whereClause = '';
+  }
+
+  const query = `
+    SELECT 
+      t.*,
+      au.FullName as UserName,
+      au.Email as UserEmail,
+      c.CompanyName,
+      s.SystemName,
+      tc.CategoryName
+    FROM ticket t
+    LEFT JOIN appuser au ON t.UserId = au.UserID
+    LEFT JOIN client c ON au.UserID = c.UserID
+    LEFT JOIN asipiyasystem s ON t.AsipiyaSystemID = s.AsipiyaSystemID
+    LEFT JOIN ticketcategory tc ON t.TicketCategoryID = tc.TicketCategoryID
+    ${whereClause}
+    ORDER BY t.DateTime DESC
+  `;
+
+  try {
+    req.db.query(query, (err, results) => {
+      if (err) {
+        console.error('Error fetching tickets:', err);
+        return res.status(500).json({ error: 'Failed to fetch tickets' });
+      }
+      res.json(results);
+    });
+  } catch (error) {
+    console.error('Error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Update ticket status
 router.put('/:ticketId', async (req, res) => {
     const { ticketId } = req.params;
