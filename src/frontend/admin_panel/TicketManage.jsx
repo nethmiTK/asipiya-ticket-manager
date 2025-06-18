@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { FaArrowUpLong, FaBell, FaEye } from "react-icons/fa6";
+import { FaBell } from "react-icons/fa6";
 import { MessageCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import TicketCard from "./TicketCard";
@@ -178,69 +178,41 @@ export default function TicketManage() {
     }
   };
 
-  const handlePriorityChange = async (newPriority) => {
-    if (!selectedTicket) return;
+  // Helper: Convert priority to a number for sorting
+const getPriorityValue = (priority) => {
+  switch (priority) {
+    case "High": return 1;
+    case "Medium": return 2;
+    case "Low": return 3;
+    default: return 4;
+  }
+};
 
-    try {
-      await axios.put(`http://localhost:5000/api/tickets/${selectedTicket.id}/priority`, {
-        priority: newPriority,
-        userId: user.UserID
-      });
+// Helper: Check if due date is more than 2 days ago
+const isExpired = (dueDateStr) => {
+  if (!dueDateStr) return false;
+  const dueDate = new Date(dueDateStr);
+  const today = new Date();
+  const diffInTime = today - dueDate;
+  const diffInDays = diffInTime / (1000 * 3600 * 24);
+  return diffInDays > 2;
+};
 
-      // Update local state
-      setSelectedTicket(prev => ({
-        ...prev,
-        priority: newPriority
-      }));
+// Filter & Sort: Open
+const open = tickets
+  .filter((t) => t.status === "Open")
+  .sort((a, b) => getPriorityValue(a.priority) - getPriorityValue(b.priority));
 
-      // Update tickets list
-      setTickets(prev =>
-        prev.map(t =>
-          t.id === selectedTicket.id
-            ? { ...t, priority: newPriority }
-            : t
-        )
-      );
+// In Process
+const inProcess = tickets
+  .filter((t) => t.status === "In Process")
+  .sort((a, b) => getPriorityValue(a.priority) - getPriorityValue(b.priority));
 
-      toast.success('Priority updated successfully');
-    } catch (error) {
-      console.error('Error updating priority:', error);
-      toast.error('Failed to update priority');
-    }
-  };
+// Resolved (show all even if overdue)
+const resolved = tickets
+  .filter((t) => t.status === "Resolved" && (!isExpired(t.dueDate)))
+  .sort((a, b) => getPriorityValue(a.priority) - getPriorityValue(b.priority));
 
-  const handleFileUpload = async (event) => {
-    const file = event.target.files[0];
-    if (!file || !selectedTicket) return;
-
-    const formData = new FormData();
-    formData.append('file', file);
-
-    try {
-      // First upload the file
-      const uploadResponse = await axios.post('http://localhost:5000/api/upload', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        }
-      });
-
-      // Then create the attachment log
-      await axios.post(`http://localhost:5000/api/tickets/${selectedTicket.id}/attachments`, {
-        fileName: file.name,
-        fileUrl: uploadResponse.data.fileUrl,
-        userId: user.UserID
-      });
-
-      toast.success('File uploaded successfully');
-    } catch (error) {
-      console.error('Error uploading file:', error);
-      toast.error('Failed to upload file');
-    }
-  };
-
-  const open = tickets.filter((t) => t.status === "Open");
-  const inProcess = tickets.filter((t) => t.status === "In Process");
-  const resolved = tickets.filter((t) => t.status === "Resolved");
 
   const initialMessages = [
     {
@@ -477,7 +449,7 @@ export default function TicketManage() {
                   </nav>
                 </div>
 
-                <div className="h-[600px] overflow-y-auto">
+                <div className="h-[580px] overflow-y-auto">
                   {activeTab === 'details' ? (
                     <div className="grid grid-cols-2 gap-6">
                       {/* LEFT: Ticket Info */}
@@ -492,8 +464,44 @@ export default function TicketManage() {
                           <strong>Date:</strong> {selectedTicket.date}
                         </p>
                         <p>
-                          <strong>Problem:</strong> {selectedTicket.problem}
+                          <strong>Priority:</strong> {selectedTicket.priority}
                         </p>
+                        <p className="text-sm">
+                    <strong>Problem:</strong>{" "}
+                    {selectedTicket.problem.length > 100 ? (
+                      <>
+                        {selectedTicket.problem.slice(0, 100)}...
+                        <button
+                          onClick={() => setShowProblemModal(true)}
+                          className="text-blue-600 hover:underline ml-1"
+                        >
+                          See More
+                        </button>
+                      </>
+                    ) : (
+                      selectedTicket.problem
+                    )}
+                  </p>
+                  {showProblemModal && (
+                    <div className="fixed inset-0 z-50 bg-black/40 bg-opacity-40 flex justify-center items-center">
+                      <div className="bg-white rounded-lg shadow-lg p-6 max-w-lg w-full max-h-[80vh]">
+                        <h2 className="text-lg font-semibold mb-4">
+                          Full Problem Description
+                        </h2>
+                        <div className="text-gray-800 whitespace-pre-wrap overflow-y-auto max-h-60 pr-2">
+                          {selectedTicket.problem}
+                        </div>
+                        <div className="text-right mt-4">
+                          <button
+                            onClick={() => setShowProblemModal(false)}
+                            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                          >
+                            Close
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                         <p>
                           <strong>System Name:</strong> {selectedTicket.systemName}
                         </p>
@@ -545,33 +553,17 @@ export default function TicketManage() {
                             className="w-full p-2 border rounded-md"
                           />
                         </div>
-
-                        <div className="flex justify-between pt-2">
-                          <button
-                            onClick={handleUpdateTicket}
-                            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-                          >
-                            Save Changes
-                          </button>
-                          <button
-                            onClick={() => setChatMode(!chatMode)}
-                            className="bg-green-600 text-white px-4 py-2 rounded flex items-center gap-2"
-                          >
-                            <MessageCircle size={20} />
-                            {chatMode ? "Close Chat" : "Open Chat"}
-                          </button>
-                        </div>
                       </div>
 
                       {/* RIGHT: Evidence Files */}
-                      <div className="space-y-4">
+                      <div className="space-y-4 h-[430px]">
                         <h4 className="font-semibold mb-2">Evidence Files</h4>
                         {evidenceList.length === 0 ? (
                           <p className="text-sm text-gray-500">
                             No evidence files available.
                           </p>
                         ) : (
-                          <div className="h-[450px] overflow-y-auto grid grid-cols-2 gap-4 p-2 border rounded bg-gray-50">
+                          <div className=" overflow-y-auto grid grid-cols-2 gap-4 p-2 border rounded bg-gray-50">
                             {evidenceList.map((evi, index) => {
                               const fileUrl = `http://localhost:5000/${evi.FilePath}`;
                               const fileName = evi.FilePath.split("/").pop();
@@ -623,6 +615,21 @@ export default function TicketManage() {
                             })}
                           </div>
                         )}
+                        <div className="flex justify-between pt-2">
+                          <button
+                            onClick={handleUpdateTicket}
+                            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+                          >
+                            Save Changes
+                          </button>
+                          <button
+                            onClick={() => setChatMode(!chatMode)}
+                            className="bg-green-600 text-white px-4 py-2 rounded flex items-center gap-2"
+                          >
+                            <MessageCircle size={20} />
+                            {chatMode ? "Close Chat" : "Open Chat"}
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ) : activeTab === 'activity' ? (
@@ -662,7 +669,7 @@ export default function TicketManage() {
           {/* Chat Modal */}
           {chatMode && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-              <div className="relative max-w-lg h-[600px] p-4 bg-white rounded-lg shadow-lg flex flex-col">
+              <div className="relative max-w-lg h-[600px] p-4 bg-gray-200 rounded-lg shadow-lg flex flex-col">
                 <button
                   onClick={() => setChatMode(false)}
                   className="absolute top-2 right-2 text-gray-500 hover:text-red-600 text-xl"
