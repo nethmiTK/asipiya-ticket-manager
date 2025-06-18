@@ -1,11 +1,11 @@
 // src/App.jsx
 import {
-  BrowserRouter,
-  Routes,
-  Route,
-  Navigate,
-  useNavigate,
-  useLocation,
+    BrowserRouter,
+    Routes,
+    Route,
+    Navigate,
+    useNavigate,
+    useLocation,
 } from "react-router-dom";
 import Register from "./frontend/Authenication/Register";
 import Login from "./frontend/Authenication/Login";
@@ -30,8 +30,8 @@ import TicketCategory from "./frontend/admin_panel/TicketCategory";
 import UserProfile from "./frontend/users_panel/UserProfile";
 import TicketViewPage from "./frontend/admin_panel/TicketViewPage";
 import TicketRequest from "./frontend/admin_panel/TicketRequest";
-import ForgotPassword from "./frontend/Authenication/ForgotPassword"; 
-import ResetPassword from "./frontend/Authenication/ResetPassword"; 
+import ForgotPassword from "./frontend/Authenication/ForgotPassword";
+import ResetPassword from "./frontend/Authenication/ResetPassword";
 import PendingTicket from "./frontend/admin_panel/PendingTicket"
 import SupervisorAssign from "./frontend/admin_panel/SupervisorAssign"
 import TicketView from "./frontend/users_panel/TicketView";
@@ -44,17 +44,28 @@ export const useAuth = () => useContext(AuthContext);
 
 // Protected Route Component
 const ProtectedRoute = ({ children, allowedRoles }) => {
-    const { isLoggedIn, userRole } = useAuth();
+    // const { isLoggedIn, userRole } = useAuth();
+    const { isLoggedIn, userRole, authCheckComplete } = useAuth();
     const navigate = useNavigate();
+
 
     // This handles cases where userRole might be null initially or undefined
     const normalizedUserRole = userRole ? userRole.toLowerCase() : '';
 
     useEffect(() => {
+        // if (!isLoggedIn) {
+        //     navigate('/login', { replace: true });
+        //     return;
+        // }
+        if (!authCheckComplete) {
+            return; // Or render a loading indicator here
+        }
+
         if (!isLoggedIn) {
             navigate('/login', { replace: true });
             return;
         }
+
 
         // Check if the normalized user role is in the allowedRoles array
         if (allowedRoles && !allowedRoles.includes(normalizedUserRole)) {
@@ -67,33 +78,44 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
                 // Fallback for any unknown or non-logged-in roles
                 navigate('/login', { replace: true });
             }
-            return; 
+            return;
         }
-    }, [isLoggedIn, normalizedUserRole, allowedRoles, navigate]);
+        // }, [isLoggedIn, normalizedUserRole, allowedRoles, navigate]);
 
-    if (!isLoggedIn || (allowedRoles && !allowedRoles.includes(normalizedUserRole))) return null;
+        // if (!isLoggedIn || (allowedRoles && !allowedRoles.includes(normalizedUserRole))) return null;
+    }, [isLoggedIn, normalizedUserRole, allowedRoles, navigate, authCheckComplete]);
+
+    // Render nothing or a loading spinner while authentication check is in progress
+    if (!authCheckComplete) {
+        return null;
+    }
+    // If authCheckComplete is true, proceed with the original logic
+    if (!isLoggedIn || (allowedRoles && !allowedRoles.includes(normalizedUserRole))) {
+        return null;
+    }
     return children;
 };
 
 // App Routes Component
 const AppRoutes = ({
-  isLoggedIn,
-  setIsLoggedIn,
-  userRole,
-  setUserRole,
-  loggedInUser,
-  setLoggedInUser,
+    isLoggedIn,
+    setIsLoggedIn,
+    userRole,
+    setUserRole,
+    loggedInUser,
+    setLoggedInUser,
+    authCheckComplete,
 }) => {
-  const navigate = useNavigate();
+    const navigate = useNavigate();
 
     // handleLoginSuccess now accepts the full user object
     const handleLoginSuccess = (user) => {
         setIsLoggedIn(true);
-        const normalizedRole = user.Role.toLowerCase(); 
+        const normalizedRole = user.Role.toLowerCase();
         setUserRole(normalizedRole);
-        setLoggedInUser(user); 
-        localStorage.setItem('user', JSON.stringify(user)); 
-        localStorage.setItem('role', normalizedRole); 
+        setLoggedInUser(user);
+        localStorage.setItem('user', JSON.stringify(user));
+        localStorage.setItem('role', normalizedRole);
 
         // Navigate based on the clarified role logic 
         if (['admin', 'supervisor', 'manager', 'developer'].includes(normalizedRole)) {
@@ -106,24 +128,25 @@ const AppRoutes = ({
     };
 
     const handleLogout = () => {
-        localStorage.removeItem('user'); 
+        localStorage.removeItem('user');
         localStorage.removeItem('role');
         setIsLoggedIn(false);
         setUserRole(null);
-        setLoggedInUser(null); 
+        setLoggedInUser(null);
         navigate('/login');
     };
 
     return (
-        <AuthContext.Provider value={{ isLoggedIn, userRole, loggedInUser, setLoggedInUser, handleLoginSuccess, handleLogout }}>
+        // <AuthContext.Provider value={{ isLoggedIn, userRole, loggedInUser, setLoggedInUser, handleLoginSuccess, handleLogout }}>
+        <AuthContext.Provider value={{ isLoggedIn, userRole, loggedInUser, setLoggedInUser, handleLoginSuccess, handleLogout, authCheckComplete }}>
             <Routes>
                 <Route path='/' element={<Navigate to="/login" replace />} />
                 <Route path='/register' element={<Register />} />
                 <Route path='/login' element={<Login onLoginSuccess={handleLoginSuccess} />} />
                 <Route path='/forgot-password' element={<ForgotPassword />} />
-                <Route path='/reset-password' element={<ResetPassword />} /> 
-                <Route path='/all-tickets' element={<UserDashboard />} /> 
-                <Route path='/open-tickets' element={<OpenTickets />} /> 
+                <Route path='/reset-password' element={<ResetPassword />} />
+                <Route path='/all-tickets' element={<UserDashboard />} />
+                <Route path='/open-tickets' element={<OpenTickets />} />
                 <Route path='/ticket-view' element={<TicketView />} />
                 <Route
                     path='/user-dashboard'
@@ -151,7 +174,7 @@ const AppRoutes = ({
                         </ProtectedRoute>
                     }
                 />
-               
+
                 <Route
                     path="/tickets"
                     element={
@@ -231,8 +254,8 @@ const AppRoutes = ({
                     }
                 />
 
-                <Route 
-                    path="/user-details/:userId" 
+                <Route
+                    path="/user-details/:userId"
                     element={
                         <ProtectedRoute allowedRoles={['admin', 'supervisor', 'manager', 'developer']}>
                             <UserDetails />
@@ -271,14 +294,15 @@ const AppRoutes = ({
 
 // Component to render sidebar conditionally based on route and role
 const RenderWithLayout = ({
-  isLoggedIn,
-  userRole,
-  setIsLoggedIn,
-  setUserRole,
-  loggedInUser,
-  setLoggedInUser,
+    isLoggedIn,
+    userRole,
+    setIsLoggedIn,
+    setUserRole,
+    loggedInUser,
+    setLoggedInUser,
+    authCheckComplete,
 }) => {
-  const location = useLocation();
+    const location = useLocation();
 
     // Show AdminSideBar only for logged in admin-side roles and not on auth routes
     const showAdminSidebar =
@@ -297,6 +321,7 @@ const RenderWithLayout = ({
                     setUserRole={setUserRole}
                     loggedInUser={loggedInUser}
                     setLoggedInUser={setLoggedInUser}
+                    authCheckComplete={authCheckComplete}
                 />
             </div>
         </div>
@@ -308,6 +333,7 @@ function App() {
     const [isLoggedIn, setIsLoggedIn] = useState(false);
     const [userRole, setUserRole] = useState(null);
     const [loggedInUser, setLoggedInUser] = useState(null);
+    const [authCheckComplete, setAuthCheckComplete] = useState(false);
 
     useEffect(() => {
         const storedUser = localStorage.getItem('user');
@@ -319,12 +345,14 @@ function App() {
                 setLoggedInUser(user);
             } catch (e) {
                 console.error("Failed to parse user from localStorage", e);
-                
+
                 localStorage.removeItem('user');
                 localStorage.removeItem('role');
 
             }
-        }
+             }
+        setAuthCheckComplete(true);
+        
     }, []);
 
     return (
@@ -336,6 +364,7 @@ function App() {
                 setUserRole={setUserRole}
                 loggedInUser={loggedInUser}
                 setLoggedInUser={setLoggedInUser}
+                authCheckComplete={authCheckComplete}
             />
         </BrowserRouter>
     );

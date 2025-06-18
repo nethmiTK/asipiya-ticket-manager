@@ -14,8 +14,8 @@ import { v4 as uuidv4 } from 'uuid';
 import moment from 'moment';
 import crypto from 'crypto';
 import util from 'util'; 
-
-
+import ticketLogRoutes from './routes/ticketLog.js';
+import userProfileRoutes from './routes/userProfile.js';
 
 // --- Database Connection ---
 const db = mysql.createConnection({
@@ -37,6 +37,16 @@ db.connect((err) => {
 const app = express();
 app.use(bodyParser.json());
 app.use(cors());
+
+// Add middleware to pass db connection to routes
+app.use((req, res, next) => {
+    req.db = db;
+    next();
+});
+
+// Configure routes
+app.use('/api/ticket-logs', ticketLogRoutes);
+app.use('/', userProfileRoutes);
 
 //evidence uploads
 app.use("/uploads", express.static("uploads"));
@@ -932,90 +942,356 @@ app.get('/api/supervisors', (req, res) => {
     });
 });
 
-
-app.put('/api/tickets/:ticketId/status', async (req, res) => {
-    const ticketId = req.params.ticketId;
-    const { status, userId, supervisorName } = req.body;
-
-    try {
-        // First get the ticket details to know the user who created it and current status
-        const getTicket = "SELECT t.UserId, t.Status, t.SupervisorID, u.FullName as SupervisorName FROM ticket t LEFT JOIN appuser u ON t.SupervisorID = u.UserID WHERE t.TicketID = ?";
-        db.query(getTicket, [ticketId], async (err, results) => {
-            if (err) {
-                console.error("Error fetching ticket:", err);
-                return res.status(500).json({ message: "Server error" });
-            }
-
-            if (results.length === 0) {
-                return res.status(404).json({ message: "Ticket not found" });
-            }
-
-            const ticketUserId = results[0].UserId;
-            const oldStatus = results[0].Status;
-            const supervisorId = results[0].SupervisorID;
-            const supervisorFullName = results[0].SupervisorName;
-
-            // Update the ticket status
-            const updateQuery = "UPDATE ticket SET Status = ?, LastRespondedTime = NOW() WHERE TicketID = ?";
-            db.query(updateQuery, [status, ticketId], async (err, result) => {
-                if (err) {
-                    console.error("Error updating ticket status:", err);
-                    return res.status(500).json({ message: "Server error" });
-                }
-
-                // Create a ticket log entry with old and new values
-                const logQuery = `
-          INSERT INTO ticketlog (TicketID, DateTime, Type, Description, UserID, OldValue, NewValue)
-          VALUES (?, NOW(), 'STATUS_CHANGE', ?, ?, ?, ?)
+// Helper function to create a ticket log
+const createTicketLog = async (ticketId, type, description, userId, oldValue, newValue) => {
+    return new Promise((resolve, reject) => {
+        const logQuery = `
+            INSERT INTO ticketlog (TicketID, DateTime, Type, Description, UserID, OldValue, NewValue)
+            VALUES (?, NOW(), ?, ?, ?, ?, ?)
         `;
-                db.query(logQuery, [
-                    ticketId,
-                    `Status changed from ${oldStatus} to ${status}`,
-                    userId,
-                    oldStatus,
-                    status
-                ], async (err, logResult) => {
-                    if (err) {
-                        console.error("Error creating ticket log:", err);
-                    } else {
-                        try {
-                            // Create first notification for the ticket creator about supervisor assignment
-                            await createNotification(
-                                ticketUserId,
-                                `Your ticket #${ticketId} has been assigned to supervisor ${supervisorFullName}. They will be handling your ticket.`,
-                                'SUPERVISOR_ASSIGNED',
-                                logResult.insertId
-                            );
+        
+        // Get user info for the log description
+        const userQuery = 'SELECT FullName, Role FROM appuser WHERE UserID = ?';
+        db.query(userQuery, [userId], (userErr, userResults) => {
+            if (userErr) {
+                console.error("Error getting user info:", userErr);
+                reject(userErr);
+                return;
+            }
 
-                            // Create second notification for the ticket creator about status change
-                            await createNotification(
-                                ticketUserId,
-                                `Your ticket #${ticketId} status has been updated from ${oldStatus} to ${status}`,
-                                'STATUS_UPDATE',
-                                logResult.insertId
-                            );
-
-                            // Notify supervisor about the assignment
-                            if (supervisorId) {
-                                await createNotification(
-                                    supervisorId,
-                                    `You have been assigned to handle ticket #${ticketId}. The ticket status has been changed from ${oldStatus} to ${status}`,
-                                    'TICKET_ASSIGNED',
-                                    logResult.insertId
-                                );
-                            }
-
-                        } catch (error) {
-                            console.error("Error creating notifications:", error);
-                        }
-                    }
-                });
-
-                res.json({ message: "Ticket status updated successfully" });
+            const userName = userResults[0]?.FullName || 'Unknown User';
+            const userRole = userResults[0]?.Role || 'Unknown Role';
+            
+            const finalDescription = `${userName} (${userRole}) ${description}`;
+            
+            db.query(logQuery, [
+                ticketId,
+                type,
+                finalDescription,
+                userId,
+                oldValue,
+                newValue
+            ], (err, result) => {
+                if (err) {
+                    console.error("Error creating ticket log:", err);
+                    reject(err);
+                    return;
+                }
+                resolve(result);
             });
         });
+    });
+};
+
+// In the status change handler:
+app.put('/api/tickets/:ticketId/status', async (req, res) => {
+    const { ticketId } = req.params;
+    const { status, userId } = req.body;
+
+    // First get the current ticket and user details
+    const getTicket = `
+        SELECT 
+            t.Status, 
+            t.UserId as ticketUserId,
+            t.SupervisorID,
+            au.FullName as updatedByName,
+            au_creator.FullName as creatorName
+        FROM ticket t
+        LEFT JOIN appuser au ON au.UserID = ?
+        LEFT JOIN appuser au_creator ON au_creator.UserID = t.UserId
+        WHERE t.TicketID = ?
+    `;
+    
+    try {
+        const [ticketResults] = await new Promise((resolve, reject) => {
+            db.query(getTicket, [userId, ticketId], (err, results) => {
+                if (err) reject(err);
+                else resolve(results);
+            });
+        });
+
+        if (!ticketResults) {
+            return res.status(404).json({ message: "Ticket not found" });
+        }
+
+        const oldStatus = ticketResults.Status;
+        const ticketUserId = ticketResults.ticketUserId;
+        const updatedByName = ticketResults.updatedByName;
+
+        // Update the ticket status
+        const updateQuery = "UPDATE ticket SET Status = ?, LastRespondedTime = NOW() WHERE TicketID = ?";
+        
+        await new Promise((resolve, reject) => {
+            db.query(updateQuery, [status, ticketId], (err, result) => {
+                if (err) reject(err);
+                else resolve(result);
+            });
+        });
+
+        // Create ticket log entry
+        const logQuery = `
+            INSERT INTO ticketlog 
+            (TicketID, DateTime, Type, Description, UserID, OldValue, NewValue, Note)
+            VALUES (?, NOW(), ?, ?, ?, ?, ?, ?)
+        `;
+
+        const description = `Status changed from ${oldStatus} to ${status}`;
+        const note = `Updated by ${updatedByName}`;
+
+        const [logResult] = await new Promise((resolve, reject) => {
+            db.query(
+                logQuery,
+                [ticketId, 'STATUS_CHANGE', description, userId, oldStatus, status, note],
+                (err, result) => {
+                    if (err) reject(err);
+                    else resolve(result);
+                }
+            );
+        });
+
+        // Create notifications
+        try {
+            // Notify ticket creator
+            await createNotification(
+                ticketUserId,
+                `Your ticket #${ticketId} status has been updated from ${oldStatus} to ${status} by ${updatedByName}`,
+                'STATUS_UPDATE',
+                logResult.insertId
+            );
+
+            // If status changed to "In Process", notify about supervisor assignment
+            if (status === 'In Process' && ticketResults.SupervisorID) {
+                await createNotification(
+                    ticketUserId,
+                    `Your ticket #${ticketId} is now being processed.`,
+                    'TICKET_IN_PROCESS',
+                    logResult.insertId
+                );
+
+                // Notify supervisor
+                await createNotification(
+                    ticketResults.SupervisorID,
+                    `Ticket #${ticketId} has been moved to In Process status. Please review it.`,
+                    'TICKET_NEEDS_ATTENTION',
+                    logResult.insertId
+                );
+            }
+
+            // If status changed to "Resolved"
+            if (status === 'Resolved') {
+                await createNotification(
+                    ticketUserId,
+                    `Your ticket #${ticketId} has been marked as resolved by ${updatedByName}. Please review the resolution.`,
+                    'TICKET_RESOLVED',
+                    logResult.insertId
+                );
+            }
+        } catch (error) {
+            console.error("Error creating notifications:", error);
+        }
+
+        res.json({ 
+            message: "Ticket status updated successfully",
+            logId: logResult.insertId
+        });
     } catch (error) {
-        console.error("Error:", error);
+        console.error("Error updating ticket status:", error);
+        res.status(500).json({ message: "Server error" });
+    }
+});
+
+// Update ticket priority
+app.put('/api/tickets/:ticketId/priority', async (req, res) => {
+    const { ticketId } = req.params;
+    const { priority, userId } = req.body;
+
+    // First get the current ticket and user details
+    const getTicket = `
+        SELECT 
+            t.Priority,
+            t.UserId as ticketUserId,
+            t.SupervisorID,
+            au.FullName as updatedByName,
+            au_creator.FullName as creatorName
+        FROM ticket t
+        LEFT JOIN appuser au ON au.UserID = ?
+        LEFT JOIN appuser au_creator ON au_creator.UserID = t.UserId
+        WHERE t.TicketID = ?
+    `;
+    
+    try {
+        const [ticketResults] = await new Promise((resolve, reject) => {
+            db.query(getTicket, [userId, ticketId], (err, results) => {
+                if (err) reject(err);
+                else resolve(results);
+            });
+        });
+
+        if (!ticketResults) {
+            return res.status(404).json({ message: "Ticket not found" });
+        }
+
+        const oldPriority = ticketResults.Priority;
+        const ticketUserId = ticketResults.ticketUserId;
+        const updatedByName = ticketResults.updatedByName;
+
+        // Update the ticket priority
+        const updateQuery = "UPDATE ticket SET Priority = ?, LastRespondedTime = NOW() WHERE TicketID = ?";
+        
+        await new Promise((resolve, reject) => {
+            db.query(updateQuery, [priority, ticketId], (err, result) => {
+                if (err) reject(err);
+                else resolve(result);
+            });
+        });
+
+        // Create ticket log entry
+        const logQuery = `
+            INSERT INTO ticketlog 
+            (TicketID, DateTime, Type, Description, UserID, OldValue, NewValue, Note)
+            VALUES (?, NOW(), ?, ?, ?, ?, ?, ?)
+        `;
+
+        const description = `Priority changed from ${oldPriority} to ${priority}`;
+        const note = `Updated by ${updatedByName}`;
+
+        const [logResult] = await new Promise((resolve, reject) => {
+            db.query(
+                logQuery,
+                [ticketId, 'PRIORITY_CHANGE', description, userId, oldPriority, priority, note],
+                (err, result) => {
+                    if (err) reject(err);
+                    else resolve(result);
+                }
+            );
+        });
+
+        // Create notifications
+        try {
+            // Notify ticket creator
+            await createNotification(
+                ticketUserId,
+                `Your ticket #${ticketId} priority has been changed from ${oldPriority} to ${priority} by ${updatedByName}`,
+                'PRIORITY_UPDATE',
+                logResult.insertId
+            );
+
+            // If priority changed to High, notify supervisor
+            if (priority === 'High' && ticketResults.SupervisorID) {
+                await createNotification(
+                    ticketResults.SupervisorID,
+                    `Ticket #${ticketId} has been marked as High priority. Immediate attention required.`,
+                    'HIGH_PRIORITY_ALERT',
+                    logResult.insertId
+                );
+            }
+        } catch (error) {
+            console.error("Error creating notifications:", error);
+        }
+
+        res.json({ 
+            message: "Ticket priority updated successfully",
+            logId: logResult.insertId
+        });
+    } catch (error) {
+        console.error("Error updating ticket priority:", error);
+        res.status(500).json({ message: "Server error" });
+    }
+});
+
+// Add comment to ticket
+app.post('/api/tickets/:ticketId/comments', async (req, res) => {
+    const { ticketId } = req.params;
+    const { comment, userId } = req.body;
+
+    // Get user details
+    const getUserQuery = `
+        SELECT 
+            au.FullName as commenterName,
+            t.UserId as ticketUserId,
+            t.SupervisorID
+        FROM appuser au
+        LEFT JOIN ticket t ON t.TicketID = ?
+        WHERE au.UserID = ?
+    `;
+
+    try {
+        const [userResults] = await new Promise((resolve, reject) => {
+            db.query(getUserQuery, [ticketId, userId], (err, results) => {
+                if (err) reject(err);
+                else resolve(results);
+            });
+        });
+
+        if (!userResults) {
+            return res.status(404).json({ message: "User or ticket not found" });
+        }
+
+        const commenterName = userResults.commenterName;
+
+        // Create ticket log entry
+        const logQuery = `
+            INSERT INTO ticketlog 
+            (TicketID, DateTime, Type, Description, UserID, Note)
+            VALUES (?, NOW(), ?, ?, ?, ?)
+        `;
+
+        const description = `Comment added by ${commenterName}`;
+
+        const [logResult] = await new Promise((resolve, reject) => {
+            db.query(
+                logQuery,
+                [ticketId, 'COMMENT', description, userId, comment],
+                (err, result) => {
+                    if (err) reject(err);
+                    else resolve(result);
+                }
+            );
+        });
+
+        // Update LastRespondedTime
+        await new Promise((resolve, reject) => {
+            db.query(
+                "UPDATE ticket SET LastRespondedTime = NOW() WHERE TicketID = ?",
+                [ticketId],
+                (err, result) => {
+                    if (err) reject(err);
+                    else resolve(result);
+                }
+            );
+        });
+
+        // Create notifications
+        try {
+            // Notify ticket creator if comment is from someone else
+            if (userId !== userResults.ticketUserId) {
+                await createNotification(
+                    userResults.ticketUserId,
+                    `New comment on ticket #${ticketId} by ${commenterName}`,
+                    'NEW_COMMENT',
+                    logResult.insertId
+                );
+            }
+
+            // Notify supervisor if exists and comment is from ticket creator
+            if (userResults.SupervisorID && userId === userResults.ticketUserId) {
+                await createNotification(
+                    userResults.SupervisorID,
+                    `Ticket creator added a comment to ticket #${ticketId}`,
+                    'CREATOR_COMMENT',
+                    logResult.insertId
+                );
+            }
+        } catch (error) {
+            console.error("Error creating notifications:", error);
+        }
+
+        res.json({ 
+            message: "Comment added successfully",
+            logId: logResult.insertId
+        });
+    } catch (error) {
+        console.error("Error adding comment:", error);
         res.status(500).json({ message: "Server error" });
     }
 });
@@ -1305,6 +1581,8 @@ app.get('/api/users/recent', (req, res) => {
     });
 });
 
+/*-------------------------------NOTIFICATIONS---------------------------------------------------*/
+
 // API endpoint to get unread notifications count
 app.get('/api/notifications/count/:id', (req, res) => {
     const userId = req.params.id;
@@ -1372,7 +1650,7 @@ app.put('/api/notifications/read', (req, res) => {
     });
 });
 
-/*----------------------------------------------------------------------------------*/
+/*------------------------------COUNT TICKETS----------------------------------------------------*/
 
 // API endpoint to fetch ticket counts for a SPECIFIC USER
 app.get('/api/user/tickets/counts/:userId', (req, res) => {
@@ -1783,7 +2061,7 @@ app.put('/api/ticket_status/:id', (req, res) => {
     });
 });
 
-/* ----------------------------------------------------------------------------------------------*/
+/* ------------------------------NOTIFY ROLE BASED----------------------------------------------------------------*/
 
 // Helper function to create a notification
 const createNotification = async (userId, message, type, ticketLogId = null) => {
@@ -2124,6 +2402,8 @@ app.post('/api/clients', async (req, res) => {
 });
 
 
+// Add ticket log routes
+app.use('/api/ticket-logs', ticketLogRoutes);
 
 // Start the server
 app.listen(5000, () => {
@@ -2131,3 +2411,513 @@ app.listen(5000, () => {
 });
 
 export default db;
+
+// Add attachment endpoint
+app.post('/api/tickets/:ticketId/attachments', async (req, res) => {
+    const { ticketId } = req.params;
+    const { fileName, fileUrl, userId } = req.body;
+
+    try {
+        // Create log entry for the attachment
+        const logResult = await createTicketLog(
+            ticketId,
+            'ATTACHMENT',
+            `added an attachment: ${fileName}`,
+            userId,
+            null,
+            fileUrl
+        );
+
+        // Get ticket creator ID for notification
+        const getTicket = "SELECT UserId as ticketUserId FROM ticket WHERE TicketID = ?";
+        const [ticketResult] = await new Promise((resolve, reject) => {
+            db.query(getTicket, [ticketId], (err, results) => {
+                if (err) reject(err);
+                else resolve(results);
+            });
+        });
+
+        if (ticketResult) {
+            try {
+                await createNotification(
+                    ticketResult.ticketUserId,
+                    `New attachment added to your ticket #${ticketId}`,
+                    'NEW_ATTACHMENT',
+                    logResult.insertId
+                );
+            } catch (error) {
+                console.error("Error creating notification:", error);
+            }
+        }
+
+        res.json({ message: "Attachment added successfully" });
+    } catch (error) {
+        console.error("Error adding attachment:", error);
+        res.status(500).json({ message: "Server error" });
+    }
+});
+
+// Configure multer for attachments
+const attachmentStorage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        const uploadDir = path.join(__dirname, 'uploads', 'attachments');
+        fs.mkdirSync(uploadDir, { recursive: true });
+        cb(null, uploadDir);
+    },
+    filename: (req, file, cb) => {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        cb(null, uniqueSuffix + '-' + file.originalname);
+    }
+});
+
+const attachmentUpload = multer({ 
+    storage: attachmentStorage,
+    limits: {
+        fileSize: 10 * 1024 * 1024 // 10MB limit
+    }
+});
+
+// Add attachment endpoint
+app.post('/api/tickets/:ticketId/attachments', attachmentUpload.single('file'), async (req, res) => {
+    const { ticketId } = req.params;
+    const { userId } = req.body;
+    const file = req.file;
+
+    if (!file) {
+        return res.status(400).json({ message: "No file uploaded" });
+    }
+
+    // Get user details
+    const getUserQuery = `
+        SELECT 
+            au.FullName as uploaderName,
+            t.UserId as ticketUserId,
+            t.SupervisorID
+        FROM appuser au
+        LEFT JOIN ticket t ON t.TicketID = ?
+        WHERE au.UserID = ?
+    `;
+
+    try {
+        const [userResults] = await new Promise((resolve, reject) => {
+            db.query(getUserQuery, [ticketId, userId], (err, results) => {
+                if (err) reject(err);
+                else resolve(results);
+            });
+        });
+
+        if (!userResults) {
+            return res.status(404).json({ message: "User or ticket not found" });
+        }
+
+        const uploaderName = userResults.uploaderName;
+        const filePath = file.path;
+        const fileName = file.originalname;
+        const fileSize = file.size;
+        const fileType = file.mimetype;
+
+        // Create ticket log entry
+        const logQuery = `
+            INSERT INTO ticketlog 
+            (TicketID, DateTime, Type, Description, UserID, Note, NewValue)
+            VALUES (?, NOW(), ?, ?, ?, ?, ?)
+        `;
+
+        const description = `File "${fileName}" uploaded by ${uploaderName}`;
+        const fileDetails = JSON.stringify({
+            name: fileName,
+            size: fileSize,
+            type: fileType,
+            path: filePath
+        });
+
+        const [logResult] = await new Promise((resolve, reject) => {
+            db.query(
+                logQuery,
+                [ticketId, 'ATTACHMENT', description, userId, `File size: ${Math.round(fileSize/1024)}KB`, fileDetails],
+                (err, result) => {
+                    if (err) reject(err);
+                    else resolve(result);
+                }
+            );
+        });
+
+        // Update LastRespondedTime
+        await new Promise((resolve, reject) => {
+            db.query(
+                "UPDATE ticket SET LastRespondedTime = NOW() WHERE TicketID = ?",
+                [ticketId],
+                (err, result) => {
+                    if (err) reject(err);
+                    else resolve(result);
+                }
+            );
+        });
+
+        // Create notifications
+        try {
+            // Notify ticket creator if attachment is from someone else
+            if (userId !== userResults.ticketUserId) {
+                await createNotification(
+                    userResults.ticketUserId,
+                    `New file "${fileName}" attached to ticket #${ticketId} by ${uploaderName}`,
+                    'NEW_ATTACHMENT',
+                    logResult.insertId
+                );
+            }
+
+            // Notify supervisor if exists and attachment is from ticket creator
+            if (userResults.SupervisorID && userId === userResults.ticketUserId) {
+                await createNotification(
+                    userResults.SupervisorID,
+                    `Ticket creator attached a file "${fileName}" to ticket #${ticketId}`,
+                    'CREATOR_ATTACHMENT',
+                    logResult.insertId
+                );
+            }
+        } catch (error) {
+            console.error("Error creating notifications:", error);
+        }
+
+        res.json({ 
+            message: "File uploaded successfully",
+            file: {
+                name: fileName,
+                path: filePath,
+                size: fileSize,
+                type: fileType
+            },
+            logId: logResult.insertId
+        });
+    } catch (error) {
+        console.error("Error uploading file:", error);
+        res.status(500).json({ message: "Server error" });
+    }
+});
+
+// Assign supervisor to ticket
+app.put('/api/tickets/:ticketId/supervisor', async (req, res) => {
+    const { ticketId } = req.params;
+    const { supervisorId, userId } = req.body;
+
+    // Get current ticket and user details
+    const getDetailsQuery = `
+        SELECT 
+            t.SupervisorID as currentSupervisorId,
+            t.UserId as ticketUserId,
+            au_new.FullName as newSupervisorName,
+            au_old.FullName as currentSupervisorName,
+            au_assigner.FullName as assignerName
+        FROM ticket t
+        LEFT JOIN appuser au_new ON au_new.UserID = ?
+        LEFT JOIN appuser au_old ON au_old.UserID = t.SupervisorID
+        LEFT JOIN appuser au_assigner ON au_assigner.UserID = ?
+        WHERE t.TicketID = ?
+    `;
+
+    try {
+        const [details] = await new Promise((resolve, reject) => {
+            db.query(getDetailsQuery, [supervisorId, userId, ticketId], (err, results) => {
+                if (err) reject(err);
+                else resolve(results);
+            });
+        });
+
+        if (!details) {
+            return res.status(404).json({ message: "Ticket not found" });
+        }
+
+        // Update supervisor
+        const updateQuery = "UPDATE ticket SET SupervisorID = ?, LastRespondedTime = NOW() WHERE TicketID = ?";
+        
+        await new Promise((resolve, reject) => {
+            db.query(updateQuery, [supervisorId, ticketId], (err, result) => {
+                if (err) reject(err);
+                else resolve(result);
+            });
+        });
+
+        // Create ticket log entry
+        const logQuery = `
+            INSERT INTO ticketlog 
+            (TicketID, DateTime, Type, Description, UserID, OldValue, NewValue, Note)
+            VALUES (?, NOW(), ?, ?, ?, ?, ?, ?)
+        `;
+
+        let description;
+        if (!details.currentSupervisorId) {
+            description = `Supervisor assigned: ${details.newSupervisorName}`;
+        } else {
+            description = `Supervisor changed from ${details.currentSupervisorName} to ${details.newSupervisorName}`;
+        }
+
+        const note = `Updated by ${details.assignerName}`;
+
+        const [logResult] = await new Promise((resolve, reject) => {
+            db.query(
+                logQuery,
+                [
+                    ticketId, 
+                    'SUPERVISOR_CHANGE', 
+                    description, 
+                    userId,
+                    details.currentSupervisorId,
+                    supervisorId,
+                    note
+                ],
+                (err, result) => {
+                    if (err) reject(err);
+                    else resolve(result);
+                }
+            );
+        });
+
+        // Create notifications
+        try {
+            // Notify new supervisor
+            await createNotification(
+                supervisorId,
+                `You have been assigned as supervisor for ticket #${ticketId} by ${details.assignerName}`,
+                'SUPERVISOR_ASSIGNED',
+                logResult.insertId
+            );
+
+            // Notify ticket creator
+            await createNotification(
+                details.ticketUserId,
+                `${details.newSupervisorName} has been assigned as supervisor for your ticket #${ticketId}`,
+                'SUPERVISOR_UPDATED',
+                logResult.insertId
+            );
+
+            // Notify old supervisor if exists
+            if (details.currentSupervisorId && details.currentSupervisorId !== supervisorId) {
+                await createNotification(
+                    details.currentSupervisorId,
+                    `You have been unassigned from ticket #${ticketId} by ${details.assignerName}`,
+                    'SUPERVISOR_UNASSIGNED',
+                    logResult.insertId
+                );
+            }
+        } catch (error) {
+            console.error("Error creating notifications:", error);
+        }
+
+        res.json({ 
+            message: "Supervisor assigned successfully",
+            logId: logResult.insertId
+        });
+    } catch (error) {
+        console.error("Error assigning supervisor:", error);
+        res.status(500).json({ message: "Server error" });
+    }
+});
+
+// Update ticket due date
+app.put('/api/tickets/:ticketId/due-date', async (req, res) => {
+    const { ticketId } = req.params;
+    const { dueDate, userId } = req.body;
+
+    // Get current ticket and user details
+    const getDetailsQuery = `
+        SELECT 
+            t.DueDate as currentDueDate,
+            t.UserId as ticketUserId,
+            t.SupervisorID,
+            au.FullName as updaterName
+        FROM ticket t
+        LEFT JOIN appuser au ON au.UserID = ?
+        WHERE t.TicketID = ?
+    `;
+
+    try {
+        const [details] = await new Promise((resolve, reject) => {
+            db.query(getDetailsQuery, [userId, ticketId], (err, results) => {
+                if (err) reject(err);
+                else resolve(results);
+            });
+        });
+
+        if (!details) {
+            return res.status(404).json({ message: "Ticket not found" });
+        }
+
+        // Format dates for display
+        const formattedOldDate = details.currentDueDate ? new Date(details.currentDueDate).toLocaleDateString() : 'Not set';
+        const formattedNewDate = new Date(dueDate).toLocaleDateString();
+
+        // Update due date
+        const updateQuery = "UPDATE ticket SET DueDate = ?, LastRespondedTime = NOW() WHERE TicketID = ?";
+        
+        await new Promise((resolve, reject) => {
+            db.query(updateQuery, [dueDate, ticketId], (err, result) => {
+                if (err) reject(err);
+                else resolve(result);
+            });
+        });
+
+        // Create ticket log entry
+        const logQuery = `
+            INSERT INTO ticketlog 
+            (TicketID, DateTime, Type, Description, UserID, OldValue, NewValue, Note)
+            VALUES (?, NOW(), ?, ?, ?, ?, ?, ?)
+        `;
+
+        let description;
+        if (!details.currentDueDate) {
+            description = `Due date set to ${formattedNewDate}`;
+        } else {
+            description = `Due date changed from ${formattedOldDate} to ${formattedNewDate}`;
+        }
+
+        const note = `Updated by ${details.updaterName}`;
+
+        const [logResult] = await new Promise((resolve, reject) => {
+            db.query(
+                logQuery,
+                [
+                    ticketId, 
+                    'DUE_DATE_CHANGE', 
+                    description, 
+                    userId,
+                    details.currentDueDate,
+                    dueDate,
+                    note
+                ],
+                (err, result) => {
+                    if (err) reject(err);
+                    else resolve(result);
+                }
+            );
+        });
+
+        // Create notifications
+        try {
+            // Notify ticket creator
+            await createNotification(
+                details.ticketUserId,
+                `Due date for ticket #${ticketId} has been ${details.currentDueDate ? 'changed to' : 'set to'} ${formattedNewDate} by ${details.updaterName}`,
+                'DUE_DATE_UPDATED',
+                logResult.insertId
+            );
+
+            // Notify supervisor if exists
+            if (details.SupervisorID) {
+                await createNotification(
+                    details.SupervisorID,
+                    `Due date for ticket #${ticketId} has been ${details.currentDueDate ? 'changed to' : 'set to'} ${formattedNewDate} by ${details.updaterName}`,
+                    'DUE_DATE_UPDATED',
+                    logResult.insertId
+                );
+            }
+        } catch (error) {
+            console.error("Error creating notifications:", error);
+        }
+
+        res.json({ 
+            message: "Due date updated successfully",
+            logId: logResult.insertId
+        });
+    } catch (error) {
+        console.error("Error updating due date:", error);
+        res.status(500).json({ message: "Server error" });
+    }
+});
+
+// Update ticket resolution
+app.put('/api/tickets/:ticketId/resolution', async (req, res) => {
+    const { ticketId } = req.params;
+    const { resolution, userId } = req.body;
+
+    // Get current ticket and user details
+    const getDetailsQuery = `
+        SELECT 
+            t.Resolution as currentResolution,
+            t.UserId as ticketUserId,
+            t.SupervisorID,
+            t.Status as currentStatus,
+            au.FullName as updaterName
+        FROM ticket t
+        LEFT JOIN appuser au ON au.UserID = ?
+        WHERE t.TicketID = ?
+    `;
+
+    try {
+        const [details] = await new Promise((resolve, reject) => {
+            db.query(getDetailsQuery, [userId, ticketId], (err, results) => {
+                if (err) reject(err);
+                else resolve(results);
+            });
+        });
+
+        if (!details) {
+            return res.status(404).json({ message: "Ticket not found" });
+        }
+
+        // Update resolution and status if needed
+        let updateQuery = "UPDATE ticket SET Resolution = ?, LastRespondedTime = NOW()";
+        let queryParams = [resolution];
+
+        // If adding resolution and status isn't already resolved, update it
+        if (resolution && details.currentStatus !== 'Resolved') {
+            updateQuery += ", Status = 'Resolved'";
+        }
+        // If clearing resolution and status is resolved, update it back to In Process
+        else if (!resolution && details.currentStatus === 'Resolved') {
+            updateQuery += ", Status = 'In Process'";
+        }
+
+        updateQuery += " WHERE TicketID = ?";
+        queryParams.push(ticketId);
+        
+        await new Promise((resolve, reject) => {
+            db.query(updateQuery, queryParams, (err, result) => {
+                if (err) reject(err);
+                else resolve(result);
+            });
+        });
+
+        // Create ticket log entry
+        const logEntry = {
+            ticketId,
+            type: 'RESOLUTION',
+            description: resolution ? 'Resolution added' : 'Resolution cleared',
+            userId,
+            oldValue: details.currentResolution || '',
+            newValue: resolution || ''
+        };
+
+        await new Promise((resolve, reject) => {
+            db.query(
+                `INSERT INTO ticketlog (TicketID, Type, Description, UserID, OldValue, NewValue, DateTime)
+                VALUES (?, ?, ?, ?, ?, ?, NOW())`,
+                [logEntry.ticketId, logEntry.type, logEntry.description, logEntry.userId, logEntry.oldValue, logEntry.newValue],
+                (err, result) => {
+                    if (err) reject(err);
+                    else resolve(result);
+                }
+            );
+        });
+
+        // Send notifications
+        const notificationMessage = resolution 
+            ? `Ticket #${ticketId} has been resolved by ${details.updaterName}`
+            : `Resolution for Ticket #${ticketId} has been cleared by ${details.updaterName}`;
+
+        // Notify ticket creator and supervisor
+        if (details.ticketUserId) {
+            await createNotification(details.ticketUserId, notificationMessage, ticketId);
+        }
+        if (details.SupervisorID && details.SupervisorID !== userId) {
+            await createNotification(details.SupervisorID, notificationMessage, ticketId);
+        }
+
+        res.json({ 
+            message: 'Ticket resolution updated successfully',
+            newStatus: resolution ? 'Resolved' : 'In Process'
+        });
+    } catch (error) {
+        console.error('Error updating ticket resolution:', error);
+        res.status(500).json({ error: 'Failed to update ticket resolution' });
+    }
+});
