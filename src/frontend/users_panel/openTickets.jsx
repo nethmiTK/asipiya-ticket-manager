@@ -82,7 +82,8 @@ const OpenTickets = () => {
   const fetchSystems = async () => {
     try {
       const res = await axios.get("http://localhost:5000/system_registration");
-      setSystemNames(res.data);
+      const activeSystems = res.data.filter(system => system.Status === 1);
+      setSystemNames(activeSystems);
     } catch (error) {
       console.error("Error fetching systems:", error);
     }
@@ -95,7 +96,8 @@ const OpenTickets = () => {
   const fetchCategory = async () => {
     try {
       const res = await axios.get("http://localhost:5000/ticket_category");
-      setCategoryName(res.data);
+      const activeCategories = res.data.filter(cat => cat.Status === 1);
+      setCategoryName(activeCategories);
     } catch (error) {
       console.error("Error fetching systems:", error);
     }

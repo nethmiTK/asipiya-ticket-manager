@@ -29,11 +29,33 @@ const TicketViewPage = ({ ticketId, popupMode = false, onClose }) => {
     return <div className="text-center p-4">Loading...</div>;
   }
 
+  const handleReject = async () => {
+    try {
+      const response = await axios.put(`http://localhost:5000/api/ticket_status/${id}`, {
+        status: 'Reject',
+      });
+
+      if (response.status === 200 || response.status === 204) {
+        toast.success('Ticket rejected successfully');
+        if (popupMode) {
+          onClose();
+        } else {
+          navigate(-1);
+        }
+      } else {
+        toast.error('Failed to reject the ticket');
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error('An error occurred while rejecting the ticket');
+    }
+  };
+
   return (
     <div className="bg-white rounded-lg p-6 w-full max-w-2xl mx-auto">
       <div className="flex justify-between items-center mb-6">
         <button
-          onClick={() => popupMode ? onClose() : navigate(-1)}
+          onClick={() => (popupMode ? onClose() : navigate(-1))}
           className="flex items-center text-gray-600 hover:text-gray-900"
         >
           <IoArrowBack className="mr-2" /> Back
@@ -45,30 +67,22 @@ const TicketViewPage = ({ ticketId, popupMode = false, onClose }) => {
       <div className="space-y-6">
         <div className="flex">
           <label className="w-1/3 font-medium">System Name</label>
-          <div className="w-2/3 bg-gray-100 p-2 rounded">
-            {ticketData.SystemName}
-          </div>
+          <div className="w-2/3 bg-gray-100 p-2 rounded">{ticketData.SystemName}</div>
         </div>
 
         <div className="flex">
           <label className="w-1/3 font-medium">User Email</label>
-          <div className="w-2/3 bg-gray-100 p-2 rounded">
-            {ticketData.UserEmail}
-          </div>
+          <div className="w-2/3 bg-gray-100 p-2 rounded">{ticketData.UserEmail}</div>
         </div>
 
         <div className="flex">
           <label className="w-1/3 font-medium">Category</label>
-          <div className="w-2/3 bg-gray-100 p-2 rounded">
-            {ticketData.CategoryName}
-          </div>
+          <div className="w-2/3 bg-gray-100 p-2 rounded">{ticketData.CategoryName}</div>
         </div>
 
         <div className="flex">
           <label className="w-1/3 font-medium">Description</label>
-          <div className="w-2/3 bg-gray-100 p-2 rounded">
-            {ticketData.Description}
-          </div>
+          <div className="w-2/3 bg-gray-100 p-2 rounded">{ticketData.Description}</div>
         </div>
 
         <div className="flex">
@@ -81,26 +95,7 @@ const TicketViewPage = ({ ticketId, popupMode = false, onClose }) => {
 
       <div className="flex justify-center gap-4 mt-8">
         <button
-          onClick={async () => {
-            try {
-              const response = await axios.put(`http://localhost:5000/api/ticket_status/${id}`, {
-                status: 'Reject',
-              });
-
-              if (response.status === 200 || response.status === 204) {
-                toast.success('Ticket rejected successfully');
-                if (popupMode) {
-                  onClose();
-                } else {
-                  navigate(-1);
-                }
-              } else {
-                toast.error('Failed to reject the ticket');
-              }
-            } catch (err) {
-              console.error(err);
-            }
-          }}
+          onClick={handleReject}
           className="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded"
         >
           Reject
