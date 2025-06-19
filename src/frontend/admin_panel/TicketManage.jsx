@@ -203,9 +203,9 @@ const open = tickets
   .filter((t) => t.status === "Open")
   .sort((a, b) => getPriorityValue(a.priority) - getPriorityValue(b.priority));
 
-// In Process
+// In Progress
 const inProcess = tickets
-  .filter((t) => t.status === "In Process")
+  .filter((t) => t.status === "In Progress")
   .sort((a, b) => getPriorityValue(a.priority) - getPriorityValue(b.priority));
 
 // Resolved (show all even if overdue)
@@ -388,10 +388,10 @@ const resolved = tickets
             />
             <hr className="border-t-2 border-gray-300" />
             <Section
-              title="In Process"
+              title="In Progress"
               tickets={inProcess}
               onCardClick={handleCardClick}
-              color="text-yellow-700"
+              color="#FFB020"
             />
             <hr className="border-t-2 border-gray-300" />
             <Section
@@ -519,7 +519,7 @@ const resolved = tickets
                             className="w-full px-3 py-2 border rounded-md"
                           >
                             <option>Open</option>
-                            <option>In Process</option>
+                            <option>In Progress</option>
                             <option>Resolved</option>
                           </select>
                         </div>

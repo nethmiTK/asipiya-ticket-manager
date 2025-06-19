@@ -21,13 +21,13 @@ const getPriorityDetails = (priority) => {
 const getStatusColor = (status) => {
   switch (status) {
     case "Open":
-      return "text-green-700";
-    case "In Process":
-      return "text-yellow-700";
+      return "bg-blue-100 text-blue-800";
+    case "In Progress":
+      return "bg-yellow-100 text-yellow-800";
     case "Resolved":
-      return "text-blue-700";
+      return "bg-green-100 text-green-800";
     default:
-      return "text-gray-700";
+      return "bg-gray-100 text-gray-800";
   }
 };
 
@@ -39,7 +39,7 @@ export default function TicketCard({ ticket, onClick }) {
       const now = new Date();
       let output = "";
 
-      if (ticket.status === "In Process" && ticket.dueDate) {
+      if (ticket.status === "In Progress" && ticket.dueDate) {
         const due = new Date(ticket.dueDate);
         const diff = due - now;
         if (diff <= 0) {
@@ -68,7 +68,7 @@ export default function TicketCard({ ticket, onClick }) {
   }, [ticket.status, ticket.dueDate, ticket.date]);
 
   const isOverdue =
-    ticket.status === "In Process" &&
+    ticket.status === "In Progress" &&
     ticket.dueDate &&
     new Date(ticket.dueDate) < new Date();
 
