@@ -261,7 +261,7 @@ const OpenTickets = () => {
                       rows="4"
                       className="w-full h-50 p-3 border border-gray-300 rounded-md text-sm mt-1 focus:ring-2 focus:ring-gray-400"
                       placeholder="Provide details of your problem"
-                      // required
+                    // required
                     />
                   </div>
 
@@ -272,8 +272,8 @@ const OpenTickets = () => {
                     {/* Dropzone Area */}
                     <div
                       {...getRootProps()}
-                      className={`border-dashed border-2 border-gray-300 rounded-md p-6 hover:border-gray-400 cursor-pointer mt-1
-                                 flex flex-col justify-center items-center h-[10rem]`}
+                      className={`border-dashed border-2 border-gray-300 rounded-md p-6 hover:border-gray-400 cursor-pointer mt-1 
+    ${files.length > 0 ? 'h-auto max-h-[19rem] overflow-y-auto' : 'flex flex-col justify-center items-center'} min-h-[10rem]`}
                     >
                       <input {...getInputProps()} />
                       {files.length === 0 ? (
@@ -286,7 +286,7 @@ const OpenTickets = () => {
                           </p>
                         </>
                       ) : (
-                        <div className="flex flex-row flex-nowrap overflow-x-auto gap-2 mt-2 py-1 items-center w-full justify-start">
+                         <div className="grid grid-cols-[repeat(auto-fill,minmax(80px,1fr))] gap-2 mt-2 py-1 w-full justify-items-center">
                           {files.map((file, index) => {
                             const isImage = file.type.startsWith("image/");
                             const isVideo = file.type.startsWith("video/");
