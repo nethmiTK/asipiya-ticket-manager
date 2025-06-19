@@ -1060,11 +1060,11 @@ app.put('/api/tickets/:ticketId/status', async (req, res) => {
                 logResult.insertId
             );
 
-            // If status changed to "In Process", notify about supervisor assignment
-            if (status === 'In Process' && ticketResults.SupervisorID) {
+            // If status changed to "In Progress", notify about supervisor assignment
+            if (status === 'In Progress' && ticketResults.SupervisorID) {
                 await createNotification(
                     ticketUserId,
-                    `Your ticket #${ticketId} is now being processed.`,
+                    `Your ticket #${ticketId} has been moved to In Progress status. Please review it.`,
                     'TICKET_IN_PROCESS',
                     logResult.insertId
                 );
@@ -1072,7 +1072,7 @@ app.put('/api/tickets/:ticketId/status', async (req, res) => {
                 // Notify supervisor
                 await createNotification(
                     ticketResults.SupervisorID,
-                    `Ticket #${ticketId} has been moved to In Process status. Please review it.`,
+                    `Ticket #${ticketId} has been moved to In Progress status. Please review it.`,
                     'TICKET_NEEDS_ATTENTION',
                     logResult.insertId
                 );
@@ -2923,9 +2923,9 @@ app.put('/api/tickets/:ticketId/resolution', async (req, res) => {
         if (resolution && details.currentStatus !== 'Resolved') {
             updateQuery += ", Status = 'Resolved'";
         }
-        // If clearing resolution and status is resolved, update it back to In Process
+        // If clearing resolution and status is resolved, update it back to In Progress
         else if (!resolution && details.currentStatus === 'Resolved') {
-            updateQuery += ", Status = 'In Process'";
+            updateQuery += ", Status = 'In Progress'";
         }
 
         updateQuery += " WHERE TicketID = ?";
@@ -2975,7 +2975,7 @@ app.put('/api/tickets/:ticketId/resolution', async (req, res) => {
 
         res.json({ 
             message: 'Ticket resolution updated successfully',
-            newStatus: resolution ? 'Resolved' : 'In Process'
+            newStatus: resolution ? 'Resolved' : 'In Progress'
         });
     } catch (error) {
         console.error('Error updating ticket resolution:', error);

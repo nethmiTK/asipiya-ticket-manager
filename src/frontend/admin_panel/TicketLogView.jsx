@@ -47,7 +47,7 @@ const TicketLogView = ({ ticketId }) => {
         switch (status?.toLowerCase()) {
             case 'open':
                 return 'text-blue-600';
-            case 'in process':
+            case 'in progress':
                 return 'text-yellow-600';
             case 'resolved':
                 return 'text-green-600';

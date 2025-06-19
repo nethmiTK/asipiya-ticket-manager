@@ -3,15 +3,6 @@ import { BsFillTicketPerforatedFill } from "react-icons/bs";
 import { FaUser } from "react-icons/fa6";
 import { GrSystem } from "react-icons/gr";
 
-// Helper to format time difference
-const formatDuration = (ms) => {
-  const abs = Math.abs(ms);
-  const d = Math.floor(abs / (1000 * 60 * 60 * 24));
-  const h = Math.floor((abs / (1000 * 60 * 60)) % 24);
-  const m = Math.floor((abs / (1000 * 60)) % 60);
-  return `${d}d ${h}h ${m}m`;
-};
-
 // Priority icons and colors
 const getPriorityDetails = (priority) => {
   switch (priority) {
@@ -30,13 +21,13 @@ const getPriorityDetails = (priority) => {
 const getStatusColor = (status) => {
   switch (status) {
     case "Open":
-      return "text-green-700";
-    case "In Process":
-      return "text-yellow-700";
+      return "bg-blue-100 text-blue-800";
+    case "In Progress":
+      return "bg-yellow-100 text-yellow-800";
     case "Resolved":
-      return "text-blue-700";
+      return "bg-green-100 text-green-800";
     default:
-      return "text-gray-700";
+      return "bg-gray-100 text-gray-800";
   }
 };
 
@@ -44,50 +35,42 @@ export default function TicketCard({ ticket, onClick }) {
   const [timeText, setTimeText] = useState("");
 
   useEffect(() => {
-  const interval = setInterval(() => {
-    const now = new Date();
-    const created = new Date(ticket.date);
-    const due = ticket.dueDate ? new Date(ticket.dueDate) : null;
-    let output = "";
+    const interval = setInterval(() => {
+      const now = new Date();
+      let output = "";
 
-    if (ticket.status === "Open") {
-      if (due) {
+      if (ticket.status === "In Progress" && ticket.dueDate) {
+        const due = new Date(ticket.dueDate);
         const diff = due - now;
-        output =
-          diff > 0
-            ? `⏳ ${formatDuration(diff)} left`
-            : `⚠️ Overdue by ${formatDuration(diff)}`;
-      } else {
+        if (diff <= 0) {
+          output = "⏳ Time's up";
+        } else {
+          const d = Math.floor(diff / (1000 * 60 * 60 * 24));
+          const h = Math.floor((diff / (1000 * 60 * 60)) % 24);
+          const m = Math.floor((diff / (1000 * 60)) % 60);
+          const s = Math.floor((diff / 1000) % 60);
+          output = `⏳ ${d}d ${h}h ${m}m left`;
+        }
+      } else if (ticket.status === "Open" && ticket.date) {
+        const created = new Date(ticket.date);
         const diff = now - created;
-        output = `🕒 Opened ${formatDuration(diff)} ago`;
+        const d = Math.floor(diff / (1000 * 60 * 60 * 24));
+        const h = Math.floor((diff / (1000 * 60 * 60)) % 24);
+        const m = Math.floor((diff / (1000 * 60)) % 60);
+        const s = Math.floor((diff / 1000) % 60);
+        output = `🕒 Opened: ${d}d ${h}h ${m}m ago`;
       }
-    }
 
-    else if (ticket.status === "In Process" && due) {
-      const diff = due - now;
-      output =
-        diff > 0
-          ? `⏳ ${formatDuration(diff)} left`
-          : `⌛ Overdue by ${formatDuration(diff)}`;
-    }
+      setTimeText(output);
+    }, 1000);
 
-    else if (ticket.status === "Resolved" && due) {
-      const diff = due - created;
-      output = `⏱ Resolved in ${formatDuration(diff)}`;
-    }
-
-    setTimeText(output);
-  }, 60000); // Update every minute
-
-  return () => clearInterval(interval);
-}, [ticket.status, ticket.dueDate, ticket.date]);
+    return () => clearInterval(interval);
+  }, [ticket.status, ticket.dueDate, ticket.date]);
 
   const isOverdue =
-    ticket.status === ("In Process" &&
+    ticket.status === "In Progress" &&
     ticket.dueDate &&
-    new Date(ticket.dueDate) < new Date()) ||("Open" &&
-    ticket.dueDate &&
-    new Date(ticket.dueDate) < new Date());
+    new Date(ticket.dueDate) < new Date();
 
   const priority = getPriorityDetails(ticket.priority);
 
@@ -95,10 +78,10 @@ export default function TicketCard({ ticket, onClick }) {
     <div
       onClick={() => onClick(ticket)}
       className={`relative bg-white p-4 rounded-lg shadow cursor-pointer hover:shadow-lg transition duration-300 ${
-        isOverdue ? "border-2 border-red-500" : ""
+        isOverdue ? "border-2 border-red-500 " : ""
       }`}
     >
-      {/* Header */}
+      {/* Header with Ticket ID and Status */}
       <div className="flex justify-between items-center">
         <h2 className="font-bold text-gray-800 flex items-center gap-2 text-lg">
           <BsFillTicketPerforatedFill className="text-indigo-600" />
@@ -108,8 +91,7 @@ export default function TicketCard({ ticket, onClick }) {
           className={`text-sm font-bold px-2 py-1 rounded-full ${getStatusColor(
             ticket.status
           )}`}
-        >
-        </span>
+        ></span>
       </div>
 
       {/* User Info */}
@@ -131,13 +113,11 @@ export default function TicketCard({ ticket, onClick }) {
         </span>
       </div>
 
-      {/* Time Text */}
+      {/* Timer */}
       {timeText && (
-        <div
-          className={`absolute bottom-2 right-3 text-xs font-semibold ${
-            isOverdue ? "text-red-500" : "text-green-600"
-          }`}
-        >
+        <div className={`absolute bottom-2 right-3 text-xs text-green-600 font-semibold ${
+        isOverdue ? " text-red-500 " : ""
+      }`}>
           {timeText}
         </div>
       )}

@@ -135,8 +135,8 @@ router.put('/:ticketId', async (req, res) => {
                 logResult.insertId
             );
 
-            // If status changed to "In Process", notify about supervisor assignment
-            if (status === 'In Process' && details.SupervisorID) {
+            // If status changed to "In Progress", notify about supervisor assignment
+            if (status === 'In Progress' && details.SupervisorID) {
                 await createNotification(
                     ticketUserId,
                     `Your ticket #${ticketId} is now being processed.`,
@@ -147,7 +147,7 @@ router.put('/:ticketId', async (req, res) => {
                 // Notify supervisor
                 await createNotification(
                     details.SupervisorID,
-                    `Ticket #${ticketId} has been moved to In Process status. Please review it.`,
+                    `Ticket #${ticketId} has been moved to In Progress status. Please review it.`,
                     'TICKET_NEEDS_ATTENTION',
                     logResult.insertId
                 );
