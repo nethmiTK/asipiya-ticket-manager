@@ -1,19 +1,49 @@
-import React from 'react';
-import { FaSearch } from 'react-icons/fa';
+import React, { useState } from 'react';
+import Select from 'react-select';
 
-const SearchBar = ({ value, onChange, placeholder = "Search tickets..." }) => {
+const SearchBar = ({
+  systemFilter,
+  companyFilter,
+  onSystemFilterChange,
+  onCompanyFilterChange,
+  systems = [],
+  companies = []
+}) => {
+  // Convert arrays to react-select format
+  const systemOptions = systems.map(system => ({
+    value: system.id || system,
+    label: system.name || system
+  }));
+
+  const companyOptions = companies.map(company => ({
+    value: company.id || company,
+    label: company.name || company
+  }));
+
   return (
-    <div className="relative w-full max-w-md">
-      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-        <FaSearch className="h-5 w-5 text-gray-400" />
+    <div className="flex gap-4 mb-4">
+      <div className="w-64">
+        <Select
+          options={systemOptions}
+          value={systemFilter}
+          onChange={onSystemFilterChange}
+          placeholder="Filter by System"
+          isClearable
+          className="text-sm"
+          classNamePrefix="select"
+        />
       </div>
-      <input
-        type="text"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-        placeholder={placeholder}
-      />
+      <div className="w-64">
+        <Select
+          options={companyOptions}
+          value={companyFilter}
+          onChange={onCompanyFilterChange}
+          placeholder="Filter by Company"
+          isClearable
+          className="text-sm"
+          classNamePrefix="select"
+        />
+      </div>
     </div>
   );
 };
