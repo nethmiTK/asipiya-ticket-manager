@@ -408,11 +408,11 @@ const TicketView = () => {
                   {currentTickets.map((ticket) => (
                     <tr
                       key={ticket.id}
-                      onClick={() => {
-                        setSelectedTicket(ticket);
-                        setActiveTab("details");
-                        setIsModalOpen(true);
-                      }}
+                      // onClick={() => {
+                      //   setSelectedTicket(ticket);
+                      //   setActiveTab("details");
+                      //   setIsModalOpen(true);
+                      // }}
                       className="hover:bg-gray-50 cursor-pointer"
                     >
                       <td className="px-4 py-2 font-medium text-gray-900">
