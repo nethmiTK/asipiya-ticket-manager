@@ -2,19 +2,26 @@ import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import AdminSideBar from "../../user_components/SideBar/AdminSideBar";
-import { FaEye } from 'react-icons/fa';
+import { FaEye, FaEdit } from 'react-icons/fa';
 import Ticket_secret from "./Ticket_secret";
 import TicketViewPage from "./TicketViewPage";
+import TicketTable from "./components/TicketTable";
+import SearchBar from "./components/SearchBar";
+import Pagination from "./components/Pagination";
 
 const Tickets = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [tickets, setTickets] = useState([]);
+  const [filteredTickets, setFilteredTickets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchParams] = useSearchParams();
   const type = searchParams.get("type");
   const ticketId = searchParams.get("id");
   const navigate = useNavigate();
   const [selectedTicket, setSelectedTicket] = useState(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
 
   useEffect(() => {
     const fetchTickets = async () => {
@@ -25,10 +32,10 @@ const Tickets = () => {
         }
         const response = await axios.get(url);
         
-        // If type is 'resolved', filter only resolved tickets
-        const filteredTickets = type === 'resolved' 
-          ? response.data.filter(ticket => ticket.Status.toLowerCase() === 'resolved')
-          : response.data;
+        let filteredTickets = response.data;
+        if (type === 'resolved') {
+          filteredTickets = response.data.filter(ticket => ticket.Status.toLowerCase() === 'resolved');
+        }
         
         setTickets(filteredTickets);
         
@@ -48,6 +55,20 @@ const Tickets = () => {
 
     fetchTickets();
   }, [type, ticketId]);
+
+  useEffect(() => {
+    const filtered = tickets.filter(ticket => {
+      const searchString = searchTerm.toLowerCase();
+      return (
+        ticket.TicketID.toString().includes(searchString) ||
+        (ticket.Description || "").toLowerCase().includes(searchString) ||
+        (ticket.SystemName || "").toLowerCase().includes(searchString) ||
+        (ticket.CompanyName || "").toLowerCase().includes(searchString)
+      );
+    });
+    setFilteredTickets(filtered);
+    setCurrentPage(1);
+  }, [searchTerm, tickets]);
 
   const getStatusColor = (status) => {
     switch (status?.toLowerCase()) {
@@ -93,6 +114,13 @@ const Tickets = () => {
   const handleViewTicket = (ticket) => {
     setSelectedTicket(ticket);
   };
+
+  const paginatedTickets = filteredTickets.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+  const totalPages = Math.ceil(filteredTickets.length / itemsPerPage);
 
   if (loading) {
     return (
@@ -148,9 +176,9 @@ const Tickets = () => {
                 Pending Tickets
               </button>
               <button
-                onClick={() => navigate('/tickets?type=high-priority')}
+                onClick={() => navigate('/tickets?type=high')}
                 className={`px-4 sm:px-6 py-2 rounded-lg transition-colors text-sm sm:text-base ${
-                  type === 'high-priority' ? 'bg-blue-500 text-white' : 'bg-gray-200 hover:bg-gray-300'
+                  type === 'high' ? 'bg-blue-500 text-white' : 'bg-gray-200 hover:bg-gray-300'
                 }`}
               >
                 High Priority
@@ -164,73 +192,30 @@ const Tickets = () => {
                 Resolved Tickets
               </button>
             </div>
+
+            <div className="mb-6">
+              <SearchBar
+                value={searchTerm}
+                onChange={setSearchTerm}
+                placeholder="Search by ID, description, system, or company..."
+              />
+            </div>
           </header>
 
-          <div className="bg-white rounded-lg shadow overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="min-w-full">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      TicketID
-                    </th>
-                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      User Name
-                    </th>
-                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Description
-                    </th>
-                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Priority
-                    </th>
-                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Action
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {tickets.map((ticket) => (
-                    <tr
-                      key={ticket.TicketID}
-                      className="hover:bg-gray-50 transition-colors"
-                    >
-                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {ticket.TicketID}
-                      </td>
-                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {ticket.UserName || "N/A"}
-                      </td>
-                      <td className="px-4 sm:px-6 py-4 text-sm text-gray-500 max-w-xs truncate">
-                        {ticket.Description}
-                      </td>
-                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm">
-                        <span className={`${getStatusColor(ticket.Status)} font-medium`}>
-                          {ticket.Status}
-                        </span>
-                      </td>
-                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm">
-                        <span className={`${getPriorityColor(ticket.Priority)} font-medium`}>
-                          {ticket.Priority}
-                        </span>
-                      </td>
-                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm">
-                        <button
-                          onClick={() => handleViewTicket(ticket)}
-                          className="text-blue-600 hover:text-blue-800 transition-colors"
-                          title="View Ticket Details"
-                        >
-                          <FaEye className="w-5 h-5" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          <TicketTable
+            tickets={paginatedTickets}
+            onTicketClick={handleViewTicket}
+            showStatus={type !== 'pending' && type !== 'resolved'}
+            showPriority={type !== 'pending'}
+          />
+
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={setCurrentPage}
+            itemsPerPage={itemsPerPage}
+            onItemsPerPageChange={setItemsPerPage}
+          />
 
           {selectedTicket && (
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">

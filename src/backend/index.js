@@ -2147,64 +2147,63 @@ app.post('/api/invite-supervisor', async (req, res) => {
 });
 
 // Assign supervisor to ticket endpoint
-app.put('/api/tickets/:id/assign', async (req, res) => {
+app.put('/api/tickets/:id/assign', (req, res) => {
     const ticketId = req.params.id;
-    const { status, priority, supervisorId } = req.body;
-    const now = new Date();
-    const firstRespondedTimeValue = now;
+    const { supervisorId, status, priority } = req.body;
 
-    const getTicketQuery = 'SELECT UserId, FirstRespondedTime FROM ticket WHERE TicketID = ?';
-    db.query(getTicketQuery, [ticketId], async (err, ticketResults) => {
+    if (!ticketId || !supervisorId) {
+        return res.status(400).json({ 
+            error: 'Ticket ID and Supervisor ID are required' 
+        });
+    }
+
+    // Update ticket with supervisor
+    const updateQuery = `
+        UPDATE ticket 
+        SET SupervisorID = ?,
+            Status = ?,
+            Priority = ?,
+            LastRespondedTime = NOW(),
+            FirstRespondedTime = COALESCE(FirstRespondedTime, NOW())
+        WHERE TicketID = ?
+    `;
+
+    db.query(updateQuery, [supervisorId, status, priority, ticketId], (err, result) => {
         if (err) {
-            console.error('Error fetching ticket:', err);
-            return res.status(500).json({ error: 'Database error' });
+            console.error('Error updating ticket:', err);
+            return res.status(500).json({ 
+                error: 'Failed to assign supervisor',
+                message: err.message 
+            });
         }
 
-        if (ticketResults.length === 0) {
-            return res.status(404).json({ message: 'Ticket not found' });
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ 
+                error: 'Ticket not found' 
+            });
         }
 
-        const userId = ticketResults[0].UserId;
+        // Create log entry
+        const logQuery = `
+            INSERT INTO ticketlog 
+            (TicketID, DateTime, Type, Description, UserID)
+            VALUES (?, NOW(), 'SUPERVISOR_ASSIGN', 'Supervisor assigned', ?)
+        `;
 
-        const sql = `UPDATE ticket SET Status = ?, Priority = ?,FirstRespondedTime = ?, SupervisorID = ?  WHERE TicketID = ?`;
-
-        db.query(sql, [status, priority, firstRespondedTimeValue, supervisorId, ticketId], async (err, result) => {
-            if (err) {
-                console.error('Error assigning supervisor:', err);
-                return res.status(500).json({ error: 'Database error' });
+        db.query(logQuery, [ticketId, supervisorId], (logErr) => {
+            if (logErr) {
+                console.error('Error creating log:', logErr);
+                // Don't fail the request if log creation fails
             }
+        });
 
-            try {
-                // Notify the assigned supervisor
-                await createNotification(
-                    supervisorId,
-                    `You have been assigned to ticket #${ticketId}`,
-                    'SUPERVISOR_ASSIGNED'
-                );
-
-                // Notify the ticket creator
-                await createNotification(
-                    userId,
-                    `A supervisor has been assigned to your ticket #${ticketId}`,
-                    'TICKET_UPDATED'
-                );
-
-                // Notify admins
-                await sendNotificationsByRoles(
-                    ['Admin'],
-                    `Supervisor assigned to ticket #${ticketId}`,
-                    'SUPERVISOR_ASSIGNMENT'
-                );
-            } catch (error) {
-                console.error('Error sending supervisor assignment notifications:', error);
-            }
-
-            res.json({ message: 'Supervisor assigned successfully' });
+        // Send success response
+        res.json({ 
+            message: 'Supervisor assigned successfully',
+            status: 'success'
         });
     });
 });
-
-
 
 // Create new ticket
 app.post('/api/tickets', async (req, res) => {

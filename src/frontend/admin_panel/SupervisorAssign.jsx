@@ -40,40 +40,37 @@ const SupervisorAssignPage = ({ ticketId }) => {
 
   const handleAssign = () => {
     if (!selectedSupervisor) {
-      alert("Please select a supervisor.");
+      toast.error("Please select a supervisor.");
       return;
     }
 
     const supervisor = supervisors.find(s => s.UserID.toString() === selectedSupervisor.toString());
     if (!supervisor) {
-      alert("Selected supervisor not found.");
+      toast.error("Selected supervisor not found.");
       return;
     }
+
     const finalStatus = ['Open', 'In Progress', 'Resolved'].includes(status) ? status : 'Open';
 
     axios.put(`http://localhost:5000/api/tickets/${id}/assign`, {
       supervisorId: selectedSupervisor,
       status: finalStatus,
-      priority,
-      supervisorName: supervisor.FullName
+      priority
     })
-      .then(() => {
-        return axios.put(`http://localhost:5000/api/tickets/${id}/status`, {
-          status: finalStatus,
-          userId: selectedSupervisor,
-          supervisorName: supervisor.FullName
-        });
-      })
-      .then(() => {
-        toast.success('Supervisor assigned and ticket status updated successfully!');
+    .then(response => {
+      if (response.data.status === 'success') {
+        toast.success('Supervisor assigned successfully!');
         if (!ticketId) {
           navigate(-1);
         }
-      })
-      .catch(err => {
-        console.error('Error assigning supervisor:', err);
-        toast.error('Failed to assign supervisor.');
-      });
+      } else {
+        throw new Error(response.data.message || 'Failed to assign supervisor');
+      }
+    })
+    .catch(err => {
+      console.error('Error assigning supervisor:', err);
+      toast.error(err.response?.data?.message || err.message || 'Failed to assign supervisor.');
+    });
   };
 
   if (!ticketData) return <div className="p-4">Loading...</div>;
