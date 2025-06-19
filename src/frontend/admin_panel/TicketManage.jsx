@@ -391,7 +391,7 @@ const resolved = tickets
               title="In Progress"
               tickets={inProcess}
               onCardClick={handleCardClick}
-              color="#FFB020"
+              color="text-yellow-700"
             />
             <hr className="border-t-2 border-gray-300" />
             <Section
