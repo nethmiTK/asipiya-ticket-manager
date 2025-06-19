@@ -5,7 +5,8 @@ import axios from "axios";
 function renderMessageWithLinks(text) {
   if (typeof text !== "string") return text;
 
-  const urlRegex = /((https?:\/\/)?(www\.)?[\w\-]+\.[\w]{2,}([\/\w\-\.?=&%]*)?)/gi;
+  const urlRegex =
+    /((https?:\/\/)?(www\.)?[\w\-]+\.[\w]{2,}([\/\w\-\.?=&%]*)?)/gi;
 
   return text.split(urlRegex).map((part, i) => {
     if (
@@ -174,7 +175,9 @@ export default function ChatSection({
             >
               {isClient && (
                 <img
-                  src={supportUser?.avatar || "https://i.pravatar.cc/40?u=user1"}
+                  src={
+                    supportUser?.avatar || "https://i.pravatar.cc/40?u=user1"
+                  }
                   alt="avatar"
                   className="w-8 h-8 rounded-full mr-2 self-end"
                 />
@@ -187,72 +190,74 @@ export default function ChatSection({
                     : "bg-gray-300 text-gray-800 rounded-bl-none"
                 }`}
               >
-                {msg.file ? (
-                  (() => {
-                    const fileUrl = msg.file.url;
-                    const fileName = msg.file.name.toLowerCase();
+                {msg.file
+                  ? (() => {
+                      const fileUrl = msg.file.url;
+                      const fileName = msg.file.name.toLowerCase();
 
-                    if (fileName.match(/\.(jpg|jpeg|png|gif|bmp|webp)$/i)) {
-                      return (
-                        <div>
-                          <img
-                            src={fileUrl}
-                            alt={fileName}
-                            className="w-40 h-auto rounded-md mb-1"
-                          />
-                          <p className="text-sm break-words">{msg.file.name}</p>
-                        </div>
-                      );
-                    } else if (fileName.match(/\.(mp4|webm|ogg|mov)$/i)) {
-                      return (
-                        <div>
-                          <video
-                            controls
-                            src={fileUrl}
-                            className="w-40 h-auto rounded-md mb-1"
-                          />
-                          <p className="text-sm break-words">{msg.file.name}</p>
-                        </div>
-                      );
-                    } else if (fileName.match(/\.pdf$/i)) {
-                      return (
-                        <div>
-                          <iframe
-                            src={fileUrl}
-                            className="w-40 h-40 rounded-md mb-1"
-                            title="PDF Preview"
-                          />
-                          <a
-                            href={fileUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-gray-800 underline text-xs"
-                          >
-                            View Full PDF
-                          </a>
-                        </div>
-                      );
-                    } else {
-                      return (
-                        <div>
-                          <p className="text-sm break-words font-semibold">
-                            {msg.file.name}
-                          </p>
-                          <a
-                            href={fileUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-gray-800 underline text-xs"
-                          >
-                            Download File
-                          </a>
-                        </div>
-                      );
-                    }
-                  })()
-                ) : (
-                  renderMessageWithLinks(msg.content)
-                )}
+                      if (fileName.match(/\.(jpg|jpeg|png|gif|bmp|webp)$/i)) {
+                        return (
+                          <div>
+                            <img
+                              src={fileUrl}
+                              alt={fileName}
+                              className="w-40 h-auto rounded-md mb-1"
+                            />
+                            <p className="text-sm break-words">
+                              {msg.file.name}
+                            </p>
+                          </div>
+                        );
+                      } else if (fileName.match(/\.(mp4|webm|ogg|mov)$/i)) {
+                        return (
+                          <div>
+                            <video
+                              controls
+                              src={fileUrl}
+                              className="w-40 h-auto rounded-md mb-1"
+                            />
+                            <p className="text-sm break-words">
+                              {msg.file.name}
+                            </p>
+                          </div>
+                        );
+                      } else if (fileName.match(/\.pdf$/i)) {
+                        return (
+                          <div>
+                            <img
+                              src="https://upload.wikimedia.org/wikipedia/commons/8/87/PDF_file_icon.svg"
+                              alt="PDF"
+                              className="w-20 h-20 object-contain mb-1"
+                            />
+                            <a
+                              href={fileUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-gray-800 underline text-xs"
+                            >
+                              View Full PDF
+                            </a>
+                          </div>
+                        );
+                      } else {
+                        return (
+                          <div>
+                            <p className="text-sm break-words font-semibold">
+                              {msg.file.name}
+                            </p>
+                            <a
+                              href={fileUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-gray-800 underline text-xs"
+                            >
+                              Download File
+                            </a>
+                          </div>
+                        );
+                      }
+                    })()
+                  : renderMessageWithLinks(msg.content)}
 
                 <div className="flex justify-between text-xs mt-1 opacity-70">
                   <span>{new Date(msg.timestamp).toLocaleString()}</span>
@@ -305,10 +310,10 @@ export default function ChatSection({
                   );
                 } else if (fileName.endsWith(".pdf")) {
                   return (
-                    <iframe
-                      src={fileUrl}
-                      title="PDF Preview"
-                      className="w-full h-full rounded"
+                    <img
+                      src="https://upload.wikimedia.org/wikipedia/commons/8/87/PDF_file_icon.svg"
+                      alt="PDF"
+                      className="w-20 h-20 object-contain mb-1"
                     />
                   );
                 } else {
