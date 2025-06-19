@@ -2286,7 +2286,7 @@ app.post('/api/upload_evidence', upload_evidence.array('evidenceFiles'), async (
   try {
     const values = req.files.map(file => [
       ticketId,
-      file.path.replace(/\\/g, '/'), // ✅ Fix path before storing
+      file.path.replace(/\\/g, '/'),
       description
     ]);
 
