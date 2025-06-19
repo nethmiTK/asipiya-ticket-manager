@@ -104,16 +104,22 @@ const SupervisorAssignPage = ({ ticketId }) => {
 
         <div>
           <label className="block font-medium">Status</label>
-          <select
-            value={status}
-            onChange={e => setStatus(e.target.value)}
-            className="w-full mt-1 px-4 py-2 border border-gray-300 rounded"
-          >
-            <option value="Open">Open</option>
-            <option value="In Progress">In Progress</option>
-            <option value="Resolved">Resolved</option>
-          </select>
+            <select
+              value={status}
+              onChange={(e) => setStatus(e.target.value)}
+              className={`w-full mt-1 px-4 py-2 border rounded border-gray-300 appearance-none
+                ${status === 'Open' ? 'bg-blue-100 text-blue-800' :
+                  status === 'In Progress' ? 'bg-yellow-100 text-yellow-800' :
+                  status === 'Resolved' ? 'bg-green-100  text-green-800' :
+                  'bg-blue-100 text-blue-800' // fallback/default blue
+                }`}
+            >
+              <option className="bg-white text-gray-800" value="Open">Open</option>
+              <option className="bg-white text-gray-800" value="In Progress">In Progress</option>
+              <option className="bg-white text-gray-800" value="Resolved">Resolved</option>
+            </select>
         </div>
+
 
         <div>
           <label className="block font-medium">Supervisor Name</label>
@@ -136,13 +142,19 @@ const SupervisorAssignPage = ({ ticketId }) => {
           <select
             value={priority}
             onChange={e => setPriority(e.target.value)}
-            className="w-full mt-1 px-4 py-2 border border-gray-300 rounded"
+            className={`w-full mt-1 px-4 py-2 border rounded appearance-none
+              ${priority === 'Low' ? 'bg-green-100 border-green-300 text-green-800' :
+                priority === 'Medium' ? 'bg-yellow-100 border-yellow-300 text-yellow-800' :
+                priority === 'High' ? 'bg-red-100 border-red-300 text-red-800' :
+                'bg-white border-gray-300 text-gray-700'
+              }`}
           >
-            <option>Low</option>
-            <option>Medium</option>
-            <option>High</option>
+            <option className="bg-white text-gray-800" value="Low">Low</option>
+            <option className="bg-white text-gray-800" value="Medium">Medium</option>
+            <option className="bg-white text-gray-800" value="High">High</option>
           </select>
         </div>
+
       </div>
 
       <div className="mt-8 flex justify-end">
