@@ -3043,6 +3043,7 @@ app.put('/api/tickets/:ticketId/resolution', async (req, res) => {
     }
 });
 
+
 // API endpoint to fetch companies
 app.get('/api/companies', (req, res) => {
   const query = `
@@ -3061,3 +3062,5 @@ app.get('/api/companies', (req, res) => {
     res.json(results);
   });
 });
+
+ 

@@ -3,6 +3,7 @@ const router = express.Router();
 
 // Get all logs for a specific ticket
 router.get('/:ticketId', async (req, res) => {
+    console.log('req.db:', req.db);
     const { ticketId } = req.params;
     
     const query = `
