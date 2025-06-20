@@ -40,7 +40,7 @@ const TicketCategory = () => {
         await axios.put(`http://localhost:5000/api/ticket_category_update/${editingId}`, form);
         toast.success('Category updated successfully.');
       } else {
-        await axios.post('http://localhost:5000/ticket_category', { ...form, Status: '1' });
+        await axios.post('http://localhost:5000/api/ticket_category', { ...form, Status: '1' });
         toast.success('Category added successfully.');
       }
 
