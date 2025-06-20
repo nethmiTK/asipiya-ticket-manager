@@ -22,15 +22,29 @@ const Tickets = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [selectedSystem, setSelectedSystem] = useState(null);
+  const [selectedCompany, setSelectedCompany] = useState(null);
 
   useEffect(() => {
     const fetchTickets = async () => {
       try {
         let url = 'http://localhost:5000/api/tickets/filter';
+        const params = new URLSearchParams();
+        
         if (type) {
-          url += `?type=${type}`;
+          params.append('type', type);
         }
-        const response = await axios.get(url);
+        if (selectedSystem) {
+          params.append('system', selectedSystem.value);
+        }
+        if (selectedCompany) {
+          params.append('company', selectedCompany.value);
+        }
+
+        const queryString = params.toString();
+        const finalUrl = queryString ? `${url}?${queryString}` : url;
+        
+        const response = await axios.get(finalUrl);
         
         let filteredTickets = response.data;
         if (type === 'resolved') {
@@ -54,7 +68,7 @@ const Tickets = () => {
     };
 
     fetchTickets();
-  }, [type, ticketId]);
+  }, [type, ticketId, selectedSystem, selectedCompany]);
 
   useEffect(() => {
     const filtered = tickets.filter(ticket => {
@@ -113,6 +127,16 @@ const Tickets = () => {
 
   const handleViewTicket = (ticket) => {
     setSelectedTicket(ticket);
+  };
+
+  const handleSystemFilterChange = (selected) => {
+    setSelectedSystem(selected);
+    setCurrentPage(1);
+  };
+
+  const handleCompanyFilterChange = (selected) => {
+    setSelectedCompany(selected);
+    setCurrentPage(1);
   };
 
   const paginatedTickets = filteredTickets.slice(
@@ -198,6 +222,10 @@ const Tickets = () => {
                 value={searchTerm}
                 onChange={setSearchTerm}
                 placeholder="Search by ID, description, system, or company..."
+                selectedSystem={selectedSystem}
+                selectedCompany={selectedCompany}
+                onSystemFilterChange={handleSystemFilterChange}
+                onCompanyFilterChange={handleCompanyFilterChange}
               />
             </div>
           </header>
