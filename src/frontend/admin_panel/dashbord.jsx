@@ -135,16 +135,19 @@ const TicketByStatusChart = () => {
           </div>
         </div>
       </div>
-      <div className="mt-4 flex justify-center gap-4">
-        {chartData.labels.map((label, index) => (
-          <p key={index} className="text-sm flex items-center">
-            <span
-              className="inline-block w-3 h-3 mr-2 rounded"
-              style={{ backgroundColor: chartData.datasets[0].backgroundColor[index] }}
-            ></span>
-            {label}: {chartData.datasets[0].data[index]}
-          </p>
-        ))}
+      <div className="flex justify-center mt-2 gap-4">
+        <span className="flex items-center gap-1">
+          <span className="w-3 h-3 rounded-full" style={{ background: "#ff6384" }}></span>
+          High: {chartData.datasets[0].data[0]}
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="w-3 h-3 rounded-full" style={{ background: "#ffcd56" }}></span>
+          Medium: {chartData.datasets[0].data[1]}
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="w-3 h-3 rounded-full" style={{ background: "#36a2eb" }}></span>
+          Low: {chartData.datasets[0].data[2]}
+        </span>
       </div>
     </div>
   );
