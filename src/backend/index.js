@@ -1455,45 +1455,60 @@ app.get('/api/tickets/counts', (req, res) => {
     });
 });
 
-// API endpoint to fetch filtered tickets
+// API endpoint to fetch filtered tickets  
 app.get('/api/tickets/filter', (req, res) => {
-    const { type } = req.query;
+    const { type, company, system } = req.query; // <-- ADD company, system
 
     let baseQuery = `
         SELECT 
             t.TicketID,
             u.FullName AS UserName,
+            c.CompanyName AS CompanyName,
+            s.SystemName AS SystemName,
             t.Description,
             t.Status,
             t.Priority,
             t.DateTime
         FROM ticket t
         LEFT JOIN appuser u ON t.UserId = u.UserID
+        LEFT JOIN client c ON u.Email = c.ContactPersonEmail
+        LEFT JOIN asipiyasystem s ON t.AsipiyaSystemID = s.AsipiyaSystemID
     `;
 
-    let whereClause = '';
+    let whereClause = [];
     let orderClause = 'ORDER BY t.DateTime DESC';
 
+    // Type-based filter
     switch (type) {
         case 'pending':
-            whereClause = "WHERE t.Status = 'Pending'";
+            whereClause.push("t.Status = 'Pending'");
             break;
         case 'open':
-            whereClause = "WHERE t.Status IN ('Open', 'In Progress') AND t.Status != 'Rejected'";
+            whereClause.push("t.Status IN ('Open', 'In Progress') AND t.Status != 'Rejected'");
             break;
         case 'today':
-            whereClause = "WHERE DATE(t.DateTime) = CURDATE()";
+            whereClause.push("DATE(t.DateTime) = CURDATE()");
             break;
         case 'high-priority':
-            whereClause = "WHERE t.Status != 'Rejected'";
+            whereClause.push("t.Status != 'Rejected'");
             orderClause = "ORDER BY FIELD(t.Priority, 'High', 'Medium', 'Low'), t.DateTime DESC";
             break;
         case 'resolved':
-            whereClause = "WHERE t.Status = 'Resolved'";
+            whereClause.push("t.Status = 'Resolved'");
             break;
     }
 
-    const query = baseQuery + (whereClause ? ' ' + whereClause : '') + ' ' + orderClause;
+    // Company filter
+    if (company && company !== 'all') {
+        whereClause.push("c.CompanyName = " + db.escape(company));
+    }
+    // System filter
+    if (system && system !== 'all') {
+        whereClause.push("s.SystemName = " + db.escape(system));
+    }
+
+    const finalWhere = whereClause.length > 0 ? 'WHERE ' + whereClause.join(' AND ') : '';
+    const query = `${baseQuery} ${finalWhere} ${orderClause}`;
 
     db.query(query, (err, results) => {
         if (err) {

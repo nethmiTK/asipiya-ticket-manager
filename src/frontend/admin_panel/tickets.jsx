@@ -145,6 +145,8 @@ const Tickets = () => {
   );
 
   const totalPages = Math.ceil(filteredTickets.length / itemsPerPage);
+  const showingFrom = filteredTickets.length === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1;
+  const showingTo = Math.min(currentPage * itemsPerPage, filteredTickets.length);
 
   if (loading) {
     return (
@@ -243,6 +245,9 @@ const Tickets = () => {
             onPageChange={setCurrentPage}
             itemsPerPage={itemsPerPage}
             onItemsPerPageChange={setItemsPerPage}
+            totalItems={filteredTickets.length}
+            showingFrom={showingFrom}
+            showingTo={showingTo}
           />
 
           {selectedTicket && (
