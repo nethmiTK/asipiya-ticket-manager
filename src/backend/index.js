@@ -1378,6 +1378,51 @@ app.get("/userTickets", (req, res) => {
     });
 });
 
+//User View ticket details by ticketId 
+app.get("/userTicket/:ticketId", (req, res) => {
+  const { ticketId } = req.params;
+  const sql = `
+    SELECT 
+      t.TicketID AS id,
+      t.Description AS description,
+      t.Status AS status,
+      a.SystemName AS system_name,
+      c.CategoryName AS category,
+      t.DateTime AS datetime,
+      t.SupervisorID AS supervisor_id,
+      u.FullName AS supervisor_name
+    FROM ticket t
+    JOIN asipiyasystem a ON t.AsipiyaSystemID = a.AsipiyaSystemID
+    JOIN ticketcategory c ON t.TicketCategoryID = c.TicketCategoryID
+    LEFT JOIN appUser u ON t.SupervisorID = u.UserID
+    WHERE t.TicketID = ?
+  `;
+  db.query(sql, [ticketId], (err, results) => {
+    if (err) {
+      console.error("Error fetching ticket:", err);
+      return res.status(500).json({ message: "Error fetching ticket" });
+    }
+    if (results.length === 0) {
+      return res.status(404).json({ message: "Ticket not found" });
+    }
+    res.status(200).json(results[0]);
+  });
+});
+
+//User view evidence by ticketId
+app.get('/api/evidence/:ticketId', async (req, res) => {
+  const { ticketId } = req.params;
+  try {
+    const [rows] = await db.promise().query(
+      'SELECT * FROM evidence WHERE ComplaintID = ?',
+      [ticketId]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error('Error fetching evidence:', err);
+    res.status(500).json({ message: 'Failed to fetch evidence' });
+  }
+});
 
 // API endpoint to fetch ticket counts
 app.get('/api/tickets/counts', (req, res) => {

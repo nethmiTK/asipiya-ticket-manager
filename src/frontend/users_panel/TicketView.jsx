@@ -4,7 +4,8 @@ import SideBar from "../../user_components/SideBar/SideBar";
 import NavBar from "../../user_components/NavBar/NavBar";
 import ChatUI from "../../user_components/ChatUI/ChatUI";
 import NotificationPanel from "../components/NotificationPanel";
-import { FaEye } from 'react-icons/fa';
+import { FaEye } from "react-icons/fa";
+import { useNavigate } from "react-router-dom";
 
 const statusColors = {
   pending: "bg-yellow-100 text-yellow-800",
@@ -14,14 +15,14 @@ const statusColors = {
 };
 
 const truncateDescription = (text, maxLength = 80) => {
-  if (!text) return '';
+  if (!text) return "";
   if (text.length <= maxLength) return text;
   let truncated = text.substring(0, maxLength);
-  const lastSpace = truncated.lastIndexOf(' ');
+  const lastSpace = truncated.lastIndexOf(" ");
   if (lastSpace > -1) {
     truncated = truncated.substring(0, lastSpace);
   }
-  return truncated + '...';
+  return truncated + "...";
 };
 
 const TicketView = () => {
@@ -39,7 +40,8 @@ const TicketView = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
 
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState("");
+  const navigate = useNavigate();
 
   // const filteredTickets = tickets.filter(ticket =>
   //   Object.values(ticket).some(value =>
@@ -53,11 +55,11 @@ const TicketView = () => {
   const [isSystemDropdownOpen, setIsSystemDropdownOpen] = useState(false);
 
   // state variables for filter selections
-  const [selectedStatus, setSelectedStatus] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('');
-  const [selectedSystem, setSelectedSystem] = useState('');
+  const [selectedStatus, setSelectedStatus] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("");
+  const [selectedSystem, setSelectedSystem] = useState("");
 
-  // state variables for unique filter options 
+  // state variables for unique filter options
   const [uniqueStatuses, setUniqueStatuses] = useState([]);
   const [uniqueCategories, setUniqueCategories] = useState([]);
   const [uniqueSystems, setUniqueSystems] = useState([]);
@@ -68,42 +70,47 @@ const TicketView = () => {
     const categories = new Set();
     const systems = new Set();
 
-    tickets.forEach(ticket => {
+    tickets.forEach((ticket) => {
       if (ticket.status) statuses.add(ticket.status);
       if (ticket.category) categories.add(ticket.category);
       if (ticket.system_name) systems.add(ticket.system_name);
     });
 
     // Add empty string for "All" option and sort
-    setUniqueStatuses(['', ...Array.from(statuses).sort()]);
-    setUniqueCategories(['', ...Array.from(categories).sort()]);
-    setUniqueSystems(['', ...Array.from(systems).sort()]);
+    setUniqueStatuses(["", ...Array.from(statuses).sort()]);
+    setUniqueCategories(["", ...Array.from(categories).sort()]);
+    setUniqueSystems(["", ...Array.from(systems).sort()]);
   }, [tickets]);
 
   // only filters by ID and Description
-  const filteredTickets = tickets.filter(ticket =>
-    // String(ticket.id).toLowerCase().includes(searchQuery.toLowerCase()) ||
-    // String(ticket.status).toLowerCase().includes(searchQuery.toLowerCase()) ||
-    // String(ticket.category).toLowerCase().includes(searchQuery.toLowerCase()) ||
-    // String(ticket.system_name).toLowerCase().(searchQuery.toLowerCase())
-    String(ticket.id).toLowerCase().includes(searchQuery.toLowerCase()) ||
-    String(ticket.description).toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredTickets = tickets.filter(
+    (ticket) =>
+      // String(ticket.id).toLowerCase().includes(searchQuery.toLowerCase()) ||
+      // String(ticket.status).toLowerCase().includes(searchQuery.toLowerCase()) ||
+      // String(ticket.category).toLowerCase().includes(searchQuery.toLowerCase()) ||
+      // String(ticket.system_name).toLowerCase().(searchQuery.toLowerCase())
+      String(ticket.id).toLowerCase().includes(searchQuery.toLowerCase()) ||
+      String(ticket.description)
+        .toLowerCase()
+        .includes(searchQuery.toLowerCase())
   );
 
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
 
-  const finalFilteredTickets = filteredTickets.filter(ticket => {
+  const finalFilteredTickets = filteredTickets.filter((ticket) => {
     if (selectedStatus && ticket.status !== selectedStatus) return false;
     if (selectedCategory && ticket.category !== selectedCategory) return false;
     if (selectedSystem && ticket.system_name !== selectedSystem) return false;
     return true;
   });
 
-  const currentTickets = finalFilteredTickets.slice(indexOfFirstItem, indexOfLastItem);
+  const currentTickets = finalFilteredTickets.slice(
+    indexOfFirstItem,
+    indexOfLastItem
+  );
   const totalPages = Math.ceil(finalFilteredTickets.length / itemsPerPage);
   const paginate = (pageNumber) => setCurrentPage(pageNumber);
-
 
   const handleItemsPerPageChange = (e) => {
     setItemsPerPage(Number(e.target.value));
@@ -114,7 +121,6 @@ const TicketView = () => {
   const statusDropdownRef = useRef(null);
   const categoryDropdownRef = useRef(null);
   const systemDropdownRef = useRef(null);
-
 
   useEffect(() => {
     const fetchTickets = async () => {
@@ -159,42 +165,63 @@ const TicketView = () => {
   // useEffect for closing custom dropdowns when clicked outside
   useEffect(() => {
     const handleStatusDropdownClickOutside = (event) => {
-      if (statusDropdownRef.current && !statusDropdownRef.current.contains(event.target)) {
+      if (
+        statusDropdownRef.current &&
+        !statusDropdownRef.current.contains(event.target)
+      ) {
         setIsStatusDropdownOpen(false);
       }
     };
     const handleCategoryDropdownClickOutside = (event) => {
-      if (categoryDropdownRef.current && !categoryDropdownRef.current.contains(event.target)) {
+      if (
+        categoryDropdownRef.current &&
+        !categoryDropdownRef.current.contains(event.target)
+      ) {
         setIsCategoryDropdownOpen(false);
       }
     };
     const handleSystemDropdownClickOutside = (event) => {
-      if (systemDropdownRef.current && !systemDropdownRef.current.contains(event.target)) {
+      if (
+        systemDropdownRef.current &&
+        !systemDropdownRef.current.contains(event.target)
+      ) {
         setIsSystemDropdownOpen(false);
       }
     };
 
-    document.addEventListener('mousedown', handleStatusDropdownClickOutside);
-    document.addEventListener('mousedown', handleCategoryDropdownClickOutside);
-    document.addEventListener('mousedown', handleSystemDropdownClickOutside);
+    document.addEventListener("mousedown", handleStatusDropdownClickOutside);
+    document.addEventListener("mousedown", handleCategoryDropdownClickOutside);
+    document.addEventListener("mousedown", handleSystemDropdownClickOutside);
     return () => {
-      document.removeEventListener('mousedown', handleStatusDropdownClickOutside);
-      document.removeEventListener('mousedown', handleCategoryDropdownClickOutside);
-      document.removeEventListener('mousedown', handleSystemDropdownClickOutside);
+      document.removeEventListener(
+        "mousedown",
+        handleStatusDropdownClickOutside
+      );
+      document.removeEventListener(
+        "mousedown",
+        handleCategoryDropdownClickOutside
+      );
+      document.removeEventListener(
+        "mousedown",
+        handleSystemDropdownClickOutside
+      );
     };
   }, []);
 
   // useEffect for closing notification panel when clicked outside
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (notificationRef.current && !notificationRef.current.contains(event.target)) {
+      if (
+        notificationRef.current &&
+        !notificationRef.current.contains(event.target)
+      ) {
         setShowNotifications(false);
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
 
@@ -207,10 +234,12 @@ const TicketView = () => {
       if (!userId) return;
 
       try {
-        const response = await axios.get(`http://localhost:5000/api/notifications/count/${userId}`);
+        const response = await axios.get(
+          `http://localhost:5000/api/notifications/count/${userId}`
+        );
         setUnreadNotifications(response.data.count);
       } catch (error) {
-        console.error('Error fetching unread notifications:', error);
+        console.error("Error fetching unread notifications:", error);
       }
     };
 
@@ -223,7 +252,11 @@ const TicketView = () => {
     <div className="flex">
       <title>My All Tickets</title>
       <SideBar open={isSidebarOpen} setOpen={setIsSidebarOpen} />
-      <div className={`flex-1 ${isSidebarOpen ? 'ml-72' : 'ml-20'} flex flex-col h-screen overflow-y-auto transition-all duration-300`}>
+      <div
+        className={`flex-1 ${
+          isSidebarOpen ? "ml-72" : "ml-20"
+        } flex flex-col h-screen overflow-y-auto transition-all duration-300`}
+      >
         <NavBar
           isSidebarOpen={isSidebarOpen}
           showNotifications={showNotifications}
@@ -233,7 +266,10 @@ const TicketView = () => {
         />
         <div className="p-6 mt-[60px]">
           {showNotifications && (
-            <div ref={notificationRef} className="absolute right-4 top-[70px] z-50">
+            <div
+              ref={notificationRef}
+              className="absolute right-4 top-[70px] z-50"
+            >
               <NotificationPanel
                 userId={JSON.parse(localStorage.getItem("user"))?.UserID}
                 role={JSON.parse(localStorage.getItem("user"))?.Role}
@@ -245,8 +281,14 @@ const TicketView = () => {
           {/* Filter Options Section */}
           <div className="mb-6 flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4">
             {/* Status Filter*/}
-            <div className="flex flex-col flex-1 relative" ref={statusDropdownRef}>
-              <label htmlFor="statusFilterCustom" className="text-sm font-medium text-gray-700 mb-1">
+            <div
+              className="flex flex-col flex-1 relative"
+              ref={statusDropdownRef}
+            >
+              <label
+                htmlFor="statusFilterCustom"
+                className="text-sm font-medium text-gray-700 mb-1"
+              >
                 Filter by Status:
               </label>
               <button
@@ -256,23 +298,32 @@ const TicketView = () => {
               >
                 {selectedStatus || "All Statuses"}
                 <svg
-                  className={`w-4 h-4 transition-transform duration-200 ${isStatusDropdownOpen ? 'rotate-180' : 'rotate-0'
-                    }`}
+                  className={`w-4 h-4 transition-transform duration-200 ${
+                    isStatusDropdownOpen ? "rotate-180" : "rotate-0"
+                  }`}
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
                   xmlns="http://www.w3.org/2000/svg"
                 >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M19 9l-7 7-7-7"
+                  ></path>
                 </svg>
               </button>
               {isStatusDropdownOpen && (
                 <div className="absolute z-10 w-full bg-white border border-gray-300 rounded-md shadow-lg mt-1 max-h-60 overflow-y-auto">
                   {uniqueStatuses.map((statusOption) => (
                     <div
-                      key={statusOption || 'all-status'}
-                      className={`p-2 cursor-pointer hover:bg-gray-100 ${selectedStatus === statusOption ? 'bg-blue-100 font-semibold' : ''
-                        }`}
+                      key={statusOption || "all-status"}
+                      className={`p-2 cursor-pointer hover:bg-gray-100 ${
+                        selectedStatus === statusOption
+                          ? "bg-blue-100 font-semibold"
+                          : ""
+                      }`}
                       onClick={() => {
                         setSelectedStatus(statusOption);
                         setIsStatusDropdownOpen(false);
@@ -287,34 +338,51 @@ const TicketView = () => {
             </div>
 
             {/* Category Filter */}
-            <div className="flex flex-col flex-1 relative" ref={categoryDropdownRef}>
-              <label htmlFor="categoryFilterCustom" className="text-sm font-medium text-gray-700 mb-1">
+            <div
+              className="flex flex-col flex-1 relative"
+              ref={categoryDropdownRef}
+            >
+              <label
+                htmlFor="categoryFilterCustom"
+                className="text-sm font-medium text-gray-700 mb-1"
+              >
                 Filter by Category:
               </label>
               <button
                 id="categoryFilterCustom"
-                onClick={() => setIsCategoryDropdownOpen(!isCategoryDropdownOpen)}
+                onClick={() =>
+                  setIsCategoryDropdownOpen(!isCategoryDropdownOpen)
+                }
                 className="flex justify-between items-center p-2 border border-gray-300 rounded-md w-full focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-left cursor-pointer"
               >
                 {selectedCategory || "All Categories"}
                 <svg
-                  className={`w-4 h-4 transition-transform duration-200 ${isCategoryDropdownOpen ? 'rotate-180' : 'rotate-0'
-                    }`}
+                  className={`w-4 h-4 transition-transform duration-200 ${
+                    isCategoryDropdownOpen ? "rotate-180" : "rotate-0"
+                  }`}
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
                   xmlns="http://www.w3.org/2000/svg"
                 >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M19 9l-7 7-7-7"
+                  ></path>
                 </svg>
               </button>
               {isCategoryDropdownOpen && (
                 <div className="absolute z-10 w-full bg-white border border-gray-300 rounded-md shadow-lg mt-1 max-h-60 overflow-y-auto">
                   {uniqueCategories.map((categoryOption) => (
                     <div
-                      key={categoryOption || 'all-category'} // Added unique key for "All" option
-                      className={`p-2 cursor-pointer hover:bg-gray-100 ${selectedCategory === categoryOption ? 'bg-blue-100 font-semibold' : ''
-                        }`}
+                      key={categoryOption || "all-category"} // Added unique key for "All" option
+                      className={`p-2 cursor-pointer hover:bg-gray-100 ${
+                        selectedCategory === categoryOption
+                          ? "bg-blue-100 font-semibold"
+                          : ""
+                      }`}
                       onClick={() => {
                         setSelectedCategory(categoryOption);
                         setIsCategoryDropdownOpen(false);
@@ -329,8 +397,14 @@ const TicketView = () => {
             </div>
 
             {/* System Filter */}
-            <div className="flex flex-col flex-1 relative" ref={systemDropdownRef}>
-              <label htmlFor="systemFilterCustom" className="text-sm font-medium text-gray-700 mb-1">
+            <div
+              className="flex flex-col flex-1 relative"
+              ref={systemDropdownRef}
+            >
+              <label
+                htmlFor="systemFilterCustom"
+                className="text-sm font-medium text-gray-700 mb-1"
+              >
                 Filter by System:
               </label>
               <button
@@ -340,23 +414,32 @@ const TicketView = () => {
               >
                 {selectedSystem || "All Systems"}
                 <svg
-                  className={`w-4 h-4 transition-transform duration-200 ${isSystemDropdownOpen ? 'rotate-180' : 'rotate-0'
-                    }`}
+                  className={`w-4 h-4 transition-transform duration-200 ${
+                    isSystemDropdownOpen ? "rotate-180" : "rotate-0"
+                  }`}
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
                   xmlns="http://www.w3.org/2000/svg"
                 >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M19 9l-7 7-7-7"
+                  ></path>
                 </svg>
               </button>
               {isSystemDropdownOpen && (
                 <div className="absolute z-10 w-full bg-white border border-gray-300 rounded-md shadow-lg mt-1 max-h-60 overflow-y-auto">
                   {uniqueSystems.map((systemOption) => (
                     <div
-                      key={systemOption || 'all-system'} // Added unique key for "All" option
-                      className={`p-2 cursor-pointer hover:bg-gray-100 ${selectedSystem === systemOption ? 'bg-blue-100 font-semibold' : ''
-                        }`}
+                      key={systemOption || "all-system"} // Added unique key for "All" option
+                      className={`p-2 cursor-pointer hover:bg-gray-100 ${
+                        selectedSystem === systemOption
+                          ? "bg-blue-100 font-semibold"
+                          : ""
+                      }`}
                       onClick={() => {
                         setSelectedSystem(systemOption);
                         setIsSystemDropdownOpen(false);
@@ -388,7 +471,7 @@ const TicketView = () => {
             <p>Loading...</p>
           ) : tickets.length === 0 ? (
             <p>No tickets found.</p>
-          ) : currentTickets.length === 0 && searchQuery !== '' ? (
+          ) : currentTickets.length === 0 && searchQuery !== "" ? (
             <p>No matching tickets found for "{searchQuery}".</p>
           ) : (
             <div className="overflow-x-auto rounded-lg shadow border border-gray-200 w-full">
@@ -401,18 +484,20 @@ const TicketView = () => {
                     <th className="px-4 py-3 w-[15%]">System Name</th>
                     <th className="px-4 py-3 w-[15%]">Category</th>
                     <th className="px-4 py-3 w-[15%]">Date & Time</th>
-                    <th className="px-4 py-3 w-[10%] rounded-tr-lg text-center">Action</th>
+                    <th className="px-4 py-3 w-[10%] rounded-tr-lg text-center">
+                      Action
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {currentTickets.map((ticket) => (
                     <tr
                       key={ticket.id}
-                      // onClick={() => {
-                      //   setSelectedTicket(ticket);
-                      //   setActiveTab("details");
-                      //   setIsModalOpen(true);
-                      // }}
+                      onClick={() => {
+                        setSelectedTicket(ticket);
+                        setActiveTab("details");
+                        setIsModalOpen(true);
+                      }}
                       className="hover:bg-gray-50 cursor-pointer"
                     >
                       <td className="px-4 py-2 font-medium text-gray-900">
@@ -420,17 +505,21 @@ const TicketView = () => {
                       </td>
                       <td className="px-6 py-2">
                         <span
-                          className={`px-2 py-1 rounded-full text-xs font-medium ${statusColors[ticket.status?.toLowerCase()] ||
+                          className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            statusColors[ticket.status?.toLowerCase()] ||
                             "bg-gray-200 text-gray-800"
-                            }`}
+                          }`}
                         >
                           {ticket.status}
                         </span>
                       </td>
-                      <td className="px-4 py-2 text-justify whitespace-normal overflow-hidden break-words" style={{
-                        maxHeight: '3.6em',
-                        lineHeight: '1.2em'
-                      }}>
+                      <td
+                        className="px-4 py-2 text-justify whitespace-normal overflow-hidden break-words"
+                        style={{
+                          maxHeight: "3.6em",
+                          lineHeight: "1.2em",
+                        }}
+                      >
                         {truncateDescription(ticket.description, 120)}
                       </td>
 
@@ -445,9 +534,7 @@ const TicketView = () => {
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            setSelectedTicket(ticket);
-                            setActiveTab("details");
-                            setIsModalOpen(true);
+                            navigate(`/ticket/${ticket.id}`);
                           }}
                           className="text-blue-600 hover:text-blue-800 transition-colors cursor-pointer"
                         >
@@ -456,7 +543,6 @@ const TicketView = () => {
                       </td>
                     </tr>
                   ))}
-
                 </tbody>
               </table>
             </div>
@@ -467,7 +553,9 @@ const TicketView = () => {
           <div className="flex flex-col sm:flex-row justify-end items-center mt-4 p-4 bg-white rounded-lg shadow">
             <div className="flex items-center space-x-4">
               <div className="flex items-center">
-                <span className="text-gray-700 text-sm mr-2">Entries per page :</span>
+                <span className="text-gray-700 text-sm mr-2">
+                  Entries per page :
+                </span>
                 <select
                   value={itemsPerPage}
                   onChange={handleItemsPerPageChange}
@@ -480,7 +568,10 @@ const TicketView = () => {
                 </select>
               </div>
               <span className="text-gray-700 text-sm">
-                {` ${indexOfFirstItem + 1}-${Math.min(indexOfLastItem, finalFilteredTickets.length)} of ${finalFilteredTickets.length}`}
+                {` ${indexOfFirstItem + 1}-${Math.min(
+                  indexOfLastItem,
+                  finalFilteredTickets.length
+                )} of ${finalFilteredTickets.length}`}
               </span>
               <div className="flex items-center space-x-2">
                 <button
@@ -518,75 +609,8 @@ const TicketView = () => {
             </div>
           </div>
         )}
-
-        {isModalOpen && selectedTicket && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm">
-            <div
-              ref={modalRef}
-              className="bg-gray-100 rounded-lg shadow-xl w-[90%] max-w-md min-h-[500px] border border-gray-300 relative"
-            >
-              <div className="flex border-b border-gray-300 relative">
-                <button
-                  className={`px-4 py-2 w-1/2 text-sm font-medium rounded-tl-lg ${activeTab === "details"
-                    ? "bg-gray-900 text-white"
-                    : "bg-purple-100 text-gray-900"
-                    }`}
-                  onClick={() => setActiveTab("details")}
-                >
-                  Ticket Details
-                </button>
-                <button
-                  className={`px-4 py-2 w-1/2 text-sm font-medium rounded-tr-lg ${activeTab === "chat"
-                    ? "bg-gray-900 text-white"
-                    : "bg-purple-100 text-gray-900"
-                    }`}
-                  onClick={() => setActiveTab("chat")}
-                >
-                  Chat
-                </button>
-              </div>
-
-              <div className="p-4 text-sm h-[450px] overflow-y-auto">
-                {activeTab === "details" ? (
-                  <div className="space-y-3">
-                    <h2 className="font-bold mb-6 text-2xl">Ticket Details</h2>
-                    <p>
-                      <strong>Ticket ID:</strong> {selectedTicket.id}
-                    </p>
-                    <p>
-                      <strong>Status:</strong> {selectedTicket.status}
-                    </p>
-                    <p>
-                      <strong>Description:</strong>{" "}
-                      {selectedTicket.description}
-                    </p>
-                    <p>
-                      <strong>System Name:</strong> {selectedTicket.system_name}
-                    </p>
-                    <p>
-                      <strong>Category:</strong> {selectedTicket.category}
-                    </p>
-                    <p>
-                      <strong>Date & Time:</strong>{" "}
-                      {new Date(selectedTicket.datetime).toLocaleString()}
-                    </p>
-                    <p>
-                      <strong>Supervisor:</strong>{" "}
-                      {selectedTicket.supervisor_name || "Not Assigned"}
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    <h2 className="font-semibold mb-2">Chat</h2>
-                    <ChatUI ticketID={selectedTicket.id} />
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
       </div>
-    </div >
+    </div>
   );
 };
 
