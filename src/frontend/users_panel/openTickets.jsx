@@ -117,9 +117,15 @@ const OpenTickets = () => {
     <div className="flex">
       <title>Create Ticket</title>
       <SideBar open={isSidebarOpen} setOpen={setIsSidebarOpen} />
-      <div
+      {/* <div
         className={`flex-1 flex flex-col h-screen overflow-y-auto transition-all duration-300 ${isSidebarOpen ? "ml-72" : "ml-20"
           }`}
+      > */}
+       <div
+        className={`flex-1 flex flex-col h-screen overflow-y-auto transition-all duration-300
+          ml-0 
+          lg:ml-20 ${isSidebarOpen ? 'lg:ml-72' : ''} 
+        `}
       >
         <NavBar
           isSidebarOpen={isSidebarOpen}
@@ -127,6 +133,7 @@ const OpenTickets = () => {
           unreadNotifications={unreadNotifications}
           setShowNotifications={setShowNotifications}
           notificationRef={notificationRef}
+          setOpen={setIsSidebarOpen} 
         />
         <div className="p-6 mt-[60px]">
           {showNotifications && (

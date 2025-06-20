@@ -252,10 +252,16 @@ const TicketView = () => {
     <div className="flex">
       <title>My All Tickets</title>
       <SideBar open={isSidebarOpen} setOpen={setIsSidebarOpen} />
-      <div
+      {/* <div
         className={`flex-1 ${
           isSidebarOpen ? "ml-72" : "ml-20"
         } flex flex-col h-screen overflow-y-auto transition-all duration-300`}
+      > */}
+      <div
+        className={`flex-1 flex flex-col h-screen overflow-y-auto transition-all duration-300
+          ml-0 
+          lg:ml-20 ${isSidebarOpen ? 'lg:ml-72' : ''} 
+        `}
       >
         <NavBar
           isSidebarOpen={isSidebarOpen}
@@ -263,6 +269,7 @@ const TicketView = () => {
           unreadNotifications={unreadNotifications}
           setShowNotifications={setShowNotifications}
           notificationRef={notificationRef}
+          setOpen={setIsSidebarOpen}
         />
         <div className="p-6 mt-[60px]">
           {showNotifications && (
@@ -298,9 +305,8 @@ const TicketView = () => {
               >
                 {selectedStatus || "All Statuses"}
                 <svg
-                  className={`w-4 h-4 transition-transform duration-200 ${
-                    isStatusDropdownOpen ? "rotate-180" : "rotate-0"
-                  }`}
+                  className={`w-4 h-4 transition-transform duration-200 ${isStatusDropdownOpen ? "rotate-180" : "rotate-0"
+                    }`}
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -319,11 +325,10 @@ const TicketView = () => {
                   {uniqueStatuses.map((statusOption) => (
                     <div
                       key={statusOption || "all-status"}
-                      className={`p-2 cursor-pointer hover:bg-gray-100 ${
-                        selectedStatus === statusOption
+                      className={`p-2 cursor-pointer hover:bg-gray-100 ${selectedStatus === statusOption
                           ? "bg-blue-100 font-semibold"
                           : ""
-                      }`}
+                        }`}
                       onClick={() => {
                         setSelectedStatus(statusOption);
                         setIsStatusDropdownOpen(false);
@@ -357,9 +362,8 @@ const TicketView = () => {
               >
                 {selectedCategory || "All Categories"}
                 <svg
-                  className={`w-4 h-4 transition-transform duration-200 ${
-                    isCategoryDropdownOpen ? "rotate-180" : "rotate-0"
-                  }`}
+                  className={`w-4 h-4 transition-transform duration-200 ${isCategoryDropdownOpen ? "rotate-180" : "rotate-0"
+                    }`}
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -378,11 +382,10 @@ const TicketView = () => {
                   {uniqueCategories.map((categoryOption) => (
                     <div
                       key={categoryOption || "all-category"} // Added unique key for "All" option
-                      className={`p-2 cursor-pointer hover:bg-gray-100 ${
-                        selectedCategory === categoryOption
+                      className={`p-2 cursor-pointer hover:bg-gray-100 ${selectedCategory === categoryOption
                           ? "bg-blue-100 font-semibold"
                           : ""
-                      }`}
+                        }`}
                       onClick={() => {
                         setSelectedCategory(categoryOption);
                         setIsCategoryDropdownOpen(false);
@@ -414,9 +417,8 @@ const TicketView = () => {
               >
                 {selectedSystem || "All Systems"}
                 <svg
-                  className={`w-4 h-4 transition-transform duration-200 ${
-                    isSystemDropdownOpen ? "rotate-180" : "rotate-0"
-                  }`}
+                  className={`w-4 h-4 transition-transform duration-200 ${isSystemDropdownOpen ? "rotate-180" : "rotate-0"
+                    }`}
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -435,11 +437,10 @@ const TicketView = () => {
                   {uniqueSystems.map((systemOption) => (
                     <div
                       key={systemOption || "all-system"} // Added unique key for "All" option
-                      className={`p-2 cursor-pointer hover:bg-gray-100 ${
-                        selectedSystem === systemOption
+                      className={`p-2 cursor-pointer hover:bg-gray-100 ${selectedSystem === systemOption
                           ? "bg-blue-100 font-semibold"
                           : ""
-                      }`}
+                        }`}
                       onClick={() => {
                         setSelectedSystem(systemOption);
                         setIsSystemDropdownOpen(false);
@@ -505,10 +506,9 @@ const TicketView = () => {
                       </td>
                       <td className="px-6 py-2">
                         <span
-                          className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            statusColors[ticket.status?.toLowerCase()] ||
+                          className={`px-2 py-1 rounded-full text-xs font-medium ${statusColors[ticket.status?.toLowerCase()] ||
                             "bg-gray-200 text-gray-800"
-                          }`}
+                            }`}
                         >
                           {ticket.status}
                         </span>

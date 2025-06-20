@@ -7,6 +7,7 @@ import { AiOutlineUser } from "react-icons/ai";
 import { CiLogout } from "react-icons/ci";
 import { useAuth } from "../../App.jsx";
 import { toast } from "react-toastify";
+import { X } from "lucide-react";
 
 const Menus = [
   { title: "Dashboard", icon: <LuLayoutDashboard />, path: "/all-tickets" },
@@ -47,9 +48,15 @@ const SideBar = ({ open, setOpen }) => {
 
   return (
     <div className="flex">
-      <div
+      {/* <div
         className={`bg-gray-900 h-screen duration-300 p-5 pt-30 fixed top-0 left-0 z-50 transition-all
         ${open ? "w-72" : "w-20"}`}
+      > */}
+      <div
+        className={`bg-gray-900 h-screen duration-300 p-5 pt-30 fixed top-0 left-0 z-50 transition-all transform
+          ${open ? "w-72 translate-x-0" : "w-72 -translate-x-full"} /* Mobile: full width when open, slides off-screen when closed */
+          lg:translate-x-0 lg:block ${open ? "lg:w-72" : "lg:w-20"} /* Desktop: always visible, width toggles */
+        `}
       >
         <BsChevronLeft
           className={`absolute -right-3 mr-10 top-16 cursor-pointer text-white text-base transition-transform duration-300 z-50
@@ -57,6 +64,17 @@ const SideBar = ({ open, setOpen }) => {
           onClick={() => setOpen(!open)}
           aria-label="Toggle sidebar"
         />
+         {/* Close button for mobile sidebar - visible when open on small screens */}
+        {open && (
+          <button
+            className="absolute top-4 right-4 text-white text-2xl lg:hidden"
+            onClick={() => setOpen(false)}
+            aria-label="Close sidebar"
+            title="Close Sidebar"
+          >
+            <X />
+          </button>
+        )}
 
         <div className="flex flex-col h-full justify-between">
           <ul className="pt-8">
@@ -65,7 +83,8 @@ const SideBar = ({ open, setOpen }) => {
                 key={index}
                 className={`text-white text-sm flex items-center gap-x-4 mt-5 cursor-pointer p-2 rounded-md
                   ${location.pathname === menu.path ? "bg-gray-700" : "hover:bg-gray-700"}
-                  ${open ? "justify-between" : "justify-center"}`}
+                  ${open ? "justify-between" : "justify-center"}
+                   lg:justify-between `}
               >
                 <Link
                   to={menu.path}
@@ -100,14 +119,16 @@ const SideBar = ({ open, setOpen }) => {
             {/* Logout Button */}
             <li
               className={`text-white text-sm flex items-center gap-x-4 cursor-pointer p-2 rounded-md
-                hover:bg-gray-700 ${open ? "justify-between" : "justify-center"}`}
+                hover:bg-gray-700 ${open ? "justify-between" : "justify-center"} lg:justify-between`}
               onClick={handleConfirmLogout} // Show confirmation modal instead of immediate logout
             >
               <div className="flex items-center gap-x-4 w-full relative group">
                 <span className="text-2xl"><CiLogout /></span>
                 <span
                   className={`font-medium overflow-hidden whitespace-nowrap duration-300
-      ${open ? "opacity-100" : "opacity-0 w-0"}`}
+      ${open ? "opacity-100" : "opacity-0 w-0"}
+      lg:opacity-100 ${open ? "lg:w-auto" : "lg:w-0 lg:overflow-hidden"} 
+      `}
                 >
                   Log Out
                 </span>
