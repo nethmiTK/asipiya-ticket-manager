@@ -37,6 +37,7 @@ import SupervisorAssign from "./frontend/admin_panel/SupervisorAssign"
 import TicketView from "./frontend/users_panel/TicketView";
 import UserDetails from "./frontend/admin_panel/UserDetails";
 import ClientRegistration from "./frontend/admin_panel/ClientRegistration";
+import TicketDetails from "./frontend/users_panel/TicketDetails";
 
 // Create Auth Context - loggedInUser and setLoggedInUser
 const AuthContext = createContext(null);
@@ -148,6 +149,7 @@ const AppRoutes = ({
                 <Route path='/all-tickets' element={<UserDashboard />} />
                 <Route path='/open-tickets' element={<OpenTickets />} />
                 <Route path='/ticket-view' element={<TicketView />} />
+                <Route path="/ticket/:ticketId" element={<TicketDetails />} />
                 <Route
                     path='/user-dashboard'
                     element={
