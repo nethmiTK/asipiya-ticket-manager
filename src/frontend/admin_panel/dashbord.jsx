@@ -106,16 +106,38 @@ const TicketByStatusChart = () => {
   }, []);
 
   if (!chartData) {
-    return <p>Loading chart...</p>;
+    return (
+      <div className="bg-white p-6 rounded-lg shadow h-[400px] flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+      </div>
+    );
   }
 
   return (
-    <div className="bg-white p-4 rounded shadow">
-      <h2 className="text-lg font-semibold mb-4">Ticket by Status</h2>
-      <Pie data={chartData} />
-      <div className="mt-4">
+    <div className="bg-white p-6 rounded-lg shadow h-[400px] flex flex-col">
+      <h2 className="text-xl font-semibold mb-4">Ticket by Status</h2>
+      <div className="flex-1 relative">
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="w-full h-full max-w-[300px] max-h-[300px] mx-auto">
+            <Pie data={chartData} options={{ 
+              maintainAspectRatio: true,
+              responsive: true,
+              plugins: {
+                legend: {
+                  position: 'bottom',
+                  labels: {
+                    boxWidth: 12,
+                    padding: 15
+                  }
+                }
+              }
+            }} />
+          </div>
+        </div>
+      </div>
+      <div className="mt-4 flex justify-center gap-4">
         {chartData.labels.map((label, index) => (
-          <p key={index} className="text-sm">
+          <p key={index} className="text-sm flex items-center">
             <span
               className="inline-block w-3 h-3 mr-2 rounded"
               style={{ backgroundColor: chartData.datasets[0].backgroundColor[index] }}
@@ -407,7 +429,7 @@ const Dashboard = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <div className="bg-white p-6 rounded-lg shadow">
+        <div className="bg-white p-6 rounded-lg shadow h-[400px] overflow-y-auto">
           <h2 className="text-xl font-semibold mb-6">Recently Activity</h2>
           <div className="overflow-x-auto">
             <table className="min-w-full border-collapse">
@@ -445,7 +467,7 @@ const Dashboard = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <TicketByStatusChart />
-        <div className="bg-white p-6 rounded-lg shadow">
+        <div className="bg-white p-6 rounded-lg shadow h-[400px] overflow-y-auto">
           <h2 className="text-xl font-semibold mb-6">Recently Users</h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6">
             {recentUsers.map((user) => (

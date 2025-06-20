@@ -2982,3 +2982,22 @@ app.put('/api/tickets/:ticketId/resolution', async (req, res) => {
         res.status(500).json({ error: 'Failed to update ticket resolution' });
     }
 });
+
+// API endpoint to fetch companies
+app.get('/api/companies', (req, res) => {
+  const query = `
+    SELECT DISTINCT c.CompanyName
+    FROM client c
+    JOIN appuser au ON c.UserID = au.UserID
+    WHERE c.CompanyName IS NOT NULL
+    ORDER BY c.CompanyName
+  `;
+
+  db.query(query, (err, results) => {
+    if (err) {
+      console.error('Error fetching companies:', err);
+      return res.status(500).json({ error: 'Failed to fetch companies' });
+    }
+    res.json(results);
+  });
+});

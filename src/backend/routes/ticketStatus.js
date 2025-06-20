@@ -3,29 +3,44 @@ const router = express.Router();
 
 // Get filtered tickets
 router.get('/api/tickets/filter', async (req, res) => {
-  const { type } = req.query;
+  const { type, system, company } = req.query;
   
-  let whereClause = '';
+  let whereClause = [];
+  const params = [];
   const today = new Date().toISOString().split('T')[0];
   
-  switch (type) {
-    case 'open':
-      whereClause = "WHERE t.Status = 'Open'";
-      break;
-    case 'today':
-      whereClause = `WHERE DATE(t.DateTime) = '${today}'`;
-      break;
-    case 'pending':
-      whereClause = "WHERE t.Status = 'Pending'";
-      break;
-    case 'high':
-      whereClause = "WHERE t.Priority = 'High'";
-      break;
-    case 'resolved':
-      whereClause = "WHERE t.Status = 'Resolved'";
-      break;
-    default:
-      whereClause = '';
+  // Add type-based filtering
+  if (type) {
+    switch (type) {
+      case 'open':
+        whereClause.push("t.Status = 'Open'");
+        break;
+      case 'today':
+        whereClause.push(`DATE(t.DateTime) = ?`);
+        params.push(today);
+        break;
+      case 'pending':
+        whereClause.push("t.Status = 'Pending'");
+        break;
+      case 'high':
+        whereClause.push("t.Priority = 'High'");
+        break;
+      case 'resolved':
+        whereClause.push("t.Status = 'Resolved'");
+        break;
+    }
+  }
+
+  // Add system filtering
+  if (system) {
+    whereClause.push("s.SystemName = ?");
+    params.push(system);
+  }
+
+  // Add company filtering
+  if (company) {
+    whereClause.push("c.CompanyName = ?");
+    params.push(company);
   }
 
   const query = `
@@ -41,12 +56,12 @@ router.get('/api/tickets/filter', async (req, res) => {
     LEFT JOIN client c ON au.UserID = c.UserID
     LEFT JOIN asipiyasystem s ON t.AsipiyaSystemID = s.AsipiyaSystemID
     LEFT JOIN ticketcategory tc ON t.TicketCategoryID = tc.TicketCategoryID
-    ${whereClause}
+    ${whereClause.length > 0 ? 'WHERE ' + whereClause.join(' AND ') : ''}
     ORDER BY t.DateTime DESC
   `;
 
   try {
-    req.db.query(query, (err, results) => {
+    req.db.query(query, params, (err, results) => {
       if (err) {
         console.error('Error fetching tickets:', err);
         return res.status(500).json({ error: 'Failed to fetch tickets' });

@@ -13,8 +13,8 @@ const Pagination = ({
   const endItem = Math.min(currentPage * itemsPerPage, totalItems);
 
   return (
-    <div className="flex flex-col sm:flex-row justify-end items-center mt-4 p-4">
-      <div className="flex items-center space-x-4">
+    <div className="flex flex-col sm:flex-row justify-between items-center mt-4 p-4 bg-white rounded-lg shadow">
+      <div className="flex items-center space-x-4 mb-4 sm:mb-0">
         {/* Entries per page selector */}
         <div className="flex items-center">
           <span className="text-gray-700 text-sm mr-2">Entries per page:</span>
@@ -31,47 +31,51 @@ const Pagination = ({
         </div>
 
         {/* Items range display */}
-        <span className="text-gray-700 text-sm">
-          {totalItems > 0 
-            ? `${startItem}-${endItem} of ${totalItems}`
-            : 'No items'
+        <span className="text-gray-700 text-sm whitespace-nowrap">
+          {totalItems === 0 
+            ? 'No items found'
+            : `Showing ${startItem} to ${endItem} of ${totalItems} entries`
           }
         </span>
+      </div>
 
-        {/* Navigation buttons */}
-        <div className="flex items-center space-x-2">
-          <button
-            onClick={() => onPageChange(1)}
-            disabled={currentPage === 1}
-            className="px-3 py-1 rounded-md bg-gray-200 text-gray-700 hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-          >
-            &lt;&lt;
-          </button>
-          <button
-            onClick={() => onPageChange(currentPage - 1)}
-            disabled={currentPage === 1}
-            className="px-3 py-1 rounded-md bg-gray-200 text-gray-700 hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-          >
-            &lt;
-          </button>
-          <span className="text-gray-700 text-sm font-medium px-2">
-            {currentPage}
-          </span>
-          <button
-            onClick={() => onPageChange(currentPage + 1)}
-            disabled={currentPage === totalPages || totalPages === 0}
-            className="px-3 py-1 rounded-md bg-gray-200 text-gray-700 hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-          >
-            &gt;
-          </button>
-          <button
-            onClick={() => onPageChange(totalPages)}
-            disabled={currentPage === totalPages || totalPages === 0}
-            className="px-3 py-1 rounded-md bg-gray-200 text-gray-700 hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-          >
-            &gt;&gt;
-          </button>
-        </div>
+      {/* Navigation buttons */}
+      <div className="flex items-center space-x-2">
+        <button
+          onClick={() => onPageChange(1)}
+          disabled={currentPage === 1 || totalItems === 0}
+          className="px-3 py-1 rounded-md bg-gray-200 text-gray-700 hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+          title="First Page"
+        >
+          &lt;&lt;
+        </button>
+        <button
+          onClick={() => onPageChange(currentPage - 1)}
+          disabled={currentPage === 1 || totalItems === 0}
+          className="px-3 py-1 rounded-md bg-gray-200 text-gray-700 hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+          title="Previous Page"
+        >
+          &lt;
+        </button>
+        <span className="text-gray-700 text-sm font-medium px-2">
+          Page {totalItems === 0 ? 0 : currentPage} of {totalPages || 1}
+        </span>
+        <button
+          onClick={() => onPageChange(currentPage + 1)}
+          disabled={currentPage === totalPages || totalItems === 0}
+          className="px-3 py-1 rounded-md bg-gray-200 text-gray-700 hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+          title="Next Page"
+        >
+          &gt;
+        </button>
+        <button
+          onClick={() => onPageChange(totalPages)}
+          disabled={currentPage === totalPages || totalItems === 0}
+          className="px-3 py-1 rounded-md bg-gray-200 text-gray-700 hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+          title="Last Page"
+        >
+          &gt;&gt;
+        </button>
       </div>
     </div>
   );
