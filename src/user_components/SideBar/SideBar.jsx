@@ -65,7 +65,7 @@ const SideBar = ({ open, setOpen }) => {
           aria-label="Toggle sidebar"
         />
          {/* Close button for mobile sidebar - visible when open on small screens */}
-        {open && (
+        {/* {open && (
           <button
             className="absolute top-4 right-4 text-white text-2xl lg:hidden"
             onClick={() => setOpen(false)}
@@ -74,7 +74,7 @@ const SideBar = ({ open, setOpen }) => {
           >
             <X />
           </button>
-        )}
+        )} */}
 
         <div className="flex flex-col h-full justify-between">
           <ul className="pt-8">
