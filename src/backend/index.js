@@ -1202,99 +1202,28 @@ app.put('/api/tickets/:ticketId/priority', async (req, res) => {
 
 // Add comment to ticket
 app.post('/api/tickets/:ticketId/comments', async (req, res) => {
-    const { ticketId } = req.params;
-    const { comment, userId } = req.body;
-
-    // Get user details
-    const getUserQuery = `
-        SELECT 
-            au.FullName as commenterName,
-            t.UserId as ticketUserId,
-            t.SupervisorID
-        FROM appuser au
-        LEFT JOIN ticket t ON t.TicketID = ?
-        WHERE au.UserID = ?
-    `;
-
-    try {
-        const [userResults] = await new Promise((resolve, reject) => {
-            db.query(getUserQuery, [ticketId, userId], (err, results) => {
-                if (err) reject(err);
-                else resolve(results);
-            });
-        });
-
-        if (!userResults) {
-            return res.status(404).json({ message: "User or ticket not found" });
-        }
-
-        const commenterName = userResults.commenterName;
-
-        // Create ticket log entry
-        const logQuery = `
-            INSERT INTO ticketlog 
-            (TicketID, DateTime, Type, Description, UserID, Note)
-            VALUES (?, NOW(), ?, ?, ?, ?)
-        `;
-
-        const description = `Comment added by ${commenterName}`;
-
-        const [logResult] = await new Promise((resolve, reject) => {
-            db.query(
-                logQuery,
-                [ticketId, 'COMMENT', description, userId, comment],
-                (err, result) => {
-                    if (err) reject(err);
-                    else resolve(result);
-                }
-            );
-        });
-
-        // Update LastRespondedTime
-        await new Promise((resolve, reject) => {
-            db.query(
-                "UPDATE ticket SET LastRespondedTime = NOW() WHERE TicketID = ?",
-                [ticketId],
-                (err, result) => {
-                    if (err) reject(err);
-                    else resolve(result);
-                }
-            );
-        });
-
-        // Create notifications
-        try {
-            // Notify ticket creator if comment is from someone else
-            if (userId !== userResults.ticketUserId) {
-                await createNotification(
-                    userResults.ticketUserId,
-                    `New comment on ticket #${ticketId} by ${commenterName}`,
-                    'NEW_COMMENT',
-                    logResult.insertId
-                );
-            }
-
-            // Notify supervisor if exists and comment is from ticket creator
-            if (userResults.SupervisorID && userId === userResults.ticketUserId) {
-                await createNotification(
-                    userResults.SupervisorID,
-                    `Ticket creator added a comment to ticket #${ticketId}`,
-                    'CREATOR_COMMENT',
-                    logResult.insertId
-                );
-            }
-        } catch (error) {
-            console.error("Error creating notifications:", error);
-        }
-
-        res.json({ 
-            message: "Comment added successfully",
-            logId: logResult.insertId
-        });
-    } catch (error) {
-        console.error("Error adding comment:", error);
-        res.status(500).json({ message: "Server error" });
+  const { ticketId } = req.params;
+  const { userId, comment, mentions, mentionedUserIds } = req.body;
+  const sql = `CALL AddTicketComment(?, ?, ?, ?)`;
+  db.query(sql, [ticketId, userId, comment, mentions || null], async (err, result) => {
+    if (err) {
+      console.error('Error adding comment:', err);
+      return res.status(500).json({ message: 'Failed to add comment' });
     }
+
+    // Notify mentioned users
+    if (Array.isArray(mentionedUserIds)) {
+      for (const mentionedUserId of mentionedUserIds) {
+        await createNotification(
+          mentionedUserId,
+          `You were mentioned in a comment on ticket #${ticketId}`,
+          'MENTION'
+        );
+      }
+    }
+
+    res.status(201).json({ message: 'Comment added successfully' });
+  });
 });
 
 const storage = multer.diskStorage({
@@ -3061,6 +2990,34 @@ app.get('/api/companies', (req, res) => {
     }
     res.json(results);
   });
+});
+
+app.get('/api/tickets/:ticketId/comments', (req, res) => {
+  const { ticketId } = req.params;
+  const sql = `
+    SELECT c.CommentID, c.CommentText, c.CreatedAt, c.Mentions, u.FullName
+    FROM comments c
+    JOIN appuser u ON c.UserID = u.UserID
+    WHERE c.TicketID = ?
+    ORDER BY c.CreatedAt ASC
+  `;
+  db.query(sql, [ticketId], (err, results) => {
+    if (err) {
+      console.error('Error fetching comments:', err);
+      return res.status(500).json({ message: 'Failed to fetch comments' });
+    }
+    res.json(results);
+  });
+});
+
+app.get('/api/mentionable-users', (req, res) => {
+  db.query(
+    "SELECT UserID, FullName, Role FROM appuser WHERE Role IN ('Admin', 'Supervisor', 'Developer')",
+    (err, results) => {
+      if (err) return res.status(500).json({ error: 'Failed to fetch users' });
+      res.json(results);
+    }
+  );
 });
 
  

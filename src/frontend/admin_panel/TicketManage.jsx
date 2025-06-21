@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { FaBell } from "react-icons/fa6";
 import { MessageCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -39,6 +39,13 @@ export default function TicketManage() {
   const [selectedSupervisorId, setSelectedSupervisorId] = useState("");
   const [selectedSystem, setSelectedSystem] = useState("");
   const [activeTab, setActiveTab] = useState('details');
+  const [commentsList, setCommentsList] = useState([]);
+  const [mentionableUsers, setMentionableUsers] = useState([]);
+  const [mentionQuery, setMentionQuery] = useState('');
+  const [showMentionDropdown, setShowMentionDropdown] = useState(false);
+  const [mentionDropdownPos, setMentionDropdownPos] = useState({ top: 0, left: 0 });
+  const [filteredMentions, setFilteredMentions] = useState([]);
+  const textareaRef = useRef(null);
 
   // This computes which supervisorId to use based on user role and selection
   const supervisorIdToUse =
@@ -149,6 +156,29 @@ export default function TicketManage() {
     fetchTickets();
   }, []);
 
+  useEffect(() => {
+    if (!selectedTicket?.id) return;
+    const fetchComments = async () => {
+      try {
+        const res = await fetch(`http://localhost:5000/api/tickets/${selectedTicket.id}/comments`);
+        const data = await res.json();
+        setCommentsList(data);
+      } catch (err) {
+        console.error('Failed to load comments', err);
+      }
+    };
+    fetchComments();
+  }, [selectedTicket?.id]);
+
+  useEffect(() => {
+    if (selectedTicket) {
+      fetch('http://localhost:5000/api/mentionable-users')
+        .then(res => res.json())
+        .then(setMentionableUsers)
+        .catch(console.error);
+    }
+  }, [selectedTicket]);
+
   const handleCardClick = (ticket) => {
     setSelectedTicket(ticket);
     setComment("");
@@ -164,14 +194,25 @@ export default function TicketManage() {
   const handleAddComment = async () => {
     if (!selectedTicket || !comment.trim()) return;
 
+    // Extract mentions from comment text (e.g., @FullName)
+    const mentionMatches = comment.match(/@([\w\s]+)/g) || [];
+    const mentionedNames = mentionMatches.map(m => m.slice(1).trim());
+    const mentionedUserIds = mentionableUsers
+      .filter(u => mentionedNames.includes(u.FullName))
+      .map(u => u.UserID);
+
     try {
       await axios.post(`http://localhost:5000/api/tickets/${selectedTicket.id}/comments`, {
         comment: comment.trim(),
-        userId: user.UserID
+        userId: user.UserID,
+        mentions: mentionMatches.join(','),
+        mentionedUserIds,
       });
-
       setComment('');
       toast.success('Comment added successfully');
+      // Refresh comments
+      const res = await fetch(`http://localhost:5000/api/tickets/${selectedTicket.id}/comments`);
+      setCommentsList(await res.json());
     } catch (error) {
       console.error('Error adding comment:', error);
       toast.error('Failed to add comment');
@@ -325,6 +366,56 @@ const resolved = tickets
       toast.error("Failed to update due date");
     }
   };
+
+  function handleCommentChange(e) {
+    setComment(e.target.value);
+
+    // Detect if user is typing @mention
+    const caret = e.target.selectionStart;
+    const text = e.target.value.slice(0, caret);
+    const match = text.match(/@([\w\s]*)$/);
+    if (match) {
+      setMentionQuery(match[1]);
+      setShowMentionDropdown(true);
+      // Position dropdown below the textarea (simple, not pixel-perfect)
+      setMentionDropdownPos({ top: e.target.offsetTop + e.target.offsetHeight, left: e.target.offsetLeft });
+      setFilteredMentions(
+        mentionableUsers.filter(u =>
+          u.FullName.toLowerCase().includes(match[1].toLowerCase())
+        )
+      );
+    } else {
+      setShowMentionDropdown(false);
+      setMentionQuery('');
+    }
+  }
+
+  function handleMentionKeyUp(e) {
+    // If dropdown is open and user presses ArrowDown/ArrowUp/Enter, handle navigation/selection
+    // (Optional: for keyboard navigation)
+  }
+
+  function handleMentionSelect(user) {
+    // Insert @FullName at the current caret position
+    const textarea = textareaRef.current;
+    const caret = textarea.selectionStart;
+    const text = comment;
+    const match = text.slice(0, caret).match(/@([\w\s]*)$/);
+    if (match) {
+      const before = text.slice(0, caret - match[0].length);
+      const after = text.slice(caret);
+      const mentionText = `@${user.FullName} `;
+      const newComment = before + mentionText + after;
+      setComment(newComment);
+      setShowMentionDropdown(false);
+      setMentionQuery('');
+      // Move caret after inserted mention
+      setTimeout(() => {
+        textarea.focus();
+        textarea.setSelectionRange(before.length + mentionText.length, before.length + mentionText.length);
+      }, 0);
+    }
+  }
 
   return (
     <div className="flex">
@@ -639,16 +730,34 @@ const resolved = tickets
                   ) : (
                     <div className="space-y-4">
                       {/* Comments Section */}
-                      <div>
+                      <div className="relative">
                         <label className="block text-sm font-medium text-gray-700">Add Comment</label>
                         <div className="mt-1">
                           <textarea
+                            ref={textareaRef}
                             rows={3}
                             value={comment}
-                            onChange={(e) => setComment(e.target.value)}
+                            onChange={handleCommentChange}
+                            onKeyUp={handleMentionKeyUp}
                             className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                            placeholder="Type your comment here..."
+                            placeholder="Type your comment here... Use @ to mention users."
                           />
+                          {showMentionDropdown && filteredMentions.length > 0 && (
+                            <div
+                              className="absolute z-50 bg-white border rounded shadow-md mt-1 max-h-40 overflow-y-auto"
+                              style={{ top: mentionDropdownPos.top + 5, left: mentionDropdownPos.left, minWidth: 200 }}
+                            >
+                              {filteredMentions.map(user => (
+                                <div
+                                  key={user.UserID}
+                                  className="px-3 py-2 hover:bg-blue-100 cursor-pointer"
+                                  onMouseDown={e => { e.preventDefault(); handleMentionSelect(user); }}
+                                >
+                                  <span className="font-medium">@{user.FullName}</span> <span className="text-xs text-gray-400">({user.Role})</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
                         <button
                           onClick={handleAddComment}
@@ -658,7 +767,30 @@ const resolved = tickets
                           Add Comment
                         </button>
                       </div>
-                      {/* Here you can add the list of existing comments */}
+                      <div className="mt-4">
+                        <h4 className="font-semibold mb-2">Comments</h4>
+                        {commentsList.length === 0 ? (
+                          <p className="text-gray-500">No comments yet.</p>
+                        ) : (
+                          <ul className="space-y-2">
+                            {commentsList.map((c) => (
+                              <li key={c.CommentID} className="border rounded p-2 bg-gray-50">
+                                <div className="flex justify-between items-center">
+                                  <span className="font-medium">{c.FullName}</span>
+                                  <span className="text-xs text-gray-400">
+                                    {new Date(c.CreatedAt).toLocaleString()}
+                                  </span>
+                                </div>
+                                {c.Mentions && (
+                                  <div className="text-xs text-blue-600 mt-1">
+                                    Mentioned: {c.Mentions}
+                                  </div>
+                                )}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>
