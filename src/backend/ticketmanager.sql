@@ -164,26 +164,40 @@ CREATE TABLE IF NOT EXISTS `ticketcategory` (
 -- --------------------------------------------------------
 
 --
--- Table structure for table `ticketchat`
+-- Table structure for table `ticketcomments`
 --
 
-DROP TABLE IF EXISTS `ticketchat`;
-CREATE TABLE IF NOT EXISTS `ticketchat` (
-  `TicketChatID` int NOT NULL AUTO_INCREMENT,
-  `TicketID` int DEFAULT NULL,
-  `Type` varchar(45) DEFAULT NULL,
-  `Note` varchar(45) DEFAULT NULL,
-  `UserCustomerID` varchar(45) DEFAULT NULL,
-  `UserID` int DEFAULT NULL,
-  `Path` text,
-  PRIMARY KEY (`TicketChatID`),
+DROP TABLE IF EXISTS `ticketcomments`;
+CREATE TABLE IF NOT EXISTS `ticketcomments` (
+  `CommentID` INT NOT NULL AUTO_INCREMENT,
+  `TicketID` INT NOT NULL,
+  `UserID` INT NOT NULL,
+  `CommentText` TEXT NOT NULL,
+  `CreatedAt` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`CommentID`),
   KEY `TicketID` (`TicketID`),
-  KEY `UserID` (`UserID`)
-) ENGINE=MyISAM AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+  KEY `UserID` (`UserID`),
+  FOREIGN KEY (`TicketID`) REFERENCES `ticket`(`TicketID`) ON DELETE CASCADE,
+  FOREIGN KEY (`UserID`) REFERENCES `appuser`(`UserID`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- --------------------------------------------------------
 
 --
--- Dumping data for table `ticketchat`
- 
+-- Table structure for table `commentmentions`
+--
+
+DROP TABLE IF EXISTS `commentmentions`;
+CREATE TABLE IF NOT EXISTS `commentmentions` (
+  `MentionID` INT NOT NULL AUTO_INCREMENT,
+  `CommentID` INT NOT NULL,
+  `MentionedUserID` INT NOT NULL,
+  PRIMARY KEY (`MentionID`),
+  KEY `CommentID` (`CommentID`),
+  KEY `MentionedUserID` (`MentionedUserID`),
+  FOREIGN KEY (`CommentID`) REFERENCES `ticketcomments`(`CommentID`) ON DELETE CASCADE,
+  FOREIGN KEY (`MentionedUserID`) REFERENCES `appuser`(`UserID`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- --------------------------------------------------------
 

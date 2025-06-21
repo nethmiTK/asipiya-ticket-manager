@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { FaBell } from "react-icons/fa6";
 import { MessageCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -39,6 +39,13 @@ export default function TicketManage() {
   const [selectedSupervisorId, setSelectedSupervisorId] = useState("");
   const [selectedSystem, setSelectedSystem] = useState("");
   const [activeTab, setActiveTab] = useState('details');
+  const [commentsList, setCommentsList] = useState([]);
+  const [mentionableUsers, setMentionableUsers] = useState([]);
+  const [mentionQuery, setMentionQuery] = useState('');
+  const [showMentionDropdown, setShowMentionDropdown] = useState(false);
+  const [mentionDropdownPos, setMentionDropdownPos] = useState({ top: 0, left: 0 });
+  const [filteredMentions, setFilteredMentions] = useState([]);
+  const textareaRef = useRef(null);
 
   // This computes which supervisorId to use based on user role and selection
   const supervisorIdToUse =
@@ -149,6 +156,29 @@ export default function TicketManage() {
     fetchTickets();
   }, []);
 
+  useEffect(() => {
+    if (!selectedTicket?.id) return;
+    const fetchComments = async () => {
+      try {
+        const res = await fetch(`http://localhost:5000/api/tickets/${selectedTicket.id}/comments`);
+        const data = await res.json();
+        setCommentsList(data);
+      } catch (err) {
+        console.error('Failed to load comments', err);
+      }
+    };
+    fetchComments();
+  }, [selectedTicket?.id]);
+
+  useEffect(() => {
+    if (selectedTicket) {
+      fetch('http://localhost:5000/api/mentionable-users')
+        .then(res => res.json())
+        .then(setMentionableUsers)
+        .catch(console.error);
+    }
+  }, [selectedTicket]);
+
   const handleCardClick = (ticket) => {
     setSelectedTicket(ticket);
     setComment("");
@@ -164,14 +194,25 @@ export default function TicketManage() {
   const handleAddComment = async () => {
     if (!selectedTicket || !comment.trim()) return;
 
+    // Extract mentions from comment text (e.g., @FullName)
+    const mentionMatches = comment.match(/@([\w\s]+)/g) || [];
+    const mentionedNames = mentionMatches.map(m => m.slice(1).trim());
+    const mentionedUserIds = mentionableUsers
+      .filter(u => mentionedNames.includes(u.FullName))
+      .map(u => u.UserID);
+
     try {
       await axios.post(`http://localhost:5000/api/tickets/${selectedTicket.id}/comments`, {
         comment: comment.trim(),
-        userId: user.UserID
+        userId: user.UserID,
+        mentions: mentionMatches.join(','),
+        mentionedUserIds,
       });
-
       setComment('');
       toast.success('Comment added successfully');
+      // Refresh comments
+      const res = await fetch(`http://localhost:5000/api/tickets/${selectedTicket.id}/comments`);
+      setCommentsList(await res.json());
     } catch (error) {
       console.error('Error adding comment:', error);
       toast.error('Failed to add comment');
@@ -272,7 +313,7 @@ const resolved = tickets
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ status: newStatus }),
+          body: JSON.stringify({ status: newStatus, userId: user.UserID }),
         }
       );
 
@@ -305,7 +346,7 @@ const resolved = tickets
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ dueDate: newDueDate }), // send ISO date
+          body: JSON.stringify({ dueDate: newDueDate, userId: user.UserID }), // send ISO date and userId
         }
       );
 
@@ -325,6 +366,57 @@ const resolved = tickets
       toast.error("Failed to update due date");
     }
   };
+
+  function handleCommentChange(e) {
+    setComment(e.target.value);
+
+    // Detect if user is typing @mention
+    const caret = e.target.selectionStart;
+    const text = e.target.value.slice(0, caret);
+    const match = text.match(/@([\w\s]*)$/);
+    if (match) {
+      setMentionQuery(match[1]);
+      setShowMentionDropdown(true);
+      setMentionDropdownPos({ top: e.target.offsetTop + e.target.offsetHeight, left: e.target.offsetLeft });
+      setFilteredMentions(
+        mentionableUsers.filter(u =>
+          u.FullName.toLowerCase().includes(match[1].toLowerCase())
+        )
+      );
+    } else {
+      setShowMentionDropdown(false);
+      setMentionQuery('');
+    }
+  }
+
+  function handleMentionKeyUp(e) {
+    // If dropdown is open and user presses ArrowDown/ArrowUp/Enter, handle navigation/selection
+    // (Optional: for keyboard navigation)
+  }
+
+  function handleMentionSelect(user) {
+    // Insert @FullName at the current caret position
+    const textarea = textareaRef.current;
+    const caret = textarea.selectionStart;
+    const text = comment;
+    const match = text.slice(0, caret).match(/@([\w\s]*)$/);
+    if (match) {
+      const before = text.slice(0, caret - match[0].length);
+      const after = text.slice(caret);
+      const mentionText = `@${user.FullName} `;
+      const newComment = before + mentionText + after;
+      setComment(newComment);
+      setShowMentionDropdown(false);
+      setMentionQuery('');
+      // Move caret after inserted mention
+      setTimeout(() => {
+        textarea.focus();
+        textarea.setSelectionRange(before.length + mentionText.length, before.length + mentionText.length);
+      }, 0);
+    }
+  }
+ 
+
 
   return (
     <div className="flex">
@@ -639,26 +731,74 @@ const resolved = tickets
                   ) : (
                     <div className="space-y-4">
                       {/* Comments Section */}
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700">Add Comment</label>
-                        <div className="mt-1">
+                      <div className="relative mb-6 p-4 border rounded-lg bg-gray-50 shadow-sm">
+                        <label className="block text-lg font-semibold text-gray-800 mb-3">Add Comment</label>
+                        <div className="flex flex-col gap-3">
                           <textarea
-                            rows={3}
+                            ref={textareaRef}
+                            rows={4} // Increased rows for better initial visibility
                             value={comment}
-                            onChange={(e) => setComment(e.target.value)}
-                            className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                            placeholder="Type your comment here..."
+                            onChange={handleCommentChange}
+                            onKeyUp={handleMentionKeyUp}
+                            className="block w-full rounded-md border border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 resize-y p-3 transition duration-200 ease-in-out"
+                            placeholder="Type your comment here... Use @ to mention users."
+                            style={{ minHeight: 80 }}
                           />
+                        
                         </div>
+                        {showMentionDropdown && filteredMentions.length > 0 && (
+                          <div
+                            className="absolute z-50 bg-white border border-blue-300 rounded-lg shadow-xl mt-2 max-h-48 overflow-y-auto w-full md:w-auto"
+                            style={{ top: mentionDropdownPos.top + 10, left: mentionDropdownPos.left, minWidth: 200 }}
+                          >
+                            {filteredMentions.map(user => (
+                              <div
+                                key={user.UserID}
+                                className="px-4 py-2 hover:bg-blue-50 cursor-pointer flex items-center gap-2"
+                                onMouseDown={e => { e.preventDefault(); handleMentionSelect(user); }}
+                              >
+                                <span className="font-medium text-blue-700">@{user.FullName}</span> <span className="text-sm text-gray-500">({user.Role})</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                         <button
                           onClick={handleAddComment}
                           disabled={!comment.trim()}
-                          className="mt-2 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-gray-400"
+                          className="mt-4 inline-flex items-center px-5 py-2.5 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-gray-400 transition duration-200 ease-in-out"
                         >
                           Add Comment
                         </button>
                       </div>
-                      {/* Here you can add the list of existing comments */}
+                      <div className="mt-8">
+                        <h4 className="font-semibold text-xl text-gray-800 mb-4">Comments</h4>
+                        {commentsList.length === 0 ? (
+                          <p className="text-gray-500 text-center py-4 border rounded-lg bg-white shadow-sm">No comments yet. Be the first to add one!</p>
+                        ) : (
+                          <ul className="space-y-4">
+                            {commentsList.slice().reverse().map((c) => (
+                              <li key={c.CommentID} className="border border-gray-200 rounded-lg bg-white p-4 flex flex-col sm:flex-row sm:items-start justify-between shadow-md hover:shadow-lg transition-shadow duration-200 ease-in-out">
+                                <div className="flex-1">
+                                  <div className="font-bold text-lg text-gray-900 mb-1">{c.FullName}</div>
+                                  {c.Mentions && c.Mentions.trim() && (
+                                    <div className="text-sm text-blue-600 font-medium mb-2 flex flex-wrap items-center gap-x-2">
+                                      {c.Mentions.split(',').map((m, idx) =>
+                                        m.trim() ? (
+                                          <span key={idx} className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full text-xs font-semibold">{m.trim()}</span>
+                                        ) : null
+                                      )}
+                                    </div>
+                                  )}
+                                  <div className="mt-2 text-gray-800 leading-relaxed whitespace-pre-wrap text-base">{c.CommentText}</div>
+                                </div>
+                                <div className="text-xs text-gray-500 mt-3 sm:mt-0 sm:ml-4 text-right flex-shrink-0 min-w-[140px]">
+                                  {new Date(c.CreatedAt).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })}
+                                </div>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>

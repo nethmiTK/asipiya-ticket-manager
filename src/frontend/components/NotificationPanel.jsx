@@ -88,6 +88,15 @@ const NotificationPanel = ({ userId, role, onClose }) => {
         return '#';
     };
 
+    const markAllAsRead = async () => {
+        try {
+            await axios.put(`http://localhost:5000/api/notifications/read-all/${userId}`);
+            setNotifications(notifications.map(notification => ({ ...notification, IsRead: true })));
+        } catch (error) {
+            console.error('Error marking all notifications as read:', error);
+        }
+    };
+
     if (loading) {
         return (
             <div className="bg-white rounded-lg shadow-lg w-96 p-4">
@@ -114,6 +123,14 @@ const NotificationPanel = ({ userId, role, onClose }) => {
         <div className="bg-white rounded-lg shadow-lg w-96 max-h-[80vh] flex flex-col">
             <div className="flex justify-between items-center p-4 border-b">
                 <h2 className="text-lg font-semibold">Notifications</h2>
+                {notifications.some(notif => !notif.IsRead) && (
+                    <button 
+                        onClick={markAllAsRead}
+                        className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                    >
+                        Mark all as read
+                    </button>
+                )}
                 <button 
                     onClick={onClose}
                     className="text-gray-500 hover:text-gray-700"
