@@ -4,10 +4,12 @@ import { useParams, useNavigate } from 'react-router-dom';
 import AdminSideBar from '../../user_components/SideBar/AdminSideBar';
 import { toast } from 'react-toastify';
 import { IoArrowBack } from 'react-icons/io5';
+import { useAuth } from '../../App.jsx';
 
 const SupervisorAssignPage = ({ ticketId }) => {
   const params = useParams();
   const navigate = useNavigate();
+  const { loggedInUser: user } = useAuth();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [ticketData, setTicketData] = useState(null);
   const [supervisors, setSupervisors] = useState([]);
@@ -55,7 +57,8 @@ const SupervisorAssignPage = ({ ticketId }) => {
     axios.put(`http://localhost:5000/api/tickets/${id}/assign`, {
       supervisorId: selectedSupervisor,
       status: finalStatus,
-      priority
+      priority,
+      assignerId: user.UserID
     })
     .then(response => {
       if (response.data.status === 'success') {

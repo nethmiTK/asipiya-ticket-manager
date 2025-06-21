@@ -313,7 +313,7 @@ const resolved = tickets
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ status: newStatus }),
+          body: JSON.stringify({ status: newStatus, userId: user.UserID }),
         }
       );
 
@@ -346,7 +346,7 @@ const resolved = tickets
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ dueDate: newDueDate }), // send ISO date
+          body: JSON.stringify({ dueDate: newDueDate, userId: user.UserID }), // send ISO date and userId
         }
       );
 
@@ -377,7 +377,6 @@ const resolved = tickets
     if (match) {
       setMentionQuery(match[1]);
       setShowMentionDropdown(true);
-      // Position dropdown below the textarea (simple, not pixel-perfect)
       setMentionDropdownPos({ top: e.target.offsetTop + e.target.offsetHeight, left: e.target.offsetLeft });
       setFilteredMentions(
         mentionableUsers.filter(u =>
@@ -416,6 +415,8 @@ const resolved = tickets
       }, 0);
     }
   }
+ 
+
 
   return (
     <div className="flex">
@@ -731,34 +732,36 @@ const resolved = tickets
                     <div className="space-y-4">
                       {/* Comments Section */}
                       <div className="relative">
-                        <label className="block text-sm font-medium text-gray-700">Add Comment</label>
-                        <div className="mt-1">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Add Comment</label>
+                        <div className="flex gap-2 items-center">
                           <textarea
                             ref={textareaRef}
                             rows={3}
                             value={comment}
                             onChange={handleCommentChange}
                             onKeyUp={handleMentionKeyUp}
-                            className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                            className="block w-full rounded-md border border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 resize-none p-2"
                             placeholder="Type your comment here... Use @ to mention users."
+                            style={{ minHeight: 60 }}
                           />
-                          {showMentionDropdown && filteredMentions.length > 0 && (
-                            <div
-                              className="absolute z-50 bg-white border rounded shadow-md mt-1 max-h-40 overflow-y-auto"
-                              style={{ top: mentionDropdownPos.top + 5, left: mentionDropdownPos.left, minWidth: 200 }}
-                            >
-                              {filteredMentions.map(user => (
-                                <div
-                                  key={user.UserID}
-                                  className="px-3 py-2 hover:bg-blue-100 cursor-pointer"
-                                  onMouseDown={e => { e.preventDefault(); handleMentionSelect(user); }}
-                                >
-                                  <span className="font-medium">@{user.FullName}</span> <span className="text-xs text-gray-400">({user.Role})</span>
-                                </div>
-                              ))}
-                            </div>
-                          )}
+                        
                         </div>
+                        {showMentionDropdown && filteredMentions.length > 0 && (
+                          <div
+                            className="absolute z-50 bg-white border rounded shadow-md mt-1 max-h-40 overflow-y-auto"
+                            style={{ top: mentionDropdownPos.top + 5, left: mentionDropdownPos.left, minWidth: 200 }}
+                          >
+                            {filteredMentions.map(user => (
+                              <div
+                                key={user.UserID}
+                                className="px-3 py-2 hover:bg-blue-100 cursor-pointer"
+                                onMouseDown={e => { e.preventDefault(); handleMentionSelect(user); }}
+                              >
+                                <span className="font-medium">@{user.FullName}</span> <span className="text-xs text-gray-400">({user.Role})</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                         <button
                           onClick={handleAddComment}
                           disabled={!comment.trim()}
@@ -772,20 +775,25 @@ const resolved = tickets
                         {commentsList.length === 0 ? (
                           <p className="text-gray-500">No comments yet.</p>
                         ) : (
-                          <ul className="space-y-2">
+                          <ul className="space-y-3">
                             {commentsList.map((c) => (
-                              <li key={c.CommentID} className="border rounded p-2 bg-gray-50">
-                                <div className="flex justify-between items-center">
-                                  <span className="font-medium">{c.FullName}</span>
-                                  <span className="text-xs text-gray-400">
-                                    {new Date(c.CreatedAt).toLocaleString()}
-                                  </span>
+                              <li key={c.CommentID} className="border rounded-lg bg-white p-3 flex flex-col sm:flex-row sm:items-center justify-between shadow-sm">
+                                <div className="flex-1">
+                                  <div className="font-semibold text-gray-800">{c.FullName}</div>
+                                  {c.Mentions && c.Mentions.trim() && (
+                                    <div className="text-xs text-blue-700 mb-1">
+                                      Mentioned: {c.Mentions.split(',').map((m, idx) =>
+                                        m.trim() ? (
+                                          <span key={idx} className="font-semibold mr-2">{m.trim()}</span>
+                                        ) : null
+                                      )}
+                                    </div>
+                                  )}
+                                  <div className="mt-1 text-gray-700 text-sm">{c.CommentText}</div>
                                 </div>
-                                {c.Mentions && (
-                                  <div className="text-xs text-blue-600 mt-1">
-                                    Mentioned: {c.Mentions}
-                                  </div>
-                                )}
+                                <div className="text-xs text-gray-400 mt-2 sm:mt-0 sm:ml-4 text-right min-w-[120px]">
+                                  {new Date(c.CreatedAt).toLocaleString()}
+                                </div>
                               </li>
                             ))}
                           </ul>

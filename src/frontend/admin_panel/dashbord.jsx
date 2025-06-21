@@ -21,6 +21,7 @@ import {
   BarElement,
   Title
 } from "chart.js";
+import { format } from 'date-fns';
 import RecentlyActivity from "./RecentlyActivity";
 import { useAuth } from '../../App.jsx';
 import Ticket_secret from "./Ticket_secret";
@@ -295,38 +296,6 @@ const Dashboard = () => {
   const [recentUsers, setRecentUsers] = useState([]);
   const [selectedTicket, setSelectedTicket] = useState(null);
 
-  // Add status color function
-  const getStatusColor = (status) => {
-    switch (status?.toLowerCase()) {
-      case "open":
-        return "text-blue-500";
-      case "in progress":
-        return "text-yellow-500";
-      case "resolved":
-        return "text-green-500";
-      case "rejected":
-        return "text-red-500";
-      case "pending":
-        return "text-orange-500";
-      default:
-        return "text-gray-500";
-    }
-  };
-
-  // Add priority color function
-  const getPriorityColor = (priority) => {
-    switch (priority?.toLowerCase()) {
-      case "high":
-        return "text-red-500";
-      case "medium":
-        return "text-yellow-500";
-      case "low":
-        return "text-green-500";
-      default:
-        return "text-gray-500";
-    }
-  };
-
   useEffect(() => {
     const fetchCounts = async () => {
       try {
@@ -343,11 +312,11 @@ const Dashboard = () => {
   useEffect(() => {
     const fetchRecentData = async () => {
       try {
-        const [activitiesRes, usersRes] = await Promise.all([
-          axios.get("http://localhost:5000/api/tickets/recent-activities"),
+        const [logRes, usersRes] = await Promise.all([
+          axios.get("http://localhost:5000/api/ticket-logs/recent"),
           axios.get("http://localhost:5000/api/users/recent")
         ]);
-        setRecentActivities(activitiesRes.data);
+        setRecentActivities(logRes.data);
         setRecentUsers(usersRes.data);
       } catch (error) {
         console.error("Error fetching recent data:", error);
@@ -373,7 +342,6 @@ const Dashboard = () => {
     setIsNotificationOpen(!isNotificationOpen);
   };
 
-  // Add this new function
   const handleUserClick = (userId) => {
     navigate(`/user-details/${userId}`);
   };
@@ -439,26 +407,20 @@ const Dashboard = () => {
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ticket ID</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date Time</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Priority</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {recentActivities.map((ticket) => (
-                  <tr key={ticket.TicketID} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">#{ticket.TicketID}</td>
-                    <td className="px-4 py-3 text-sm text-gray-500 max-w-xs truncate">{ticket.Description}</td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm">
-                      <span className={`${getStatusColor(ticket.Status)} font-medium`}>
-                        {ticket.Status}
-                      </span>
+                {recentActivities.map((log) => (
+                  <tr key={log.TicketID + log.DateTime} className="hover:bg-gray-50">
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">#{log.TicketID}</td>
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                      {format(new Date(log.DateTime), 'yyyy-MM-dd HH:mm:ss')}
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm">
-                      <span className={`${getPriorityColor(ticket.Priority)} font-medium`}>
-                        {ticket.Priority}
-                      </span>
-                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">{log.Type}</td>
+                    <td className="px-4 py-3 text-sm text-gray-500 max-w-xs truncate">{log.Description}</td>
                   </tr>
                 ))}
               </tbody>
@@ -611,7 +573,6 @@ const DashboardLayout = () => {
             </div>
           </header>
 
-          {/* Notification Panel */}
           {showNotifications && (
             <div ref={notificationRef} className="absolute right-4 top-32 z-50">
               <NotificationPanel

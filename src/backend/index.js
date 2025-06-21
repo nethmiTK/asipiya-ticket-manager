@@ -16,6 +16,7 @@ import crypto from 'crypto';
 import util from 'util'; 
 import ticketLogRoutes from './routes/ticketLog.js';
 import userProfileRoutes from './routes/userProfile.js';
+import axios from 'axios';
 
 // --- Database Connection ---
 const db = mysql.createConnection({
@@ -951,7 +952,7 @@ const createTicketLog = async (ticketId, type, description, userId, oldValue, ne
             VALUES (?, NOW(), ?, ?, ?, ?, ?)
         `;
         
-        // Get user info for the log description
+        // Get user info for the log description - REVERTED CHANGE
         const userQuery = 'SELECT FullName, Role FROM appuser WHERE UserID = ?';
         db.query(userQuery, [userId], (userErr, userResults) => {
             if (userErr) {
@@ -986,119 +987,28 @@ const createTicketLog = async (ticketId, type, description, userId, oldValue, ne
 
 // In the status change handler:
 app.put('/api/tickets/:ticketId/status', async (req, res) => {
-    const { ticketId } = req.params;
-    const { status, userId } = req.body;
+  const { ticketId } = req.params;
+  const { status, userId } = req.body; // <-- userId must be sent from frontend
 
-    // First get the current ticket and user details
-    const getTicket = `
-        SELECT 
-            t.Status, 
-            t.UserId as ticketUserId,
-            t.SupervisorID,
-            au.FullName as updatedByName,
-            au_creator.FullName as creatorName
-        FROM ticket t
-        LEFT JOIN appuser au ON au.UserID = ?
-        LEFT JOIN appuser au_creator ON au_creator.UserID = t.UserId
-        WHERE t.TicketID = ?
-    `;
-    
-    try {
-        const [ticketResults] = await new Promise((resolve, reject) => {
-            db.query(getTicket, [userId, ticketId], (err, results) => {
-                if (err) reject(err);
-                else resolve(results);
-            });
-        });
+  // 1. Get old status
+  db.query('SELECT Status FROM ticket WHERE TicketID = ?', [ticketId], (err, results) => {
+    if (err || results.length === 0) return res.status(500).json({ message: 'Error' });
+    const oldStatus = results[0].Status;
 
-        if (!ticketResults) {
-            return res.status(404).json({ message: "Ticket not found" });
-        }
+    // 2. Update ticket
+    db.query('UPDATE ticket SET Status = ? WHERE TicketID = ?', [status, ticketId], (err2) => {
+      if (err2) return res.status(500).json({ message: 'Error updating status' });
 
-        const oldStatus = ticketResults.Status;
-        const ticketUserId = ticketResults.ticketUserId;
-        const updatedByName = ticketResults.updatedByName;
-
-        // Update the ticket status
-        const updateQuery = "UPDATE ticket SET Status = ?, LastRespondedTime = NOW() WHERE TicketID = ?";
-        
-        await new Promise((resolve, reject) => {
-            db.query(updateQuery, [status, ticketId], (err, result) => {
-                if (err) reject(err);
-                else resolve(result);
-            });
-        });
-
-        // Create ticket log entry
-        const logQuery = `
-            INSERT INTO ticketlog 
-            (TicketID, DateTime, Type, Description, UserID, OldValue, NewValue, Note)
-            VALUES (?, NOW(), ?, ?, ?, ?, ?, ?)
-        `;
-
-        const description = `Status changed from ${oldStatus} to ${status}`;
-        const note = `Updated by ${updatedByName}`;
-
-        const [logResult] = await new Promise((resolve, reject) => {
-            db.query(
-                logQuery,
-                [ticketId, 'STATUS_CHANGE', description, userId, oldStatus, status, note],
-                (err, result) => {
-                    if (err) reject(err);
-                    else resolve(result);
-                }
-            );
-        });
-
-        // Create notifications
-        try {
-            // Notify ticket creator
-            await createNotification(
-                ticketUserId,
-                `Your ticket #${ticketId} status has been updated from ${oldStatus} to ${status} by ${updatedByName}`,
-                'STATUS_UPDATE',
-                logResult.insertId
-            );
-
-            // If status changed to "In Progress", notify about supervisor assignment
-            if (status === 'In Progress' && ticketResults.SupervisorID) {
-                await createNotification(
-                    ticketUserId,
-                    `Your ticket #${ticketId} has been moved to In Progress status. Please review it.`,
-                    'TICKET_IN_PROCESS',
-                    logResult.insertId
-                );
-
-                // Notify supervisor
-                await createNotification(
-                    ticketResults.SupervisorID,
-                    `Ticket #${ticketId} has been moved to In Progress status. Please review it.`,
-                    'TICKET_NEEDS_ATTENTION',
-                    logResult.insertId
-                );
-            }
-
-            // If status changed to "Resolved"
-            if (status === 'Resolved') {
-                await createNotification(
-                    ticketUserId,
-                    `Your ticket #${ticketId} has been marked as resolved by ${updatedByName}. Please review the resolution.`,
-                    'TICKET_RESOLVED',
-                    logResult.insertId
-                );
-            }
-        } catch (error) {
-            console.error("Error creating notifications:", error);
-        }
-
-        res.json({ 
-            message: "Ticket status updated successfully",
-            logId: logResult.insertId
-        });
-    } catch (error) {
-        console.error("Error updating ticket status:", error);
-        res.status(500).json({ message: "Server error" });
-    }
+      // 3. Log
+      const desc = `Status changed from ${oldStatus} to ${status}`;
+      db.query(
+        'INSERT INTO ticketlog (TicketID, DateTime, Type, Description, UserID, OldValue, NewValue) VALUES (?, NOW(), ?, ?, ?, ?, ?)',
+        [ticketId, 'STATUS_CHANGE', desc, userId, oldStatus, status],
+        () => {}
+      );
+      res.json({ message: 'Status updated and logged' });
+    });
+  });
 });
 
 // Update ticket priority
@@ -1211,7 +1121,19 @@ app.post('/api/tickets/:ticketId/comments', async (req, res) => {
       return res.status(500).json({ message: 'Failed to add comment' });
     }
 
-    // Notify mentioned users
+    // Add to ticketlog
+    const logSql = `
+      INSERT INTO ticketlog (TicketID, DateTime, Type, Description, UserID)
+      VALUES (?, NOW(), 'COMMENT', ?, ?)
+    `;
+    db.query(logSql, [ticketId, comment, userId], (logErr) => {
+      if (logErr) {
+        console.error('Error adding to ticketlog:', logErr);
+        // Not fatal, continue
+      }
+    });
+
+    // Notify mentioned users (if you want)
     if (Array.isArray(mentionedUserIds)) {
       for (const mentionedUserId of mentionedUserIds) {
         await createNotification(
@@ -1637,6 +1559,29 @@ app.put('/api/notifications/read', (req, res) => {
             return res.status(500).json({ error: 'Failed to mark notifications as read' });
         }
         res.json({ message: 'Notifications marked as read', updatedCount: result.affectedRows });
+    });
+});
+
+// ADDED: API endpoint to mark all notifications for a user as read
+app.put('/api/notifications/read-all/:userId', (req, res) => {
+    const userId = req.params.userId;
+
+    if (!userId) {
+        return res.status(400).json({ error: 'User ID is required' });
+    }
+
+    const query = `
+        UPDATE notifications 
+        SET IsRead = TRUE 
+        WHERE UserID = ? AND IsRead = FALSE
+    `;
+
+    db.query(query, [userId], (err, result) => {
+        if (err) {
+            console.error('Error marking all notifications as read:', err);
+            return res.status(500).json({ error: 'Failed to mark all notifications as read' });
+        }
+        res.json({ message: 'All notifications marked as read', updatedCount: result.affectedRows });
     });
 });
 
@@ -2138,58 +2083,148 @@ app.post('/api/invite-supervisor', async (req, res) => {
 // Assign supervisor to ticket endpoint
 app.put('/api/tickets/:id/assign', (req, res) => {
     const ticketId = req.params.id;
-    const { supervisorId, status, priority } = req.body;
+    const { supervisorId, status, priority, assignerId } = req.body; // `assignerId` එක මෙහිදී ලැබේ
 
-    if (!ticketId || !supervisorId) {
+    console.log('Assign endpoint: Received:', { ticketId, supervisorId, status, priority, assignerId }); // Add this line
+
+    if (!ticketId || !supervisorId || !assignerId) { // `assignerId` අනිවාර්ය කරමු
         return res.status(400).json({ 
-            error: 'Ticket ID and Supervisor ID are required' 
+            error: 'Ticket ID, Supervisor ID, and Assigner ID are required' 
         });
     }
 
-    // Update ticket with supervisor
-    const updateQuery = `
-        UPDATE ticket 
-        SET SupervisorID = ?,
-            Status = ?,
-            Priority = ?,
-            LastRespondedTime = NOW(),
-            FirstRespondedTime = COALESCE(FirstRespondedTime, NOW())
-        WHERE TicketID = ?
-    `;
-
-    db.query(updateQuery, [supervisorId, status, priority, ticketId], (err, result) => {
+    // 1. ටිකට් එකේ වත්මන් Status, Priority සහ SupervisorID ලබාගන්න
+    db.query('SELECT Status, Priority, SupervisorID FROM ticket WHERE TicketID = ?', [ticketId], async (err, currentTicketResults) => {
         if (err) {
-            console.error('Error updating ticket:', err);
-            return res.status(500).json({ 
-                error: 'Failed to assign supervisor',
-                message: err.message 
-            });
+            console.error('Error fetching current ticket details for assignment:', err);
+            return res.status(500).json({ error: 'Server error while fetching ticket details' });
+        }
+        if (currentTicketResults.length === 0) {
+            return res.status(404).json({ error: 'Ticket not found' });
         }
 
-        if (result.affectedRows === 0) {
-            return res.status(404).json({ 
-                error: 'Ticket not found' 
-            });
-        }
+        const oldStatus = currentTicketResults[0].Status;
+        const oldPriority = currentTicketResults[0].Priority;
+        const oldSupervisorId = currentTicketResults[0].SupervisorID;
 
-        // Create log entry
-        const logQuery = `
-            INSERT INTO ticketlog 
-            (TicketID, DateTime, Type, Description, UserID)
-            VALUES (?, NOW(), 'SUPERVISOR_ASSIGN', 'Supervisor assigned', ?)
+        console.log('Assign endpoint: Old Supervisor ID from DB:', oldSupervisorId); // Add this line
+
+        // 2. ටිකට් එක update කරන්න (supervisor, status, priority සමග)
+        const updateQuery = `
+            UPDATE ticket 
+            SET SupervisorID = ?,
+                Status = ?,
+                Priority = ?,
+                LastRespondedTime = NOW(),
+                FirstRespondedTime = COALESCE(FirstRespondedTime, NOW())
+            WHERE TicketID = ?
         `;
 
-        db.query(logQuery, [ticketId, supervisorId], (logErr) => {
-            if (logErr) {
-                console.error('Error creating log:', logErr);
-                // Don't fail the request if log creation fails
+        db.query(updateQuery, [supervisorId, status, priority, ticketId], async (err, result) => {
+            if (err) {
+                console.error('Error updating ticket during assignment:', err);
+                return res.status(500).json({ 
+                    error: 'Failed to assign supervisor',
+                    message: err.message 
+                });
             }
-        });
 
-        // Send success response
-        res.json({ 
-            message: 'Supervisor assigned successfully',
-            status: 'success'
+            if (result.affectedRows === 0) {
+                return res.status(404).json({ 
+                    error: 'Ticket not found' 
+                });
+            }
+
+            try {
+                // Fetch supervisor names for logging
+                const getSupervisorNames = `
+                    SELECT
+                        (SELECT FullName FROM appuser WHERE UserID = ?) as newSupervisorName,
+                        (SELECT FullName FROM appuser WHERE UserID = ?) as oldSupervisorName;
+                `;
+                const [supervisorNamesQueryResult] = await new Promise((resolve, reject) => {
+                    db.query(getSupervisorNames, [supervisorId, oldSupervisorId], (err, results) => {
+                        if (err) reject(err);
+                        else resolve(results);
+                    });
+                });
+
+                console.log('Assign endpoint: Raw supervisorNames query result:', supervisorNamesQueryResult);
+
+                let currentSupervisorName = 'unassigned';
+                let newSupervisorName = 'Unknown Supervisor';
+
+                if (supervisorNamesQueryResult && supervisorNamesQueryResult.length > 0) {
+                    const names = supervisorNamesQueryResult[0];
+                    console.log('Assign endpoint: Type of names.oldSupervisorName:', typeof names.oldSupervisorName, 'Value:', names.oldSupervisorName);
+                    console.log('Assign endpoint: Type of names.newSupervisorName:', typeof names.newSupervisorName, 'Value:', names.newSupervisorName);
+
+                    if (names.oldSupervisorName !== null && names.oldSupervisorName !== undefined) {
+                        currentSupervisorName = names.oldSupervisorName.trim(); // Trim to remove any hidden whitespace
+                    }
+                    if (names.newSupervisorName !== null && names.newSupervisorName !== undefined) {
+                        newSupervisorName = names.newSupervisorName.trim(); // Trim to remove any hidden whitespace
+                    }
+                }
+                // Log the values after the assignment logic
+                console.log('Assign endpoint: Names after explicit logic - current:', currentSupervisorName, 'new:', newSupervisorName);
+
+                // 3. Supervisor පවරාදීම ලොග් කරන්න (වෙනස් වී ඇත්නම් පමණක්)
+                if (oldSupervisorId != supervisorId) {
+                    await createTicketLog(
+                        ticketId,
+                        'SUPERVISOR_CHANGE',
+                        `Supervisor changed from ${currentSupervisorName} to ${newSupervisorName}`, // Changed to use names
+                        assignerId, 
+                        oldSupervisorId,
+                        supervisorId
+                    );
+                }
+
+                 if (oldStatus !== status) {
+                    await createTicketLog(
+                        ticketId,
+                        'STATUS_CHANGE',
+                        `Status changed from ${oldStatus} to ${status}`,
+                        assignerId,  
+                        oldStatus,
+                        status
+                    );
+                }
+
+                // 5. Priority වෙනස් වීම ලොග් කරන්න (වෙනස් වී ඇත්නම් පමණක්)
+                if (oldPriority !== priority) {
+                    await createTicketLog(
+                        ticketId,
+                        'PRIORITY_CHANGE',
+                        `Priority changed from ${oldPriority} to ${priority}`,
+                        assignerId, // වෙනස්කම කළ user ගේ ID
+                        oldPriority,
+                        priority
+                    );
+                }
+
+                // දැනට පවතින notification logic (අවශ්‍ය නම් තවදුරටත් සකස් කළ හැකිය)
+                // Assign වූ supervisor ට notification යවන්න
+                await createNotification(
+                    supervisorId,
+                    `You have been assigned to ticket #${ticketId}. Status: ${status}, Priority: ${priority}.`,
+                    'SUPERVISOR_ASSIGNED'
+                );
+                
+                res.json({ 
+                    message: 'Supervisor assigned and changes logged successfully',
+                    status: 'success'
+                });
+
+            } catch (logErr) {
+                console.error('Error creating logs or sending notifications during assignment:', logErr);
+                // Logging/notification අසාර්ථක වුවත් ප්‍රධාන ඉල්ලීම අසාර්ථක නොකරන්න
+                res.status(500).json({ 
+                    error: 'Assignment successful, but failed to log changes or send notifications',
+                    message: logErr.message 
+                });
+            }
         });
     });
 });
@@ -2765,211 +2800,48 @@ app.put('/api/tickets/:ticketId/supervisor', async (req, res) => {
 
 // Update ticket due date
 app.put('/api/tickets/:ticketId/due-date', async (req, res) => {
-    const { ticketId } = req.params;
-    const { dueDate, userId } = req.body;
+  const { ticketId } = req.params;
+  const { dueDate, userId } = req.body; // <-- userId must be sent from frontend
 
-    // Get current ticket and user details
-    const getDetailsQuery = `
-        SELECT 
-            t.DueDate as currentDueDate,
-            t.UserId as ticketUserId,
-            t.SupervisorID,
-            au.FullName as updaterName
-        FROM ticket t
-        LEFT JOIN appuser au ON au.UserID = ?
-        WHERE t.TicketID = ?
-    `;
+  db.query('SELECT DueDate FROM ticket WHERE TicketID = ?', [ticketId], (err, results) => {
+    if (err || results.length === 0) return res.status(500).json({ message: 'Error' });
+    const oldDueDate = results[0].DueDate;
 
-    try {
-        const [details] = await new Promise((resolve, reject) => {
-            db.query(getDetailsQuery, [userId, ticketId], (err, results) => {
-                if (err) reject(err);
-                else resolve(results);
-            });
-        });
+    db.query('UPDATE ticket SET DueDate = ? WHERE TicketID = ?', [dueDate, ticketId], (err2) => {
+      if (err2) return res.status(500).json({ message: 'Error updating due date' });
 
-        if (!details) {
-            return res.status(404).json({ message: "Ticket not found" });
-        }
-
-        // Format dates for display
-        const formattedOldDate = details.currentDueDate ? new Date(details.currentDueDate).toLocaleDateString() : 'Not set';
-        const formattedNewDate = new Date(dueDate).toLocaleDateString();
-
-        // Update due date
-        const updateQuery = "UPDATE ticket SET DueDate = ?, LastRespondedTime = NOW() WHERE TicketID = ?";
-        
-        await new Promise((resolve, reject) => {
-            db.query(updateQuery, [dueDate, ticketId], (err, result) => {
-                if (err) reject(err);
-                else resolve(result);
-            });
-        });
-
-        // Create ticket log entry
-        const logQuery = `
-            INSERT INTO ticketlog 
-            (TicketID, DateTime, Type, Description, UserID, OldValue, NewValue, Note)
-            VALUES (?, NOW(), ?, ?, ?, ?, ?, ?)
-        `;
-
-        let description;
-        if (!details.currentDueDate) {
-            description = `Due date set to ${formattedNewDate}`;
-        } else {
-            description = `Due date changed from ${formattedOldDate} to ${formattedNewDate}`;
-        }
-
-        const note = `Updated by ${details.updaterName}`;
-
-        const [logResult] = await new Promise((resolve, reject) => {
-            db.query(
-                logQuery,
-                [
-                    ticketId, 
-                    'DUE_DATE_CHANGE', 
-                    description, 
-                    userId,
-                    details.currentDueDate,
-                    dueDate,
-                    note
-                ],
-                (err, result) => {
-                    if (err) reject(err);
-                    else resolve(result);
-                }
-            );
-        });
-
-        // Create notifications
-        try {
-            // Notify ticket creator
-            await createNotification(
-                details.ticketUserId,
-                `Due date for ticket #${ticketId} has been ${details.currentDueDate ? 'changed to' : 'set to'} ${formattedNewDate} by ${details.updaterName}`,
-                'DUE_DATE_UPDATED',
-                logResult.insertId
-            );
-
-            // Notify supervisor if exists
-            if (details.SupervisorID) {
-                await createNotification(
-                    details.SupervisorID,
-                    `Due date for ticket #${ticketId} has been ${details.currentDueDate ? 'changed to' : 'set to'} ${formattedNewDate} by ${details.updaterName}`,
-                    'DUE_DATE_UPDATED',
-                    logResult.insertId
-                );
-            }
-        } catch (error) {
-            console.error("Error creating notifications:", error);
-        }
-
-        res.json({ 
-            message: "Due date updated successfully",
-            logId: logResult.insertId
-        });
-    } catch (error) {
-        console.error("Error updating due date:", error);
-        res.status(500).json({ message: "Server error" });
-    }
+      const desc = `Due date changed from ${oldDueDate} to ${dueDate}`;
+      db.query(
+        'INSERT INTO ticketlog (TicketID, DateTime, Type, Description, UserID, OldValue, NewValue) VALUES (?, NOW(), ?, ?, ?, ?, ?)',
+        [ticketId, 'DUE_DATE_CHANGE', desc, userId, oldDueDate, dueDate],
+        () => {}
+      );
+      res.json({ message: 'Due date updated and logged' });
+    });
+  });
 });
 
 // Update ticket resolution
 app.put('/api/tickets/:ticketId/resolution', async (req, res) => {
-    const { ticketId } = req.params;
-    const { resolution, userId } = req.body;
+  const { ticketId } = req.params;
+  const { resolution, userId } = req.body; // <-- userId must be sent from frontend
 
-    // Get current ticket and user details
-    const getDetailsQuery = `
-        SELECT 
-            t.Resolution as currentResolution,
-            t.UserId as ticketUserId,
-            t.SupervisorID,
-            t.Status as currentStatus,
-            au.FullName as updaterName
-        FROM ticket t
-        LEFT JOIN appuser au ON au.UserID = ?
-        WHERE t.TicketID = ?
-    `;
+  db.query('SELECT Resolution FROM ticket WHERE TicketID = ?', [ticketId], (err, results) => {
+    if (err || results.length === 0) return res.status(500).json({ message: 'Error' });
+    const oldResolution = results[0].Resolution;
 
-    try {
-        const [details] = await new Promise((resolve, reject) => {
-            db.query(getDetailsQuery, [userId, ticketId], (err, results) => {
-                if (err) reject(err);
-                else resolve(results);
-            });
-        });
+    db.query('UPDATE ticket SET Resolution = ? WHERE TicketID = ?', [resolution, ticketId], (err2) => {
+      if (err2) return res.status(500).json({ message: 'Error updating resolution' });
 
-        if (!details) {
-            return res.status(404).json({ message: "Ticket not found" });
-        }
-
-        // Update resolution and status if needed
-        let updateQuery = "UPDATE ticket SET Resolution = ?, LastRespondedTime = NOW()";
-        let queryParams = [resolution];
-
-        // If adding resolution and status isn't already resolved, update it
-        if (resolution && details.currentStatus !== 'Resolved') {
-            updateQuery += ", Status = 'Resolved'";
-        }
-        // If clearing resolution and status is resolved, update it back to In Progress
-        else if (!resolution && details.currentStatus === 'Resolved') {
-            updateQuery += ", Status = 'In Progress'";
-        }
-
-        updateQuery += " WHERE TicketID = ?";
-        queryParams.push(ticketId);
-        
-        await new Promise((resolve, reject) => {
-            db.query(updateQuery, queryParams, (err, result) => {
-                if (err) reject(err);
-                else resolve(result);
-            });
-        });
-
-        // Create ticket log entry
-        const logEntry = {
-            ticketId,
-            type: 'RESOLUTION',
-            description: resolution ? 'Resolution added' : 'Resolution cleared',
-            userId,
-            oldValue: details.currentResolution || '',
-            newValue: resolution || ''
-        };
-
-        await new Promise((resolve, reject) => {
-            db.query(
-                `INSERT INTO ticketlog (TicketID, Type, Description, UserID, OldValue, NewValue, DateTime)
-                VALUES (?, ?, ?, ?, ?, ?, NOW())`,
-                [logEntry.ticketId, logEntry.type, logEntry.description, logEntry.userId, logEntry.oldValue, logEntry.newValue],
-                (err, result) => {
-                    if (err) reject(err);
-                    else resolve(result);
-                }
-            );
-        });
-
-        // Send notifications
-        const notificationMessage = resolution 
-            ? `Ticket #${ticketId} has been resolved by ${details.updaterName}`
-            : `Resolution for Ticket #${ticketId} has been cleared by ${details.updaterName}`;
-
-        // Notify ticket creator and supervisor
-        if (details.ticketUserId) {
-            await createNotification(details.ticketUserId, notificationMessage, ticketId);
-        }
-        if (details.SupervisorID && details.SupervisorID !== userId) {
-            await createNotification(details.SupervisorID, notificationMessage, ticketId);
-        }
-
-        res.json({ 
-            message: 'Ticket resolution updated successfully',
-            newStatus: resolution ? 'Resolved' : 'In Progress'
-        });
-    } catch (error) {
-        console.error('Error updating ticket resolution:', error);
-        res.status(500).json({ error: 'Failed to update ticket resolution' });
-    }
+      const desc = `Resolution changed from "${oldResolution || ''}" to "${resolution || ''}"`;
+      db.query(
+        'INSERT INTO ticketlog (TicketID, DateTime, Type, Description, UserID, OldValue, NewValue) VALUES (?, NOW(), ?, ?, ?, ?, ?)',
+        [ticketId, 'RESOLUTION_CHANGE', desc, userId, oldResolution, resolution],
+        () => {}
+      );
+      res.json({ message: 'Resolution updated and logged' });
+    });
+  });
 });
 
 
@@ -3018,6 +2890,28 @@ app.get('/api/mentionable-users', (req, res) => {
       res.json(results);
     }
   );
+});
+
+// API endpoint to fetch the last five ticket logs
+app.get('/api/ticket-logs/recent', (req, res) => {
+    const query = `
+        SELECT 
+            TicketID,
+            DateTime,
+            Type,
+            Description
+        FROM ticketlog
+        ORDER BY DateTime DESC
+        LIMIT 6
+    `;
+
+    db.query(query, (err, results) => {
+        if (err) {
+            console.error('Error fetching recent ticket logs:', err);
+            return res.status(500).json({ error: 'Failed to fetch recent ticket logs' });
+        }
+        res.json(results);
+    });
 });
 
  
