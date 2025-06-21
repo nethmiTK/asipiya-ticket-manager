@@ -731,33 +731,33 @@ const resolved = tickets
                   ) : (
                     <div className="space-y-4">
                       {/* Comments Section */}
-                      <div className="relative">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Add Comment</label>
-                        <div className="flex gap-2 items-center">
+                      <div className="relative mb-6 p-4 border rounded-lg bg-gray-50 shadow-sm">
+                        <label className="block text-lg font-semibold text-gray-800 mb-3">Add Comment</label>
+                        <div className="flex flex-col gap-3">
                           <textarea
                             ref={textareaRef}
-                            rows={3}
+                            rows={4} // Increased rows for better initial visibility
                             value={comment}
                             onChange={handleCommentChange}
                             onKeyUp={handleMentionKeyUp}
-                            className="block w-full rounded-md border border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 resize-none p-2"
+                            className="block w-full rounded-md border border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 resize-y p-3 transition duration-200 ease-in-out"
                             placeholder="Type your comment here... Use @ to mention users."
-                            style={{ minHeight: 60 }}
+                            style={{ minHeight: 80 }}
                           />
                         
                         </div>
                         {showMentionDropdown && filteredMentions.length > 0 && (
                           <div
-                            className="absolute z-50 bg-white border rounded shadow-md mt-1 max-h-40 overflow-y-auto"
-                            style={{ top: mentionDropdownPos.top + 5, left: mentionDropdownPos.left, minWidth: 200 }}
+                            className="absolute z-50 bg-white border border-blue-300 rounded-lg shadow-xl mt-2 max-h-48 overflow-y-auto w-full md:w-auto"
+                            style={{ top: mentionDropdownPos.top + 10, left: mentionDropdownPos.left, minWidth: 200 }}
                           >
                             {filteredMentions.map(user => (
                               <div
                                 key={user.UserID}
-                                className="px-3 py-2 hover:bg-blue-100 cursor-pointer"
+                                className="px-4 py-2 hover:bg-blue-50 cursor-pointer flex items-center gap-2"
                                 onMouseDown={e => { e.preventDefault(); handleMentionSelect(user); }}
                               >
-                                <span className="font-medium">@{user.FullName}</span> <span className="text-xs text-gray-400">({user.Role})</span>
+                                <span className="font-medium text-blue-700">@{user.FullName}</span> <span className="text-sm text-gray-500">({user.Role})</span>
                               </div>
                             ))}
                           </div>
@@ -765,34 +765,34 @@ const resolved = tickets
                         <button
                           onClick={handleAddComment}
                           disabled={!comment.trim()}
-                          className="mt-2 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-gray-400"
+                          className="mt-4 inline-flex items-center px-5 py-2.5 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-gray-400 transition duration-200 ease-in-out"
                         >
                           Add Comment
                         </button>
                       </div>
-                      <div className="mt-4">
-                        <h4 className="font-semibold mb-2">Comments</h4>
+                      <div className="mt-8">
+                        <h4 className="font-semibold text-xl text-gray-800 mb-4">Comments</h4>
                         {commentsList.length === 0 ? (
-                          <p className="text-gray-500">No comments yet.</p>
+                          <p className="text-gray-500 text-center py-4 border rounded-lg bg-white shadow-sm">No comments yet. Be the first to add one!</p>
                         ) : (
-                          <ul className="space-y-3">
-                            {commentsList.map((c) => (
-                              <li key={c.CommentID} className="border rounded-lg bg-white p-3 flex flex-col sm:flex-row sm:items-center justify-between shadow-sm">
+                          <ul className="space-y-4">
+                            {commentsList.slice().reverse().map((c) => (
+                              <li key={c.CommentID} className="border border-gray-200 rounded-lg bg-white p-4 flex flex-col sm:flex-row sm:items-start justify-between shadow-md hover:shadow-lg transition-shadow duration-200 ease-in-out">
                                 <div className="flex-1">
-                                  <div className="font-semibold text-gray-800">{c.FullName}</div>
+                                  <div className="font-bold text-lg text-gray-900 mb-1">{c.FullName}</div>
                                   {c.Mentions && c.Mentions.trim() && (
-                                    <div className="text-xs text-blue-700 mb-1">
-                                      Mentioned: {c.Mentions.split(',').map((m, idx) =>
+                                    <div className="text-sm text-blue-600 font-medium mb-2 flex flex-wrap items-center gap-x-2">
+                                      {c.Mentions.split(',').map((m, idx) =>
                                         m.trim() ? (
-                                          <span key={idx} className="font-semibold mr-2">{m.trim()}</span>
+                                          <span key={idx} className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full text-xs font-semibold">{m.trim()}</span>
                                         ) : null
                                       )}
                                     </div>
                                   )}
-                                  <div className="mt-1 text-gray-700 text-sm">{c.CommentText}</div>
+                                  <div className="mt-2 text-gray-800 leading-relaxed whitespace-pre-wrap text-base">{c.CommentText}</div>
                                 </div>
-                                <div className="text-xs text-gray-400 mt-2 sm:mt-0 sm:ml-4 text-right min-w-[120px]">
-                                  {new Date(c.CreatedAt).toLocaleString()}
+                                <div className="text-xs text-gray-500 mt-3 sm:mt-0 sm:ml-4 text-right flex-shrink-0 min-w-[140px]">
+                                  {new Date(c.CreatedAt).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })}
                                 </div>
                               </li>
                             ))}
