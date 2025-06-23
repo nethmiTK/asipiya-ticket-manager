@@ -25,6 +25,12 @@ const truncateDescription = (text, maxLength = 80) => {
   return truncated + "...";
 };
 
+const formatDateTime = (dateTimeString) => {
+  if (!dateTimeString) return 'N/A';
+  const date = new Date(dateTimeString);
+  return date.toLocaleString();
+};
+
 const TicketView = () => {
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -121,6 +127,17 @@ const TicketView = () => {
   const statusDropdownRef = useRef(null);
   const categoryDropdownRef = useRef(null);
   const systemDropdownRef = useRef(null);
+
+  const handleTicketClick = (ticket) => {
+    setSelectedTicket(ticket);
+    setActiveTab("details");
+    setIsModalOpen(true);
+  };
+
+  const handleViewTicket = (e, ticketId) => {
+    e.stopPropagation();
+    navigate(`/ticket/${ticketId}`);
+  };
 
   useEffect(() => {
     const fetchTickets = async () => {
@@ -326,8 +343,8 @@ const TicketView = () => {
                     <div
                       key={statusOption || "all-status"}
                       className={`p-2 cursor-pointer hover:bg-gray-100 ${selectedStatus === statusOption
-                          ? "bg-blue-100 font-semibold"
-                          : ""
+                        ? "bg-blue-100 font-semibold"
+                        : ""
                         }`}
                       onClick={() => {
                         setSelectedStatus(statusOption);
@@ -383,8 +400,8 @@ const TicketView = () => {
                     <div
                       key={categoryOption || "all-category"} // Added unique key for "All" option
                       className={`p-2 cursor-pointer hover:bg-gray-100 ${selectedCategory === categoryOption
-                          ? "bg-blue-100 font-semibold"
-                          : ""
+                        ? "bg-blue-100 font-semibold"
+                        : ""
                         }`}
                       onClick={() => {
                         setSelectedCategory(categoryOption);
@@ -438,8 +455,8 @@ const TicketView = () => {
                     <div
                       key={systemOption || "all-system"} // Added unique key for "All" option
                       className={`p-2 cursor-pointer hover:bg-gray-100 ${selectedSystem === systemOption
-                          ? "bg-blue-100 font-semibold"
-                          : ""
+                        ? "bg-blue-100 font-semibold"
+                        : ""
                         }`}
                       onClick={() => {
                         setSelectedSystem(systemOption);
@@ -475,83 +492,125 @@ const TicketView = () => {
           ) : currentTickets.length === 0 && searchQuery !== "" ? (
             <p>No matching tickets found for "{searchQuery}".</p>
           ) : (
-            <div className="overflow-x-auto rounded-lg shadow border border-gray-200 w-full">
-              <table className="min-w-full text-sm text-left table-fixed w-full">
-                <thead className="bg-gray-100 text-gray-700 uppercase">
-                  <tr>
-                    <th className="px-4 py-3 w-[8%]">ID</th>
-                    <th className="px-4 py-3 w-[12%]">Status</th>
-                    <th className="px-4 py-3 w-[35%]">Description</th>
-                    <th className="px-4 py-3 w-[15%]">System Name</th>
-                    <th className="px-4 py-3 w-[15%]">Category</th>
-                    <th className="px-4 py-3 w-[15%]">Date & Time</th>
-                    <th className="px-4 py-3 w-[10%] rounded-tr-lg text-center">
-                      Action
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {currentTickets.map((ticket) => (
-                    <tr
-                      key={ticket.id}
-                      onClick={() => {
-                        setSelectedTicket(ticket);
-                        setActiveTab("details");
-                        setIsModalOpen(true);
-                      }}
-                      className="hover:bg-gray-50 cursor-pointer"
-                    >
-                      <td className="px-4 py-2 font-medium text-gray-900">
-                        {ticket.id}
-                      </td>
-                      <td className="px-6 py-2">
-                        <span
-                          className={`px-2 py-1 rounded-full text-xs font-medium ${statusColors[ticket.status?.toLowerCase()] ||
-                            "bg-gray-200 text-gray-800"
-                            }`}
-                        >
-                          {ticket.status}
-                        </span>
-                      </td>
-                      <td
-                        className="px-4 py-2 text-justify whitespace-normal overflow-hidden break-words"
-                        style={{
-                          maxHeight: "3.6em",
-                          lineHeight: "1.2em",
-                        }}
+            <>
+              {/* Mobile View - Card Layout */}
+              <div className="block md:hidden space-y-4 mb-6">
+                {currentTickets.map((ticket) => (
+                  <div
+                    key={ticket.id}
+                    className="border border-gray-200 rounded-lg p-4 bg-white shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+                    onClick={() => handleTicketClick(ticket)}
+                  >
+                    <div className="flex justify-between items-start mb-3">
+                      <span className="font-bold text-gray-900 text-lg">#{ticket.id}</span>
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusColors[ticket.status?.toLowerCase()] || "bg-gray-200 text-gray-800"}`}>
+                        {ticket.status}
+                      </span>
+                    </div>
+
+                    <p className="text-gray-700 mb-3 text-sm leading-relaxed">
+                      {truncateDescription(ticket.description, 20)} 
+                    </p>
+                    <div className="grid grid-cols-2 gap-3 text-sm text-gray-600 mb-3">
+                      <div>
+                        <span className="font-medium text-gray-800">System:</span>
+                        <br />
+                        <span className="text-gray-600">{ticket.system_name}</span>
+                      </div>
+                      <div>
+                        <span className="font-medium text-gray-800">Category:</span>
+                        <br />
+                        <span className="text-gray-600">{ticket.category}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-between items-center pt-3 border-t border-gray-100">
+                      <div className="text-xs text-gray-500">
+                        {formatDateTime(ticket.datetime)}
+                      </div>
+                      <button
+                        onClick={(e) => handleViewTicket(e, ticket.id)}
+                        className="flex items-center space-x-1 text-blue-600 hover:text-blue-800 transition-colors text-sm font-medium"
                       >
-                        {truncateDescription(ticket.description, 120)}
-                      </td>
+                        <FaEye className="w-4 h-4" />
+                        <span>View</span>
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
 
-                      <td className="px-4 py-2">{ticket.system_name}</td>
-                      <td className="px-4 py-2">{ticket.category}</td>
-                      <td className="px-4 py-2 text-gray-500">
-                        {new Date(ticket.datetime).toLocaleString()}
-                      </td>
-
-                      {/* Action Column */}
-                      <td className="px-4 py-2 flex justify-center items-center h-full">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigate(`/ticket/${ticket.id}`);
-                          }}
-                          className="text-blue-600 hover:text-blue-800 transition-colors cursor-pointer"
-                        >
-                          <FaEye className="w-5 h-5" />
-                        </button>
-                      </td>
+              {/* Desktop View - Table Layout */}
+              <div className="hidden md:block overflow-x-auto rounded-lg shadow border border-gray-200 w-full mb-6">
+                <table className="min-w-[768px] w-full text-sm text-left border-collapse table-auto">
+                  <thead className="bg-gray-100 text-gray-700 uppercase">
+                    <tr>
+                      <th className="px-4 py-3 whitespace-nowrap">ID</th>
+                      <th className="px-4 py-3 whitespace-nowrap">Status</th>
+                      <th className="px-4 py-3 whitespace-nowrap">Description</th>
+                      <th className="px-4 py-3 whitespace-nowrap">System Name</th>
+                      <th className="px-4 py-3 whitespace-nowrap">Category</th>
+                      <th className="px-4 py-3 whitespace-nowrap">Date & Time</th>
+                      <th className="px-4 py-3 rounded-tr-lg text-center whitespace-nowrap">Action</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {currentTickets.map((ticket) => (
+                      <tr
+                        key={ticket.id}
+                        onClick={() => handleTicketClick(ticket)}
+                        className="hover:bg-gray-50 cursor-pointer"
+                      >
+                        <td className="px-4 py-2 font-medium text-gray-900">
+                          {ticket.id}
+                        </td>
+                        <td className="px-6 py-2">
+                          <span
+                            className={`px-2 py-1 rounded-full text-xs font-medium ${statusColors[ticket.status?.toLowerCase()] ||
+                              "bg-gray-200 text-gray-800"
+                              }`}
+                          >
+                            {ticket.status}
+                          </span>
+                        </td>
+                        {/* Description cell */}
+                        <td
+                          className="px-4 py-2 text-justify whitespace-normal overflow-hidden break-words"
+                          style={{
+                            maxHeight: "3.6em",
+                            lineHeight: "1.2em",
+                          }}
+                        >
+                          {truncateDescription(ticket.description, 80)}
+                        </td>
+
+                        <td className="px-4 py-2 whitespace-nowrap">{ticket.system_name}</td>
+                        <td className="px-4 py-2 whitespace-nowrap">{ticket.category}</td>
+                        <td className="px-4 py-2 text-gray-500 whitespace-nowrap">
+                          {formatDateTime(ticket.datetime)}
+                        </td>
+
+                        {/* Action Column */}
+                        <td className="px-4 py-2 flex justify-center items-center h-full">
+                          <button
+                            onClick={(e) => handleViewTicket(e, ticket.id)}
+                            className="text-blue-600 hover:text-blue-800 transition-colors cursor-pointer"
+                          >
+                            <FaEye className="w-5 h-5" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
           )}
         </div>
         {/* Pagination Controls at the bottom */}
         {finalFilteredTickets.length > 0 && ( // Changed from filteredTickets.length
-          <div className="flex flex-col sm:flex-row justify-end items-center mt-4 p-4 bg-white rounded-lg shadow">
-            <div className="flex items-center space-x-4">
+                              <div className="flex flex-col sm:flex-row justify-end items-end sm:items-center mt-4 p-4 bg-white rounded-lg shadow flex-wrap gap-4">
+            <div className="flex items-center flex-wrap gap-2 sm:space-x-4">
               <div className="flex items-center">
                 <span className="text-gray-700 text-sm mr-2">
                   Entries per page :
@@ -573,7 +632,7 @@ const TicketView = () => {
                   finalFilteredTickets.length
                 )} of ${finalFilteredTickets.length}`}
               </span>
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center flex-wrap gap-1 sm:space-x-2">
                 <button
                   onClick={() => paginate(1)}
                   disabled={currentPage === 1}
