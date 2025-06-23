@@ -1525,7 +1525,7 @@ app.get('/api/notifications/:userId', (req, res) => {
             CreatedAt,
             TicketLogID
         FROM notifications 
-        WHERE UserID = ?
+        WHERE UserID = ? AND IsRead = FALSE
         ORDER BY CreatedAt DESC
         LIMIT 50
     `;
@@ -2083,18 +2083,17 @@ app.post('/api/invite-supervisor', async (req, res) => {
 // Assign supervisor to ticket endpoint
 app.put('/api/tickets/:id/assign', (req, res) => {
     const ticketId = req.params.id;
-    const { supervisorId, status, priority, assignerId } = req.body; // `assignerId` එක මෙහිදී ලැබේ
+    const { supervisorId, status, priority, assignerId } = req.body; // assignerId is received here
 
     console.log('Assign endpoint: Received:', { ticketId, supervisorId, status, priority, assignerId }); // Add this line
 
-    if (!ticketId || !supervisorId || !assignerId) { // `assignerId` අනිවාර්ය කරමු
+    if (!ticketId || !supervisorId || !assignerId) { // Assigner ID is required
         return res.status(400).json({ 
             error: 'Ticket ID, Supervisor ID, and Assigner ID are required' 
         });
     }
 
-    // 1. ටිකට් එකේ වත්මන් Status, Priority සහ SupervisorID ලබාගන්න
-    db.query('SELECT Status, Priority, SupervisorID FROM ticket WHERE TicketID = ?', [ticketId], async (err, currentTicketResults) => {
+     db.query('SELECT Status, Priority, SupervisorID FROM ticket WHERE TicketID = ?', [ticketId], async (err, currentTicketResults) => {
         if (err) {
             console.error('Error fetching current ticket details for assignment:', err);
             return res.status(500).json({ error: 'Server error while fetching ticket details' });
@@ -2109,8 +2108,7 @@ app.put('/api/tickets/:id/assign', (req, res) => {
 
         console.log('Assign endpoint: Old Supervisor ID from DB:', oldSupervisorId); // Add this line
 
-        // 2. ටිකට් එක update කරන්න (supervisor, status, priority සමග)
-        const updateQuery = `
+         const updateQuery = `
             UPDATE ticket 
             SET SupervisorID = ?,
                 Status = ?,
@@ -2169,8 +2167,7 @@ app.put('/api/tickets/:id/assign', (req, res) => {
                 // Log the values after the assignment logic
                 console.log('Assign endpoint: Names after explicit logic - current:', currentSupervisorName, 'new:', newSupervisorName);
 
-                // 3. Supervisor පවරාදීම ලොග් කරන්න (වෙනස් වී ඇත්නම් පමණක්)
-                if (oldSupervisorId != supervisorId) {
+                 if (oldSupervisorId != supervisorId) {
                     await createTicketLog(
                         ticketId,
                         'SUPERVISOR_CHANGE',
@@ -2192,20 +2189,18 @@ app.put('/api/tickets/:id/assign', (req, res) => {
                     );
                 }
 
-                // 5. Priority වෙනස් වීම ලොග් කරන්න (වෙනස් වී ඇත්නම් පමණක්)
+                
                 if (oldPriority !== priority) {
                     await createTicketLog(
                         ticketId,
                         'PRIORITY_CHANGE',
                         `Priority changed from ${oldPriority} to ${priority}`,
-                        assignerId, // වෙනස්කම කළ user ගේ ID
+                        assignerId,  
                         oldPriority,
                         priority
                     );
                 }
-
-                // දැනට පවතින notification logic (අවශ්‍ය නම් තවදුරටත් සකස් කළ හැකිය)
-                // Assign වූ supervisor ට notification යවන්න
+ 
                 await createNotification(
                     supervisorId,
                     `You have been assigned to ticket #${ticketId}. Status: ${status}, Priority: ${priority}.`,
@@ -2219,8 +2214,7 @@ app.put('/api/tickets/:id/assign', (req, res) => {
 
             } catch (logErr) {
                 console.error('Error creating logs or sending notifications during assignment:', logErr);
-                // Logging/notification අසාර්ථක වුවත් ප්‍රධාන ඉල්ලීම අසාර්ථක නොකරන්න
-                res.status(500).json({ 
+                 res.status(500).json({ 
                     error: 'Assignment successful, but failed to log changes or send notifications',
                     message: logErr.message 
                 });
