@@ -176,48 +176,61 @@ const usersDashboard = () => {
                     {error && <div className="text-red-600 mb-4">{error}</div>}
 
                     {/* Cards Section */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                        {loadingCounts ? (
-                            <div className="col-span-4 text-center text-gray-600">Loading counts...</div>
-                        ) : (
-                            <>
-                                {/* Total Tickets Card */}
-                                <div className="bg-white p-6 rounded-lg shadow-md flex items-center justify-between">
-                                    <div>
-                                        <h3 className="text-lg font-semibold text-gray-700">Total Tickets</h3>
-                                        <p className="text-4xl font-bold text-blue-600">{ticketCounts.total}</p>
-                                    </div>
-                                    <LuTicketCheck className="text-5xl text-blue-400" />
-                                </div>
 
-                                {/* Pending Tickets Card */}
-                                <div className="bg-white p-6 rounded-lg shadow-md flex items-center justify-between">
-                                    <div>
-                                        <h3 className="text-lg font-semibold text-gray-700">Pending Tickets</h3>
-                                        <p className="text-4xl font-bold text-yellow-600">{ticketCounts.pending}</p>
-                                    </div>
-                                    <LuTicketX className="text-5xl text-yellow-400" />
-                                </div>
+                    <div className="mb-8">
+                        {/* Mobile View - Icon + Number Only */}
+                        <div className="flex justify-around items-center md:hidden">
+                            <div className="flex flex-col items-center">
+                                <LuTicketCheck className="text-3xl text-blue-500" />
+                                <p className="mt-1 text-sm font-bold text-gray-700">{ticketCounts.total}</p>
+                            </div>
+                            <div className="flex flex-col items-center">
+                                <LuTicketX className="text-3xl text-yellow-500" />
+                                <p className="mt-1 text-sm font-bold text-gray-700">{ticketCounts.pending}</p>
+                            </div>
+                            <div className="flex flex-col items-center">
+                                <LuTicket className="text-3xl text-green-500" />
+                                <p className="mt-1 text-sm font-bold text-gray-700">{ticketCounts.resolved}</p>
+                            </div>
+                            <div className="flex flex-col items-center">
+                                <LuStar className="text-3xl text-purple-500" />
+                                <p className="mt-1 text-sm font-bold text-gray-700">{ticketCounts.ongoing}</p>
+                            </div>
+                        </div>
 
-                                {/* Resolved Tickets Card */}
-                                <div className="bg-white p-6 rounded-lg shadow-md flex items-center justify-between">
-                                    <div>
-                                        <h3 className="text-lg font-semibold text-gray-700">Resolved Tickets</h3>
-                                        <p className="text-4xl font-bold text-green-600">{ticketCounts.resolved}</p>
-                                    </div>
-                                    <LuTicket className="text-5xl text-green-400" />
+                        {/* Desktop View - Full Cards */}
+                        <div className="hidden md:grid grid-cols-2 lg:grid-cols-4 gap-6">
+                            <div className="bg-white p-6 rounded-lg shadow-md flex items-center justify-between">
+                                <div>
+                                    <h3 className="text-lg font-semibold text-gray-700">Total Tickets</h3>
+                                    <p className="text-4xl font-bold text-blue-600">{ticketCounts.total}</p>
                                 </div>
-                                {/* Ongoing Tickets Card */}
-                                <div className="bg-white p-6 rounded-lg shadow-md flex items-center justify-between">
-                                    <div>
-                                        <h3 className="text-lg font-semibold text-gray-700">Ongoing Tickets</h3>
-                                        <p className="text-4xl font-bold text-purple-600">{ticketCounts.ongoing}</p>
-                                    </div>
-                                    <LuStar className="text-5xl text-purple-400" />
+                                <LuTicketCheck className="text-5xl text-blue-400" />
+                            </div>
+                            <div className="bg-white p-6 rounded-lg shadow-md flex items-center justify-between">
+                                <div>
+                                    <h3 className="text-lg font-semibold text-gray-700">Pending Tickets</h3>
+                                    <p className="text-4xl font-bold text-yellow-600">{ticketCounts.pending}</p>
                                 </div>
-                            </>
-                        )}
+                                <LuTicketX className="text-5xl text-yellow-400" />
+                            </div>
+                            <div className="bg-white p-6 rounded-lg shadow-md flex items-center justify-between">
+                                <div>
+                                    <h3 className="text-lg font-semibold text-gray-700">Resolved Tickets</h3>
+                                    <p className="text-4xl font-bold text-green-600">{ticketCounts.resolved}</p>
+                                </div>
+                                <LuTicket className="text-5xl text-green-400" />
+                            </div>
+                            <div className="bg-white p-6 rounded-lg shadow-md flex items-center justify-between">
+                                <div>
+                                    <h3 className="text-lg font-semibold text-gray-700">Ongoing Tickets</h3>
+                                    <p className="text-4xl font-bold text-purple-600">{ticketCounts.ongoing}</p>
+                                </div>
+                                <LuStar className="text-5xl text-purple-400" />
+                            </div>
+                        </div>
                     </div>
+
                     {/* Recent tickets Section - Mobile */}
                     <div className="bg-white p-6 rounded-lg shadow-md">
                         <h2 className="text-xl font-bold mb-4 text-gray-800 flex items-center">
