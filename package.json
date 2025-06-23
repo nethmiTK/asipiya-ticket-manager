@@ -44,6 +44,7 @@
     "react-mentions": "^4.4.10",
     "react-router-dom": "^7.6.1",
     "react-select": "^5.10.1",
+    "react-super-responsive-table": "^6.0.2",
     "react-toastify": "^11.0.5",
     "react-tooltip": "^5.29.1",
     "tailwindcss": "^4.1.7",

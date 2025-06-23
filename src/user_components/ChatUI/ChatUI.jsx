@@ -300,7 +300,7 @@ const ChatUI = ({ ticketID: propTicketID }) => {
       </div>
 
       {selectedFile && (
-        <div className="flex items-center justify-between p-2 border rounded bg-zinc-50 m-2">
+        <div className="flex items-center justify-between p-2 border border-zinc-300 rounded bg-zinc-50 m-2">
           {selectedFile.type.startsWith("image/") ? (
             <img
               src={URL.createObjectURL(selectedFile)}
@@ -323,7 +323,7 @@ const ChatUI = ({ ticketID: propTicketID }) => {
           )}
           <button
             onClick={() => setSelectedFile(null)}
-            className="text-red-500 text-sm ml-4"
+            className="text-red-500 text-sm ml-4 cursor-pointer mr-5"
           >
             Remove
           </button>
@@ -373,7 +373,7 @@ const ChatUI = ({ ticketID: propTicketID }) => {
         </div>
 
         <button onClick={handleSend} disabled={!input.trim() && !selectedFile}>
-          <MdSend className="text-gray-900 hover:text-gray-700 size-8" />
+          <MdSend className="text-gray-900 hover:text-gray-700 size-8 cursor-pointer"/>
         </button>
       </div>
     </div>

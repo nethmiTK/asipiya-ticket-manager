@@ -176,50 +176,62 @@ const usersDashboard = () => {
                     {error && <div className="text-red-600 mb-4">{error}</div>}
 
                     {/* Cards Section */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                        {loadingCounts ? (
-                            <div className="col-span-4 text-center text-gray-600">Loading counts...</div>
-                        ) : (
-                            <>
-                                {/* Total Tickets Card */}
-                                <div className="bg-white p-6 rounded-lg shadow-md flex items-center justify-between">
-                                    <div>
-                                        <h3 className="text-lg font-semibold text-gray-700">Total Tickets</h3>
-                                        <p className="text-4xl font-bold text-blue-600">{ticketCounts.total}</p>
-                                    </div>
-                                    <LuTicketCheck className="text-5xl text-blue-400" />
-                                </div>
 
-                                {/* Pending Tickets Card */}
-                                <div className="bg-white p-6 rounded-lg shadow-md flex items-center justify-between">
-                                    <div>
-                                        <h3 className="text-lg font-semibold text-gray-700">Pending Tickets</h3>
-                                        <p className="text-4xl font-bold text-yellow-600">{ticketCounts.pending}</p>
-                                    </div>
-                                    <LuTicketX className="text-5xl text-yellow-400" />
-                                </div>
+                    <div className="mb-8">
+                        {/* Mobile View - Icon + Number Only */}
+                        <div className="flex justify-around items-center md:hidden">
+                            <div className="flex flex-col items-center">
+                                <LuTicketCheck className="text-3xl text-blue-500" />
+                                <p className="mt-1 text-sm font-bold text-gray-700">{ticketCounts.total}</p>
+                            </div>
+                            <div className="flex flex-col items-center">
+                                <LuTicketX className="text-3xl text-yellow-500" />
+                                <p className="mt-1 text-sm font-bold text-gray-700">{ticketCounts.pending}</p>
+                            </div>
+                            <div className="flex flex-col items-center">
+                                <LuTicket className="text-3xl text-green-500" />
+                                <p className="mt-1 text-sm font-bold text-gray-700">{ticketCounts.resolved}</p>
+                            </div>
+                            <div className="flex flex-col items-center">
+                                <LuStar className="text-3xl text-purple-500" />
+                                <p className="mt-1 text-sm font-bold text-gray-700">{ticketCounts.ongoing}</p>
+                            </div>
+                        </div>
 
-                                {/* Resolved Tickets Card */}
-                                <div className="bg-white p-6 rounded-lg shadow-md flex items-center justify-between">
-                                    <div>
-                                        <h3 className="text-lg font-semibold text-gray-700">Resolved Tickets</h3>
-                                        <p className="text-4xl font-bold text-green-600">{ticketCounts.resolved}</p>
-                                    </div>
-                                    <LuTicket className="text-5xl text-green-400" />
+                        {/* Desktop View - Full Cards */}
+                        <div className="hidden md:grid grid-cols-2 lg:grid-cols-4 gap-6">
+                            <div className="bg-white p-6 rounded-lg shadow-md flex items-center justify-between">
+                                <div>
+                                    <h3 className="text-lg font-semibold text-gray-700">Total Tickets</h3>
+                                    <p className="text-4xl font-bold text-blue-600">{ticketCounts.total}</p>
                                 </div>
-                                {/* Ongoing Tickets Card */}
-                                <div className="bg-white p-6 rounded-lg shadow-md flex items-center justify-between">
-                                    <div>
-                                        <h3 className="text-lg font-semibold text-gray-700">Ongoing Tickets</h3>
-                                        <p className="text-4xl font-bold text-purple-600">{ticketCounts.ongoing}</p>
-                                    </div>
-                                    <LuStar className="text-5xl text-purple-400" />
+                                <LuTicketCheck className="text-5xl text-blue-400" />
+                            </div>
+                            <div className="bg-white p-6 rounded-lg shadow-md flex items-center justify-between">
+                                <div>
+                                    <h3 className="text-lg font-semibold text-gray-700">Pending Tickets</h3>
+                                    <p className="text-4xl font-bold text-yellow-600">{ticketCounts.pending}</p>
                                 </div>
-                            </>
-                        )}
+                                <LuTicketX className="text-5xl text-yellow-400" />
+                            </div>
+                            <div className="bg-white p-6 rounded-lg shadow-md flex items-center justify-between">
+                                <div>
+                                    <h3 className="text-lg font-semibold text-gray-700">Resolved Tickets</h3>
+                                    <p className="text-4xl font-bold text-green-600">{ticketCounts.resolved}</p>
+                                </div>
+                                <LuTicket className="text-5xl text-green-400" />
+                            </div>
+                            <div className="bg-white p-6 rounded-lg shadow-md flex items-center justify-between">
+                                <div>
+                                    <h3 className="text-lg font-semibold text-gray-700">Ongoing Tickets</h3>
+                                    <p className="text-4xl font-bold text-purple-600">{ticketCounts.ongoing}</p>
+                                </div>
+                                <LuStar className="text-5xl text-purple-400" />
+                            </div>
+                        </div>
                     </div>
 
-                    {/* Recent tickets Section */}
+                    {/* Recent tickets Section - Mobile */}
                     <div className="bg-white p-6 rounded-lg shadow-md">
                         <h2 className="text-xl font-bold mb-4 text-gray-800 flex items-center">
                             <FaHistory className="mr-2 text-blue-500" /> Recent Tickets
@@ -230,41 +242,93 @@ const usersDashboard = () => {
                         ) : recentTickets.length === 0 ? (
                             <p className="text-gray-600">No recent tickets found.</p>
                         ) : (
-                            <div className="overflow-x-auto">
-                                <table className="min-w-full text-sm text-left border-collapse table-fixed w-full">
-                                    <thead className="bg-gray-100 text-gray-700 uppercase">
-                                        <tr>
-                                            <th className="px-4 py-3 border-b border-gray-200 rounded-tl-lg w-[10%]">ID</th>
-                                            <th className="px-4 py-3 border-b border-gray-200 w-[30%]">Description</th>
-                                            <th className="px-4 py-3 border-b border-gray-200 w-[15%]">System</th>
-                                            <th className="px-4 py-3 border-b border-gray-200 w-[15%]">Category</th>
-                                            <th className="px-4 py-3 border-b border-gray-200 w-[10%]">Status</th>
-                                            <th className="px-4 py-3 border-b border-gray-200 rounded-tr-lg w-[20%]">Date & Time</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-gray-200">
-                                        {recentTickets.map((ticket) => (
-                                            <tr key={ticket.TicketID} className="hover:bg-gray-50">
-                                                <td className="px-4 py-2 font-medium text-gray-900">{ticket.TicketID}</td>
-                                                <td className="px-4 py-2 text-gray-700 whitespace-normal overflow-hidden break-words" style={{
-                                                    maxHeight: '3.6em',
-                                                    lineHeight: '1.2em'
-                                                }}>
-                                                    {truncateDescription(ticket.Description, 120)}
-                                                </td>
-                                                <td className="px-4 py-2 text-gray-700">{ticket.SystemName}</td>
-                                                <td className="px-4 py-2 text-gray-700">{ticket.CategoryName}</td>
-                                                <td className="px-4 py-2">
-                                                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(ticket.Status)}`}>
-                                                        {ticket.Status}
-                                                    </span>
-                                                </td>
-                                                <td className="px-4 py-2 text-gray-500">{formatDateTime(ticket.DateTime)}</td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
+                            <>
+                                {/* Mobile View - Card Layout */}
+                                <div className="block md:hidden space-y-4">
+                                    {recentTickets.map((ticket) => (
+                                        <div key={ticket.TicketID} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                                            <div className="flex justify-between items-start mb-2">
+                                                <span className="font-bold text-gray-900">#{ticket.TicketID}</span>
+                                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(ticket.Status)}`}>
+                                                    {ticket.Status}
+                                                </span>
+                                            </div>
+                                            <p className="text-gray-700 mb-2 text-sm">
+                                                {truncateDescription(ticket.Description, 100)}
+                                            </p>
+                                            <div className="grid grid-cols-2 gap-2 text-sm text-gray-600">
+                                                <div>
+                                                    <span className="font-medium">System:</span> {ticket.SystemName}
+                                                </div>
+                                                <div>
+                                                    <span className="font-medium">Category:</span> {ticket.CategoryName}
+                                                </div>
+                                            </div>
+                                            <div className="mt-2 text-xs text-gray-500">
+                                                {formatDateTime(ticket.DateTime)}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                {/* Desktop View - Table Layout */}
+                                <div className="hidden md:block">
+                                    <div className="overflow-x-auto">
+                                        <table className="min-w-full divide-y divide-gray-200">
+                                            <thead className="bg-gray-50">
+                                                <tr>
+                                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                        ID
+                                                    </th>
+                                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                        Description
+                                                    </th>
+                                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                        System
+                                                    </th>
+                                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                        Category
+                                                    </th>
+                                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                        Status
+                                                    </th>
+                                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                        Date & Time
+                                                    </th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="bg-white divide-y divide-gray-200">
+                                                {recentTickets.map((ticket) => (
+                                                    <tr key={ticket.TicketID} className="hover:bg-gray-50">
+                                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                                            {ticket.TicketID}
+                                                        </td>
+                                                        <td className="px-6 py-4 text-sm text-gray-900">
+                                                            <div className="max-w-xs">
+                                                                {truncateDescription(ticket.Description, 120)}
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                            {ticket.SystemName}
+                                                        </td>
+                                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                            {ticket.CategoryName}
+                                                        </td>
+                                                        <td className="px-6 py-4 whitespace-nowrap">
+                                                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(ticket.Status)}`}>
+                                                                {ticket.Status}
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                            {formatDateTime(ticket.DateTime)}
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </>
                         )}
                     </div>
                 </div>
