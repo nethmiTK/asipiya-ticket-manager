@@ -17,6 +17,24 @@ export default function AddSupervisor() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [editUserId, setEditUserId] = useState(null);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [currentPage, setCurrentPage] = useState(1);
+
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const totalPages = Math.ceil(users.length / itemsPerPage);
+  const currentUsers = users.slice(indexOfFirstItem, indexOfLastItem);
+
+  const handleItemsPerPageChange = (e) => {
+    setItemsPerPage(Number(e.target.value));
+    setCurrentPage(1);
+  };
+
+  const paginate = (pageNumber) => {
+    if (pageNumber < 1 || pageNumber > totalPages) return;
+    setCurrentPage(pageNumber);
+  };
+
   const handleAddClick = () => setShowAddModal(true);
 
   useEffect(() => {
@@ -90,8 +108,8 @@ export default function AddSupervisor() {
                 </tr>
               </thead>
               <tbody>
-                {users.length > 0 ? (
-                  users.map((user) => (
+                {currentUsers.length > 0 ? (
+                  currentUsers.map((user) => (
                     <tr
                       key={user.UserID}
                       className="border-b border-gray-100 hover:bg-gray-50 transition"
@@ -151,10 +169,39 @@ export default function AddSupervisor() {
               </tbody>
             </table>
           </div>
+
+          {/* Pagination Controls */}
+          {users.length > 0 && (
+            <div className="flex flex-col sm:flex-row justify-between items-center mt-4 p-4 bg-white rounded-lg shadow-sm">
+              <div className="flex items-center mb-3 sm:mb-0">
+                <label className="text-sm text-gray-700 mr-2">Entries per page:</label>
+                <select
+                  value={itemsPerPage}
+                  onChange={handleItemsPerPageChange}
+                  className="p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                >
+                  {[5, 10, 20, 50].map((num) => (
+                    <option key={num} value={num}>{num}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex items-center space-x-4">
+                <span className="text-sm text-gray-700">
+                  Showing <strong>{indexOfFirstItem + 1}</strong> to <strong>{Math.min(indexOfLastItem, users.length)}</strong> of <strong>{users.length}</strong> entries
+                </span>
+                <div className="flex items-center space-x-1">
+                  <button onClick={() => paginate(1)} disabled={currentPage === 1} className="px-3 py-1 rounded-md bg-gray-200 text-sm text-gray-700 hover:bg-gray-300 disabled:opacity-50">&lt;&lt;</button>
+                  <button onClick={() => paginate(currentPage - 1)} disabled={currentPage === 1} className="px-3 py-1 rounded-md bg-gray-200 text-sm text-gray-700 hover:bg-gray-300 disabled:opacity-50">&lt;</button>
+                  <span className="px-2 text-sm font-semibold text-gray-700">Page {currentPage} of {totalPages}</span>
+                  <button onClick={() => paginate(currentPage + 1)} disabled={currentPage === totalPages} className="px-3 py-1 rounded-md bg-gray-200 text-sm text-gray-700 hover:bg-gray-300 disabled:opacity-50">&gt;</button>
+                  <button onClick={() => paginate(totalPages)} disabled={currentPage === totalPages} className="px-3 py-1 rounded-md bg-gray-200 text-sm text-gray-700 hover:bg-gray-300 disabled:opacity-50">&gt;&gt;</button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Tooltip */}
       <Tooltip id="tooltip" place="top" />
 
       {showEditModal && (
@@ -167,7 +214,6 @@ export default function AddSupervisor() {
           onUpdate={() => {
             setShowEditModal(false);
             setEditUserId(null);
-            // Refresh members
             fetch("http://localhost:5000/supervisor")
               .then((res) => res.json())
               .then((data) => setUsers(data));
@@ -180,7 +226,6 @@ export default function AddSupervisor() {
           onClose={() => setShowAddModal(false)}
           onSuccess={() => {
             setShowAddModal(false);
-            // Refresh users after successful addition
             fetch("http://localhost:5000/supervisor")
               .then((res) => res.json())
               .then((data) => setUsers(data));
@@ -188,30 +233,16 @@ export default function AddSupervisor() {
         />
       )}
 
-      {/* Delete Confirmation Modal */}
       {showDeleteModal && (
         <div className="fixed inset-0 bg-black/50 bg-opacity-30 flex items-center justify-center z-50">
           <div className="bg-white p-6 rounded-lg shadow-lg w-96">
-            <h2 className="text-xl font-semibold mb-4 text-gray-800">
-              Confirm Deletion
-            </h2>
+            <h2 className="text-xl font-semibold mb-4 text-gray-800">Confirm Deletion</h2>
             <p className="text-gray-600 mb-6">
-              Are you sure you want to delete{" "}
-              <strong>{selectedUser?.FullName}</strong>?
+              Are you sure you want to delete <strong>{selectedUser?.FullName}</strong>?
             </p>
             <div className="flex justify-end gap-3">
-              <button
-                onClick={() => setShowDeleteModal(false)}
-                className="px-4 py-2 bg-gray-300 text-gray-800 rounded hover:bg-gray-400"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={confirmDelete}
-                className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
-              >
-                Delete
-              </button>
+              <button onClick={() => setShowDeleteModal(false)} className="px-4 py-2 bg-gray-300 text-gray-800 rounded hover:bg-gray-400">Cancel</button>
+              <button onClick={confirmDelete} className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600">Delete</button>
             </div>
           </div>
         </div>
