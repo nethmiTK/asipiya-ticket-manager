@@ -309,7 +309,7 @@ const resolved = tickets
 
     try {
       const res = await fetch(
-        `http://localhost:5000/tickets/${selectedTicket.id}`,
+        `http://localhost:5000/api/tickets/${selectedTicket.id}/status`,
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
@@ -333,20 +333,20 @@ const resolved = tickets
 
   const handleDueDateChange = async (e) => {
     const rawDate = e.target.value;
-    const newDueDate = new Date(rawDate).toISOString(); // ISO format with time
+    const newDueDate = rawDate;
 
     setSelectedTicket((prev) => ({
       ...prev,
-      dueDate: rawDate, // keep local viewable date
+      dueDate: rawDate,
     }));
 
     try {
       const res = await fetch(
-        `http://localhost:5000/tickets/${selectedTicket.id}`,
+        `http://localhost:5000/api/tickets/${selectedTicket.id}/due-date`,
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ dueDate: newDueDate, userId: user.UserID }), // send ISO date and userId
+          body: JSON.stringify({ dueDate: newDueDate, userId: user.UserID }),
         }
       );
 
