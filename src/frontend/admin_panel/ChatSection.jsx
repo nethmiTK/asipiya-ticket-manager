@@ -149,8 +149,8 @@ export default function ChatSection({
   };
 
   return (
-    <div className="flex flex-col h-full max-w-md mx-auto border-gray-400 rounded-lg shadow-lg">
-      <header className="p-4 rounded-lg border-b bg-gray-50">
+    <div className="flex flex-col h-full max-w-md w-3xl mx-auto border-gray-400 rounded-lg shadow-lg border">
+      <header className="p-4 rounded-lg border-b bg-gray-50 border-gray-400">
         <h2 className="text-lg font-bold">
           Chat for Ticket #{ticket?.id || ticketId}
         </h2>
