@@ -81,6 +81,26 @@ const profileImageStorage = multer.diskStorage({
 
 const upload = multer({ storage: profileImageStorage });
 
+// --- Multer Configuration for Comment Attachments ---
+const commentAttachmentStorage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        const uploadDir = path.join(__dirname, 'uploads', 'comment_attachments');
+        fs.mkdirSync(uploadDir, { recursive: true });
+        cb(null, uploadDir);
+    },
+    filename: (req, file, cb) => {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        cb(null, 'comment-' + uniqueSuffix + path.extname(file.originalname));
+    }
+});
+
+const commentAttachmentUpload = multer({
+    storage: commentAttachmentStorage,
+    limits: {
+        fileSize: 10 * 1024 * 1024 // 10MB limit
+    }
+});
+
 //  Define salt rounds for bcrypt hashing.
 const saltRounds = 10;
 
@@ -1166,41 +1186,81 @@ app.put('/api/tickets/:ticketId/priority', async (req, res) => {
 });
 
 // Add comment to ticket
-app.post('/api/tickets/:ticketId/comments', async (req, res) => {
+app.post('/api/tickets/:ticketId/comments', commentAttachmentUpload.single('file'), async (req, res) => { // Added multer middleware
   const { ticketId } = req.params;
-  const { userId, comment, mentions, mentionedUserIds } = req.body;
-  const sql = `CALL AddTicketComment(?, ?, ?, ?)`;
-  db.query(sql, [ticketId, userId, comment, mentions || null], async (err, result) => {
-    if (err) {
-      console.error('Error adding comment:', err);
-      return res.status(500).json({ message: 'Failed to add comment' });
+  let { userId, comment, mentionedUserIds, replyToCommentId } = req.body; // Added replyToCommentId
+
+  let attachmentFilePath = null;
+  let attachmentFileName = null;
+  let attachmentFileType = null;
+
+  if (req.file) {
+    attachmentFilePath = path.join('uploads', 'comment_attachments', req.file.filename).replace(/\\/g, '/'); // Normalize path for DB storage
+    attachmentFileName = req.file.originalname;
+    attachmentFileType = req.file.mimetype;
+  }
+
+  try {
+    // Process mentions: Extract mentioned user IDs
+    let processedMentions = [];
+
+    if (mentionedUserIds && typeof mentionedUserIds === 'string') {
+        processedMentions = mentionedUserIds.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id));
     }
+    
+    // IMPORTANT: Storing the original comment text (including @mentions) in CommentText for display.
+    // The mentioned user IDs are still separately stored in the Mentions column.
+
+    const sql = `
+      INSERT INTO comments (TicketID, UserID, CommentText, Mentions, ReplyToCommentID, AttachmentFilePath, AttachmentFileName, AttachmentFileType)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `;
+    const result = await db.promise().query(sql, [
+      ticketId,
+      userId,
+      comment.trim(), // Store original comment text
+      processedMentions.length > 0 ? processedMentions.join(',') : null, // Store only user IDs
+      replyToCommentId || null,
+      attachmentFilePath,
+      attachmentFileName,
+      attachmentFileType
+    ]);
+
+    const newCommentId = result[0].insertId;
 
     // Add to ticketlog
     const logSql = `
       INSERT INTO ticketlog (TicketID, DateTime, Type, Description, UserID)
       VALUES (?, NOW(), 'COMMENT', ?, ?)
     `;
-    db.query(logSql, [ticketId, comment, userId], (logErr) => {
-      if (logErr) {
-        console.error('Error adding to ticketlog:', logErr);
-        // Not fatal, continue
-      }
-    });
+    // Fetch user's name for the log description
+    const [userResult] = await db.promise().query('SELECT FullName FROM appuser WHERE UserID = ?', [userId]);
+    const userName = userResult.length > 0 ? userResult[0].FullName : 'Unknown User';
+    
+    const logDescription = `Comment added by ${userName}: "${comment.substring(0, 100)}..."`; // Use original comment for log description
+    await db.promise().query(logSql, [ticketId, logDescription, userId]); // Use await for logging
 
-    // Notify mentioned users (if you want)
-    if (Array.isArray(mentionedUserIds)) {
-      for (const mentionedUserId of mentionedUserIds) {
+    // Notify mentioned users
+    if (processedMentions.length > 0) {
+      for (const mentionedUserId of processedMentions) {
         await createNotification(
           mentionedUserId,
           `You were mentioned in a comment on ticket #${ticketId}`,
-          'MENTION'
+          'MENTION',
+          newCommentId // Link notification to the new comment
         );
       }
     }
 
-    res.status(201).json({ message: 'Comment added successfully' });
-  });
+    res.status(201).json({ 
+      message: 'Comment added successfully',
+      commentId: newCommentId,
+      filePath: attachmentFilePath // Return file path for frontend
+    });
+  } catch (err) {
+    console.error('Error adding comment:', err);
+    res.status(500).json({ message: 'Failed to add comment', error: err.message });
+  }
 });
 
 const storage = multer.diskStorage({
@@ -2997,10 +3057,26 @@ app.get('/api/companies', (req, res) => {
 
 app.get('/api/tickets/:ticketId/comments', (req, res) => {
   const { ticketId } = req.params;
+  const { userId } = req.query; // Get userId from query parameters
   const sql = `
-    SELECT c.CommentID, c.CommentText, c.CreatedAt, c.Mentions, u.FullName
+    SELECT 
+      c.CommentID, 
+      c.CommentText, 
+      c.CreatedAt, 
+      c.Mentions, 
+      c.ReplyToCommentID, 
+      c.AttachmentFilePath, 
+      c.AttachmentFileName, 
+      c.AttachmentFileType, 
+      u.FullName,
+      u.ProfileImagePath, 
+      (SELECT COUNT(*) FROM comment_likes cl WHERE cl.CommentID = c.CommentID) as LikesCount, 
+      ${userId ? `(SELECT COUNT(*) FROM comment_likes cl WHERE cl.CommentID = c.CommentID AND cl.UserID = ${db.escape(userId)})` : '0'} as UserHasLiked, 
+      ru.FullName as RepliedToUserName 
     FROM comments c
     JOIN appuser u ON c.UserID = u.UserID
+    LEFT JOIN comments rc ON c.ReplyToCommentID = rc.CommentID 
+    LEFT JOIN appuser ru ON rc.UserID = ru.UserID 
     WHERE c.TicketID = ?
     ORDER BY c.CreatedAt ASC
   `;
@@ -3009,7 +3085,16 @@ app.get('/api/tickets/:ticketId/comments', (req, res) => {
       console.error('Error fetching comments:', err);
       return res.status(500).json({ message: 'Failed to fetch comments' });
     }
-    res.json(results);
+
+    const commentsWithFullUrls = results.map(comment => {
+      const formattedComment = { ...comment };
+      if (formattedComment.AttachmentFilePath) {
+        formattedComment.AttachmentFullUrl = `http://localhost:5000/${formattedComment.AttachmentFilePath.replace(/\\/g, '/')}`;
+      }
+      return formattedComment;
+    });
+
+    res.json(commentsWithFullUrls);
   });
 });
 
@@ -3043,6 +3128,69 @@ app.get('/api/ticket-logs/recent', (req, res) => {
         }
         res.json(results);
     });
+});
+
+// Endpoint to like a comment
+app.post('/api/comments/:commentId/like', async (req, res) => {
+  const { commentId } = req.params;
+  const { userId } = req.body;
+
+  if (!userId) {
+    return res.status(400).json({ message: 'User ID is required.' });
+  }
+
+  try {
+    const sql = 'INSERT IGNORE INTO comment_likes (CommentID, UserID) VALUES (?, ?)'; // IGNORE prevents duplicate likes
+    const [result] = await db.promise().query(sql, [commentId, userId]);
+
+    if (result.affectedRows > 0) {
+      res.status(200).json({ message: 'Comment liked successfully.' });
+    } else {
+      res.status(200).json({ message: 'Comment already liked by this user.' });
+    }
+  } catch (err) {
+    console.error('Error liking comment:', err);
+    res.status(500).json({ message: 'Failed to like comment.', error: err.message });
+  }
+});
+
+// Endpoint to unlike a comment
+app.delete('/api/comments/:commentId/like', async (req, res) => {
+  const { commentId } = req.params;
+  const { userId } = req.body; // userId sent in body for DELETE
+
+  if (!userId) {
+    return res.status(400).json({ message: 'User ID is required.' });
+  }
+
+  try {
+    const sql = 'DELETE FROM comment_likes WHERE CommentID = ? AND UserID = ?';
+    const [result] = await db.promise().query(sql, [commentId, userId]);
+
+    if (result.affectedRows > 0) {
+      res.status(200).json({ message: 'Comment unliked successfully.' });
+    } else {
+      res.status(404).json({ message: 'Like not found for this comment and user.' });
+    }
+  } catch (err) {
+    console.error('Error unliking comment:', err);
+    res.status(500).json({ message: 'Failed to unlike comment.', error: err.message });
+  }
+});
+
+// Endpoint to check if a user has liked a comment
+app.get('/api/comments/:commentId/hasLiked/:userId', async (req, res) => {
+  const { commentId, userId } = req.params;
+
+  try {
+    const sql = 'SELECT COUNT(*) as count FROM comment_likes WHERE CommentID = ? AND UserID = ?';
+    const [rows] = await db.promise().query(sql, [commentId, userId]);
+    const hasLiked = rows[0].count > 0;
+    res.status(200).json({ hasLiked });
+  } catch (err) {
+    console.error('Error checking like status:', err);
+    res.status(500).json({ message: 'Failed to check like status.', error: err.message });
+  }
 });
 
  
