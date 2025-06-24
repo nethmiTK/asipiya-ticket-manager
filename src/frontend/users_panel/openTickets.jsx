@@ -6,6 +6,7 @@ import SideBar from "../../user_components/SideBar/SideBar";
 import NavBar from "../../user_components/NavBar/NavBar";
 import NotificationPanel from "../components/NotificationPanel";
 import { toast } from 'react-toastify';
+import { useNavigate } from "react-router-dom";
 
 const enhanceFilesWithPreview = (acceptedFiles) =>
   acceptedFiles.map((file) =>
@@ -15,6 +16,7 @@ const enhanceFilesWithPreview = (acceptedFiles) =>
   );
 
 const OpenTickets = () => {
+  const navigate = useNavigate();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [files, setFiles] = useState([]);
   const [systemNames, setSystemNames] = useState([]);
@@ -296,6 +298,7 @@ const OpenTickets = () => {
                       setSelectedCategory("");
                       setIsSubmitting(false);
                       setUploadProgress(0);
+                      navigate("/user-dashboard");
                     }, 500);
 
                   } catch (err) {
@@ -341,8 +344,8 @@ const OpenTickets = () => {
                           <div
                             key={index}
                             className={`p-2 cursor-pointer hover:bg-gray-100 ${selectedSystem === sys.SystemName
-                                ? "bg-blue-100 font-semibold"
-                                : ""
+                              ? "bg-blue-100 font-semibold"
+                              : ""
                               }`}
                             onClick={() => {
                               setSelectedSystem(sys.SystemName);
@@ -390,8 +393,8 @@ const OpenTickets = () => {
                           <div
                             key={index}
                             className={`p-2 cursor-pointer hover:bg-gray-100 ${selectedCategory === cat.CategoryName
-                                ? "bg-blue-100 font-semibold"
-                                : ""
+                              ? "bg-blue-100 font-semibold"
+                              : ""
                               }`}
                             onClick={() => {
                               setSelectedCategory(cat.CategoryName);
@@ -501,8 +504,8 @@ const OpenTickets = () => {
                       type="submit"
                       disabled={isSubmitting}
                       className={`px-4 py-2 bg-blue-600 text-white rounded-md text-base font-medium transition-all duration-200 ${isSubmitting
-                          ? 'opacity-50 cursor-not-allowed'
-                          : 'hover:scale-105 hover:bg-blue-700'
+                        ? 'opacity-50 cursor-not-allowed'
+                        : 'hover:scale-105 hover:bg-blue-700'
                         }`}
                     >
                       {isSubmitting ? (
