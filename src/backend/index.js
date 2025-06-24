@@ -17,6 +17,8 @@ import util from 'util';
 import ticketLogRoutes from './routes/ticketLog.js';
 import userProfileRoutes from './routes/userProfile.js';
 import axios from 'axios';
+import http from 'http';
+import { Server } from 'socket.io';
 
 // --- Database Connection ---
 const db = mysql.createConnection({
@@ -38,6 +40,15 @@ db.connect((err) => {
 const app = express();
 app.use(bodyParser.json());
 app.use(cors());
+
+const server = http.createServer(app);
+
+const io = new Server(server, {
+  cors: {
+    origin: '*',
+    methods: ['GET', 'POST'],
+  },
+});
 
 // Add middleware to pass db connection to routes
 app.use((req, res, next) => {
@@ -2532,50 +2543,70 @@ function isImageFile(filename) {
 }
 
 app.post("/api/ticketchatUser", upload.single("file"), (req, res) => {
-  const { TicketID, Type, Note, UserID, Role } = req.body;
-  const filePath = req.file ? req.file.filename : null;
+    const { TicketID, Type, Note, UserID, Role } = req.body;
+    const filePath = req.file ? req.file.filename : null;
 
-  if (!TicketID || !Note) {
-    return res.status(400).json({ error: "TicketID and Note are required." });
-  }
-
-  const sql = `
-    INSERT INTO ticketchat (TicketID, Type, Note, UserID, Path, Role) 
-    VALUES (?, ?, ?, ?, ?, ?)
-  `;
-  const values = [
-    TicketID,
-    Type || "text",
-    Note,
-    UserID || null,
-    filePath,
-    Role || "User",
-  ];
-
-  db.query(sql, values, (err, result) => {
-    if (err) {
-      console.error("DB insert error:", err);
-      return res.status(500).json({ error: "Failed to save message." });
+    if (!TicketID || !Note) {
+        return res.status(400).json({ error: "TicketID and Note are required." });
     }
-    const fileUrl = filePath
-      ? `${req.protocol}://${req.get(
-          "host"
-        )}/uploads/profile_images/${filePath}`
-      : null;
 
-    res.status(201).json({
-      message: "Message saved",
-      chatId: result.insertId,
-      file: fileUrl
-        ? {
-            url: fileUrl,
-            isImage: isImageFile(filePath),
-            name: req.file.originalname,
-          }
-        : null,
+    const sql = `
+        INSERT INTO ticketchat (TicketID, Type, Note, UserID, Path, Role) 
+        VALUES (?, ?, ?, ?, ?, ?)
+    `;
+    const values = [
+        TicketID,
+        Type || "text",
+        Note,
+        UserID || null,
+        filePath,
+        Role || "User",
+    ];
+
+    db.query(sql, values, (err, result) => {
+        if (err) {
+            console.error("DB insert error:", err);
+            return res.status(500).json({ error: "Failed to save message." });
+        }
+
+        const newMessage = {
+            id: result.insertId,
+            ticketid: TicketID,
+            type: Type || "text",
+            content: Note,
+            userid: UserID || null,
+            role: Role || "User",
+            timestamp: new Date(),
+            file: filePath
+                ? {
+                    url: `${req.protocol}://${req.get("host")}/uploads/profile_images/${filePath}`,
+                    isImage: isImageFile(filePath),
+                    name: req.file.originalname,
+                }
+                : null,
+        };
+
+        io.to(TicketID).emit('receiveTicketMessage', newMessage);
+
+        res.status(201).json({
+            message: "Message saved",
+            chatId: result.insertId,
+            file: newMessage.file,
+        });
     });
-  });
 });
+
+io.on("connection", (socket) => {
+  socket.on("joinTicketRoom", (ticketID) => {
+    socket.join(ticketID);
+  });
+
+ socket.on("sendTicketMessage", (message) => {
+  io.to(message.TicketID).emit("receiveTicketMessage", message);
+});
+});
+
+
 
 app.get("/api/ticketchatUser/:ticketID", (req, res) => {
   const ticketID = req.params.ticketID;
