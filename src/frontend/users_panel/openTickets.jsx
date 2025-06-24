@@ -15,6 +15,41 @@ const enhanceFilesWithPreview = (acceptedFiles) =>
     })
   );
 
+  // Helper function to get file icon based on file type
+const getFileIcon = (fileName) => {
+  const extension = fileName.split('.').pop().toLowerCase();
+  
+  switch (extension) {
+    case 'pdf': return '📄';
+    case 'doc': case 'docx': return '📝';
+    case 'xls': case 'xlsx': return '📊';
+    case 'ppt': case 'pptx': return '📽️';
+    case 'txt': return '📃';
+    case 'zip': case 'rar': case '7z': return '🗜️';
+    case 'mp3': case 'wav': case 'flac': return '🎵';
+    case 'mp4': case 'avi': case 'mov': case 'mkv': return '🎬';
+    case 'jpg': case 'jpeg': case 'png': case 'gif': case 'bmp': return '🖼️';
+    default: return '📎';
+  }
+};
+
+// Helper function to check if file can be previewed in browser
+const canPreviewFile = (file) => {
+  const previewableTypes = [
+    'application/pdf',
+    'text/plain',
+    'text/html',
+    'text/css',
+    'text/javascript',
+    'application/json'
+  ];
+  
+  return file.type.startsWith('image/') || 
+         file.type.startsWith('video/') || 
+         file.type.startsWith('audio/') ||
+         previewableTypes.includes(file.type);
+};
+
 const OpenTickets = () => {
   const navigate = useNavigate();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -25,41 +60,43 @@ const OpenTickets = () => {
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const notificationRef = useRef(null);
 
-  // Loading state
+    // Loading state
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
 
-  // Custom dropdown states
+    // Custom dropdown states
   const [isSystemDropdownOpen, setIsSystemDropdownOpen] = useState(false);
   const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
   const [selectedSystem, setSelectedSystem] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("");
 
-  // Refs for dropdown click outside detection
+    // File dropdown states
+  const [fileDropdownStates, setFileDropdownStates] = useState({});
+
+    // Refs for dropdown click outside detection
+  const [dropdownPosition, setDropdownPosition] = useState({ x: 0, y: 0 });
   const systemDropdownRef = useRef(null);
   const categoryDropdownRef = useRef(null);
 
+  // Click outside handler
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (notificationRef.current && !notificationRef.current.contains(event.target)) {
         setShowNotifications(false);
       }
-
-      // Handle system dropdown
       if (systemDropdownRef.current && !systemDropdownRef.current.contains(event.target)) {
         setIsSystemDropdownOpen(false);
       }
-
-      // Handle category dropdown
       if (categoryDropdownRef.current && !categoryDropdownRef.current.contains(event.target)) {
         setIsCategoryDropdownOpen(false);
+      }
+      if (!event.target.closest('.file-dropdown')) {
+        setFileDropdownStates({});
       }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   useEffect(() => {
@@ -82,25 +119,62 @@ const OpenTickets = () => {
     return () => clearInterval(interval);
   }, []);
 
+  // File handling
   const { getRootProps, getInputProps } = useDropzone({
     onDrop: (acceptedFiles) => {
       const newFiles = acceptedFiles.filter(
-        (newFile) => !files.some(
-          (existingFile) => existingFile.name === newFile.name && existingFile.size === newFile.size
+        newFile => !files.some(existingFile => 
+          existingFile.name === newFile.name && existingFile.size === newFile.size
         )
       );
-      setFiles((prev) => [...prev, ...enhanceFilesWithPreview(newFiles)]);
+      setFiles(prev => [...prev, ...enhanceFilesWithPreview(newFiles)]);
     },
     multiple: true,
-    accept: {
-      "image/*": [],
-      "application/pdf": [],
-      "video/*": [],
-    },
+    accept: undefined,
   });
 
   const handleRemoveFile = (index) => {
-    setFiles((prev) => prev.filter((_, i) => i !== index));
+    setFiles(prev => prev.filter((_, i) => i !== index));
+    setFileDropdownStates(prev => {
+      const newState = { ...prev };
+      delete newState[index];
+      return newState;
+    });
+  };
+
+  const handleFileDropdownToggle = (index, event) => {
+    event.stopPropagation();
+    event.preventDefault();
+    
+    const rect = event.currentTarget.getBoundingClientRect();
+    setDropdownPosition({
+      x: rect.left,
+      y: rect.bottom + window.scrollY
+    });
+    
+    setFileDropdownStates(prev => ({
+      [index]: !prev[index]
+    }));
+  };
+
+  const handleFileOpen = (file) => {
+    if (canPreviewFile(file)) {
+      const newWindow = window.open(file.preview, '_blank');
+      if (!newWindow) toast.error('Please allow popups to preview files');
+    } else {
+      toast.info('This file type cannot be previewed in browser. Use download instead.');
+    }
+    setFileDropdownStates({});
+  };
+
+  const handleFileDownload = (file) => {
+    const link = document.createElement('a');
+    link.href = file.preview;
+    link.download = file.name;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setFileDropdownStates({});
   };
 
   const fetchSystems = async () => {
@@ -123,7 +197,7 @@ const OpenTickets = () => {
       const activeCategories = res.data.filter(cat => cat.Status === 1);
       setCategoryName(activeCategories);
     } catch (error) {
-      console.error("Error fetching systems:", error);
+      console.error("Error fetching categories:", error);
     }
   };
 
@@ -131,7 +205,7 @@ const OpenTickets = () => {
     fetchCategory();
   }, []);
 
-  // Clean up object URLs when component unmounts or files change
+  // Clean up object URLs
   useEffect(() => {
     return () => files.forEach(file => URL.revokeObjectURL(file.preview));
   }, [files]);
@@ -140,12 +214,7 @@ const OpenTickets = () => {
     <div className="flex">
       <title>Create Ticket</title>
       <SideBar open={isSidebarOpen} setOpen={setIsSidebarOpen} />
-      <div
-        className={`flex-1 flex flex-col h-screen overflow-y-auto transition-all duration-300
-          ml-0 
-          lg:ml-20 ${isSidebarOpen ? 'lg:ml-72' : ''} 
-        `}
-      >
+      <div className={`flex-1 flex flex-col h-screen overflow-y-auto transition-all duration-300 ml-0 lg:ml-20 ${isSidebarOpen ? 'lg:ml-72' : ''}`}>
         <NavBar
           isSidebarOpen={isSidebarOpen}
           showNotifications={showNotifications}
@@ -154,6 +223,7 @@ const OpenTickets = () => {
           notificationRef={notificationRef}
           setOpen={setIsSidebarOpen}
         />
+        
         <div className="p-6 mt-[60px] relative">
           {showNotifications && (
             <div ref={notificationRef} className="absolute right-4 top-[70px] z-50">
@@ -165,7 +235,6 @@ const OpenTickets = () => {
             </div>
           )}
 
-          {/* Loading */}
           {isSubmitting && (
             <div className="absolute inset-0 backdrop-blur-sm bg-white/10 flex items-center justify-center z-40">
               <div className="bg-white p-6 rounded-lg shadow-xl border w-80">
@@ -173,8 +242,6 @@ const OpenTickets = () => {
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
                   <p className="text-lg font-medium text-gray-800">Submitting your ticket...</p>
                 </div>
-
-                {/* Progress Bar */}
                 <div className="w-full bg-gray-200 rounded-full h-2.5 mb-2">
                   <div
                     className="bg-blue-600 h-2.5 rounded-full transition-all duration-300 ease-out"
@@ -182,7 +249,6 @@ const OpenTickets = () => {
                   ></div>
                 </div>
                 <p className="text-sm text-gray-600 text-center">{uploadProgress}% Complete</p>
-
                 {files.length > 0 && (
                   <p className="text-xs text-gray-500 text-center mt-2">
                     Uploading {files.length} file{files.length > 1 ? 's' : ''}...
@@ -195,9 +261,7 @@ const OpenTickets = () => {
           <h1 className="text-2xl font-bold mb-6">Create Your Tickets</h1>
           <div className="flex flex-col items-center justify-start">
             <div className="w-full max-w-[750px] bg-slate-100 text-black p-8 rounded-2xl shadow-lg">
-              <h1 className="text-2xl md:text-3xl font-bold text-center mb-4">
-                Create Ticket
-              </h1>
+              <h1 className="text-2xl md:text-3xl font-bold text-center mb-4">Create Ticket</h1>
 
               <Formik
                 initialValues={{
@@ -210,24 +274,17 @@ const OpenTickets = () => {
                     setIsSubmitting(true);
                     setUploadProgress(0);
 
-                    // Use selected values from custom dropdowns
-                    const formValues = {
-                      systemName: selectedSystem,
-                      ticketCategory: selectedCategory,
-                      description: values.description,
-                    };
-
-                    if (!formValues.systemName) {
+                    if (!selectedSystem || selectedSystem.trim() === "") {
                       toast.error("Please select a System Name.");
                       setIsSubmitting(false);
                       return;
                     }
-                    if (!formValues.ticketCategory) {
+                    if (!selectedCategory || selectedCategory.trim() === "") {
                       toast.error("Please select a Ticket Category.");
                       setIsSubmitting(false);
                       return;
                     }
-                    if (!formValues.description) {
+                    if (!values.description || values.description.trim() === "") {
                       toast.error("Please provide a Description.");
                       setIsSubmitting(false);
                       return;
@@ -242,9 +299,10 @@ const OpenTickets = () => {
 
                     // Progress: 20% - Submitting ticket data
                     setUploadProgress(20);
-
                     const ticketPayload = {
-                      ...formValues,
+                      systemName: selectedSystem,
+                      ticketCategory: selectedCategory,
+                      description: values.description,
                       userId: user.UserID,
                     };
 
@@ -254,8 +312,7 @@ const OpenTickets = () => {
                     );
 
                     const ticketId = ticketRes.data.ticketId;
-
-                    // Progress: 50% - Ticket created
+                     // Progress: 50% - Ticket created
                     setUploadProgress(50);
 
                     if (files.length > 0) {
@@ -264,11 +321,10 @@ const OpenTickets = () => {
                         formData.append("evidenceFiles", file);
                       });
                       formData.append("ticketId", ticketId);
-                      formData.append("description", formValues.description);
+                      formData.append("description", values.description);
 
                       // Progress: 70% - Uploading files
                       setUploadProgress(70);
-
                       await axios.post(
                         "http://localhost:5000/api/upload_evidence",
                         formData,
@@ -288,14 +344,13 @@ const OpenTickets = () => {
 
                     // Progress: 100% - Complete
                     setUploadProgress(100);
-
-                    // Small delay to show completion
                     setTimeout(() => {
                       toast.success("Ticket and evidence submitted successfully");
                       resetForm();
                       setFiles([]);
                       setSelectedSystem("");
                       setSelectedCategory("");
+                      setFileDropdownStates({});
                       setIsSubmitting(false);
                       setUploadProgress(0);
                       navigate("/user-dashboard");
@@ -310,7 +365,6 @@ const OpenTickets = () => {
                 }}
               >
                 <Form className="space-y-4">
-                  {/* Custom System Name Dropdown */}
                   <div className="flex flex-col relative" ref={systemDropdownRef}>
                     <label className="text-sm font-medium text-gray-700 mb-1">
                       System Name
@@ -323,19 +377,13 @@ const OpenTickets = () => {
                     >
                       {selectedSystem || "Select System"}
                       <svg
-                        className={`w-4 h-4 transition-transform duration-200 ${isSystemDropdownOpen ? "rotate-180" : "rotate-0"
-                          }`}
+                        className={`w-4 h-4 transition-transform duration-200 ${isSystemDropdownOpen ? "rotate-180" : "rotate-0"}`}
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"
                         xmlns="http://www.w3.org/2000/svg"
                       >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth="2"
-                          d="M19 9l-7 7-7-7"
-                        ></path>
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
                       </svg>
                     </button>
                     {isSystemDropdownOpen && !isSubmitting && (
@@ -343,10 +391,7 @@ const OpenTickets = () => {
                         {systemNames.map((sys, index) => (
                           <div
                             key={index}
-                            className={`p-2 cursor-pointer hover:bg-gray-100 ${selectedSystem === sys.SystemName
-                              ? "bg-blue-100 font-semibold"
-                              : ""
-                              }`}
+                            className={`p-2 cursor-pointer hover:bg-gray-100 ${selectedSystem === sys.SystemName ? "bg-blue-100 font-semibold" : ""}`}
                             onClick={() => {
                               setSelectedSystem(sys.SystemName);
                               setIsSystemDropdownOpen(false);
@@ -359,7 +404,7 @@ const OpenTickets = () => {
                     )}
                   </div>
 
-                  {/* Custom Category Dropdown */}
+                 {/* Custom Category Dropdown */}
                   <div className="flex flex-col relative" ref={categoryDropdownRef}>
                     <label className="text-sm font-medium text-gray-700 mb-1">
                       Ticket Category
@@ -372,19 +417,13 @@ const OpenTickets = () => {
                     >
                       {selectedCategory || "Select Ticket Category"}
                       <svg
-                        className={`w-4 h-4 transition-transform duration-200 ${isCategoryDropdownOpen ? "rotate-180" : "rotate-0"
-                          }`}
+                        className={`w-4 h-4 transition-transform duration-200 ${isCategoryDropdownOpen ? "rotate-180" : "rotate-0"}`}
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"
                         xmlns="http://www.w3.org/2000/svg"
                       >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth="2"
-                          d="M19 9l-7 7-7-7"
-                        ></path>
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
                       </svg>
                     </button>
                     {isCategoryDropdownOpen && !isSubmitting && (
@@ -392,10 +431,7 @@ const OpenTickets = () => {
                         {categoryName.map((cat, index) => (
                           <div
                             key={index}
-                            className={`p-2 cursor-pointer hover:bg-gray-100 ${selectedCategory === cat.CategoryName
-                              ? "bg-blue-100 font-semibold"
-                              : ""
-                              }`}
+                            className={`p-2 cursor-pointer hover:bg-gray-100 ${selectedCategory === cat.CategoryName ? "bg-blue-100 font-semibold" : ""}`}
                             onClick={() => {
                               setSelectedCategory(cat.CategoryName);
                               setIsCategoryDropdownOpen(false);
@@ -419,7 +455,6 @@ const OpenTickets = () => {
                       disabled={isSubmitting}
                       className={`w-full h-50 p-3 border border-gray-300 rounded-md text-sm mt-1 focus:ring-2 focus:ring-gray-400 ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}
                       placeholder="Provide details of your problem"
-                    // required
                     />
                   </div>
 
@@ -431,7 +466,8 @@ const OpenTickets = () => {
                     <div
                       {...getRootProps()}
                       className={`border-dashed border-2 border-gray-300 rounded-md p-6 hover:border-gray-400 cursor-pointer mt-1 
-    ${files.length > 0 ? 'h-auto max-h-[19rem] overflow-y-auto' : 'flex flex-col justify-center items-center'} min-h-[10rem] ${isSubmitting ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''}`}
+                        ${files.length > 0 ? 'h-auto max-h-[19rem] overflow-y-auto' : 'flex flex-col justify-center items-center'} 
+                        min-h-[10rem] ${isSubmitting ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''}`}
                     >
                       <input {...getInputProps()} disabled={isSubmitting} />
                       {files.length === 0 ? (
@@ -440,7 +476,7 @@ const OpenTickets = () => {
                             Click to upload or drag and drop
                           </p>
                           <p className="text-gray-400 text-xs text-center">
-                            Supported formats: PDF, Images, Videos
+                            All file types are supported
                           </p>
                         </>
                       ) : (
@@ -448,37 +484,54 @@ const OpenTickets = () => {
                           {files.map((file, index) => {
                             const isImage = file.type.startsWith("image/");
                             const isVideo = file.type.startsWith("video/");
+                            const fileIcon = getFileIcon(file.name);
+                            
                             return (
                               <div
-                                key={file.name + file.size + index}
+                                key={`${file.name}-${file.size}-${index}`}
                                 className="relative w-20 h-20 border rounded-md overflow-hidden flex-shrink-0"
                               >
                                 {isImage && (
-                                  <img
-                                    src={file.preview}
-                                    alt={file.name}
-                                    className="w-full h-full object-cover"
-                                  />
-                                )}
-                                {isVideo && (
-                                  <video
-                                    src={file.preview}
-                                    controls
-                                    className="w-full h-full object-cover"
-                                  />
-                                )}
-                                {!isImage && !isVideo && (
-                                  <div className="w-full p-2 text-xs truncate">
-                                    {file.name}
+                                  <div className="relative w-full h-full">
+                                    <img src={file.preview} alt={file.name} className="w-full h-full object-cover" />
+                                    <button
+                                      onClick={(e) => handleFileDropdownToggle(index, e)}
+                                      className="absolute top-1 left-1 bg-black bg-opacity-50 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs cursor-pointer hover:bg-opacity-70 z-10"
+                                    >
+                                      ⋮
+                                    </button>
                                   </div>
                                 )}
+                                {isVideo && (
+                                  <div className="relative w-full h-full">
+                                    <video src={file.preview} className="w-full h-full object-cover" controls={false} />
+                                    <button
+                                      onClick={(e) => handleFileDropdownToggle(index, e)}
+                                      className="absolute top-1 left-1 bg-black bg-opacity-50 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs cursor-pointer hover:bg-opacity-70 z-10"
+                                    >
+                                      ⋮
+                                    </button>
+                                  </div>
+                                )}
+                                {!isImage && !isVideo && (
+                                  <div className="relative w-full h-full p-1 bg-gray-50 flex flex-col items-center justify-center">
+                                    <div className="text-lg mb-1">{fileIcon}</div>
+                                    <div className="text-xs text-center truncate max-w-full px-1">{file.name}</div>
+                                    <button
+                                      onClick={(e) => handleFileDropdownToggle(index, e)}
+                                      className="absolute top-1 left-1 bg-gray-600 bg-opacity-70 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs cursor-pointer hover:bg-opacity-90 z-10"
+                                    >
+                                      ⋮
+                                    </button>
+                                  </div>
+                                )}
+
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     handleRemoveFile(index);
                                   }}
-                                  disabled={isSubmitting}
-                                  className={`absolute top-1 right-1 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs cursor-pointer ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                  className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs cursor-pointer hover:bg-red-600 z-10"
                                 >
                                   ✕
                                 </button>
@@ -490,7 +543,9 @@ const OpenTickets = () => {
                               className="relative w-20 h-20 border-dashed border-2 border-gray-300 rounded-md flex flex-col items-center justify-center text-center text-gray-500 hover:border-gray-400 cursor-pointer text-xs"
                               style={{ minWidth: '80px', minHeight: '80px' }}
                             >
-                              <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+                              <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                              </svg>
                               <p className="mt-1">Add More</p>
                             </div>
                           )}
@@ -499,14 +554,89 @@ const OpenTickets = () => {
                     </div>
                   </div>
 
+                  {Object.keys(fileDropdownStates).map(index => {
+                    const file = files[index];
+                    const isVideo = file?.type.startsWith("video/");
+                    
+                    return fileDropdownStates[index] && (
+                      <div
+                        key={`dropdown-${index}`}
+                        className="file-dropdown fixed z-[9999] bg-white border border-gray-300 rounded-md shadow-lg"
+                        style={{
+                          top: `${dropdownPosition.y}px`,
+                          left: `${dropdownPosition.x}px`,
+                          minWidth: '120px'
+                        }}
+                      >
+                        {isVideo ? (
+                          <>
+                            <button
+                              onClick={() => handleFileOpen(file)}
+                              className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 flex items-center"
+                            >
+                              <span className="mr-2">▶️</span> Play
+                            </button>
+                            <button
+                              onClick={() => {
+                                window.open(file.preview, '_blank', 'fullscreen=yes');
+                                setFileDropdownStates({});
+                              }}
+                              className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 flex items-center"
+                            >
+                              <span className="mr-2">⛶</span> Fullscreen
+                            </button>
+                            <button
+                              onClick={() => handleFileDownload(file)}
+                              className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 flex items-center"
+                            >
+                              <span className="mr-2">⬇️</span> Download
+                            </button>
+                            <button
+                              onClick={() => {
+                                toast.info('Mute functionality would be implemented with video controls');
+                                setFileDropdownStates({});
+                              }}
+                              className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 flex items-center"
+                            >
+                              <span className="mr-2">🔇</span> Mute
+                            </button>
+                            <button
+                              onClick={() => {
+                                toast.info('Playback speed control would be implemented with video controls');
+                                setFileDropdownStates({});
+                              }}
+                              className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 flex items-center"
+                            >
+                              <span className="mr-2">⏩</span> Playback speed
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button
+                              onClick={() => handleFileOpen(file)}
+                              className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 flex items-center"
+                            >
+                              <span className="mr-2">▶️</span> Open
+                            </button>
+                            <button
+                              onClick={() => handleFileDownload(file)}
+                              className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 flex items-center"
+                            >
+                              <span className="mr-2">⬇️</span> Download
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    );
+                  })}
+
                   <div className="flex justify-end">
                     <button
                       type="submit"
                       disabled={isSubmitting}
-                      className={`px-4 py-2 bg-blue-600 text-white rounded-md text-base font-medium transition-all duration-200 ${isSubmitting
-                        ? 'opacity-50 cursor-not-allowed'
-                        : 'hover:scale-105 hover:bg-blue-700'
-                        }`}
+                      className={`px-4 py-2 bg-blue-600 text-white rounded-md text-base font-medium transition-all duration-200 ${
+                        isSubmitting ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105 hover:bg-blue-700'
+                      }`}
                     >
                       {isSubmitting ? (
                         <div className="flex items-center">
