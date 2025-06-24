@@ -222,26 +222,23 @@ export default function TicketManage() {
 
     // Extract mentions from comment text (e.g., @FullName)
     let mentionedUserIds = [];
-    let processedComment = comment.trim();
+    const processedComment = comment.trim(); // Keep original comment text for context
+    const lowerCaseComment = processedComment.toLowerCase(); // Convert comment to lowercase once for efficiency
 
     // Sort mentionable users by length of FullName in descending order
-    // This helps in correctly matching longer names before shorter, partial matches (e.g., "John Doe" before "John")
     const sortedMentionableUsers = [...mentionableUsers].sort((a, b) => b.FullName.length - a.FullName.length);
 
     for (const user of sortedMentionableUsers) {
-      // Create a regex to find the user's full name prefixed with '@'
-      // Escape special characters in the user's FullName to prevent regex issues
-      const escapedFullName = user.FullName.replace(/[.*+?^${}()|[\]\\]/g, '\\\\$&');
-      const mentionRegex = new RegExp(`@${escapedFullName}\\\\b`, 'gi'); // 'gi' for global and case-insensitive, \\b for word boundary
-
-      if (mentionRegex.test(processedComment)) {
-        // If the user's full name is found as a mention in the comment
+      const lowerCaseFullName = user.FullName.toLowerCase().trim();
+      // Check if "@full name" is present in the lowercased comment
+      if (lowerCaseComment.includes(`@${lowerCaseFullName}`)) {
         mentionedUserIds.push(user.UserID);
       }
     }
     
     // Ensure unique IDs if a user is mentioned multiple times
     mentionedUserIds = [...new Set(mentionedUserIds)];
+    console.log("Frontend - Mentions to send:", mentionedUserIds); // Debugging log
 
     if (mentionedUserIds.length > 0) {
         formData.append("mentionedUserIds", mentionedUserIds.join(','));
@@ -258,7 +255,7 @@ export default function TicketManage() {
       setReplyingTo(null);
       toast.success('Comment added successfully');
       // Refresh comments after adding
-      const res = await axios.get(`http://localhost:5000/api/tickets/${selectedTicket.id}/comments`);
+      const res = await axios.get(`http://localhost:5000/api/tickets/${selectedTicket.id}/comments?userId=${user.UserID}`); // Pass userId for likes
       setCommentsList(res.data);
     } catch (error) {
       console.error('Error adding comment:', error);
@@ -480,7 +477,7 @@ const resolved = tickets
       // Toggle the local state immediately for responsiveness
       setUserLikedComments(prev => ({ ...prev, [commentId]: !hasLiked }));
       // Re-fetch comments to get updated like counts from backend
-      const res = await axios.get(`http://localhost:5000/api/tickets/${selectedTicket.id}/comments`);
+      const res = await axios.get(`http://localhost:5000/api/tickets/${selectedTicket.id}/comments?userId=${user.UserID}`); // Pass userId for likes
       setCommentsList(res.data);
     } catch (error) {
       console.error("Error toggling like:", error);
@@ -503,44 +500,52 @@ const resolved = tickets
 
   const renderCommentTextWithMentions = (text) => {
     const parts = [];
-    let lastIndex = 0;
+    // Sort mentionable users by length of FullName in descending order
     const sortedMentionableUsers = [...mentionableUsers].sort((a, b) => b.FullName.length - a.FullName.length);
 
-    // Create a single regex to find all potential mentions
-    const allMentionsRegex = new RegExp(`@(${sortedMentionableUsers.map(u => u.FullName.replace(/[.*+?^${}()|[\]\\]/g, '\\\$&')).join('|')})`, 'gi');
+    let segments = [{ type: 'text', value: text }];
 
-    let match;
-    while ((match = allMentionsRegex.exec(text)) !== null) {
-      const fullMatch = match[0]; // e.g., "@Sasindu Perera"
-      const mentionedName = match[1]; // e.g., "Sasindu Perera"
-      const offset = match.index;
+    for (const user of sortedMentionableUsers) {
+      const escapedFullName = user.FullName.replace(/[.*+?^${}()|[\]\\]/g, '\\\\$&'); // Correct escaping for regex
+      const mentionRegex = new RegExp(`@${escapedFullName}`, 'gi');
+      const newSegments = [];
 
-      // Add text before the current mention
-      if (offset > lastIndex) {
-        parts.push(text.substring(lastIndex, offset));
+      for (const segment of segments) {
+        if (segment.type === 'mention') {
+          newSegments.push(segment); // Already a mention, keep it
+          continue;
+        }
+
+        let lastSplitIndex = 0;
+        let match;
+        while ((match = mentionRegex.exec(segment.value)) !== null) {
+          const preMatchText = segment.value.substring(lastSplitIndex, match.index);
+          if (preMatchText) {
+            newSegments.push({ type: 'text', value: preMatchText });
+          }
+          newSegments.push({ type: 'mention', value: match[0], user: user });
+          lastSplitIndex = match.index + match[0].length;
+        }
+        const remainingText = segment.value.substring(lastSplitIndex);
+        if (remainingText) {
+          newSegments.push({ type: 'text', value: remainingText });
+        }
       }
+      segments = newSegments;
+    }
 
-      // Check if the captured mentioned name actually corresponds to a known user (case-insensitive and trimmed)
-      const userFound = mentionableUsers.find(u => u.FullName.toLowerCase().trim() === mentionedName.toLowerCase().trim());
-
-      if (userFound) {
-        parts.push(
-          <span key={offset} className="text-blue-600 font-semibold">
-            {fullMatch}
+    // Convert segments into JSX elements
+    return segments.map((segment, index) => {
+      if (segment.type === 'mention') {
+        return (
+          <span key={index} className="text-blue-600 font-semibold">
+            {segment.value}
           </span>
         );
       } else {
-        // If not a recognized user, treat as plain text
-        parts.push(fullMatch);
+        return segment.value;
       }
-      lastIndex = offset + fullMatch.length;
-    }
-
-    // Add any remaining text after the last mention
-    if (lastIndex < text.length) {
-      parts.push(text.substring(lastIndex));
-    }
-    return parts;
+    });
   };
 
   return (
@@ -1024,44 +1029,52 @@ function CommentItem({
 
   const renderCommentTextWithMentions = (text) => {
     const parts = [];
-    let lastIndex = 0;
+    // Sort mentionable users by length of FullName in descending order
     const sortedMentionableUsers = [...mentionableUsers].sort((a, b) => b.FullName.length - a.FullName.length);
 
-    // Create a single regex to find all potential mentions
-    const allMentionsRegex = new RegExp(`@(${sortedMentionableUsers.map(u => u.FullName.replace(/[.*+?^${}()|[\]\\]/g, '\\\$&')).join('|')})`, 'gi');
+    let segments = [{ type: 'text', value: text }];
 
-    let match;
-    while ((match = allMentionsRegex.exec(text)) !== null) {
-      const fullMatch = match[0]; // e.g., "@Sasindu Perera"
-      const mentionedName = match[1]; // e.g., "Sasindu Perera"
-      const offset = match.index;
+    for (const user of sortedMentionableUsers) {
+      const escapedFullName = user.FullName.replace(/[.*+?^${}()|[\]\\]/g, '\\\\$&'); // Correct escaping for regex
+      const mentionRegex = new RegExp(`@${escapedFullName}`, 'gi');
+      const newSegments = [];
 
-      // Add text before the current mention
-      if (offset > lastIndex) {
-        parts.push(text.substring(lastIndex, offset));
+      for (const segment of segments) {
+        if (segment.type === 'mention') {
+          newSegments.push(segment); // Already a mention, keep it
+          continue;
+        }
+
+        let lastSplitIndex = 0;
+        let match;
+        while ((match = mentionRegex.exec(segment.value)) !== null) {
+          const preMatchText = segment.value.substring(lastSplitIndex, match.index);
+          if (preMatchText) {
+            newSegments.push({ type: 'text', value: preMatchText });
+          }
+          newSegments.push({ type: 'mention', value: match[0], user: user });
+          lastSplitIndex = match.index + match[0].length;
+        }
+        const remainingText = segment.value.substring(lastSplitIndex);
+        if (remainingText) {
+          newSegments.push({ type: 'text', value: remainingText });
+        }
       }
+      segments = newSegments;
+    }
 
-      // Check if the captured mentioned name actually corresponds to a known user (case-insensitive and trimmed)
-      const userFound = mentionableUsers.find(u => u.FullName.toLowerCase().trim() === mentionedName.toLowerCase().trim());
-
-      if (userFound) {
-        parts.push(
-          <span key={offset} className="text-blue-600 font-semibold">
-            {fullMatch}
+    // Convert segments into JSX elements
+    return segments.map((segment, index) => {
+      if (segment.type === 'mention') {
+        return (
+          <span key={index} className="text-blue-600 font-semibold">
+            {segment.value}
           </span>
         );
       } else {
-        // If not a recognized user, treat as plain text
-        parts.push(fullMatch);
+        return segment.value;
       }
-      lastIndex = offset + fullMatch.length;
-    }
-
-    // Add any remaining text after the last mention
-    if (lastIndex < text.length) {
-      parts.push(text.substring(lastIndex));
-    }
-    return parts;
+    });
   };
 
   return (
