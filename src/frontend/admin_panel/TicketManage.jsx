@@ -38,12 +38,15 @@ export default function TicketManage() {
   const [systems, setSystems] = useState([]);
   const [selectedSupervisorId, setSelectedSupervisorId] = useState("");
   const [selectedSystem, setSelectedSystem] = useState("");
-  const [activeTab, setActiveTab] = useState('details');
+  const [activeTab, setActiveTab] = useState("details");
   const [commentsList, setCommentsList] = useState([]);
   const [mentionableUsers, setMentionableUsers] = useState([]);
-  const [mentionQuery, setMentionQuery] = useState('');
+  const [mentionQuery, setMentionQuery] = useState("");
   const [showMentionDropdown, setShowMentionDropdown] = useState(false);
-  const [mentionDropdownPos, setMentionDropdownPos] = useState({ top: 0, left: 0 });
+  const [mentionDropdownPos, setMentionDropdownPos] = useState({
+    top: 0,
+    left: 0,
+  });
   const [filteredMentions, setFilteredMentions] = useState([]);
   const textareaRef = useRef(null);
   const [attachmentFile, setAttachmentFile] = useState(null);
@@ -164,19 +167,20 @@ export default function TicketManage() {
     const fetchComments = async () => {
       try {
         // Pass user.UserID to the backend to get UserHasLiked status
-        const res = await axios.get(`http://localhost:5000/api/tickets/${selectedTicket.id}/comments?userId=${user.UserID}`);
+        const res = await axios.get(
+          `http://localhost:5000/api/tickets/${selectedTicket.id}/comments?userId=${user.UserID}`
+        );
         const data = res.data;
         setCommentsList(data);
 
         // Initialize userLikedComments state directly from fetched data
         const likedStatus = {};
         for (const comment of data) {
-            likedStatus[comment.CommentID] = comment.UserHasLiked === 1; // Backend returns 1 or 0
+          likedStatus[comment.CommentID] = comment.UserHasLiked === 1; // Backend returns 1 or 0
         }
         setUserLikedComments(likedStatus);
-
       } catch (err) {
-        console.error('Failed to load comments', err);
+        console.error("Failed to load comments", err);
       }
     };
     fetchComments();
@@ -184,8 +188,8 @@ export default function TicketManage() {
 
   useEffect(() => {
     if (selectedTicket) {
-      fetch('http://localhost:5000/api/mentionable-users')
-        .then(res => res.json())
+      fetch("http://localhost:5000/api/mentionable-users")
+        .then((res) => res.json())
         .then(setMentionableUsers)
         .catch(console.error);
     }
@@ -222,69 +226,84 @@ export default function TicketManage() {
 
     // Extract mentions from comment text (e.g., @FullName)
     const mentionMatches = comment.match(/@([\w\s]+)/g) || [];
-    const mentionedNames = mentionMatches.map(m => m.slice(1).trim());
+    const mentionedNames = mentionMatches.map((m) => m.slice(1).trim());
     const mentionedUserIds = mentionableUsers
-      .filter(u => mentionedNames.includes(u.FullName))
-      .map(u => u.UserID);
-    
+      .filter((u) => mentionedNames.includes(u.FullName))
+      .map((u) => u.UserID);
+
     if (mentionedUserIds.length > 0) {
-        formData.append("mentionedUserIds", mentionedUserIds.join(','));
+      formData.append("mentionedUserIds", mentionedUserIds.join(","));
     }
 
     try {
-      await axios.post(`http://localhost:5000/api/tickets/${selectedTicket.id}/comments`, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data'
+      await axios.post(
+        `http://localhost:5000/api/tickets/${selectedTicket.id}/comments`,
+        formData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
         }
-      });
-      setComment('');
+      );
+      setComment("");
       setAttachmentFile(null);
       setReplyingTo(null);
-      toast.success('Comment added successfully');
+      toast.success("Comment added successfully");
       // Refresh comments after adding
-      const res = await axios.get(`http://localhost:5000/api/tickets/${selectedTicket.id}/comments`);
+      const res = await axios.get(
+        `http://localhost:5000/api/tickets/${selectedTicket.id}/comments`
+      );
       setCommentsList(res.data);
     } catch (error) {
-      console.error('Error adding comment:', error);
-      toast.error('Failed to add comment');
+      console.error("Error adding comment:", error);
+      toast.error("Failed to add comment");
     }
   };
 
   // Helper: Convert priority to a number for sorting
-const getPriorityValue = (priority) => {
-  switch (priority) {
-    case "High": return 1;
-    case "Medium": return 2;
-    case "Low": return 3;
-    default: return 4;
-  }
-};
+  const getPriorityValue = (priority) => {
+    switch (priority) {
+      case "High":
+        return 1;
+      case "Medium":
+        return 2;
+      case "Low":
+        return 3;
+      default:
+        return 4;
+    }
+  };
 
-// Helper: Check if due date is more than 2 days ago
-const isExpired = (dueDateStr) => {
-  if (!dueDateStr) return false;
-  const dueDate = new Date(dueDateStr);
-  const today = new Date();
-  const diffInTime = today - dueDate;
-  const diffInDays = diffInTime / (1000 * 3600 * 24);
-  return diffInDays > 2;
-};
+  // Helper: Check if due date is more than 2 days ago
+  const isExpired = (dueDateStr) => {
+    if (!dueDateStr) return false;
+    const dueDate = new Date(dueDateStr);
+    const today = new Date();
+    const diffInTime = today - dueDate;
+    const diffInDays = diffInTime / (1000 * 3600 * 24);
+    return diffInDays > 2;
+  };
 
-// Filter & Sort: Open
-const open = tickets
-  .filter((t) => t.status === "Open")
-  .sort((a, b) => getPriorityValue(a.priority) - getPriorityValue(b.priority));
+  // Filter & Sort: Open
+  const open = tickets
+    .filter((t) => t.status === "Open")
+    .sort(
+      (a, b) => getPriorityValue(a.priority) - getPriorityValue(b.priority)
+    );
 
-// In Progress
-const inProcess = tickets
-  .filter((t) => t.status === "In Progress")
-  .sort((a, b) => getPriorityValue(a.priority) - getPriorityValue(b.priority));
+  // In Progress
+  const inProcess = tickets
+    .filter((t) => t.status === "In Progress")
+    .sort(
+      (a, b) => getPriorityValue(a.priority) - getPriorityValue(b.priority)
+    );
 
-// Resolved (show all even if overdue)
-const resolved = tickets
-  .filter((t) => t.status === "Resolved" && (!isExpired(t.dueDate)))
-  .sort((a, b) => getPriorityValue(a.priority) - getPriorityValue(b.priority));
-
+  // Resolved (show all even if overdue)
+  const resolved = tickets
+    .filter((t) => t.status === "Resolved" && !isExpired(t.dueDate))
+    .sort(
+      (a, b) => getPriorityValue(a.priority) - getPriorityValue(b.priority)
+    );
 
   const initialMessages = [
     {
@@ -408,15 +427,18 @@ const resolved = tickets
     if (match) {
       setMentionQuery(match[1]);
       setShowMentionDropdown(true);
-      setMentionDropdownPos({ top: e.target.offsetTop + e.target.offsetHeight, left: e.target.offsetLeft });
+      setMentionDropdownPos({
+        top: e.target.offsetTop + e.target.offsetHeight,
+        left: e.target.offsetLeft,
+      });
       setFilteredMentions(
-        mentionableUsers.filter(u =>
+        mentionableUsers.filter((u) =>
           u.FullName.toLowerCase().includes(match[1].toLowerCase())
         )
       );
     } else {
       setShowMentionDropdown(false);
-      setMentionQuery('');
+      setMentionQuery("");
     }
   }
 
@@ -438,15 +460,17 @@ const resolved = tickets
       const newComment = before + mentionText + after;
       setComment(newComment);
       setShowMentionDropdown(false);
-      setMentionQuery('');
+      setMentionQuery("");
       // Move caret after inserted mention
       setTimeout(() => {
         textarea.focus();
-        textarea.setSelectionRange(before.length + mentionText.length, before.length + mentionText.length);
+        textarea.setSelectionRange(
+          before.length + mentionText.length,
+          before.length + mentionText.length
+        );
       }, 0);
     }
   }
- 
 
   // Function to handle liking/unliking a comment
   const handleLikeToggle = async (commentId) => {
@@ -454,21 +478,29 @@ const resolved = tickets
     try {
       if (hasLiked) {
         // Unlike
-        await axios.delete(`http://localhost:5000/api/comments/${commentId}/like`, { data: { userId: user.UserID } });
+        await axios.delete(
+          `http://localhost:5000/api/comments/${commentId}/like`,
+          { data: { userId: user.UserID } }
+        );
         toast.info("Comment unliked.");
       } else {
         // Like
-        await axios.post(`http://localhost:5000/api/comments/${commentId}/like`, { userId: user.UserID });
+        await axios.post(
+          `http://localhost:5000/api/comments/${commentId}/like`,
+          { userId: user.UserID }
+        );
         toast.success("Comment liked!");
       }
       // Toggle the local state immediately for responsiveness
-      setUserLikedComments(prev => ({ ...prev, [commentId]: !hasLiked }));
+      setUserLikedComments((prev) => ({ ...prev, [commentId]: !hasLiked }));
       // Re-fetch comments to get updated like counts from backend
-      const res = await axios.get(`http://localhost:5000/api/tickets/${selectedTicket.id}/comments`);
+      const res = await axios.get(
+        `http://localhost:5000/api/tickets/${selectedTicket.id}/comments`
+      );
       setCommentsList(res.data);
     } catch (error) {
       console.error("Error toggling like:", error);
-      toast.error(`Failed to ${hasLiked ? 'unlike' : 'like'} comment.`);
+      toast.error(`Failed to ${hasLiked ? "unlike" : "like"} comment.`);
     }
   };
 
@@ -566,49 +598,60 @@ const resolved = tickets
               <div className="bg-white rounded-xl p-4 w-full shadow-lg relative mt-8">
                 <button
                   onClick={closeModal}
-                  className="absolute top-2 right-3 text-gray-500 hover:text-red-600 text-xl font-bold"
+                  className="absolute top-2 right-3 px-3 py-1 bg-gray-300 text-gray-800 rounded-md hover:bg-gray-400 text-xl font-bold"
                 >
-                  Back to Tickets
+                  &larr; Back to Tickets
                 </button>
 
                 {/* Navigation Tabs */}
                 <div className="border-b mb-4">
                   <nav className="flex gap-8">
                     <button
-                      onClick={() => setActiveTab('details')}
+                      onClick={() => setActiveTab("details")}
                       className={`pb-2 text-base font-medium ${
-                        activeTab === 'details'
-                          ? 'text-blue-600 border-b-2 border-blue-600'
-                          : 'text-gray-500 hover:text-gray-700'
+                        activeTab === "details"
+                          ? "text-blue-600 border-b-2 border-blue-600"
+                          : "text-gray-500 hover:text-gray-700"
                       }`}
                     >
                       Details
                     </button>
                     <button
-                      onClick={() => setActiveTab('activity')}
+                      onClick={() => setActiveTab("activity")}
                       className={`pb-2 text-base font-medium ${
-                        activeTab === 'activity'
-                          ? 'text-blue-600 border-b-2 border-blue-600'
-                          : 'text-gray-500 hover:text-gray-700'
+                        activeTab === "activity"
+                          ? "text-blue-600 border-b-2 border-blue-600"
+                          : "text-gray-500 hover:text-gray-700"
                       }`}
                     >
                       Activity Log
                     </button>
                     <button
-                      onClick={() => setActiveTab('comments')}
+                      onClick={() => setActiveTab("comments")}
                       className={`pb-2 text-base font-medium ${
-                        activeTab === 'comments'
-                          ? 'text-blue-600 border-b-2 border-blue-600'
-                          : 'text-gray-500 hover:text-gray-700'
+                        activeTab === "comments"
+                          ? "text-blue-600 border-b-2 border-blue-600"
+                          : "text-gray-500 hover:text-gray-700"
                       }`}
                     >
                       Comments
+                    </button>
+                    {/* NEW CHAT TAB */}
+                    <button
+                      onClick={() => setActiveTab("chat")}
+                      className={`pb-2 text-base font-medium ${
+                        activeTab === "chat"
+                          ? "text-blue-600 border-b-2 border-blue-600"
+                          : "text-gray-500 hover:text-gray-700"
+                      }`}
+                    >
+                      Chat
                     </button>
                   </nav>
                 </div>
 
                 <div className="h-[580px] overflow-y-auto">
-                  {activeTab === 'details' ? (
+                  {activeTab === "details" ? (
                     <div className="grid grid-cols-2 gap-6">
                       <div className="space-y-3">
                         <h2 className="text-xl font-bold text-gray-800 mb-4">
@@ -624,43 +667,44 @@ const resolved = tickets
                           <strong>Priority:</strong> {selectedTicket.priority}
                         </p>
                         <p className="text-sm">
-                    <strong>Problem:</strong>{" "}
-                    {selectedTicket.problem.length > 100 ? (
-                      <>
-                        {selectedTicket.problem.slice(0, 100)}...
-                        <button
-                          onClick={() => setShowProblemModal(true)}
-                          className="text-blue-600 hover:underline ml-1"
-                        >
-                          See More
-                        </button>
-                      </>
-                    ) : (
-                      selectedTicket.problem
-                    )}
-                  </p>
-                  {showProblemModal && (
-                    <div className="fixed inset-0 z-50 bg-black/40 bg-opacity-40 flex justify-center items-center">
-                      <div className="bg-white rounded-lg shadow-lg p-6 max-w-lg w-full max-h-[80vh]">
-                        <h2 className="text-lg font-semibold mb-4">
-                          Full Problem Description
-                        </h2>
-                        <div className="text-gray-800 whitespace-pre-wrap overflow-y-auto max-h-60 pr-2">
-                          {selectedTicket.problem}
-                        </div>
-                        <div className="text-right mt-4">
-                          <button
-                            onClick={() => setShowProblemModal(false)}
-                            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-                          >
-                            Close
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
+                          <strong>Problem:</strong>{" "}
+                          {selectedTicket.problem.length > 100 ? (
+                            <>
+                              {selectedTicket.problem.slice(0, 100)}...
+                              <button
+                                onClick={() => setShowProblemModal(true)}
+                                className="text-blue-600 hover:underline ml-1"
+                              >
+                                See More
+                              </button>
+                            </>
+                          ) : (
+                            selectedTicket.problem
+                          )}
+                        </p>
+                        {showProblemModal && (
+                          <div className="fixed inset-0 z-50 bg-black/40 bg-opacity-40 flex justify-center items-center">
+                            <div className="bg-white rounded-lg shadow-lg p-6 max-w-lg w-full max-h-[80vh]">
+                              <h2 className="text-lg font-semibold mb-4">
+                                Full Problem Description
+                              </h2>
+                              <div className="text-gray-800 whitespace-pre-wrap overflow-y-auto max-h-60 pr-2">
+                                {selectedTicket.problem}
+                              </div>
+                              <div className="text-right mt-4">
+                                <button
+                                  onClick={() => setShowProblemModal(false)}
+                                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                                >
+                                  Close
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        )}
                         <p>
-                          <strong>System Name:</strong> {selectedTicket.systemName}
+                          <strong>System Name:</strong>{" "}
+                          {selectedTicket.systemName}
                         </p>
                         <p>
                           <strong>User Name:</strong> {selectedTicket.userName}
@@ -724,10 +768,17 @@ const resolved = tickets
                               const fileUrl = `http://localhost:5000/${evi.FilePath}`;
                               const fileName = evi.FilePath.split("/").pop();
 
-                              const isImage = /\.(jpg|jpeg|png|gif|bmp|webp)$/i.test(fileName);
+                              const isImage =
+                                /\.(jpg|jpeg|png|gif|bmp|webp)$/i.test(
+                                  fileName
+                                );
                               const isPDF = /\.pdf$/i.test(fileName);
-                              const isVideo = /\.(mp4|webm|ogg)$/i.test(fileName);
-                              const isAudio = /\.(mp3|wav|ogg)$/i.test(fileName);
+                              const isVideo = /\.(mp4|webm|ogg)$/i.test(
+                                fileName
+                              );
+                              const isAudio = /\.(mp3|wav|ogg)$/i.test(
+                                fileName
+                              );
                               const isDoc = /\.(docx?|xlsx?)$/i.test(fileName);
 
                               return (
@@ -736,7 +787,11 @@ const resolved = tickets
                                   className="border rounded p-2 bg-white shadow-sm flex flex-col items-center text-center"
                                 >
                                   {isImage ? (
-                                    <a href={fileUrl} target="_blank" rel="noopener noreferrer">
+                                    <a
+                                      href={fileUrl}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                    >
                                       <img
                                         src={fileUrl}
                                         alt={fileName}
@@ -744,25 +799,60 @@ const resolved = tickets
                                       />
                                     </a>
                                   ) : isPDF ? (
-                                    <a href={fileUrl} target="_blank" rel="noopener noreferrer" className="text-red-600 hover:underline">
+                                    <a
+                                      href={fileUrl}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-red-600 hover:underline"
+                                    >
                                       📄 {fileName}
                                     </a>
                                   ) : isVideo ? (
-                                    <video controls className="w-24 h-24 rounded" title={fileName}>
-                                      <source src={fileUrl} type={`video/${fileName.split(".").pop()}`} />
-                                      Your browser does not support the video tag.
+                                    <video
+                                      controls
+                                      className="w-24 h-24 rounded"
+                                      title={fileName}
+                                    >
+                                      <source
+                                        src={fileUrl}
+                                        type={`video/${fileName
+                                          .split(".")
+                                          .pop()}`}
+                                      />
+                                      Your browser does not support the video
+                                      tag.
                                     </video>
                                   ) : isAudio ? (
-                                    <audio controls className="w-full" title={fileName}>
-                                      <source src={fileUrl} type={`audio/${fileName.split(".").pop()}`} />
-                                      Your browser does not support the audio element.
+                                    <audio
+                                      controls
+                                      className="w-full"
+                                      title={fileName}
+                                    >
+                                      <source
+                                        src={fileUrl}
+                                        type={`audio/${fileName
+                                          .split(".")
+                                          .pop()}`}
+                                      />
+                                      Your browser does not support the audio
+                                      element.
                                     </audio>
                                   ) : isDoc ? (
-                                    <a href={fileUrl} target="_blank" rel="noopener noreferrer" className="text-purple-600 hover:underline">
+                                    <a
+                                      href={fileUrl}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-purple-600 hover:underline"
+                                    >
                                       📄 {fileName}
                                     </a>
                                   ) : (
-                                    <a href={fileUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                                    <a
+                                      href={fileUrl}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-blue-600 hover:underline"
+                                    >
                                       📎 {fileName}
                                     </a>
                                   )}
@@ -788,18 +878,28 @@ const resolved = tickets
                         </div>
                       </div>
                     </div>
-                  ) : activeTab === 'activity' ? (
+                  ) : activeTab === "activity" ? (
                     <div className="space-y-4">
-                      {selectedTicket && <TicketLogView ticketId={selectedTicket.id} />}
+                      {selectedTicket && (
+                        <TicketLogView ticketId={selectedTicket.id} />
+                      )}
                     </div>
-                  ) : (
+                  ) : activeTab === "comments" ? (
                     <div className="space-y-4">
                       <div className="relative mb-6 p-4 border rounded-lg bg-gray-50 shadow-sm">
-                        <label className="block text-lg font-semibold text-gray-800 mb-3">Add Comment</label>
+                        <label className="block text-lg font-semibold text-gray-800 mb-3">
+                          Add Comment
+                        </label>
                         {replyingTo && (
                           <div className="flex items-center gap-2 mb-2 p-2 bg-blue-100 rounded-md text-blue-800">
-                            Replying to <span className="font-semibold">@{replyingTo.userName}</span>
-                            <button onClick={handleCancelReply} className="ml-auto text-blue-600 hover:text-blue-800 font-bold">
+                            Replying to{" "}
+                            <span className="font-semibold">
+                              @{replyingTo.userName}
+                            </span>
+                            <button
+                              onClick={handleCancelReply}
+                              className="ml-auto text-blue-600 hover:text-blue-800 font-bold"
+                            >
                               X
                             </button>
                           </div>
@@ -827,20 +927,34 @@ const resolved = tickets
                           hover:file:bg-blue-100"
                         />
                         {attachmentFile && (
-                          <p className="mt-2 text-sm text-gray-600">Attached: {attachmentFile.name}</p>
+                          <p className="mt-2 text-sm text-gray-600">
+                            Attached: {attachmentFile.name}
+                          </p>
                         )}
                         {showMentionDropdown && filteredMentions.length > 0 && (
                           <div
                             className="absolute z-50 bg-white border border-blue-300 rounded-lg shadow-xl mt-2 max-h-48 overflow-y-auto w-full md:w-auto"
-                            style={{ top: mentionDropdownPos.top + 10, left: mentionDropdownPos.left, minWidth: 200 }}
+                            style={{
+                              top: mentionDropdownPos.top + 10,
+                              left: mentionDropdownPos.left,
+                              minWidth: 200,
+                            }}
                           >
-                            {filteredMentions.map(user => (
+                            {filteredMentions.map((user) => (
                               <div
                                 key={user.UserID}
                                 className="px-4 py-2 hover:bg-blue-50 cursor-pointer flex items-center gap-2"
-                                onMouseDown={e => { e.preventDefault(); handleMentionSelect(user); }}
+                                onMouseDown={(e) => {
+                                  e.preventDefault();
+                                  handleMentionSelect(user);
+                                }}
                               >
-                                <span className="font-medium text-blue-700">@{user.FullName}</span> <span className="text-sm text-gray-500">({user.Role})</span>
+                                <span className="font-medium text-blue-700">
+                                  @{user.FullName}
+                                </span>{" "}
+                                <span className="text-sm text-gray-500">
+                                  ({user.Role})
+                                </span>
                               </div>
                             ))}
                           </div>
@@ -854,35 +968,52 @@ const resolved = tickets
                         </button>
                       </div>
                       <div className="mt-8">
-                        <h4 className="font-semibold text-xl text-gray-800 mb-4">Comments</h4>
+                        <h4 className="font-semibold text-xl text-gray-800 mb-4">
+                          Comments
+                        </h4>
                         {commentsList.length === 0 ? (
-                          <p className="text-gray-500 text-center py-4 border rounded-lg bg-white shadow-sm">No comments yet. Be the first to add one!</p>
+                          <p className="text-gray-500 text-center py-4 border rounded-lg bg-white shadow-sm">
+                            No comments yet. Be the first to add one!
+                          </p>
                         ) : (
                           <ul className="space-y-4">
                             {commentsList
-                              .filter(comment => !comment.ReplyToCommentID)
-                              .slice().reverse().map((c) => (
-                              <CommentItem
-                                key={c.CommentID}
-                                comment={c}
-                                allComments={commentsList}
-                                currentUser={user}
-                                onReplyClick={handleReplyClick}
-                                onLikeToggle={handleLikeToggle}
-                                userLikedComments={userLikedComments}
-                              />
-                            ))}
+                              .filter((comment) => !comment.ReplyToCommentID)
+                              .slice()
+                              .reverse()
+                              .map((c) => (
+                                <CommentItem
+                                  key={c.CommentID}
+                                  comment={c}
+                                  allComments={commentsList}
+                                  currentUser={user}
+                                  onReplyClick={handleReplyClick}
+                                  onLikeToggle={handleLikeToggle}
+                                  userLikedComments={userLikedComments}
+                                />
+                              ))}
                           </ul>
                         )}
                       </div>
                     </div>
-                  )}
+                  ) : activeTab === "chat" ? ( // NEW: Chat Section content
+                    <div className="h-[580px] p-4 bg-gray-100 rounded-lg flex flex-col">
+                      <ChatSection
+                        user={selectedTicket.user}
+                        supportUser={selectedTicket.assignedBy}
+                        initialMessages={initialMessages}
+                        ticket={selectedTicket}
+                        ticketId={selectedTicket.id}
+                        role={"Supervisor"} // Adjust role based on actual loggedInUser.Role
+                      />
+                    </div>
+                  ) : null}
                 </div>
               </div>
             )}
           </div>
 
-          {/* Chat Modal */}
+          {/* Chat Modal 
           {chatMode && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
               <div className="relative max-w-lg h-[600px] p-4 bg-gray-200 rounded-lg shadow-lg flex flex-col">
@@ -903,7 +1034,7 @@ const resolved = tickets
                 />
               </div>
             </div>
-          )}
+          )}*/}
         </div>
       </div>
     </div>
@@ -935,21 +1066,29 @@ function CommentItem({
   onLikeToggle,
   userLikedComments,
 }) {
-  const nestedReplies = allComments.filter(
-    (c) => c.ReplyToCommentID === comment.CommentID
-  ).sort((a, b) => new Date(a.CreatedAt) - new Date(b.CreatedAt));
+  const nestedReplies = allComments
+    .filter((c) => c.ReplyToCommentID === comment.CommentID)
+    .sort((a, b) => new Date(a.CreatedAt) - new Date(b.CreatedAt));
 
-  const isImageAttachment = (fileType) => fileType && fileType.startsWith('image/');
-  const isVideoAttachment = (fileType) => fileType && fileType.startsWith('video/');
-  const isAudioAttachment = (fileType) => fileType && fileType.startsWith('audio/');
-  const isPDFAttachment = (fileType) => fileType && fileType === 'application/pdf';
+  const isImageAttachment = (fileType) =>
+    fileType && fileType.startsWith("image/");
+  const isVideoAttachment = (fileType) =>
+    fileType && fileType.startsWith("video/");
+  const isAudioAttachment = (fileType) =>
+    fileType && fileType.startsWith("audio/");
+  const isPDFAttachment = (fileType) =>
+    fileType && fileType === "application/pdf";
 
   return (
     <li className="border border-gray-200 rounded-lg bg-white p-4 flex flex-col shadow-md hover:shadow-lg transition-shadow duration-200 ease-in-out">
       <div className="flex items-start flex-1">
         {/* Profile Picture */}
         <img
-          src={comment.ProfileImagePath ? `http://localhost:5000/${comment.ProfileImagePath}` : 'https://via.placeholder.com/40'} // Placeholder if no image
+          src={
+            comment.ProfileImagePath
+              ? `http://localhost:5000/${comment.ProfileImagePath}`
+              : "https://via.placeholder.com/40"
+          } // Placeholder if no image
           alt={comment.FullName}
           className="w-10 h-10 rounded-full mr-4 object-cover"
         />
@@ -958,41 +1097,89 @@ function CommentItem({
             {comment.FullName}
             {/* The "in reply to" will be handled inside the comment content bubble */}
           </div>
-          <div className={`mt-2 ${comment.RepliedToCommentID ? 'bg-gray-100 p-3 rounded-lg' : ''}`}> {/* Conditional styling for reply bubble */}
+          <div
+            className={`mt-2 ${
+              comment.RepliedToCommentID ? "bg-gray-100 p-3 rounded-lg" : ""
+            }`}
+          >
+            {" "}
+            {/* Conditional styling for reply bubble */}
             <div className="text-gray-800 leading-relaxed whitespace-pre-wrap text-base">
               {comment.CommentText}
             </div>
           </div>
 
           {/* Display Attachment if exists */}
-          {comment.AttachmentFullUrl && ( 
+          {comment.AttachmentFullUrl && (
             <div className="mt-3 p-3 bg-gray-100 rounded-md border border-gray-200">
               <p className="text-sm text-gray-600 mb-2">Attachment:</p>
-              {
-                isImageAttachment(comment.AttachmentFileType) ? (
-                  <a href={comment.AttachmentFullUrl} target="_blank" rel="noopener noreferrer">
-                    <img src={comment.AttachmentFullUrl} alt={comment.AttachmentFileName} className="max-w-xs h-auto rounded-md shadow-sm" />
-                  </a>
-                ) : isVideoAttachment(comment.AttachmentFileType) ? (
-                  <video controls src={comment.AttachmentFullUrl} className="max-w-xs h-auto rounded-md shadow-sm"></video>
-                ) : isAudioAttachment(comment.AttachmentFileType) ? (
-                  <audio controls src={comment.AttachmentFullUrl} className="w-full"></audio>
-                ) : isPDFAttachment(comment.AttachmentFileType) ? (
-                  <a href={comment.AttachmentFullUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline flex items-center gap-1">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0113 3.414L16.586 7A2 2 0 0118 8.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 2h2v2H6V6zm4 0h4v2h-4V6zm0 4h4v2h-4v-2z" clipRule="evenodd" />
-                    </svg>
-                    {comment.AttachmentFileName}
-                  </a>
-                ) : (
-                  <a href={comment.AttachmentFullUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline flex items-center gap-1">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M8 4a3 3 0 00-3 3v4a5 5 0 0010 0V7a1 1 0 112 0v4a7 7 0 11-14 0V7a5 5 0 0110 0v4a3 3 0 11-6 0V7a1 1 0 012 0v4a1 1 0 102 0V7a3 3 0 00-3-3z" clipRule="evenodd" />
-                    </svg>
-                    {comment.AttachmentFileName}
-                  </a>
-                )
-              }
+              {isImageAttachment(comment.AttachmentFileType) ? (
+                <a
+                  href={comment.AttachmentFullUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <img
+                    src={comment.AttachmentFullUrl}
+                    alt={comment.AttachmentFileName}
+                    className="max-w-xs h-auto rounded-md shadow-sm"
+                  />
+                </a>
+              ) : isVideoAttachment(comment.AttachmentFileType) ? (
+                <video
+                  controls
+                  src={comment.AttachmentFullUrl}
+                  className="max-w-xs h-auto rounded-md shadow-sm"
+                ></video>
+              ) : isAudioAttachment(comment.AttachmentFileType) ? (
+                <audio
+                  controls
+                  src={comment.AttachmentFullUrl}
+                  className="w-full"
+                ></audio>
+              ) : isPDFAttachment(comment.AttachmentFileType) ? (
+                <a
+                  href={comment.AttachmentFullUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600 hover:underline flex items-center gap-1"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-5 w-5"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M4 4a2 2 0 012-2h4.586A2 2 0 0113 3.414L16.586 7A2 2 0 0118 8.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 2h2v2H6V6zm4 0h4v2h-4V6zm0 4h4v2h-4v-2z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                  {comment.AttachmentFileName}
+                </a>
+              ) : (
+                <a
+                  href={comment.AttachmentFullUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600 hover:underline flex items-center gap-1"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-5 w-5"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M8 4a3 3 0 00-3 3v4a5 5 0 0010 0V7a1 1 0 112 0v4a7 7 0 11-14 0V7a5 5 0 0110 0v4a3 3 0 11-6 0V7a1 1 0 012 0v4a1 1 0 102 0V7a3 3 0 00-3-3z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                  {comment.AttachmentFileName}
+                </a>
+              )}
             </div>
           )}
 
@@ -1000,9 +1187,13 @@ function CommentItem({
             <span>{comment.LikesCount || 0} Likes</span>
             <button
               onClick={() => onLikeToggle(comment.CommentID)}
-              className={`px-3 py-1 rounded-full text-xs font-medium ${userLikedComments[comment.CommentID] ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+              className={`px-3 py-1 rounded-full text-xs font-medium ${
+                userLikedComments[comment.CommentID]
+                  ? "bg-blue-500 text-white"
+                  : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+              }`}
             >
-              {userLikedComments[comment.CommentID] ? 'Unlike' : 'Like'}
+              {userLikedComments[comment.CommentID] ? "Unlike" : "Like"}
             </button>
             <button
               onClick={() => onReplyClick(comment.CommentID, comment.FullName)}
@@ -1014,18 +1205,21 @@ function CommentItem({
         </div>
       </div>
       <div className="text-xs text-gray-500 mt-3 sm:mt-0 sm:ml-4 text-right flex-shrink-0 min-w-[140px]">
-        {new Date(comment.CreatedAt).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })}
+        {new Date(comment.CreatedAt).toLocaleString("en-US", {
+          dateStyle: "medium",
+          timeStyle: "short",
+        })}
       </div>
       {nestedReplies.length > 0 && (
         <ul className="mt-4 pl-12 w-full space-y-4 border-l-2 border-gray-200">
           {nestedReplies.map((reply) => (
-            <CommentItem 
-              key={reply.CommentID} 
-              comment={reply} 
+            <CommentItem
+              key={reply.CommentID}
+              comment={reply}
               allComments={allComments} // Pass allComments for nested replies
-              currentUser={currentUser} 
-              onReplyClick={onReplyClick} 
-              onLikeToggle={onLikeToggle} 
+              currentUser={currentUser}
+              onReplyClick={onReplyClick}
+              onLikeToggle={onLikeToggle}
               userLikedComments={userLikedComments}
             />
           ))}
