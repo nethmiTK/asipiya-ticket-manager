@@ -6,6 +6,7 @@ import SideBar from "../../user_components/SideBar/SideBar";
 import NavBar from "../../user_components/NavBar/NavBar";
 import NotificationPanel from "../components/NotificationPanel";
 import { toast } from 'react-toastify';
+import { useNavigate } from "react-router-dom";
 
 const enhanceFilesWithPreview = (acceptedFiles) =>
   acceptedFiles.map((file) =>
@@ -15,6 +16,7 @@ const enhanceFilesWithPreview = (acceptedFiles) =>
   );
 
 const OpenTickets = () => {
+  const navigate = useNavigate();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [files, setFiles] = useState([]);
   const [systemNames, setSystemNames] = useState([]);
@@ -23,12 +25,16 @@ const OpenTickets = () => {
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const notificationRef = useRef(null);
 
+  // Loading state
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+
   // Custom dropdown states
   const [isSystemDropdownOpen, setIsSystemDropdownOpen] = useState(false);
   const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
   const [selectedSystem, setSelectedSystem] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("");
-  
+
   // Refs for dropdown click outside detection
   const systemDropdownRef = useRef(null);
   const categoryDropdownRef = useRef(null);
@@ -38,12 +44,12 @@ const OpenTickets = () => {
       if (notificationRef.current && !notificationRef.current.contains(event.target)) {
         setShowNotifications(false);
       }
-      
+
       // Handle system dropdown
       if (systemDropdownRef.current && !systemDropdownRef.current.contains(event.target)) {
         setIsSystemDropdownOpen(false);
       }
-      
+
       // Handle category dropdown
       if (categoryDropdownRef.current && !categoryDropdownRef.current.contains(event.target)) {
         setIsCategoryDropdownOpen(false);
@@ -146,9 +152,9 @@ const OpenTickets = () => {
           unreadNotifications={unreadNotifications}
           setShowNotifications={setShowNotifications}
           notificationRef={notificationRef}
-          setOpen={setIsSidebarOpen} 
+          setOpen={setIsSidebarOpen}
         />
-        <div className="p-6 mt-[60px]">
+        <div className="p-6 mt-[60px] relative">
           {showNotifications && (
             <div ref={notificationRef} className="absolute right-4 top-[70px] z-50">
               <NotificationPanel
@@ -158,12 +164,41 @@ const OpenTickets = () => {
               />
             </div>
           )}
+
+          {/* Loading */}
+          {isSubmitting && (
+            <div className="absolute inset-0 backdrop-blur-sm bg-white/10 flex items-center justify-center z-40">
+              <div className="bg-white p-6 rounded-lg shadow-xl border w-80">
+                <div className="text-center mb-4">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+                  <p className="text-lg font-medium text-gray-800">Submitting your ticket...</p>
+                </div>
+
+                {/* Progress Bar */}
+                <div className="w-full bg-gray-200 rounded-full h-2.5 mb-2">
+                  <div
+                    className="bg-blue-600 h-2.5 rounded-full transition-all duration-300 ease-out"
+                    style={{ width: `${uploadProgress}%` }}
+                  ></div>
+                </div>
+                <p className="text-sm text-gray-600 text-center">{uploadProgress}% Complete</p>
+
+                {files.length > 0 && (
+                  <p className="text-xs text-gray-500 text-center mt-2">
+                    Uploading {files.length} file{files.length > 1 ? 's' : ''}...
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+
           <h1 className="text-2xl font-bold mb-6">Create Your Tickets</h1>
           <div className="flex flex-col items-center justify-start">
-           <div className="w-full max-w-[750px] bg-slate-100 text-black p-8 rounded-2xl shadow-lg">
+            <div className="w-full max-w-[750px] bg-slate-100 text-black p-8 rounded-2xl shadow-lg">
               <h1 className="text-2xl md:text-3xl font-bold text-center mb-4">
                 Create Ticket
               </h1>
+
               <Formik
                 initialValues={{
                   systemName: "",
@@ -172,6 +207,9 @@ const OpenTickets = () => {
                 }}
                 onSubmit={async (values, { resetForm }) => {
                   try {
+                    setIsSubmitting(true);
+                    setUploadProgress(0);
+
                     // Use selected values from custom dropdowns
                     const formValues = {
                       systemName: selectedSystem,
@@ -181,21 +219,29 @@ const OpenTickets = () => {
 
                     if (!formValues.systemName) {
                       toast.error("Please select a System Name.");
+                      setIsSubmitting(false);
                       return;
                     }
                     if (!formValues.ticketCategory) {
                       toast.error("Please select a Ticket Category.");
+                      setIsSubmitting(false);
                       return;
                     }
                     if (!formValues.description) {
                       toast.error("Please provide a Description.");
+                      setIsSubmitting(false);
                       return;
                     }
+
                     const user = JSON.parse(localStorage.getItem("user"));
                     if (!user || !user.UserID) {
                       toast.error("User not logged in. Please login first.");
+                      setIsSubmitting(false);
                       return;
                     }
+
+                    // Progress: 20% - Submitting ticket data
+                    setUploadProgress(20);
 
                     const ticketPayload = {
                       ...formValues,
@@ -209,6 +255,9 @@ const OpenTickets = () => {
 
                     const ticketId = ticketRes.data.ticketId;
 
+                    // Progress: 50% - Ticket created
+                    setUploadProgress(50);
+
                     if (files.length > 0) {
                       const formData = new FormData();
                       files.forEach((file) => {
@@ -217,6 +266,9 @@ const OpenTickets = () => {
                       formData.append("ticketId", ticketId);
                       formData.append("description", formValues.description);
 
+                      // Progress: 70% - Uploading files
+                      setUploadProgress(70);
+
                       await axios.post(
                         "http://localhost:5000/api/upload_evidence",
                         formData,
@@ -224,18 +276,36 @@ const OpenTickets = () => {
                           headers: {
                             "Content-Type": "multipart/form-data",
                           },
+                          onUploadProgress: (progressEvent) => {
+                            const percentCompleted = Math.round(
+                              70 + (progressEvent.loaded * 25) / progressEvent.total
+                            );
+                            setUploadProgress(percentCompleted);
+                          },
                         }
                       );
                     }
 
-                    toast.success("Ticket and evidence submitted successfully");
-                    resetForm();
-                    setFiles([]);
-                    setSelectedSystem("");
-                    setSelectedCategory("");
+                    // Progress: 100% - Complete
+                    setUploadProgress(100);
+
+                    // Small delay to show completion
+                    setTimeout(() => {
+                      toast.success("Ticket and evidence submitted successfully");
+                      resetForm();
+                      setFiles([]);
+                      setSelectedSystem("");
+                      setSelectedCategory("");
+                      setIsSubmitting(false);
+                      setUploadProgress(0);
+                      navigate("/user-dashboard");
+                    }, 500);
+
                   } catch (err) {
                     console.error("Error submitting ticket and evidence:", err);
                     toast.error("Failed to submit ticket or evidence");
+                    setIsSubmitting(false);
+                    setUploadProgress(0);
                   }
                 }}
               >
@@ -248,13 +318,13 @@ const OpenTickets = () => {
                     <button
                       type="button"
                       onClick={() => setIsSystemDropdownOpen(!isSystemDropdownOpen)}
-                      className="flex justify-between items-center p-2 border border-gray-300 rounded-md w-full focus:outline-none focus:ring-2 focus:ring-gray-400 bg-white text-left cursor-pointer h-9"
+                      disabled={isSubmitting}
+                      className={`flex justify-between items-center p-2 border border-gray-300 rounded-md w-full focus:outline-none focus:ring-2 focus:ring-gray-400 bg-white text-left cursor-pointer h-9 ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}
                     >
                       {selectedSystem || "Select System"}
                       <svg
-                        className={`w-4 h-4 transition-transform duration-200 ${
-                          isSystemDropdownOpen ? "rotate-180" : "rotate-0"
-                        }`}
+                        className={`w-4 h-4 transition-transform duration-200 ${isSystemDropdownOpen ? "rotate-180" : "rotate-0"
+                          }`}
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"
@@ -268,16 +338,15 @@ const OpenTickets = () => {
                         ></path>
                       </svg>
                     </button>
-                    {isSystemDropdownOpen && (
+                    {isSystemDropdownOpen && !isSubmitting && (
                       <div className="absolute z-10 w-full bg-white border border-gray-300 rounded-md shadow-lg mt-1 max-h-60 overflow-y-auto top-full">
                         {systemNames.map((sys, index) => (
                           <div
                             key={index}
-                            className={`p-2 cursor-pointer hover:bg-gray-100 ${
-                              selectedSystem === sys.SystemName
-                                ? "bg-blue-100 font-semibold"
-                                : ""
-                            }`}
+                            className={`p-2 cursor-pointer hover:bg-gray-100 ${selectedSystem === sys.SystemName
+                              ? "bg-blue-100 font-semibold"
+                              : ""
+                              }`}
                             onClick={() => {
                               setSelectedSystem(sys.SystemName);
                               setIsSystemDropdownOpen(false);
@@ -298,13 +367,13 @@ const OpenTickets = () => {
                     <button
                       type="button"
                       onClick={() => setIsCategoryDropdownOpen(!isCategoryDropdownOpen)}
-                      className="flex justify-between items-center p-2 border border-gray-300 rounded-md w-full focus:outline-none focus:ring-2 focus:ring-gray-400 bg-white text-left cursor-pointer h-9"
+                      disabled={isSubmitting}
+                      className={`flex justify-between items-center p-2 border border-gray-300 rounded-md w-full focus:outline-none focus:ring-2 focus:ring-gray-400 bg-white text-left cursor-pointer h-9 ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}
                     >
                       {selectedCategory || "Select Ticket Category"}
                       <svg
-                        className={`w-4 h-4 transition-transform duration-200 ${
-                          isCategoryDropdownOpen ? "rotate-180" : "rotate-0"
-                        }`}
+                        className={`w-4 h-4 transition-transform duration-200 ${isCategoryDropdownOpen ? "rotate-180" : "rotate-0"
+                          }`}
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"
@@ -318,16 +387,15 @@ const OpenTickets = () => {
                         ></path>
                       </svg>
                     </button>
-                    {isCategoryDropdownOpen && (
+                    {isCategoryDropdownOpen && !isSubmitting && (
                       <div className="absolute z-10 w-full bg-white border border-gray-300 rounded-md shadow-lg mt-1 max-h-60 overflow-y-auto top-full">
                         {categoryName.map((cat, index) => (
                           <div
                             key={index}
-                            className={`p-2 cursor-pointer hover:bg-gray-100 ${
-                              selectedCategory === cat.CategoryName
-                                ? "bg-blue-100 font-semibold"
-                                : ""
-                            }`}
+                            className={`p-2 cursor-pointer hover:bg-gray-100 ${selectedCategory === cat.CategoryName
+                              ? "bg-blue-100 font-semibold"
+                              : ""
+                              }`}
                             onClick={() => {
                               setSelectedCategory(cat.CategoryName);
                               setIsCategoryDropdownOpen(false);
@@ -348,9 +416,10 @@ const OpenTickets = () => {
                       as="textarea"
                       name="description"
                       rows="4"
-                      className="w-full h-50 p-3 border border-gray-300 rounded-md text-sm mt-1 focus:ring-2 focus:ring-gray-400"
+                      disabled={isSubmitting}
+                      className={`w-full h-50 p-3 border border-gray-300 rounded-md text-sm mt-1 focus:ring-2 focus:ring-gray-400 ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}
                       placeholder="Provide details of your problem"
-                      // required
+                    // required
                     />
                   </div>
 
@@ -362,9 +431,9 @@ const OpenTickets = () => {
                     <div
                       {...getRootProps()}
                       className={`border-dashed border-2 border-gray-300 rounded-md p-6 hover:border-gray-400 cursor-pointer mt-1 
-    ${files.length > 0 ? 'h-auto max-h-[19rem] overflow-y-auto' : 'flex flex-col justify-center items-center'} min-h-[10rem]`}
+    ${files.length > 0 ? 'h-auto max-h-[19rem] overflow-y-auto' : 'flex flex-col justify-center items-center'} min-h-[10rem] ${isSubmitting ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''}`}
                     >
-                      <input {...getInputProps()} />
+                      <input {...getInputProps()} disabled={isSubmitting} />
                       {files.length === 0 ? (
                         <>
                           <p className="text-gray-500 text-sm text-center">
@@ -375,7 +444,7 @@ const OpenTickets = () => {
                           </p>
                         </>
                       ) : (
-                         <div className="grid grid-cols-[repeat(auto-fill,minmax(80px,1fr))] gap-2 mt-2 py-1 w-full justify-items-center">
+                        <div className="grid grid-cols-[repeat(auto-fill,minmax(80px,1fr))] gap-2 mt-2 py-1 w-full justify-items-center">
                           {files.map((file, index) => {
                             const isImage = file.type.startsWith("image/");
                             const isVideo = file.type.startsWith("video/");
@@ -408,20 +477,23 @@ const OpenTickets = () => {
                                     e.stopPropagation();
                                     handleRemoveFile(index);
                                   }}
-                                  className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs cursor-pointer"
+                                  disabled={isSubmitting}
+                                  className={`absolute top-1 right-1 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs cursor-pointer ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}
                                 >
                                   ✕
                                 </button>
                               </div>
                             );
                           })}
-                          <div
-                            className="relative w-20 h-20 border-dashed border-2 border-gray-300 rounded-md flex flex-col items-center justify-center text-center text-gray-500 hover:border-gray-400 cursor-pointer text-xs"
-                            style={{ minWidth: '80px', minHeight: '80px' }}
-                          >
-                            <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
-                            <p className="mt-1">Add More</p>
-                          </div>
+                          {!isSubmitting && (
+                            <div
+                              className="relative w-20 h-20 border-dashed border-2 border-gray-300 rounded-md flex flex-col items-center justify-center text-center text-gray-500 hover:border-gray-400 cursor-pointer text-xs"
+                              style={{ minWidth: '80px', minHeight: '80px' }}
+                            >
+                              <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+                              <p className="mt-1">Add More</p>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -430,9 +502,20 @@ const OpenTickets = () => {
                   <div className="flex justify-end">
                     <button
                       type="submit"
-                      className="px-4 py-2 bg-blue-600 text-white rounded-md text-base font-medium hover:scale-105 transition-transform"
+                      disabled={isSubmitting}
+                      className={`px-4 py-2 bg-blue-600 text-white rounded-md text-base font-medium transition-all duration-200 ${isSubmitting
+                        ? 'opacity-50 cursor-not-allowed'
+                        : 'hover:scale-105 hover:bg-blue-700'
+                        }`}
                     >
-                      Submit
+                      {isSubmitting ? (
+                        <div className="flex items-center">
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                          Submitting...
+                        </div>
+                      ) : (
+                        'Submit'
+                      )}
                     </button>
                   </div>
                 </Form>
