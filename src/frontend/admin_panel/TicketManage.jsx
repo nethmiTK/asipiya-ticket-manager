@@ -539,37 +539,36 @@ const resolved = tickets
 
           {/* Ticket Sections */}
           <div className="max-w-7xl mx-auto px-4 py-6 space-y-10 ">
-            <Section
-              title="Open"
-              tickets={open}
-              onCardClick={handleCardClick}
-              color="text-green-700"
-            />
-            <hr className="border-t-2 border-gray-300" />
-            <Section
-              title="In Progress"
-              tickets={inProcess}
-              onCardClick={handleCardClick}
-              color="text-yellow-700"
-            />
-            <hr className="border-t-2 border-gray-300" />
-            <Section
-              title="Resolved"
-              tickets={resolved}
-              onCardClick={handleCardClick}
-              color="text-blue-700"
-            />
-          </div>
-
-          {/* Modal View */}
-          {selectedTicket && (
-            <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
-              <div className="bg-white rounded-xl p-4 w-[800px] shadow-lg relative">
+            {!selectedTicket ? (
+              <>
+                <Section
+                  title="Open"
+                  tickets={open}
+                  onCardClick={handleCardClick}
+                  color="text-green-700"
+                />
+                <hr className="border-t-2 border-gray-300" />
+                <Section
+                  title="In Progress"
+                  tickets={inProcess}
+                  onCardClick={handleCardClick}
+                  color="text-yellow-700"
+                />
+                <hr className="border-t-2 border-gray-300" />
+                <Section
+                  title="Resolved"
+                  tickets={resolved}
+                  onCardClick={handleCardClick}
+                  color="text-blue-700"
+                />
+              </>
+            ) : (
+              <div className="bg-white rounded-xl p-4 w-full shadow-lg relative mt-8">
                 <button
                   onClick={closeModal}
                   className="absolute top-2 right-3 text-gray-500 hover:text-red-600 text-xl font-bold"
                 >
-                  🗙
+                  Back to Tickets
                 </button>
 
                 {/* Navigation Tabs */}
@@ -611,7 +610,6 @@ const resolved = tickets
                 <div className="h-[580px] overflow-y-auto">
                   {activeTab === 'details' ? (
                     <div className="grid grid-cols-2 gap-6">
-                      {/* LEFT: Ticket Info */}
                       <div className="space-y-3">
                         <h2 className="text-xl font-bold text-gray-800 mb-4">
                           Ticket #{selectedTicket.id} Details
@@ -714,7 +712,6 @@ const resolved = tickets
                         </div>
                       </div>
 
-                      {/* RIGHT: Evidence Files */}
                       <div className="space-y-4 h-[430px]">
                         <h4 className="font-semibold mb-2">Evidence Files</h4>
                         {evidenceList.length === 0 ? (
@@ -797,7 +794,6 @@ const resolved = tickets
                     </div>
                   ) : (
                     <div className="space-y-4">
-                      {/* Comments Section */}
                       <div className="relative mb-6 p-4 border rounded-lg bg-gray-50 shadow-sm">
                         <label className="block text-lg font-semibold text-gray-800 mb-3">Add Comment</label>
                         {replyingTo && (
@@ -811,7 +807,7 @@ const resolved = tickets
                         <div className="flex flex-col gap-3">
                           <textarea
                             ref={textareaRef}
-                            rows={4} // Increased rows for better initial visibility
+                            rows={4}
                             value={comment}
                             onChange={handleCommentChange}
                             onKeyUp={handleMentionKeyUp}
@@ -820,7 +816,6 @@ const resolved = tickets
                             style={{ minHeight: 80 }}
                           />
                         </div>
-                        {/* File Attachment Input */}
                         <input
                           type="file"
                           onChange={(e) => setAttachmentFile(e.target.files[0])}
@@ -852,7 +847,7 @@ const resolved = tickets
                         )}
                         <button
                           onClick={handleAddComment}
-                          disabled={!comment.trim() && !attachmentFile} // Disable if no text and no file
+                          disabled={!comment.trim() && !attachmentFile}
                           className="mt-4 inline-flex items-center px-5 py-2.5 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-gray-400 transition duration-200 ease-in-out"
                         >
                           Add Comment
@@ -865,16 +860,16 @@ const resolved = tickets
                         ) : (
                           <ul className="space-y-4">
                             {commentsList
-                              .filter(comment => !comment.ReplyToCommentID) // Filter out replies for top level
+                              .filter(comment => !comment.ReplyToCommentID)
                               .slice().reverse().map((c) => (
-                              <CommentItem 
-                                key={c.CommentID} 
-                                comment={c} 
-                                allComments={commentsList} 
-                                currentUser={user} 
-                                onReplyClick={handleReplyClick} 
-                                onLikeToggle={handleLikeToggle} 
-                                userLikedComments={userLikedComments} 
+                              <CommentItem
+                                key={c.CommentID}
+                                comment={c}
+                                allComments={commentsList}
+                                currentUser={user}
+                                onReplyClick={handleReplyClick}
+                                onLikeToggle={handleLikeToggle}
+                                userLikedComments={userLikedComments}
                               />
                             ))}
                           </ul>
@@ -884,8 +879,8 @@ const resolved = tickets
                   )}
                 </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
 
           {/* Chat Modal */}
           {chatMode && (
