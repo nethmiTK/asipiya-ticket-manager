@@ -2111,6 +2111,30 @@ app.put('/api/ticket_status/:id', (req, res) => {
     });
 });
 
+app.get("/download_evidence/:filename", (req, res) => {
+  const filename = req.params.filename;
+
+  // Ensure it resolves to the correct full path (prevents path traversal attacks)
+  const filePath = path.resolve(__dirname, "../../uploads", filename);
+
+  // Check if the file exists before attempting download
+  fs.access(filePath, fs.constants.F_OK, (err) => {
+    if (err) {
+      console.error("File not found:", filePath);
+      return res.status(404).send("File not found.");
+    }
+
+    // Download the file
+    res.download(filePath, filename, (err) => {
+      if (err) {
+        console.error("Download error:", err);
+        res.status(500).send("Error downloading file.");
+      }
+    });
+  });
+});
+
+
 /* ------------------------------NOTIFY ROLE BASED----------------------------------------------------------------*/
 
 // Helper function to create a notification
