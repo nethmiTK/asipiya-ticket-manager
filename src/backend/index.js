@@ -2037,12 +2037,12 @@ app.delete('/api/ticket_category_delete/:id', (req, res) => {
 
 app.put('/api/ticket_status/:id', (req, res) => {
     const { id } = req.params;
-    const { status } = req.body;
+    const { status, reason } = req.body;
     const now = new Date();
     const firstRespondedTimeValue = now;
 
-    const sql = 'UPDATE ticket SET Status = ?, FirstRespondedTime = ? WHERE TicketID = ?';
-    db.query(sql, [status, firstRespondedTimeValue, id], (err, result) => {
+    const sql = 'UPDATE ticket SET Status = ?, FirstRespondedTime = ?, Reason = ? WHERE TicketID = ?';
+    db.query(sql, [status, firstRespondedTimeValue, reason, id], (err, result) => {
         if (err) {
             console.error('Update error:', err);
             return res.status(500).json({ error: 'Error Reject the Ticket' });
@@ -2440,7 +2440,7 @@ app.post('/api/upload_evidence', upload_evidence.array('evidenceFiles'), async (
   try {
     const values = req.files.map(file => [
       ticketId,
-      file.path.replace(/\\/g, '/'),
+      `uploads/${file.filename}`, 
       description
     ]);
 
