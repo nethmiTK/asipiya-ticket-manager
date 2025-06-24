@@ -47,6 +47,8 @@
     "react-super-responsive-table": "^6.0.2",
     "react-toastify": "^11.0.5",
     "react-tooltip": "^5.29.1",
+    "socket.io": "^4.8.1",
+    "socket.io-client": "^4.8.1",
     "tailwindcss": "^4.1.7",
     "uuid": "^11.1.0"
   },

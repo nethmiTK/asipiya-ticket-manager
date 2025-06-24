@@ -2,6 +2,9 @@ import React, { useState, useEffect, useRef } from "react";
 import { IoMdAttach } from "react-icons/io";
 import { MdSend } from "react-icons/md";
 import * as pdfjsLib from "pdfjs-dist";
+import { io } from "socket.io-client";
+
+const socket = io("http://localhost:5000"); 
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
   "pdfjs-dist/build/pdf.worker.min.js",
@@ -36,12 +39,11 @@ const ChatUI = ({ ticketID: propTicketID }) => {
     }
   }, [propTicketID]);
 
+  // Fetch messages on initial load
   const fetchMessages = async () => {
     if (!userID || !ticketID) return;
     try {
-      const res = await fetch(
-        `http://localhost:5000/api/ticketchatUser/${ticketID}`
-      );
+      const res = await fetch(`http://localhost:5000/api/ticketchatUser/${ticketID}`);
       const data = await res.json();
       if (Array.isArray(data)) {
         setMessages(
@@ -72,10 +74,44 @@ const ChatUI = ({ ticketID: propTicketID }) => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  const addMessage = (message) => {
+    setMessages((prev) => {
+      if (prev.some((m) => m.id === message.id)) return prev;
+      return [...prev, message];
+    });
+  };
+
+  useEffect(() => {
+    if (!userID || !ticketID) return;
+
+    socket.emit("joinTicketRoom", ticketID);
+
+    const handleIncomingMessage = (message) => {
+      addMessage({
+        id: message.chatId || message.id || Date.now(),
+        ticketid: message.TicketID,
+        sender: message.UserID === userID ? "user" : "agent",
+        text: message.Note || "",
+        filePath: message.file?.url ?? null,
+        fileName: message.file?.name ?? "",
+        type: message.Type || "text",
+        role: message.Role || "",
+        timestamp: message.timestamp || new Date().toISOString(),
+        status: "delivered",
+      });
+    };
+
+    socket.on("receiveTicketMessage", handleIncomingMessage);
+
+    return () => {
+      socket.off("receiveTicketMessage", handleIncomingMessage);
+    };
+  }, [ticketID, userID]);
+
   const generatePdfPreview = async (file) => {
     if (!file || !canvasRef.current) return;
     const reader = new FileReader();
-    reader.onload = async function () {
+    reader.onload = async () => {
       try {
         const pdf = await pdfjsLib.getDocument({ data: reader.result }).promise;
         const page = await pdf.getPage(1);
@@ -100,6 +136,7 @@ const ChatUI = ({ ticketID: propTicketID }) => {
     }
   }, [selectedFile]);
 
+
   const handleFileDownload = async (fileUrl) => {
     try {
       const response = await fetch(fileUrl, { mode: "cors" });
@@ -110,8 +147,7 @@ const ChatUI = ({ ticketID: propTicketID }) => {
 
       const a = document.createElement("a");
       a.href = downloadUrl;
-      const filename = fileUrl.split("/").pop() || "download";
-      a.download = filename;
+      a.download = fileUrl.split("/").pop() || "download";
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -139,13 +175,38 @@ const ChatUI = ({ ticketID: propTicketID }) => {
         body: formData,
       });
 
-      if (res.ok) {
-        fetchMessages();
-        setInput("");
-        setSelectedFile(null);
-      } else {
-        throw new Error("Failed to send message");
-      }
+      if (!res.ok) throw new Error("Failed to send message");
+
+      const data = await res.json();
+
+      const newMsg = {
+        id: data.chatId,
+        ticketid: ticketID,
+        sender: "user",
+        text: input || selectedFile?.name || "",
+        filePath: data.file?.url || null,
+        fileName: data.file?.name || "",
+        type: selectedFile ? "file" : "text",
+        role: role,
+        timestamp: new Date().toISOString(),
+        status: "delivered",
+      };
+
+      addMessage(newMsg);
+
+      socket.emit("sendTicketMessage", {
+        chatId: data.chatId,
+        TicketID: ticketID,
+        Note: newMsg.text,
+        UserID: userID,
+        Role: role,
+        Type: newMsg.type,
+        file: data.file || null,
+        timestamp: newMsg.timestamp,
+      });
+
+      setInput("");
+      setSelectedFile(null);
     } catch (error) {
       console.error("Send message failed:", error);
       alert("Message sending failed!");
@@ -156,42 +217,35 @@ const ChatUI = ({ ticketID: propTicketID }) => {
     if (!text) return null;
     const urlRegex = /(https?:\/\/[^\s]+)/g;
     const parts = text.split(urlRegex);
-
-    return parts.map((part, index) => {
-      if (part.match(urlRegex)) {
-        return (
-          <a
-            key={index}
-            href={part}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="underline text-blue-200 hover:text-blue-400"
-          >
-            {part}
-          </a>
-        );
-      }
-      return part;
-    });
+    return parts.map((part, i) =>
+      part.match(urlRegex) ? (
+        <a
+          key={i}
+          href={part}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="underline text-blue-600 hover:text-blue-400"
+        >
+          {part}
+        </a>
+      ) : (
+        part
+      )
+    );
   };
 
   return (
     <div className="flex flex-col h-150 border-none rounded-md bg-white">
       <div className="flex-1 overflow-y-auto space-y-2 p-2 mt-2">
         {messages.map((msg, idx) => {
-          const isImage =
-            msg.type === "file" &&
-            msg.filePath?.match(/\.(jpeg|jpg|png|gif|webp|bmp|svg)$/i);
-          const isVideo =
-            msg.type === "file" && msg.filePath?.match(/\.(mp4|webm|ogg)$/i);
-          const isPDF = msg.type === "file" && msg.filePath?.match(/\.pdf$/i);
+          const isImage = msg.filePath?.match(/\.(jpeg|jpg|png|gif|webp|bmp|svg)$/i);
+          const isVideo = msg.filePath?.match(/\.(mp4|webm|ogg)$/i);
+          const isPDF = msg.filePath?.match(/\.pdf$/i);
 
           return (
             <div
               key={msg.id || idx}
-              className={`flex ${
-                msg.sender === "user" ? "justify-end" : "justify-start"
-              }`}
+              className={`flex ${msg.sender === "user" ? "justify-end" : "justify-start"}`}
             >
               <div
                 className={`px-4 py-2 rounded-2xl text-lg max-w-xs break-words whitespace-pre-wrap ${
@@ -200,30 +254,20 @@ const ChatUI = ({ ticketID: propTicketID }) => {
                     : "bg-gray-300 text-gray-800 rounded-bl-none"
                 }`}
               >
-                {msg.role && (
-                  <p className="text-lg text-white mb-1 font-semibold">
-                    {msg.role}
-                  </p>
-                )}
-
+                {msg.role && <p className="text-lg text-white mb-1 font-semibold">{msg.role}</p>}
                 {msg.filePath ? (
                   <>
                     {isImage && (
                       <>
-                        <img
-                          src={msg.filePath}
-                          alt="Sent"
-                          className="rounded mb-2 shadow-sm object-contain max-h-30 max-w-full"
-                        />
+                        <img src={msg.filePath} alt="Sent" className="rounded mb-2 shadow-sm object-contain max-h-30 max-w-full" />
                         <button
                           onClick={() => handleFileDownload(msg.filePath)}
-                          className="text-sm px-4 py-2 text-black bg-white/80 rounded mt-1 block cursor-pointer"
+                          className="text-sm px-4 py-2 text-black bg-white/50 rounded mt-1 block cursor-pointer"
                         >
                           Download Image
                         </button>
                       </>
                     )}
-
                     {isVideo && (
                       <>
                         <video controls className="mb-2 max-w-full max-h-40">
@@ -231,21 +275,15 @@ const ChatUI = ({ ticketID: propTicketID }) => {
                         </video>
                         <button
                           onClick={() => handleFileDownload(msg.filePath)}
-                          className="text-sm px-4 py-2 text-black bg-white/80 rounded mt-1 block cursor-pointer"
+                          className="text-sm px-4 py-2 text-black bg-white/50 rounded mt-1 block cursor-pointer"
                         >
                           Download Video
                         </button>
                       </>
                     )}
-
                     {isPDF && (
                       <>
-                        <a
-                          href={msg.filePath}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="block"
-                        >
+                        <a href={msg.filePath} target="_blank" rel="noopener noreferrer" className="block">
                           <img
                             src="https://upload.wikimedia.org/wikipedia/commons/8/87/PDF_file_icon.svg"
                             alt="PDF"
@@ -254,13 +292,12 @@ const ChatUI = ({ ticketID: propTicketID }) => {
                         </a>
                         <button
                           onClick={() => handleFileDownload(msg.filePath)}
-                          className="text-xs px-4 py-2 text-black bg-white/80 rounded mt-1 block cursor-pointer"
+                          className="text-xs px-4 py-2 text-black bg-white/50 rounded mt-1 block cursor-pointer"
                         >
                           Download PDF
                         </button>
                       </>
                     )}
-
                     {!isImage && !isVideo && !isPDF && (
                       <>
                         <a
@@ -273,7 +310,7 @@ const ChatUI = ({ ticketID: propTicketID }) => {
                         </a>
                         <button
                           onClick={() => handleFileDownload(msg.filePath)}
-                          className="text-xs px-4 py-2 text-black bg-white/80 rounded mt-1 block cursor-pointer"
+                          className="text-xs px-4 py-2 text-black bg-white/50 rounded mt-1 block cursor-pointer"
                         >
                           Download File
                         </button>
@@ -283,14 +320,10 @@ const ChatUI = ({ ticketID: propTicketID }) => {
                 ) : (
                   <span>{linkifyText(msg.text)}</span>
                 )}
-
-                <div className="text-xs text-white mt-1">
-                  {new Date(msg.timestamp).toLocaleString()} -{" "}
-                  {msg.status === "sending"
-                    ? "Sending"
-                    : msg.status === "failed"
-                    ? "Failed"
-                    : "Delivered"}
+                <div className="flex justify-end mt-1">
+                  <div className="text-[11px] text-white text-right">
+                    {new Date(msg.timestamp).toLocaleString()} - {msg.status}
+                  </div>
                 </div>
               </div>
             </div>
@@ -302,17 +335,9 @@ const ChatUI = ({ ticketID: propTicketID }) => {
       {selectedFile && (
         <div className="flex items-center justify-between p-2 border border-zinc-300 rounded bg-zinc-50 m-2">
           {selectedFile.type.startsWith("image/") ? (
-            <img
-              src={URL.createObjectURL(selectedFile)}
-              alt="Preview"
-              className="h-20 object-contain rounded"
-            />
+            <img src={URL.createObjectURL(selectedFile)} alt="Preview" className="h-20 object-contain rounded" />
           ) : selectedFile.type.startsWith("video/") ? (
-            <video
-              className="h-20 object-contain rounded"
-              src={URL.createObjectURL(selectedFile)}
-              controls
-            />
+            <video className="h-20 object-contain rounded" src={URL.createObjectURL(selectedFile)} controls />
           ) : selectedFile.type === "application/pdf" ? (
             <canvas ref={canvasRef} className="h-20 rounded border shadow" />
           ) : (
@@ -337,22 +362,11 @@ const ChatUI = ({ ticketID: propTicketID }) => {
           style={{ display: "none" }}
           onChange={(e) => setSelectedFile(e.target.files[0])}
         />
-        <div
-          className="relative"
-          onDragOver={(e) => e.preventDefault()}
-          onDrop={(e) => {
-            e.preventDefault();
-            const file = e.dataTransfer.files[0];
-            if (file) setSelectedFile(file);
-          }}
-        >
-          <IoMdAttach
-            className="text-gray-900 size-7 cursor-pointer hover:text-gray-700"
-            onClick={() => fileInputRef.current.click()}
-            title="Attach or drop file"
-          />
-        </div>
-
+        <IoMdAttach
+          className="text-gray-900 size-7 cursor-pointer hover:text-gray-700"
+          onClick={() => fileInputRef.current.click()}
+          title="Attach or drop file"
+        />
         <div
           className="flex-1 border border-zinc-300 rounded-full bg-zinc-50 px-4 py-2 text-sm"
           onDragOver={(e) => e.preventDefault()}
@@ -371,9 +385,8 @@ const ChatUI = ({ ticketID: propTicketID }) => {
             onKeyDown={(e) => e.key === "Enter" && handleSend()}
           />
         </div>
-
         <button onClick={handleSend} disabled={!input.trim() && !selectedFile}>
-          <MdSend className="text-gray-900 hover:text-gray-700 size-8 cursor-pointer"/>
+          <MdSend className="text-gray-900 hover:text-gray-700 size-8 cursor-pointer" />
         </button>
       </div>
     </div>
