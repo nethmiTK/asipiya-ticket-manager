@@ -15,7 +15,8 @@ const TicketViewPage = ({ ticketId, popupMode = false, onClose }) => {
 
   const [previewUrl, setPreviewUrl] = useState(null);
   const [showRejectModal, setShowRejectModal] = useState(false);
-  const [rejectReason, setRejectReason] = useState('');
+  const [rejectReasonDropdown, setRejectReasonDropdown] = useState('');
+  const [rejectReasonText, setRejectReasonText] = useState('');
 
   useEffect(() => {
     const fetchData = async () => {
@@ -36,13 +37,33 @@ const TicketViewPage = ({ ticketId, popupMode = false, onClose }) => {
     fetchData();
   }, [id]);
 
-  if (loading) return <div className="text-center p-4">Loading...</div>;
+  const handleFileDownload = async (fileName) => {
+    try {
+      const response = await fetch(`http://localhost:5000/download_evidence/${fileName}`);
+      if (!response.ok) throw new Error('Download failed');
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Download error:', error);
+      alert('Download failed.');
+    }
+  };
 
   const handleReject = async () => {
+    const combinedReason = `${rejectReasonDropdown}${rejectReasonText ? ': ' + rejectReasonText : ''}`;
+
     try {
       const response = await axios.put(`http://localhost:5000/api/ticket_status/${id}`, {
         status: 'Reject',
-        reason: rejectReason,
+        reason: combinedReason,
       });
 
       if (response.status === 200 || response.status === 204) {
@@ -56,9 +77,12 @@ const TicketViewPage = ({ ticketId, popupMode = false, onClose }) => {
       toast.error('An error occurred while rejecting the ticket');
     } finally {
       setShowRejectModal(false);
-      setRejectReason('');
+      setRejectReasonDropdown('');
+      setRejectReasonText('');
     }
   };
+
+  if (loading) return <div className="text-center p-4">Loading...</div>;
 
   return (
     <div className="bg-white rounded-lg p-6 w-full max-w-2xl mx-auto relative">
@@ -74,12 +98,11 @@ const TicketViewPage = ({ ticketId, popupMode = false, onClose }) => {
       <h2 className="text-2xl font-semibold text-center mb-8">Complain Details</h2>
 
       <div className="space-y-6">
-        {[
-          ['System Name', ticketData.SystemName],
+        {[['System Name', ticketData.SystemName],
           ['User Email', ticketData.UserEmail],
           ['Category', ticketData.CategoryName],
           ['Description', ticketData.Description],
-          ['Date & Time', new Date(ticketData.DateTime).toLocaleString()],
+          ['Date & Time', new Date(ticketData.DateTime).toLocaleString()]
         ].map(([label, value]) => (
           <div key={label} className="flex">
             <label className="w-1/3 font-medium">{label}</label>
@@ -96,39 +119,51 @@ const TicketViewPage = ({ ticketId, popupMode = false, onClose }) => {
                 const fileName = filePath.split('/').pop();
                 const fileUrl = `http://localhost:5000/${filePath}`;
                 const isImage = /\.(jpg|jpeg|png|gif|bmp|webp)$/i.test(fileName);
-                const isPDF = /\.pdf$/i.test(fileName);
                 const isVideo = /\.(mp4|webm|ogg)$/i.test(fileName);
                 const isAudio = /\.(mp3|wav|ogg)$/i.test(fileName);
-                const isDoc = /\.(docx?|xlsx?)$/i.test(fileName);
 
                 return (
                   <div
                     key={evi.EvidenceID}
-                    className="w-28 h-28 border rounded-lg p-2 shadow-md bg-gray-100 flex flex-col items-center justify-center overflow-hidden cursor-pointer"
-                    onClick={() => setPreviewUrl(fileUrl)}
-                    title="Click to preview"
+                    className="w-28 h-28 border rounded-lg p-2 shadow-md bg-gray-100 flex flex-col items-center justify-between relative overflow-hidden"
                   >
-                    {isImage ? (
-                        <img
-                          src={fileUrl}
-                          alt={fileName}
-                          className="w-full h-full object-cover rounded"
-                        />
-                    ) : isVideo ? (
-                      <video muted className="w-full h-full object-cover rounded">
-                        <source src={fileUrl} />
-                      </video>
-                    ) : isAudio ? (
-                      <>
-                        <div className="text-xs text-center truncate w-full px-1 mb-1">{fileName}</div>
-                        <audio controls className="w-full">
+                    <div
+                      className="w-full h-full flex items-center justify-center cursor-pointer"
+                      onClick={() =>
+                        setPreviewUrl({
+                          url: fileUrl,
+                          name: fileName,
+                          type: isImage
+                            ? 'image'
+                            : isVideo
+                            ? 'video'
+                            : isAudio
+                            ? 'audio'
+                            : 'other',
+                        })
+                      }
+                      title="Click to preview"
+                    >
+                      {isImage ? (
+                        <img src={fileUrl} alt={fileName} className="w-full h-full object-cover rounded" />
+                      ) : isVideo ? (
+                        <video muted className="w-full h-full object-cover rounded">
                           <source src={fileUrl} />
-                          Your browser does not support the audio element.
-                        </audio>
-                      </>
-                    ) :  (
-			                <div className="text-xs text-center truncate w-full px-1">{fileName}</div>	
-                      )} 
+                        </video>
+                      ) : isAudio ? (
+                        <div className="text-xs text-center truncate w-full px-1">{fileName}</div>
+                      ) : (
+                        <div className="text-xs text-center truncate w-full px-1">{fileName}</div>
+                      )}
+                    </div>
+
+                    {/* Download Button */}
+                    <button
+                      onClick={() => handleFileDownload(fileName)}
+                      className="absolute bottom-1 right-1 text-xs bg-blue-600 text-white px-1 py-0.5 rounded hover:bg-blue-700"
+                    >
+                      Download
+                    </button>
                   </div>
                 );
               })}
@@ -153,65 +188,53 @@ const TicketViewPage = ({ ticketId, popupMode = false, onClose }) => {
         </button>
       </div>
 
-      {/* Preview Modal */}
-      {previewUrl && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          onClick={() => setPreviewUrl(null)}
-        >
-          <div
-            className="bg-white p-6 rounded-lg max-w-3xl w-full relative"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              onClick={() => setPreviewUrl(null)}
-              className="absolute top-2 right-2 text-gray-600 hover:text-black"
-            >
-              <IoClose size={24} />
-            </button>
-
-            {/\.(jpg|jpeg|png|gif|bmp|webp)$/i.test(previewUrl) ? (
-              <img src={previewUrl} alt="Preview" className="w-full max-h-[80vh] object-contain" />
-            ) : /\.(mp4|webm|ogg)$/i.test(previewUrl) ? (
-              <video controls className="w-full max-h-[80vh]">
-                <source src={previewUrl} />
-              </video>
-            ) : /\.(mp3|wav|ogg)$/i.test(previewUrl) ? (
-              <audio controls className="w-full mt-4">
-                <source src={previewUrl} />
-              </audio>
-            ) : /\.(pdf|docx?|xlsx?)$/i.test(previewUrl) ? (
-              <iframe src={previewUrl} className="w-full h-[80vh]" title="Document Preview" />
-            ) : (
-              <a href={previewUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">
-                Download File
-              </a>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Reject Reason Modal */}
+      {/* Reject Modal */}
       {showRejectModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-40">
           <div className="bg-gray-200 p-6 rounded-lg w-full max-w-md relative">
             <button
-              onClick={() => setShowRejectModal(false)}
+              onClick={() => {
+                setShowRejectModal(false);
+                setRejectReasonDropdown('');
+                setRejectReasonText('');
+              }}
               className="absolute top-2 right-2 text-gray-600 hover:text-black"
             >
               <IoClose size={24} />
             </button>
             <h3 className="text-lg font-semibold mb-4">Reject Ticket</h3>
+
+            <label className="block font-medium mb-1">Select Reason</label>
+            <select
+              value={rejectReasonDropdown}
+              onChange={(e) => setRejectReasonDropdown(e.target.value)}
+              className="w-full mb-4 p-3 border border-black rounded"
+            >
+              <option value="">-- Choose Reason --</option>
+              <option value="Incomplete Information">Incomplete Information</option>
+              <option value="Invalid Request">Invalid Request</option>
+              <option value="Duplicate Ticket">Duplicate Ticket</option>
+              <option value="Not a Bug">Not a Bug</option>
+              <option value="Already Fixed">Already Fixed</option>
+              <option value="Feature Request Misclassified as Bug">Feature Request Misclassified as Bug</option>
+            </select>
+
+            <label className="block font-medium mb-1">Additional Notes (optional)</label>
             <textarea
-              value={rejectReason}
-              onChange={(e) => setRejectReason(e.target.value)}
-              placeholder="Enter reason for rejection..."
+              value={rejectReasonText}
+              onChange={(e) => setRejectReasonText(e.target.value)}
+              placeholder="Write more details if needed..."
               className="w-full p-3 border border-black rounded mb-4"
               rows={4}
             />
+
             <div className="flex justify-end gap-2">
               <button
-                onClick={() => setShowRejectModal(false)}
+                onClick={() => {
+                  setShowRejectModal(false);
+                  setRejectReasonDropdown('');
+                  setRejectReasonText('');
+                }}
                 className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
               >
                 Cancel
@@ -219,9 +242,50 @@ const TicketViewPage = ({ ticketId, popupMode = false, onClose }) => {
               <button
                 onClick={handleReject}
                 className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
-                disabled={!rejectReason.trim()}
+                disabled={!rejectReasonDropdown}
               >
                 Confirm Reject
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Evidence Preview Modal with Download */}
+      {previewUrl && (
+        <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg p-4 max-w-lg w-full relative">
+            <button
+              onClick={() => setPreviewUrl(null)}
+              className="absolute top-2 right-2 text-gray-600 hover:text-black"
+            >
+              <IoClose size={24} />
+            </button>
+
+            <h4 className="text-lg font-semibold mb-4">{previewUrl.name}</h4>
+
+            <div className="mb-4 max-h-[400px] overflow-auto flex justify-center items-center">
+              {previewUrl.type === 'image' ? (
+                <img src={previewUrl.url} alt={previewUrl.name} className="max-w-full max-h-96" />
+              ) : previewUrl.type === 'video' ? (
+                <video controls className="max-w-full max-h-96">
+                  <source src={previewUrl.url} />
+                </video>
+              ) : previewUrl.type === 'audio' ? (
+                <audio controls className="w-full">
+                  <source src={previewUrl.url} />
+                </audio>
+              ) : (
+                <div className="text-sm text-gray-600">Cannot preview this file type.</div>
+              )}
+            </div>
+
+            <div className="flex justify-end">
+              <button
+                onClick={() => handleFileDownload(previewUrl.name)}
+                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+              >
+                Download
               </button>
             </div>
           </div>
