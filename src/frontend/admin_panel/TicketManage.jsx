@@ -46,6 +46,9 @@ export default function TicketManage() {
   const [mentionDropdownPos, setMentionDropdownPos] = useState({ top: 0, left: 0 });
   const [filteredMentions, setFilteredMentions] = useState([]);
   const textareaRef = useRef(null);
+  const [attachmentFile, setAttachmentFile] = useState(null);
+  const [replyingTo, setReplyingTo] = useState(null);
+  const [userLikedComments, setUserLikedComments] = useState({});
 
   // This computes which supervisorId to use based on user role and selection
   const supervisorIdToUse =
@@ -160,15 +163,24 @@ export default function TicketManage() {
     if (!selectedTicket?.id) return;
     const fetchComments = async () => {
       try {
-        const res = await fetch(`http://localhost:5000/api/tickets/${selectedTicket.id}/comments`);
-        const data = await res.json();
+        // Pass user.UserID to the backend to get UserHasLiked status
+        const res = await axios.get(`http://localhost:5000/api/tickets/${selectedTicket.id}/comments?userId=${user.UserID}`);
+        const data = res.data;
         setCommentsList(data);
+
+        // Initialize userLikedComments state directly from fetched data
+        const likedStatus = {};
+        for (const comment of data) {
+            likedStatus[comment.CommentID] = comment.UserHasLiked === 1; // Backend returns 1 or 0
+        }
+        setUserLikedComments(likedStatus);
+
       } catch (err) {
         console.error('Failed to load comments', err);
       }
     };
     fetchComments();
-  }, [selectedTicket?.id]);
+  }, [selectedTicket?.id, user.UserID]);
 
   useEffect(() => {
     if (selectedTicket) {
@@ -192,7 +204,21 @@ export default function TicketManage() {
   };
 
   const handleAddComment = async () => {
-    if (!selectedTicket || !comment.trim()) return;
+    if (!selectedTicket || (!comment.trim() && !attachmentFile)) {
+      toast.warn("Comment text or an attachment is required.");
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("ticketId", selectedTicket.id);
+    formData.append("userId", user.UserID);
+    formData.append("comment", comment.trim());
+    if (replyingTo) {
+      formData.append("replyToCommentId", replyingTo.commentId);
+    }
+    if (attachmentFile) {
+      formData.append("file", attachmentFile);
+    }
 
     // Extract mentions from comment text (e.g., @FullName)
     const mentionMatches = comment.match(/@([\w\s]+)/g) || [];
@@ -200,19 +226,24 @@ export default function TicketManage() {
     const mentionedUserIds = mentionableUsers
       .filter(u => mentionedNames.includes(u.FullName))
       .map(u => u.UserID);
+    
+    if (mentionedUserIds.length > 0) {
+        formData.append("mentionedUserIds", mentionedUserIds.join(','));
+    }
 
     try {
-      await axios.post(`http://localhost:5000/api/tickets/${selectedTicket.id}/comments`, {
-        comment: comment.trim(),
-        userId: user.UserID,
-        mentions: mentionMatches.join(','),
-        mentionedUserIds,
+      await axios.post(`http://localhost:5000/api/tickets/${selectedTicket.id}/comments`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
       });
       setComment('');
+      setAttachmentFile(null);
+      setReplyingTo(null);
       toast.success('Comment added successfully');
-      // Refresh comments
-      const res = await fetch(`http://localhost:5000/api/tickets/${selectedTicket.id}/comments`);
-      setCommentsList(await res.json());
+      // Refresh comments after adding
+      const res = await axios.get(`http://localhost:5000/api/tickets/${selectedTicket.id}/comments`);
+      setCommentsList(res.data);
     } catch (error) {
       console.error('Error adding comment:', error);
       toast.error('Failed to add comment');
@@ -417,6 +448,42 @@ const resolved = tickets
   }
  
 
+  // Function to handle liking/unliking a comment
+  const handleLikeToggle = async (commentId) => {
+    const hasLiked = userLikedComments[commentId];
+    try {
+      if (hasLiked) {
+        // Unlike
+        await axios.delete(`http://localhost:5000/api/comments/${commentId}/like`, { data: { userId: user.UserID } });
+        toast.info("Comment unliked.");
+      } else {
+        // Like
+        await axios.post(`http://localhost:5000/api/comments/${commentId}/like`, { userId: user.UserID });
+        toast.success("Comment liked!");
+      }
+      // Toggle the local state immediately for responsiveness
+      setUserLikedComments(prev => ({ ...prev, [commentId]: !hasLiked }));
+      // Re-fetch comments to get updated like counts from backend
+      const res = await axios.get(`http://localhost:5000/api/tickets/${selectedTicket.id}/comments`);
+      setCommentsList(res.data);
+    } catch (error) {
+      console.error("Error toggling like:", error);
+      toast.error(`Failed to ${hasLiked ? 'unlike' : 'like'} comment.`);
+    }
+  };
+
+  // Function to initiate a reply
+  const handleReplyClick = (commentId, userName) => {
+    setReplyingTo({ commentId, userName });
+    setComment(`@${userName} `); // Pre-fill textarea with mention
+    textareaRef.current.focus();
+  };
+
+  // Function to cancel a reply
+  const handleCancelReply = () => {
+    setReplyingTo(null);
+    setComment("");
+  };
 
   return (
     <div className="flex">
@@ -733,6 +800,14 @@ const resolved = tickets
                       {/* Comments Section */}
                       <div className="relative mb-6 p-4 border rounded-lg bg-gray-50 shadow-sm">
                         <label className="block text-lg font-semibold text-gray-800 mb-3">Add Comment</label>
+                        {replyingTo && (
+                          <div className="flex items-center gap-2 mb-2 p-2 bg-blue-100 rounded-md text-blue-800">
+                            Replying to <span className="font-semibold">@{replyingTo.userName}</span>
+                            <button onClick={handleCancelReply} className="ml-auto text-blue-600 hover:text-blue-800 font-bold">
+                              X
+                            </button>
+                          </div>
+                        )}
                         <div className="flex flex-col gap-3">
                           <textarea
                             ref={textareaRef}
@@ -744,8 +819,21 @@ const resolved = tickets
                             placeholder="Type your comment here... Use @ to mention users."
                             style={{ minHeight: 80 }}
                           />
-                        
                         </div>
+                        {/* File Attachment Input */}
+                        <input
+                          type="file"
+                          onChange={(e) => setAttachmentFile(e.target.files[0])}
+                          className="mt-3 block w-full text-sm text-gray-500
+                          file:mr-4 file:py-2 file:px-4
+                          file:rounded-full file:border-0
+                          file:text-sm file:font-semibold
+                          file:bg-blue-50 file:text-blue-700
+                          hover:file:bg-blue-100"
+                        />
+                        {attachmentFile && (
+                          <p className="mt-2 text-sm text-gray-600">Attached: {attachmentFile.name}</p>
+                        )}
                         {showMentionDropdown && filteredMentions.length > 0 && (
                           <div
                             className="absolute z-50 bg-white border border-blue-300 rounded-lg shadow-xl mt-2 max-h-48 overflow-y-auto w-full md:w-auto"
@@ -764,7 +852,7 @@ const resolved = tickets
                         )}
                         <button
                           onClick={handleAddComment}
-                          disabled={!comment.trim()}
+                          disabled={!comment.trim() && !attachmentFile} // Disable if no text and no file
                           className="mt-4 inline-flex items-center px-5 py-2.5 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-gray-400 transition duration-200 ease-in-out"
                         >
                           Add Comment
@@ -776,25 +864,18 @@ const resolved = tickets
                           <p className="text-gray-500 text-center py-4 border rounded-lg bg-white shadow-sm">No comments yet. Be the first to add one!</p>
                         ) : (
                           <ul className="space-y-4">
-                            {commentsList.slice().reverse().map((c) => (
-                              <li key={c.CommentID} className="border border-gray-200 rounded-lg bg-white p-4 flex flex-col sm:flex-row sm:items-start justify-between shadow-md hover:shadow-lg transition-shadow duration-200 ease-in-out">
-                                <div className="flex-1">
-                                  <div className="font-bold text-lg text-gray-900 mb-1">{c.FullName}</div>
-                                  {c.Mentions && c.Mentions.trim() && (
-                                    <div className="text-sm text-blue-600 font-medium mb-2 flex flex-wrap items-center gap-x-2">
-                                      {c.Mentions.split(',').map((m, idx) =>
-                                        m.trim() ? (
-                                          <span key={idx} className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full text-xs font-semibold">{m.trim()}</span>
-                                        ) : null
-                                      )}
-                                    </div>
-                                  )}
-                                  <div className="mt-2 text-gray-800 leading-relaxed whitespace-pre-wrap text-base">{c.CommentText}</div>
-                                </div>
-                                <div className="text-xs text-gray-500 mt-3 sm:mt-0 sm:ml-4 text-right flex-shrink-0 min-w-[140px]">
-                                  {new Date(c.CreatedAt).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })}
-                                </div>
-                              </li>
+                            {commentsList
+                              .filter(comment => !comment.ReplyToCommentID) // Filter out replies for top level
+                              .slice().reverse().map((c) => (
+                              <CommentItem 
+                                key={c.CommentID} 
+                                comment={c} 
+                                allComments={commentsList} 
+                                currentUser={user} 
+                                onReplyClick={handleReplyClick} 
+                                onLikeToggle={handleLikeToggle} 
+                                userLikedComments={userLikedComments} 
+                              />
                             ))}
                           </ul>
                         )}
@@ -847,5 +928,114 @@ function Section({ title, tickets, onCardClick, color }) {
         ))}
       </div>
     </section>
+  );
+}
+
+// New CommentItem Component for rendering comments and replies
+function CommentItem({
+  comment,
+  allComments,
+  currentUser,
+  onReplyClick,
+  onLikeToggle,
+  userLikedComments,
+}) {
+  const nestedReplies = allComments.filter(
+    (c) => c.ReplyToCommentID === comment.CommentID
+  ).sort((a, b) => new Date(a.CreatedAt) - new Date(b.CreatedAt));
+
+  const isImageAttachment = (fileType) => fileType && fileType.startsWith('image/');
+  const isVideoAttachment = (fileType) => fileType && fileType.startsWith('video/');
+  const isAudioAttachment = (fileType) => fileType && fileType.startsWith('audio/');
+  const isPDFAttachment = (fileType) => fileType && fileType === 'application/pdf';
+
+  return (
+    <li className="border border-gray-200 rounded-lg bg-white p-4 flex flex-col shadow-md hover:shadow-lg transition-shadow duration-200 ease-in-out">
+      <div className="flex items-start flex-1">
+        {/* Profile Picture */}
+        <img
+          src={comment.ProfileImagePath ? `http://localhost:5000/${comment.ProfileImagePath}` : 'https://via.placeholder.com/40'} // Placeholder if no image
+          alt={comment.FullName}
+          className="w-10 h-10 rounded-full mr-4 object-cover"
+        />
+        <div className="flex-1">
+          <div className="font-bold text-lg text-gray-900 mb-1 flex items-center">
+            {comment.FullName}
+            {/* The "in reply to" will be handled inside the comment content bubble */}
+          </div>
+          <div className={`mt-2 ${comment.RepliedToCommentID ? 'bg-gray-100 p-3 rounded-lg' : ''}`}> {/* Conditional styling for reply bubble */}
+            <div className="text-gray-800 leading-relaxed whitespace-pre-wrap text-base">
+              {comment.CommentText}
+            </div>
+          </div>
+
+          {/* Display Attachment if exists */}
+          {comment.AttachmentFullUrl && ( 
+            <div className="mt-3 p-3 bg-gray-100 rounded-md border border-gray-200">
+              <p className="text-sm text-gray-600 mb-2">Attachment:</p>
+              {
+                isImageAttachment(comment.AttachmentFileType) ? (
+                  <a href={comment.AttachmentFullUrl} target="_blank" rel="noopener noreferrer">
+                    <img src={comment.AttachmentFullUrl} alt={comment.AttachmentFileName} className="max-w-xs h-auto rounded-md shadow-sm" />
+                  </a>
+                ) : isVideoAttachment(comment.AttachmentFileType) ? (
+                  <video controls src={comment.AttachmentFullUrl} className="max-w-xs h-auto rounded-md shadow-sm"></video>
+                ) : isAudioAttachment(comment.AttachmentFileType) ? (
+                  <audio controls src={comment.AttachmentFullUrl} className="w-full"></audio>
+                ) : isPDFAttachment(comment.AttachmentFileType) ? (
+                  <a href={comment.AttachmentFullUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline flex items-center gap-1">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0113 3.414L16.586 7A2 2 0 0118 8.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 2h2v2H6V6zm4 0h4v2h-4V6zm0 4h4v2h-4v-2z" clipRule="evenodd" />
+                    </svg>
+                    {comment.AttachmentFileName}
+                  </a>
+                ) : (
+                  <a href={comment.AttachmentFullUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline flex items-center gap-1">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M8 4a3 3 0 00-3 3v4a5 5 0 0010 0V7a1 1 0 112 0v4a7 7 0 11-14 0V7a5 5 0 0110 0v4a3 3 0 11-6 0V7a1 1 0 012 0v4a1 1 0 102 0V7a3 3 0 00-3-3z" clipRule="evenodd" />
+                    </svg>
+                    {comment.AttachmentFileName}
+                  </a>
+                )
+              }
+            </div>
+          )}
+
+          <div className="flex items-center text-sm text-gray-500 mt-2 gap-4">
+            <span>{comment.LikesCount || 0} Likes</span>
+            <button
+              onClick={() => onLikeToggle(comment.CommentID)}
+              className={`px-3 py-1 rounded-full text-xs font-medium ${userLikedComments[comment.CommentID] ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+            >
+              {userLikedComments[comment.CommentID] ? 'Unlike' : 'Like'}
+            </button>
+            <button
+              onClick={() => onReplyClick(comment.CommentID, comment.FullName)}
+              className="text-blue-600 hover:underline font-medium"
+            >
+              Reply
+            </button>
+          </div>
+        </div>
+      </div>
+      <div className="text-xs text-gray-500 mt-3 sm:mt-0 sm:ml-4 text-right flex-shrink-0 min-w-[140px]">
+        {new Date(comment.CreatedAt).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })}
+      </div>
+      {nestedReplies.length > 0 && (
+        <ul className="mt-4 pl-12 w-full space-y-4 border-l-2 border-gray-200">
+          {nestedReplies.map((reply) => (
+            <CommentItem 
+              key={reply.CommentID} 
+              comment={reply} 
+              allComments={allComments} // Pass allComments for nested replies
+              currentUser={currentUser} 
+              onReplyClick={onReplyClick} 
+              onLikeToggle={onLikeToggle} 
+              userLikedComments={userLikedComments}
+            />
+          ))}
+        </ul>
+      )}
+    </li>
   );
 }
