@@ -1,12 +1,11 @@
 import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
+import { io } from "socket.io-client";
 
-// Helper to detect URLs in text and convert them to links
 function renderMessageWithLinks(text) {
   if (typeof text !== "string") return text;
 
-  const urlRegex =
-    /((https?:\/\/)?(www\.)?[\w\-]+\.[\w]{2,}([\/\w\-\.?=&%]*)?)/gi;
+  const urlRegex = /((https?:\/\/)?(www\.)?[\w\-]+\.[\w]{2,}([\/\w\-\.?=&%]*)?)/gi;
 
   return text.split(urlRegex).map((part, i) => {
     if (
@@ -45,25 +44,69 @@ function renderMessageWithLinks(text) {
   });
 }
 
-export default function ChatSection({
-  user,
-  supportUser,
-  ticketId,
-  ticket,
-  role,
-}) {
+export default function SupervisorChatSection({ user, supportUser, ticketId, ticket, role }) {
   const [chatMessages, setChatMessages] = useState([]);
   const [chatInput, setChatInput] = useState("");
   const [sendingFile, setSendingFile] = useState(null);
-  const [isTyping, setIsTyping] = useState(false);
   const chatEndRef = useRef(null);
+  const socketRef = useRef(null);
+
+  // Helper: Deduplicate messages by id
+  const deduplicateMessages = (messages) => {
+    return messages.filter(
+      (msg, index, self) =>
+        index === self.findIndex((m) => String(m.id) === String(msg.id))
+    );
+  };
+
+  useEffect(() => {
+    if (!ticketId) return;
+
+    // Connect to socket and join room
+    socketRef.current = io("http://localhost:5000");
+    socketRef.current.emit("joinTicketRoom", ticketId);
+
+    // Listen for incoming messages
+    socketRef.current.on("receiveTicketMessage", (message) => {
+      if (String(message.ticketid) !== String(ticketId)) return;
+
+      // Map role to sender properly
+      const sender = (message.role || "").toLowerCase() === "user" ? "user" : "agent";
+
+      setChatMessages((prevMsgs) => {
+        // Prevent duplicates by ID
+        if (prevMsgs.find((m) => String(m.id) === String(message.id))) return prevMsgs;
+        const combined = [...prevMsgs, { ...message, sender }];
+        return deduplicateMessages(combined);
+      });
+    });
+
+    return () => {
+      if (socketRef.current) {
+        socketRef.current.emit("leaveTicketRoom", ticketId);
+        socketRef.current.disconnect();
+        socketRef.current = null;
+      }
+    };
+  }, [ticketId]);
 
   useEffect(() => {
     if (!ticketId) return;
 
     axios
       .get(`http://localhost:5000/messages/${ticketId}`)
-      .then((res) => setChatMessages(res.data))
+      .then((res) => {
+        // Map role to sender for each message
+        const formattedMessages = res.data.map((msg) => ({
+          ...msg,
+          sender: (msg.role || "").toLowerCase() === "user" ? "user" : "agent",
+        }));
+
+        // Deduplicate messages by ID before setting state
+        const uniqueMessages = deduplicateMessages(formattedMessages);
+
+        setChatMessages(uniqueMessages);
+      })
       .catch(console.error);
   }, [ticketId]);
 
@@ -74,7 +117,7 @@ export default function ChatSection({
   const handleSendMessage = async () => {
     if (!chatInput.trim() && !sendingFile) return;
 
-    const optimisticId = Date.now();
+    const optimisticId = `temp-${Date.now()}`;
     const localFileUrl = sendingFile ? URL.createObjectURL(sendingFile) : null;
 
     const newMsg = {
@@ -82,6 +125,7 @@ export default function ChatSection({
       ticketid: ticketId,
       userid: supportUser || null,
       role: role || "Supervisor",
+      sender: "agent",
       content: chatInput || (sendingFile && sendingFile.name),
       timestamp: new Date().toISOString(),
       type: sendingFile ? "file" : "text",
@@ -94,7 +138,7 @@ export default function ChatSection({
       status: "sending",
     };
 
-    setChatMessages((prev) => [...prev, newMsg]);
+    setChatMessages((prev) => deduplicateMessages([...prev, newMsg]));
 
     try {
       const formData = new FormData();
@@ -104,7 +148,7 @@ export default function ChatSection({
       formData.append("UserID", supportUser || "");
       formData.append("Role", role || "Supervisor");
       if (sendingFile) {
-        formData.append("File", sendingFile);
+        formData.append("file", sendingFile);
       }
 
       const res = await axios.post(
@@ -119,20 +163,22 @@ export default function ChatSection({
       const uploadedFileUrl = res.data.fileUrl || localFileUrl;
 
       setChatMessages((msgs) =>
-        msgs.map((msg) =>
-          msg.id === optimisticId
-            ? {
-                ...msg,
-                id: newId,
-                status: "delivered",
-                file: sendingFile
-                  ? {
-                      name: sendingFile.name,
-                      url: uploadedFileUrl,
-                    }
-                  : null,
-              }
-            : msg
+        deduplicateMessages(
+          msgs.map((msg) =>
+            String(msg.id) === String(optimisticId)
+              ? {
+                  ...msg,
+                  id: newId,
+                  status: "delivered",
+                  file: sendingFile
+                    ? {
+                        name: sendingFile.name,
+                        url: uploadedFileUrl,
+                      }
+                    : null,
+                }
+              : msg
+          )
         )
       );
 
@@ -142,7 +188,9 @@ export default function ChatSection({
       console.error("Send failed:", error);
       setChatMessages((msgs) =>
         msgs.map((msg) =>
-          msg.id === optimisticId ? { ...msg, status: "failed" } : msg
+          String(msg.id) === String(optimisticId)
+            ? { ...msg, status: "failed" }
+            : msg
         )
       );
     }
@@ -164,11 +212,11 @@ export default function ChatSection({
         )}
 
         {chatMessages.map((msg) => {
-          const isClient = msg.role === "User";
+          const isClient = msg.sender === "user";
 
           return (
             <div
-              key={msg.id}
+              key={String(msg.id)}
               className={`flex mb-3 ${
                 !isClient ? "justify-end" : "justify-start"
               }`}
@@ -284,7 +332,6 @@ export default function ChatSection({
           );
         })}
 
-        {/* Preview for file before sending */}
         {sendingFile && (
           <div className="flex justify-center mb-2">
             <div className="relative bg-yellow-100 rounded-lg p-2 shadow-md max-w-[200px] max-h-[200px] overflow-hidden">
@@ -341,18 +388,8 @@ export default function ChatSection({
         )}
 
         <div ref={chatEndRef} />
-
-        {isTyping && (
-          <div className="flex items-center space-x-2 ml-10 mb-2">
-            <div className="w-3 h-3 bg-gray-500 rounded-full animate-bounce" />
-            <div className="w-3 h-3 bg-gray-500 rounded-full animate-bounce delay-200" />
-            <div className="w-3 h-3 bg-gray-500 rounded-full animate-bounce delay-400" />
-            <span className="text-gray-600 text-sm">Support is typing...</span>
-          </div>
-        )}
       </div>
 
-      {/* Input Section */}
       <div className="mt-3 flex items-center space-x-2 p-3 border-t border-gray-300 bg-white rounded-b-lg">
         <label
           htmlFor="file-upload"
