@@ -121,6 +121,7 @@ const TicketViewPage = ({ ticketId, popupMode = false, onClose }) => {
                 const isImage = /\.(jpg|jpeg|png|gif|bmp|webp)$/i.test(fileName);
                 const isVideo = /\.(mp4|webm|ogg)$/i.test(fileName);
                 const isAudio = /\.(mp3|wav|ogg)$/i.test(fileName);
+                const isPdf = /\.pdf$/i.test(fileName);
 
                 return (
                   <div
@@ -139,6 +140,8 @@ const TicketViewPage = ({ ticketId, popupMode = false, onClose }) => {
                             ? 'video'
                             : isAudio
                             ? 'audio'
+                            : isPdf
+                            ? 'pdf'
                             : 'other',
                         })
                       }
@@ -150,6 +153,8 @@ const TicketViewPage = ({ ticketId, popupMode = false, onClose }) => {
                         <video muted className="w-full h-full object-cover rounded">
                           <source src={fileUrl} />
                         </video>
+                      ) : isPdf ? (
+                        <div className="text-xs text-center truncate w-full px-1 text-red-600 font-semibold">PDF File</div>
                       ) : isAudio ? (
                         <div className="text-xs text-center truncate w-full px-1">{fileName}</div>
                       ) : (
@@ -157,7 +162,6 @@ const TicketViewPage = ({ ticketId, popupMode = false, onClose }) => {
                       )}
                     </div>
 
-                    {/* Download Button */}
                     <button
                       onClick={() => handleFileDownload(fileName)}
                       className="absolute bottom-1 right-1 text-xs bg-blue-600 text-white px-1 py-0.5 rounded hover:bg-blue-700"
@@ -190,7 +194,7 @@ const TicketViewPage = ({ ticketId, popupMode = false, onClose }) => {
 
       {/* Reject Modal */}
       {showRejectModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-40">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/25">
           <div className="bg-gray-200 p-6 rounded-lg w-full max-w-md relative">
             <button
               onClick={() => {
@@ -251,10 +255,10 @@ const TicketViewPage = ({ ticketId, popupMode = false, onClose }) => {
         </div>
       )}
 
-      {/* Evidence Preview Modal with Download */}
+      {/* Preview Modal */}
       {previewUrl && (
-        <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg p-4 max-w-lg w-full relative">
+        <div className="fixed inset-0 z-50 flex bg-black/25 items-center justify-center p-4">
+          <div className="bg-gray-100 rounded-lg p-4 w-full max-w-2xl mx-auto relative">
             <button
               onClick={() => setPreviewUrl(null)}
               className="absolute top-2 right-2 text-gray-600 hover:text-black"
@@ -275,6 +279,12 @@ const TicketViewPage = ({ ticketId, popupMode = false, onClose }) => {
                 <audio controls className="w-full">
                   <source src={previewUrl.url} />
                 </audio>
+              ) : previewUrl.type === 'pdf' ? (
+                <iframe
+                  src={previewUrl.url}
+                  className="w-full h-[500px] border rounded"
+                  title="PDF Preview"
+                ></iframe>
               ) : (
                 <div className="text-sm text-gray-600">Cannot preview this file type.</div>
               )}
