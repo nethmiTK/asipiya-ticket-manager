@@ -3232,7 +3232,7 @@ app.get('/api/tickets/:ticketId/comments', (req, res) => {
 
 app.get('/api/mentionable-users', (req, res) => {
   db.query(
-    "SELECT UserID, FullName, Role FROM appuser WHERE Role IN ('Admin', 'Supervisor', 'Developer')",
+    "SELECT UserID, FullName, Role, ProfileImagePath FROM appuser WHERE Role IN ('Admin', 'Supervisor', 'Developer')",
     (err, results) => {
       if (err) return res.status(500).json({ error: 'Failed to fetch users' });
       res.json(results);
