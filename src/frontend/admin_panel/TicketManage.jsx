@@ -868,13 +868,13 @@ export default function TicketManage() {
                           >
                             Save Changes
                           </button>
-                          <button
+                          {/*<button
                             onClick={() => setChatMode(!chatMode)}
                             className="bg-green-600 text-white px-4 py-2 rounded flex items-center gap-2"
                           >
                             <MessageCircle size={20} />
                             {chatMode ? "Close Chat" : "Open Chat"}
-                          </button>
+                          </button>*/}
                         </div>
                       </div>
                     </div>
