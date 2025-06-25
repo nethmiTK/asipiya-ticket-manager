@@ -306,6 +306,62 @@ app.put('/api/user/profile/:id', async (req, res) => {
     }
 });
 
+// Add Multer middleware for profile image uploads
+app.post(
+    "/api/user/profile/upload/:id",
+    upload.single("profileImage"),
+    async (req, res) => {
+        const userId = req.params.id;
+        if (!req.file) {
+            return res.status(400).json({ message: "No file uploaded." });
+        }
+
+        const imagePath = `profile_images/${req.file.filename}`; // Store relative path
+
+        try {
+            // Update the user's profile image path in the database
+            const updateQuery =
+                "UPDATE appuser SET ProfileImagePath = ? WHERE UserID = ?";
+            await db.promise().query(updateQuery, [imagePath, userId]);
+
+            res.status(200).json({
+                message: "Profile image uploaded successfully",
+                imagePath: imagePath, // Send back the relative path
+            });
+        } catch (error) {
+            console.error("Error updating profile image path in DB:", error);
+            res.status(500).json({ message: "Failed to update profile image." });
+        }
+    }
+);
+
+// Delete profile image endpoint
+app.delete('/api/user/profile/image/:id', async (req, res) => {
+    const userId = req.params.id;
+    try {
+        // Get the current image path to delete the file from the server
+        const [results] = await db.promise().query('SELECT ProfileImagePath FROM appuser WHERE UserID = ?', [userId]);
+        if (results.length > 0 && results[0].ProfileImagePath) {
+            const filePath = path.join(__dirname, 'uploads', results[0].ProfileImagePath);
+            fs.unlink(filePath, (err) => {
+                if (err) {
+                    console.error('Error deleting old profile image file:', err);
+                    // Continue even if file deletion fails, as DB update is more critical
+                }
+            });
+        }
+
+        // Update the database to remove the profile image path
+        const updateQuery = 'UPDATE appuser SET ProfileImagePath = NULL WHERE UserID = ?';
+        await db.promise().query(updateQuery, [userId]);
+
+        res.status(200).json({ message: 'Profile image removed successfully' });
+    } catch (error) {
+        console.error('Error removing profile image:', error);
+        res.status(500).json({ message: 'Failed to remove profile image.' });
+    }
+});
+
 /* ------------------------- Add Members ------------------------- */
 
 // Get all supervisors (excluding users)
@@ -1658,24 +1714,23 @@ app.get('/api/tickets/status-distribution', (req, res) => {
     });
 });
 
-// API endpoint to fetch the last five activities
+// API endpoint to fetch the last 6 ticket log activities
 app.get('/api/tickets/recent-activities', (req, res) => {
     const query = `
         SELECT 
-            t.TicketID,
-            t.Description,
-            t.Status,
-            t.Priority,
-            t.DateTime
-        FROM ticket t
-        ORDER BY t.DateTime DESC
-        LIMIT 5
+            tl.TicketID,
+            tl.DateTime,
+            tl.Type,
+            tl.Description
+        FROM ticketlog tl
+        ORDER BY tl.DateTime DESC
+        LIMIT 6
     `;
 
     db.query(query, (err, results) => {
         if (err) {
-            console.error('Error fetching recent activities:', err);
-            return res.status(500).json({ error: 'Failed to fetch recent activities' });
+            console.error('Error fetching recent ticket log activities:', err);
+            return res.status(500).json({ error: 'Failed to fetch recent ticket log activities' });
         }
         res.json(results);
     });
@@ -3177,34 +3232,12 @@ app.get('/api/tickets/:ticketId/comments', (req, res) => {
 
 app.get('/api/mentionable-users', (req, res) => {
   db.query(
-    "SELECT UserID, FullName, Role FROM appuser WHERE Role IN ('Admin', 'Supervisor', 'Developer')",
+    "SELECT UserID, FullName, Role, ProfileImagePath FROM appuser WHERE Role IN ('Admin', 'Supervisor', 'Developer')",
     (err, results) => {
       if (err) return res.status(500).json({ error: 'Failed to fetch users' });
       res.json(results);
     }
   );
-});
-
-// API endpoint to fetch the last five ticket logs
-app.get('/api/ticket-logs/recent', (req, res) => {
-    const query = `
-        SELECT 
-            TicketID,
-            DateTime,
-            Type,
-            Description
-        FROM ticketlog
-        ORDER BY TicketID DESC
-        LIMIT 5
-    `;
-
-    db.query(query, (err, results) => {
-        if (err) {
-            console.error('Error fetching recent ticket logs:', err);
-            return res.status(500).json({ error: 'Failed to fetch recent ticket logs' });
-        }
-        res.json(results);
-    });
 });
 
 // Endpoint to like a comment
@@ -3270,4 +3303,58 @@ app.get('/api/comments/:commentId/hasLiked/:userId', async (req, res) => {
   }
 });
 
+// Add Multer middleware for profile image uploads
+app.post(
+    "/api/user/profile/upload/:id",
+    upload.single("profileImage"),
+    async (req, res) => {
+        const userId = req.params.id;
+        if (!req.file) {
+            return res.status(400).json({ message: "No file uploaded." });
+        }
+
+        const imagePath = `profile_images/${req.file.filename}`; // Store relative path
+
+        try {
+            // Update the user's profile image path in the database
+            const updateQuery =
+                "UPDATE appuser SET ProfileImagePath = ? WHERE UserID = ?";
+            await db.promise().query(updateQuery, [imagePath, userId]);
+
+            res.status(200).json({
+                message: "Profile image uploaded successfully",
+                imagePath: imagePath, // Send back the relative path
+            });
+        } catch (error) {
+            console.error("Error updating profile image path in DB:", error);
+            res.status(500).json({ message: "Failed to update profile image." });
+        }
+    }
+);
+
+app.delete('/api/user/profile/image/:id', async (req, res) => {
+    const userId = req.params.id;
+    try {
+        // Get the current image path to delete the file from the server
+        const [results] = await db.promise().query('SELECT ProfileImagePath FROM appuser WHERE UserID = ?', [userId]);
+        if (results.length > 0 && results[0].ProfileImagePath) {
+            const filePath = path.join(__dirname, 'uploads', results[0].ProfileImagePath);
+            fs.unlink(filePath, (err) => {
+                if (err) {
+                    console.error('Error deleting old profile image file:', err);
+                    // Continue even if file deletion fails, as DB update is more critical
+                }
+            });
+        }
+
+        // Update the database to remove the profile image path
+        const updateQuery = 'UPDATE appuser SET ProfileImagePath = NULL WHERE UserID = ?';
+        await db.promise().query(updateQuery, [userId]);
+
+        res.status(200).json({ message: 'Profile image removed successfully' });
+    } catch (error) {
+        console.error('Error removing profile image:', error);
+        res.status(500).json({ message: 'Failed to remove profile image.' });
+    }
+});
  

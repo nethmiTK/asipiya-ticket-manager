@@ -52,6 +52,8 @@ export default function TicketManage() {
   const [attachmentFile, setAttachmentFile] = useState(null);
   const [replyingTo, setReplyingTo] = useState(null);
   const [userLikedComments, setUserLikedComments] = useState({});
+  const [showAllComments, setShowAllComments] = useState(false);
+  const [expandedReplies, setExpandedReplies] = useState({});
 
   // This computes which supervisorId to use based on user role and selection
   const supervisorIdToUse =
@@ -258,13 +260,35 @@ export default function TicketManage() {
           },
         }
       );
+      
+      // Clear all form fields completely
       setComment("");
       setAttachmentFile(null);
       setReplyingTo(null);
+      
+      // Clear file input field
+      const fileInput = document.getElementById('file-upload');
+      if (fileInput) {
+        fileInput.value = '';
+      }
+      
+      // Reset textarea
+      if (textareaRef.current) {
+        textareaRef.current.value = '';
+      }
+      
       toast.success("Comment added successfully");
+      
       // Refresh comments after adding
       const res = await axios.get(`http://localhost:5000/api/tickets/${selectedTicket.id}/comments?userId=${user.UserID}`); // Pass userId for likes
       setCommentsList(res.data);
+      
+      // Initialize userLikedComments state from refreshed data
+      const likedStatus = {};
+      for (const commentData of res.data) {
+        likedStatus[commentData.CommentID] = commentData.UserHasLiked === 1;
+      }
+      setUserLikedComments(likedStatus);
     } catch (error) {
       console.error("Error adding comment:", error);
       toast.error("Failed to add comment");
@@ -328,18 +352,40 @@ export default function TicketManage() {
 
   const handleUpdateTicket = async () => {
     try {
+      // Get the original resolution before update
+      const originalTicket = tickets.find(t => t.id === selectedTicket.id);
+      const oldResolution = originalTicket?.resolution || "";
+      const newResolution = selectedTicket.resolution || "";
+      
       const res = await fetch(
         `http://localhost:5000/tickets/${selectedTicket.id}`,
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            resolution: selectedTicket.resolution || "",
+            resolution: newResolution,
           }),
         }
       );
 
       if (!res.ok) throw new Error("Failed to update ticket");
+
+      // Log the resolution update to ticket log if resolution was added/changed
+      if (newResolution && newResolution !== oldResolution) {
+        try {
+          await axios.post('http://localhost:5000/api/ticket-logs', {
+            ticketId: selectedTicket.id,
+            type: 'RESOLUTION_UPDATE',
+            description: `Resolution summary updated: ${newResolution.substring(0, 100)}${newResolution.length > 100 ? '...' : ''}`,
+            userId: user.UserID,
+            oldValue: oldResolution,
+            newValue: newResolution
+          });
+        } catch (logError) {
+          console.error("Failed to log resolution update:", logError);
+          // Don't fail the main update if logging fails
+        }
+      }
 
       toast.success("Ticket updated successfully!");
       closeModal();
@@ -526,6 +572,13 @@ export default function TicketManage() {
     setComment("");
   };
 
+  const toggleExpandedReplies = (commentId) => {
+    setExpandedReplies(prev => ({
+      ...prev,
+      [commentId]: !prev[commentId]
+    }));
+  };
+
   const renderCommentTextWithMentions = (text) => {
     const parts = [];
     // Sort mentionable users by length of FullName in descending order
@@ -566,7 +619,7 @@ export default function TicketManage() {
     return segments.map((segment, index) => {
       if (segment.type === 'mention') {
         return (
-          <span key={index} className="text-blue-600 font-semibold">
+          <span key={index} className="text-blue-600 font-semibold bg-blue-50 px-1 rounded">
             {segment.value}
           </span>
         );
@@ -945,98 +998,330 @@ export default function TicketManage() {
                     </div>
                   ) : activeTab === "comments" ? (
                     <div className="space-y-4">
-                      <div className="relative mb-6 p-4 border rounded-lg bg-gray-50 shadow-sm">
-                        <label className="block text-lg font-semibold text-gray-800 mb-3">
-                          Add Comment
-                        </label>
+                      <div className="relative mb-6 p-6 border border-gray-200 rounded-2xl bg-white shadow-lg hover:shadow-xl transition-all duration-300 ease-in-out">
+                        <div className="flex items-center gap-4 mb-6">
+                          <div className="relative">
+                            <img
+                              src={
+                                user?.ProfileImagePath
+                                  ? `http://localhost:5000/uploads/profile_images/${user.ProfileImagePath}`
+                                  : `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.FullName || 'User')}&background=random&color=fff`
+                              }
+                              alt={user?.FullName || 'User'}
+                              className="w-12 h-12 rounded-full object-cover ring-3 ring-blue-100 shadow-md"
+                            />
+                            <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white"></div>
+                          </div>
+                          <div className="flex-1">
+                            <label className="block text-lg font-semibold text-gray-800 mb-1">
+                              Share your thoughts
+                            </label>
+                            <p className="text-sm text-gray-500">
+                              What would you like to discuss about this ticket?
+                            </p>
+                          </div>
+                        </div>
                         {replyingTo && (
-                          <div className="flex items-center gap-2 mb-2 p-2 bg-blue-100 rounded-md text-blue-800">
-                            Replying to{" "}
-                            <span className="font-semibold">
-                              @{replyingTo.userName}
-                            </span>
+                          <div className="flex items-center gap-3 mb-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200 shadow-sm">
+                            <div className="p-2 bg-blue-100 rounded-full">
+                              <svg className="w-4 h-4 text-blue-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                              </svg>
+                            </div>
+                            <div className="flex-1">
+                              <span className="text-blue-800 font-medium">Replying to</span>
+                              <span className="font-bold text-blue-900 ml-2">@{replyingTo.userName}</span>
+                            </div>
                             <button
                               onClick={handleCancelReply}
-                              className="ml-auto text-blue-600 hover:text-blue-800 font-bold"
+                              className="p-2 text-blue-600 hover:text-red-600 hover:bg-red-50 rounded-full transition-all duration-200"
+                              title="Cancel reply"
                             >
-                              X
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                              </svg>
                             </button>
                           </div>
                         )}
-                        <div className="flex flex-col gap-3">
-                          <textarea
-                            ref={textareaRef}
-                            rows={4}
-                            value={comment}
-                            onChange={handleCommentChange}
-                            onKeyUp={handleMentionKeyUp}
-                            className="block w-full rounded-md border border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 resize-y p-3 transition duration-200 ease-in-out"
-                            placeholder="Type your comment here... Use @ to mention users."
-                            style={{ minHeight: 80 }}
-                          />
+                        <div className="flex flex-col gap-4">
+                          <div className="relative">
+                            <textarea
+                              ref={textareaRef}
+                              rows={4}
+                              value={comment}
+                              onChange={handleCommentChange}
+                              onKeyUp={handleMentionKeyUp}
+                              className="block w-full rounded-2xl border-2 border-gray-200 shadow-sm focus:border-blue-500 focus:ring-4 focus:ring-blue-100 resize-none p-4 text-base transition duration-300 ease-in-out placeholder-gray-400 bg-gray-50 focus:bg-white"
+                              placeholder="Share your thoughts... Use @ to mention team members"
+                              style={{ 
+                                minHeight: 120,
+                                fontFamily: 'system-ui, -apple-system, sans-serif',
+                                fontSize: '16px',
+                                lineHeight: '1.5'
+                              }}
+                            />
+                            {/* Live mention preview overlay */}
+                            {comment && (
+                              <div 
+                                className="absolute inset-0 pointer-events-none p-4 text-base rounded-xl overflow-hidden"
+                                style={{ 
+                                  background: 'transparent',
+                                  color: 'transparent',
+                                  whiteSpace: 'pre-wrap',
+                                  wordBreak: 'break-word',
+                                  fontFamily: 'system-ui, -apple-system, sans-serif',
+                                  lineHeight: '1.5'
+                                }}
+                              >
+                                {(() => {
+                                  // Sort mentionable users by length of FullName in descending order for better matching
+                                  const sortedMentionableUsers = [...mentionableUsers].sort((a, b) => b.FullName.length - a.FullName.length);
+                                  
+                                  let segments = [{ type: 'text', value: comment }];
+
+                                  for (const mentionUser of sortedMentionableUsers) {
+                                    const escapedFullName = mentionUser.FullName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                                    const mentionRegex = new RegExp(`@${escapedFullName}`, 'gi');
+                                    const newSegments = [];
+
+                                    for (const segment of segments) {
+                                      if (segment.type === 'mention') {
+                                        newSegments.push(segment);
+                                        continue;
+                                      }
+
+                                      let lastSplitIndex = 0;
+                                      let match;
+                                      while ((match = mentionRegex.exec(segment.value)) !== null) {
+                                        const preMatchText = segment.value.substring(lastSplitIndex, match.index);
+                                        if (preMatchText) {
+                                          newSegments.push({ type: 'text', value: preMatchText });
+                                        }
+                                        newSegments.push({ type: 'mention', value: match[0], user: mentionUser });
+                                        lastSplitIndex = match.index + match[0].length;
+                                      }
+                                      const remainingText = segment.value.substring(lastSplitIndex);
+                                      if (remainingText) {
+                                        newSegments.push({ type: 'text', value: remainingText });
+                                      }
+                                    }
+                                    segments = newSegments;
+                                  }
+
+                                  return segments.map((segment, index) => {
+                                    if (segment.type === 'mention') {
+                                      return (
+                                        <span 
+                                          key={index} 
+                                          className="bg-blue-200 text-blue-800 px-1 rounded font-semibold"
+                                          style={{ color: '#1e40af' }}
+                                        >
+                                          {segment.value}
+                                        </span>
+                                      );
+                                    } else {
+                                      return segment.value;
+                                    }
+                                  });
+                                })()}
+                              </div>
+                            )}
+                            {comment.trim() && (
+                              <div className="absolute bottom-3 right-3 px-2 py-1 bg-white bg-opacity-90 rounded-lg shadow-sm">
+                                <span className="text-xs text-gray-500 font-medium">
+                                  {comment.length} characters
+                                </span>
+                              </div>
+                            )}
+                          </div>
                         </div>
-                        <input
-                          type="file"
-                          onChange={(e) => setAttachmentFile(e.target.files[0])}
-                          className="mt-3 block w-full text-sm text-gray-500
-                          file:mr-4 file:py-2 file:px-4
-                          file:rounded-full file:border-0
-                          file:text-sm file:font-semibold
-                          file:bg-blue-50 file:text-blue-700
-                          hover:file:bg-blue-100"
-                        />
+                        
+                        <div className="mt-4 p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-400 transition-colors bg-gray-50 hover:bg-blue-50">
+                          <input
+                            type="file"
+                            onChange={(e) => setAttachmentFile(e.target.files[0])}
+                            className="hidden"
+                            id="file-upload"
+                            accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.txt"
+                          />
+                          <label
+                            htmlFor="file-upload"
+                            className="cursor-pointer flex flex-col items-center justify-center gap-2 py-4"
+                          >
+                            <div className="p-3 bg-white rounded-full shadow-sm">
+                              <svg className="w-8 h-8 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                              </svg>
+                            </div>
+                            <span className="text-sm text-gray-700 font-medium">
+                              {attachmentFile ? `📎 ${attachmentFile.name}` : 'Click to attach file or drag and drop'}
+                            </span>
+                            <span className="text-xs text-gray-500">
+                              Images, Videos, Documents, PDFs supported (Max 10MB)
+                            </span>
+                          </label>
+                        </div>
+                        
                         {attachmentFile && (
-                          <p className="mt-2 text-sm text-gray-600">
-                            Attached: {attachmentFile.name}
-                          </p>
+                          <div className="mt-3 p-4 bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-lg flex items-center gap-3 shadow-sm">
+                            <div className="flex items-center gap-3 flex-1">
+                              <div className="p-2 bg-green-100 rounded-full">
+                                <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                              </div>
+                              <div className="flex-1">
+                                <span className="text-sm text-green-800 font-medium block">
+                                  File Ready to Upload
+                                </span>
+                                <span className="text-xs text-green-600">
+                                  📎 {attachmentFile.name} ({(attachmentFile.size / 1024).toFixed(1)} KB)
+                                </span>
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => {
+                                setAttachmentFile(null);
+                                const fileInput = document.getElementById('file-upload');
+                                if (fileInput) fileInput.value = '';
+                              }}
+                              className="p-1 text-green-600 hover:text-red-600 hover:bg-red-50 rounded-full transition-all duration-200"
+                              title="Remove file"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
+                          </div>
                         )}
+                        
                         {showMentionDropdown && filteredMentions.length > 0 && (
                           <div
-                            className="absolute z-50 bg-white border border-blue-300 rounded-lg shadow-xl mt-2 max-h-48 overflow-y-auto w-full md:w-auto"
+                            className="absolute z-50 bg-white border border-gray-200 rounded-2xl shadow-2xl mt-2 max-h-64 overflow-y-auto backdrop-blur-sm"
                             style={{
                               top: mentionDropdownPos.top + 10,
                               left: mentionDropdownPos.left,
-                              minWidth: 200,
+                              minWidth: 280,
                             }}
                           >
-                            {filteredMentions.map((user) => (
+                            <div className="p-3 border-b border-gray-100 bg-gray-50 rounded-t-2xl">
+                              <h4 className="text-sm font-semibold text-gray-700">Mention Team Members</h4>
+                            </div>
+                            {filteredMentions.map((user, index) => (
                               <div
                                 key={user.UserID}
-                                className="px-4 py-2 hover:bg-blue-50 cursor-pointer flex items-center gap-2"
+                                className={`px-4 py-3 hover:bg-blue-50 cursor-pointer flex items-center gap-3 transition-all duration-200 ${
+                                  index === filteredMentions.length - 1 ? 'rounded-b-2xl' : 'border-b border-gray-50'
+                                }`}
                                 onMouseDown={(e) => {
                                   e.preventDefault();
                                   handleMentionSelect(user);
                                 }}
                               >
-                                <span className="font-medium text-blue-700">
-                                  @{user.FullName}
-                                </span>{" "}
-                                <span className="text-sm text-gray-500">
-                                  ({user.Role})
-                                </span>
+                                <div className="relative">
+                                  <img
+                                    src={
+                                      user.ProfileImagePath
+                                        ? `http://localhost:5000/uploads/${user.ProfileImagePath}`
+                                        : `https://ui-avatars.com/api/?name=${encodeURIComponent(user.FullName)}&background=random&color=fff`
+                                    }
+                                    alt={user.FullName}
+                                    className="w-10 h-10 rounded-full object-cover ring-2 ring-gray-100"
+                                  />
+                                  <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 rounded-full border border-white"></div>
+                                </div>
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-semibold text-blue-700">
+                                      @{user.FullName}
+                                    </span>
+                                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                                      user.Role === 'Admin' ? 'bg-red-100 text-red-700' :
+                                      user.Role === 'Supervisor' ? 'bg-yellow-100 text-yellow-700' :
+                                      'bg-green-100 text-green-700'
+                                    }`}>
+                                      {user.Role}
+                                    </span>
+                                  </div>
+                                  <span className="text-sm text-gray-500">
+                                    Click to mention
+                                  </span>
+                                </div>
                               </div>
                             ))}
                           </div>
                         )}
-                        <button
-                          onClick={handleAddComment}
-                          disabled={!comment.trim() && !attachmentFile}
-                          className="mt-4 inline-flex items-center px-5 py-2.5 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-gray-400 transition duration-200 ease-in-out"
-                        >
-                          Add Comment
-                        </button>
+                        
+                        <div className="flex justify-between items-center mt-6 pt-4 border-t border-gray-100">
+                          <div className="flex items-center gap-3 text-sm text-gray-500">
+                            <div className="flex items-center gap-1">
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                              </svg>
+                              <span>Use @ to mention teammates</span>
+                            </div>
+                            {attachmentFile && (
+                              <div className="flex items-center gap-1 text-green-600">
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                                </svg>
+                                <span>File attached</span>
+                              </div>
+                            )}
+                          </div>
+                          <button
+                            onClick={handleAddComment}
+                            disabled={!comment.trim() && !attachmentFile}
+                            className="inline-flex items-center px-8 py-3 border border-transparent text-base font-semibold rounded-xl shadow-lg text-white bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 focus:outline-none focus:ring-4 focus:ring-blue-200 disabled:from-gray-400 disabled:to-gray-500 disabled:cursor-not-allowed transition-all duration-300 ease-in-out transform hover:scale-105 hover:shadow-xl"
+                          >
+                            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                            </svg>
+                            {replyingTo ? 'Post Reply' : 'Share Comment'}
+                          </button>
+                        </div>
                       </div>
                       <div className="mt-8 px-4">
-                        <h4 className="font-semibold text-xl text-gray-800 mb-4">Comments</h4>
+                        <div className="flex justify-between items-center mb-6">
+                          <h4 className="font-semibold text-xl text-gray-800">Comments ({commentsList.length})</h4>
+                          {commentsList.length > 5 && (
+                            <button
+                              onClick={() => setShowAllComments(!showAllComments)}
+                              className="text-blue-600 hover:text-blue-800 font-medium text-sm flex items-center gap-1"
+                            >
+                              {showAllComments ? (
+                                <>
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                                  </svg>
+                                  Show Less
+                                </>
+                              ) : (
+                                <>
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                  </svg>
+                                  View All Comments
+                                </>
+                              )}
+                            </button>
+                          )}
+                        </div>
                         {commentsList.length === 0 ? (
-                          <p className="text-gray-500 text-center py-4 border rounded-lg bg-white shadow-sm">
-                            No comments yet. Be the first to add one!
-                          </p>
+                          <div className="text-center py-12 bg-gray-50 rounded-lg border border-dashed border-gray-300">
+                            <svg className="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                            </svg>
+                            <p className="text-gray-500 text-lg">No comments yet</p>
+                            <p className="text-gray-400 text-sm mt-1">Be the first to start the conversation!</p>
+                          </div>
                         ) : (
-                          <ul className="space-y-4">
+                          <ul className="space-y-6">
                             {commentsList
                               .filter(comment => !comment.ReplyToCommentID)
-                              .slice().reverse().map((c) => (
+                              .slice().reverse()
+                              .slice(0, showAllComments ? undefined : 5)
+                              .map((c) => (
                               <CommentItem
                                 key={c.CommentID}
                                 comment={c}
@@ -1046,9 +1331,24 @@ export default function TicketManage() {
                                 onLikeToggle={handleLikeToggle}
                                 userLikedComments={userLikedComments}
                                 mentionableUsers={mentionableUsers}
+                                toggleExpandedReplies={toggleExpandedReplies}
+                                expandedReplies={expandedReplies}
                               />
                             ))}
                           </ul>
+                        )}
+                        {commentsList.filter(comment => !comment.ReplyToCommentID).length > 5 && !showAllComments && (
+                          <div className="text-center mt-6">
+                            <button
+                              onClick={() => setShowAllComments(true)}
+                              className="inline-flex items-center gap-2 px-4 py-2 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-colors duration-200"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                              </svg>
+                              View {commentsList.filter(comment => !comment.ReplyToCommentID).length - 5} more comments
+                            </button>
+                          </div>
                         )}
                       </div>
                     </div>
@@ -1122,6 +1422,8 @@ function CommentItem({
   onLikeToggle,
   userLikedComments,
   mentionableUsers,
+  toggleExpandedReplies,
+  expandedReplies
 }) {
   const nestedReplies = allComments
     .filter((c) => c.ReplyToCommentID === comment.CommentID)
@@ -1190,7 +1492,7 @@ function CommentItem({
     return segments.map((segment, index) => {
       if (segment.type === 'mention') {
         return (
-          <span key={index} className="text-blue-600 font-semibold">
+          <span key={index} className="text-blue-600 font-semibold bg-blue-50 px-1 rounded">
             {segment.value}
           </span>
         );
@@ -1201,59 +1503,68 @@ function CommentItem({
   };
 
   return (
-    <li className="border border-gray-200 rounded-lg bg-white p-4 flex flex-col shadow-md hover:shadow-lg transition-shadow duration-200 ease-in-out">
+    <li className="border border-gray-200 rounded-lg bg-white p-6 flex flex-col shadow-sm hover:shadow-md transition-all duration-200 ease-in-out">
       <div className="flex items-start flex-1">
         {/* Profile Picture */}
-        <img
-          src={
-            comment.ProfileImagePath
-              ? `http://localhost:5000/${comment.ProfileImagePath}`
-              : "https://via.placeholder.com/40"
-          } // Placeholder if no image
-          alt={comment.FullName}
-          className="w-10 h-10 rounded-full mr-4 object-cover"
-        />
+        <div className="relative">
+          <img
+            src={
+              comment.ProfileImagePath
+                ? `http://localhost:5000/uploads/${comment.ProfileImagePath}`
+                : `https://ui-avatars.com/api/?name=${encodeURIComponent(comment.FullName)}&background=random&color=fff`
+            }
+            alt={comment.FullName}
+            className="w-12 h-12 rounded-full mr-4 object-cover ring-2 ring-gray-100"
+          />
+          {/* Online status indicator could be added here */}
+        </div>
+        
         <div className="flex-1 flex flex-col">
-          <div className="font-bold text-base text-gray-900 flex items-center">
-            {comment.FullName}
-            <span className="text-gray-500 font-normal ml-2 text-xs">• {formatRelativeTime(comment.CreatedAt)}</span>
+          <div className="flex items-center mb-1">
+            <span className="font-semibold text-gray-900 mr-2">{comment.FullName}</span>
+            <span className="text-gray-500 text-sm">• {formatRelativeTime(comment.CreatedAt)}</span>
           </div>
-          {/* Add reply-to information here */}
+          
+          {/* Reply-to information */}
           {comment.ReplyToCommentID && comment.RepliedToUserName && (
-            <div className="text-xs text-gray-600 mb-2 pl-3 border-l-2 border-blue-300 ml-1.5">
-              Replying to <span className="font-semibold text-blue-600">@{comment.RepliedToUserName}</span>
+            <div className="text-sm text-blue-600 mb-2 flex items-center">
+              <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+              </svg>
+              Replying to <span className="font-medium">@{comment.RepliedToUserName}</span>
             </div>
           )}
 
-          <div className={`mt-1 text-sm ${comment.ReplyToCommentID ? 'bg-gray-50 p-2 rounded-lg' : ''}`}> {/* Conditional styling for reply bubble */}
-            <div className="text-gray-800 leading-relaxed whitespace-pre-wrap text-base">
+          {/* Comment text */}
+          <div className={`text-gray-800 leading-relaxed mb-3 ${comment.ReplyToCommentID ? 'bg-gray-50 p-3 rounded-lg border-l-4 border-blue-200' : ''}`}>
+            <div className="whitespace-pre-wrap">
               {renderCommentTextWithMentions(comment.CommentText)}
             </div>
           </div>
 
           {/* Display Attachment if exists */}
           {comment.AttachmentFullUrl && (
-            <div className="mt-3 p-3 bg-gray-100 rounded-md border border-gray-200">
-              <p className="text-sm text-gray-600 mb-2">Attachment:</p>
+            <div className="mt-3 p-4 bg-gray-50 rounded-lg border border-gray-200">
+              <p className="text-sm text-gray-600 mb-2 font-medium">📎 Attachment:</p>
               {
                 isImageAttachment(comment.AttachmentFileType) ? (
-                  <a href={comment.AttachmentFullUrl} target="_blank" rel="noopener noreferrer">
-                    <img src={comment.AttachmentFullUrl} alt={comment.AttachmentFileName} className="max-w-xs h-auto rounded-md shadow-sm" />
+                  <a href={comment.AttachmentFullUrl} target="_blank" rel="noopener noreferrer" className="block">
+                    <img src={comment.AttachmentFullUrl} alt={comment.AttachmentFileName} className="max-w-sm h-auto rounded-lg shadow-sm hover:shadow-md transition-shadow" />
                   </a>
                 ) : isVideoAttachment(comment.AttachmentFileType) ? (
-                  <video controls src={comment.AttachmentFullUrl} className="max-w-xs h-auto rounded-md shadow-sm"></video>
+                  <video controls src={comment.AttachmentFullUrl} className="max-w-sm h-auto rounded-lg shadow-sm"></video>
                 ) : isAudioAttachment(comment.AttachmentFileType) ? (
-                  <audio controls src={comment.AttachmentFullUrl} className="w-full"></audio>
+                  <audio controls src={comment.AttachmentFullUrl} className="w-full max-w-sm"></audio>
                 ) : isPDFAttachment(comment.AttachmentFileType) ? (
-                  <a href={comment.AttachmentFullUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline flex items-center gap-1">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0113 3.414L16.586 7A2 2 0 0118 8.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 2h2v2H6V6zm4 0h4v2h-4V6zm0 4h4v2h-4v-2z" clipRule="evenodd" />
+                  <a href={comment.AttachmentFullUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 px-4 py-2 bg-red-50 text-red-700 rounded-lg hover:bg-red-100 transition-colors">
+                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0113 3.414L16.586 7A2 2 0 0118 8.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd" />
                     </svg>
                     {comment.AttachmentFileName}
                   </a>
                 ) : (
-                  <a href={comment.AttachmentFullUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline flex items-center gap-1">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <a href={comment.AttachmentFullUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors">
+                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M8 4a3 3 0 00-3 3v4a5 5 0 0010 0V7a1 1 0 112 0v4a7 7 0 11-14 0V7a5 5 0 0110 0v4a3 3 0 11-6 0V7a1 1 0 012 0V7a3 3 0 00-3-3z" clipRule="evenodd" />
                     </svg>
                     {comment.AttachmentFileName}
@@ -1263,54 +1574,70 @@ function CommentItem({
             </div>
           )}
 
-          <div className="flex items-center text-sm text-gray-500 mt-3 pt-3 border-t border-gray-100 gap-4">
-            <span className="flex items-center gap-1">
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6.633 10.5c.834 0 1.5.666 1.5 1.5v2.25H9.75a3 3 0 0 1 3 3v1.5a3 3 0 0 1-3 3H5.25A3 3 0 0 1 2.25 18V7.5M14.25 10.5h2.25a2.25 2.25 0 0 0 2.25-2.25V6.108c0-1.133-.658-2.278-1.637-2.75A1.012 1.012 0 0 1 15.126 3c-.668 0-1.348.052-1.996.148A6 6 0 0 1 9.75 5.55v2.757m-3.956 2.109l-2.672 2.672a2.25 2.25 0 0 0 0 3.182l.967.967a2.25 2.25 0 0 0 3.182 0l2.672-2.672M15.75 10.5l-1.5-1.5m1.5 1.5l1.5 1.5m-1.5-1.5L12 9M9 12H4.5"
-                />
-              </svg>
-              {comment.LikesCount || 0} Likes
-            </span>
-            <button
-              onClick={() => onLikeToggle(comment.CommentID)}
-              className={`inline-flex items-center gap-1 px-3 py-1 rounded-md text-xs font-medium transition-colors duration-200
-              ${userLikedComments[comment.CommentID] ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={`w-4 h-4 ${userLikedComments[comment.CommentID] ? 'text-white' : 'text-gray-500'}`}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.815 3 8.25c0 7.219 2.912 11.313 7.5 14.002 4.588-2.69 7.5-6.783 7.5-14.002z" />
-              </svg>
-              {userLikedComments[comment.CommentID] ? 'Unlike' : 'Like'}
-            </button>
+          {/* Action buttons */}
+          <div className="flex items-center gap-4 mt-4 pt-3 border-t border-gray-100">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => onLikeToggle(comment.CommentID)}
+                className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-all duration-200 ${
+                  userLikedComments[comment.CommentID] 
+                    ? 'bg-red-100 text-red-700 hover:bg-red-200' 
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                <svg className={`w-4 h-4 ${userLikedComments[comment.CommentID] ? 'fill-current text-red-600' : 'fill-none'}`} stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                </svg>
+                {comment.LikesCount || 0}
+              </button>
+            </div>
+            
             <button
               onClick={() => onReplyClick(comment.CommentID, comment.FullName)}
-              className="inline-flex items-center gap-1 px-3 py-1 rounded-md text-xs font-medium text-blue-600 hover:bg-blue-50 transition-colors duration-200"
+              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium text-gray-600 hover:bg-gray-100 transition-colors duration-200"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9.602 18.25M9.813 15.904c.007 0 .011.127.006.167L6.913 18.79M9.813 15.904l3.183 2.11M7.643 14.048c.007.117.02.242.032.365.011.123.024.248.037.37.048.449.139.897.272 1.328m-6.428-1.328l1.676 1.676c.47.47.854 1.066 1.165 1.696m-6.428-1.328C1.868 12.636 1.5 10.59 1.5 8.25c0-4.757 3.08-8.75 7.5-8.75s7.5 3.993 7.5 8.75c0 2.34-1.18 4.672-3.187 6.075m-8.995-6.075L7.643 14.048M16.5 19.103V12M15 19.103H9m-3.857-2.052c-.011-.123-.024-.248-.037-.37a3.493 3.493 0 01-.272-1.328H2.25c.007 0 .011.127.006.167L.583 18.79M15 12V9.75M15 12H9.75" />
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
               </svg>
               Reply
             </button>
           </div>
         </div>
       </div>
-      <div className="text-xs text-gray-500 mt-3 sm:mt-0 sm:ml-4 text-right flex-shrink-0 min-w-[140px] hidden"> {/* Hidden as timestamp moved next to name */}
-        {formatRelativeTime(comment.CreatedAt)}
-      </div>
+      
+      {/* Nested replies */}
       {nestedReplies.length > 0 && (
-        <ul className="mt-4 pl-10 w-full space-y-4 border-l-2 border-gray-200">
-          {nestedReplies.map((reply) => (
-            <CommentItem
-              key={reply.CommentID}
-              comment={reply}
-              allComments={allComments} // Pass allComments for nested replies
-              currentUser={currentUser}
-              onReplyClick={onReplyClick}
-              onLikeToggle={onLikeToggle}
-              userLikedComments={userLikedComments}
-              mentionableUsers={mentionableUsers}
-            />
-          ))}
-        </ul>
+        <div className="mt-4 pl-16">
+          <div className="border-l-2 border-gray-200 pl-6">
+            {nestedReplies.length > 2 && (
+              <button 
+                onClick={() => toggleExpandedReplies(comment.CommentID)}
+                className="text-blue-600 hover:text-blue-800 text-sm font-medium mb-4 flex items-center gap-1 transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={expandedReplies[comment.CommentID] ? "M5 15l7-7 7 7" : "M19 9l-7 7-7-7"} />
+                </svg>
+                {expandedReplies[comment.CommentID] ? 'Hide replies' : `View ${nestedReplies.length} replies`}
+              </button>
+            )}
+            <ul className="space-y-4">
+              {(expandedReplies[comment.CommentID] ? nestedReplies : nestedReplies.slice(0, 2)).map((reply) => (
+                <CommentItem
+                  key={reply.CommentID}
+                  comment={reply}
+                  allComments={allComments}
+                  currentUser={currentUser}
+                  onReplyClick={onReplyClick}
+                  onLikeToggle={onLikeToggle}
+                  userLikedComments={userLikedComments}
+                  mentionableUsers={mentionableUsers}
+                  toggleExpandedReplies={toggleExpandedReplies}
+                  expandedReplies={expandedReplies}
+                />
+              ))}
+            </ul>
+          </div>
+        </div>
       )}
     </li>
   );
