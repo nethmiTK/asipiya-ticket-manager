@@ -15,10 +15,10 @@ const enhanceFilesWithPreview = (acceptedFiles) =>
     })
   );
 
-  // Helper function to get file icon based on file type
+// Helper function to get file icon based on file type
 const getFileIcon = (fileName) => {
   const extension = fileName.split('.').pop().toLowerCase();
-  
+
   switch (extension) {
     case 'pdf': return '📄';
     case 'doc': case 'docx': return '📝';
@@ -41,13 +41,161 @@ const canPreviewFile = (file) => {
     'text/html',
     'text/css',
     'text/javascript',
-    'application/json'
+    'application/json',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // DOCX
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // XLSX
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation', // PPTX
+    'application/msword', // DOC
+    'application/vnd.ms-excel', // XLS
+    'application/vnd.ms-powerpoint' // PPT
   ];
+
+  return file.type.startsWith('image/') ||
+    file.type.startsWith('video/') ||
+    file.type.startsWith('audio/') ||
+    previewableTypes.includes(file.type);
+};
+const PreviewModal = ({ previewFile, onClose }) => {
+  const previewRef = useRef(null);
+  const [loading, setLoading] = useState(true);
   
-  return file.type.startsWith('image/') || 
-         file.type.startsWith('video/') || 
-         file.type.startsWith('audio/') ||
-         previewableTypes.includes(file.type);
+  useEffect(() => {
+    if (!previewFile) return;
+
+    const renderOfficeDocument = async () => {
+      try {
+        setLoading(true);
+        
+        if (previewFile.type.includes('wordprocessingml.document') || 
+            previewFile.type === 'application/msword') {
+          // Word document preview
+          const { renderAsync } = await import('docx-preview');
+          const arrayBuffer = await previewFile.arrayBuffer();
+          await renderAsync(arrayBuffer, previewRef.current);
+        } 
+        else if (previewFile.type.includes('spreadsheetml.sheet') || 
+                 previewFile.type === 'application/vnd.ms-excel') {
+          // Excel preview
+          const XLSX = await import('xlsx');
+          const arrayBuffer = await previewFile.arrayBuffer();
+          const workbook = XLSX.read(arrayBuffer);
+          const firstSheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[firstSheetName];
+          const html = XLSX.utils.sheet_to_html(worksheet);
+          previewRef.current.innerHTML = html;
+        }
+        else if (previewFile.type.includes('presentationml.presentation') || 
+                 previewFile.type === 'application/vnd.ms-powerpoint') {
+          // PowerPoint preview
+          // const pptx = await import('pptxjs');
+          // const arrayBuffer = await previewFile.arrayBuffer();
+          // const presentation = await pptx.Presentation.load(arrayBuffer);
+          // await presentation.render(previewRef.current);
+          previewRef.current.innerHTML = '<p class="text-yellow-500 text-center py-4">PowerPoint preview is not supported at the moment. Please download the file instead.</p>'; // Add a fallback message
+      }
+      } catch (error) {
+        console.error('Error rendering document:', error);
+        previewRef.current.innerHTML = '<p class="text-red-500">Error previewing document. Please download instead.</p>';
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (previewFile.type.includes('officedocument') || 
+        previewFile.type === 'application/msword' ||
+        previewFile.type === 'application/vnd.ms-excel' ||
+        previewFile.type === 'application/vnd.ms-powerpoint') {
+      renderOfficeDocument();
+    }
+
+    return () => {
+      // Cleanup if needed
+    };
+  }, [previewFile]);
+
+  if (!previewFile) return null;
+
+  const isImage = previewFile.type.startsWith('image/');
+  const isVideo = previewFile.type.startsWith('video/');
+  const isPdf = previewFile.type === 'application/pdf';
+  const isAudio = previewFile.type.startsWith('audio/');
+  const isOfficeDoc = previewFile.type.includes('officedocument') ||
+                     previewFile.type === 'application/msword' ||
+                     previewFile.type === 'application/vnd.ms-excel';
+
+  return (
+    <div 
+      className="fixed inset-0 backdrop-blur-sm bg-black/30 flex items-center justify-center z-50 p-4"
+      onClick={onClose}
+    >
+      <div 
+        className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex justify-between items-center border-b p-4">
+          <h3 className="text-lg font-medium flex items-center">
+            {isImage && <span className="mr-2">🖼️</span>}
+            {isVideo && <span className="mr-2">🎬</span>}
+            {isPdf && <span className="mr-2">📄</span>}
+            {isAudio && <span className="mr-2">🎵</span>}
+            {isOfficeDoc && <span className="mr-2">📄</span>}
+            {previewFile.name}
+          </h3>
+          <button
+            onClick={onClose}
+            className="text-gray-500 hover:text-gray-700 p-1 rounded-full hover:bg-gray-100"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <div className="flex-1 overflow-auto p-4">
+          {loading && isOfficeDoc && (
+            <div className="flex items-center justify-center h-full">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+              <span className="ml-2">Loading document...</span>
+            </div>
+          )}
+          
+          {isImage && (
+            <img
+              src={previewFile.preview}
+              alt={previewFile.name}
+              className="max-w-full max-h-[70vh] mx-auto object-contain"
+            />
+          )}
+          {isVideo && (
+            <video
+              src={previewFile.preview}
+              controls
+              className="max-w-full max-h-[70vh] mx-auto"
+            />
+          )}
+          {isPdf && (
+            <iframe
+              src={previewFile.preview}
+              className="w-full h-[70vh] border-0"
+              title={previewFile.name}
+            />
+          )}
+          {isAudio && (
+            <audio
+              src={previewFile.preview}
+              controls
+              className="w-full max-w-md mx-auto mt-8"
+            />
+          )}
+          {isOfficeDoc && (
+            <div 
+              ref={previewRef}
+              className="w-full h-[70vh] overflow-auto border p-4"
+            ></div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 };
 
 const OpenTickets = () => {
@@ -60,23 +208,26 @@ const OpenTickets = () => {
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const notificationRef = useRef(null);
 
-    // Loading state
+  // Loading state
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
 
-    // Custom dropdown states
+  // Custom dropdown states
   const [isSystemDropdownOpen, setIsSystemDropdownOpen] = useState(false);
   const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
   const [selectedSystem, setSelectedSystem] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("");
 
-    // File dropdown states
+  // File dropdown states
   const [fileDropdownStates, setFileDropdownStates] = useState({});
 
-    // Refs for dropdown click outside detection
+  // Refs for dropdown click outside detection
   const [dropdownPosition, setDropdownPosition] = useState({ x: 0, y: 0 });
   const systemDropdownRef = useRef(null);
   const categoryDropdownRef = useRef(null);
+
+  const [previewFile, setPreviewFile] = useState(null);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
   // Click outside handler
   useEffect(() => {
@@ -123,7 +274,7 @@ const OpenTickets = () => {
   const { getRootProps, getInputProps } = useDropzone({
     onDrop: (acceptedFiles) => {
       const newFiles = acceptedFiles.filter(
-        newFile => !files.some(existingFile => 
+        newFile => !files.some(existingFile =>
           existingFile.name === newFile.name && existingFile.size === newFile.size
         )
       );
@@ -145,27 +296,27 @@ const OpenTickets = () => {
   const handleFileDropdownToggle = (index, event) => {
     event.stopPropagation();
     event.preventDefault();
-    
+
     const rect = event.currentTarget.getBoundingClientRect();
     setDropdownPosition({
       x: rect.left,
       y: rect.bottom + window.scrollY
     });
-    
+
     setFileDropdownStates(prev => ({
       [index]: !prev[index]
     }));
   };
 
-  const handleFileOpen = (file) => {
-    if (canPreviewFile(file)) {
-      const newWindow = window.open(file.preview, '_blank');
-      if (!newWindow) toast.error('Please allow popups to preview files');
-    } else {
-      toast.info('This file type cannot be previewed in browser. Use download instead.');
-    }
-    setFileDropdownStates({});
-  };
+const handleFileOpen = async (file) => {
+  if (canPreviewFile(file)) {
+    setPreviewFile(file);
+    setIsPreviewOpen(true);
+  } else {
+    toast.info('This file type cannot be previewed. Please download it instead.');
+  }
+  setFileDropdownStates({});
+};
 
   const handleFileDownload = (file) => {
     const link = document.createElement('a');
@@ -210,6 +361,8 @@ const OpenTickets = () => {
     return () => files.forEach(file => URL.revokeObjectURL(file.preview));
   }, [files]);
 
+  
+
   return (
     <div className="flex">
       <title>Create Ticket</title>
@@ -223,7 +376,7 @@ const OpenTickets = () => {
           notificationRef={notificationRef}
           setOpen={setIsSidebarOpen}
         />
-        
+
         <div className="p-6 mt-[60px] relative">
           {showNotifications && (
             <div ref={notificationRef} className="absolute right-4 top-[70px] z-50">
@@ -257,6 +410,13 @@ const OpenTickets = () => {
               </div>
             </div>
           )}
+
+{isPreviewOpen && (
+        <PreviewModal 
+          previewFile={previewFile} 
+          onClose={() => setIsPreviewOpen(false)} 
+        />
+      )}
 
           <h1 className="text-2xl font-bold mb-6">Create Your Tickets</h1>
           <div className="flex flex-col items-center justify-start">
@@ -312,7 +472,7 @@ const OpenTickets = () => {
                     );
 
                     const ticketId = ticketRes.data.ticketId;
-                     // Progress: 50% - Ticket created
+                    // Progress: 50% - Ticket created
                     setUploadProgress(50);
 
                     if (files.length > 0) {
@@ -404,7 +564,7 @@ const OpenTickets = () => {
                     )}
                   </div>
 
-                 {/* Custom Category Dropdown */}
+                  {/* Custom Category Dropdown */}
                   <div className="flex flex-col relative" ref={categoryDropdownRef}>
                     <label className="text-sm font-medium text-gray-700 mb-1">
                       Ticket Category
@@ -485,7 +645,7 @@ const OpenTickets = () => {
                             const isImage = file.type.startsWith("image/");
                             const isVideo = file.type.startsWith("video/");
                             const fileIcon = getFileIcon(file.name);
-                            
+
                             return (
                               <div
                                 key={`${file.name}-${file.size}-${index}`}
@@ -557,7 +717,7 @@ const OpenTickets = () => {
                   {Object.keys(fileDropdownStates).map(index => {
                     const file = files[index];
                     const isVideo = file?.type.startsWith("video/");
-                    
+
                     return fileDropdownStates[index] && (
                       <div
                         key={`dropdown-${index}`}
@@ -634,9 +794,8 @@ const OpenTickets = () => {
                     <button
                       type="submit"
                       disabled={isSubmitting}
-                      className={`px-4 py-2 bg-blue-600 text-white rounded-md text-base font-medium transition-all duration-200 ${
-                        isSubmitting ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105 hover:bg-blue-700'
-                      }`}
+                      className={`px-4 py-2 bg-blue-600 text-white rounded-md text-base font-medium transition-all duration-200 ${isSubmitting ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105 hover:bg-blue-700'
+                        }`}
                     >
                       {isSubmitting ? (
                         <div className="flex items-center">
