@@ -2737,8 +2737,9 @@ app.post('/api/clients', async (req, res) => {
 app.use('/api/ticket-logs', ticketLogRoutes);
 
 // Start the server
-app.listen(5000, () => {
-    console.log('Server is running on port 5000');
+const PORT = 5000;
+server.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
 });
 
 export default db;
