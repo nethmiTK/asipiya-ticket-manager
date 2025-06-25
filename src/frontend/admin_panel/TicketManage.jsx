@@ -221,12 +221,25 @@ export default function TicketManage() {
     }
 
     // Extract mentions from comment text (e.g., @FullName)
-    const mentionMatches = comment.match(/@([\w\s]+)/g) || [];
-    const mentionedNames = mentionMatches.map(m => m.slice(1).trim());
-    const mentionedUserIds = mentionableUsers
-      .filter(u => mentionedNames.includes(u.FullName))
-      .map(u => u.UserID);
+    let mentionedUserIds = [];
+    const processedComment = comment.trim(); // Keep original comment text for context
+    const lowerCaseComment = processedComment.toLowerCase(); // Convert comment to lowercase once for efficiency
+
+    // Sort mentionable users by length of FullName in descending order
+    const sortedMentionableUsers = [...mentionableUsers].sort((a, b) => b.FullName.length - a.FullName.length);
+
+    for (const user of sortedMentionableUsers) {
+      const lowerCaseFullName = user.FullName.toLowerCase().trim();
+      // Check if "@full name" is present in the lowercased comment
+      if (lowerCaseComment.includes(`@${lowerCaseFullName}`)) {
+        mentionedUserIds.push(user.UserID);
+      }
+    }
     
+    // Ensure unique IDs if a user is mentioned multiple times
+    mentionedUserIds = [...new Set(mentionedUserIds)];
+    console.log("Frontend - Mentions to send:", mentionedUserIds); // Debugging log
+
     if (mentionedUserIds.length > 0) {
         formData.append("mentionedUserIds", mentionedUserIds.join(','));
     }
@@ -242,7 +255,7 @@ export default function TicketManage() {
       setReplyingTo(null);
       toast.success('Comment added successfully');
       // Refresh comments after adding
-      const res = await axios.get(`http://localhost:5000/api/tickets/${selectedTicket.id}/comments`);
+      const res = await axios.get(`http://localhost:5000/api/tickets/${selectedTicket.id}/comments?userId=${user.UserID}`); // Pass userId for likes
       setCommentsList(res.data);
     } catch (error) {
       console.error('Error adding comment:', error);
@@ -464,7 +477,7 @@ const resolved = tickets
       // Toggle the local state immediately for responsiveness
       setUserLikedComments(prev => ({ ...prev, [commentId]: !hasLiked }));
       // Re-fetch comments to get updated like counts from backend
-      const res = await axios.get(`http://localhost:5000/api/tickets/${selectedTicket.id}/comments`);
+      const res = await axios.get(`http://localhost:5000/api/tickets/${selectedTicket.id}/comments?userId=${user.UserID}`); // Pass userId for likes
       setCommentsList(res.data);
     } catch (error) {
       console.error("Error toggling like:", error);
@@ -483,6 +496,56 @@ const resolved = tickets
   const handleCancelReply = () => {
     setReplyingTo(null);
     setComment("");
+  };
+
+  const renderCommentTextWithMentions = (text) => {
+    const parts = [];
+    // Sort mentionable users by length of FullName in descending order
+    const sortedMentionableUsers = [...mentionableUsers].sort((a, b) => b.FullName.length - a.FullName.length);
+
+    let segments = [{ type: 'text', value: text }];
+
+    for (const user of sortedMentionableUsers) {
+      const escapedFullName = user.FullName.replace(/[.*+?^${}()|[\]\\]/g, '\\\\$&'); // Correct escaping for regex
+      const mentionRegex = new RegExp(`@${escapedFullName}`, 'gi');
+      const newSegments = [];
+
+      for (const segment of segments) {
+        if (segment.type === 'mention') {
+          newSegments.push(segment); // Already a mention, keep it
+          continue;
+        }
+
+        let lastSplitIndex = 0;
+        let match;
+        while ((match = mentionRegex.exec(segment.value)) !== null) {
+          const preMatchText = segment.value.substring(lastSplitIndex, match.index);
+          if (preMatchText) {
+            newSegments.push({ type: 'text', value: preMatchText });
+          }
+          newSegments.push({ type: 'mention', value: match[0], user: user });
+          lastSplitIndex = match.index + match[0].length;
+        }
+        const remainingText = segment.value.substring(lastSplitIndex);
+        if (remainingText) {
+          newSegments.push({ type: 'text', value: remainingText });
+        }
+      }
+      segments = newSegments;
+    }
+
+    // Convert segments into JSX elements
+    return segments.map((segment, index) => {
+      if (segment.type === 'mention') {
+        return (
+          <span key={index} className="text-blue-600 font-semibold">
+            {segment.value}
+          </span>
+        );
+      } else {
+        return segment.value;
+      }
+    });
   };
 
   return (
@@ -853,7 +916,7 @@ const resolved = tickets
                           Add Comment
                         </button>
                       </div>
-                      <div className="mt-8">
+                      <div className="mt-8 px-4">
                         <h4 className="font-semibold text-xl text-gray-800 mb-4">Comments</h4>
                         {commentsList.length === 0 ? (
                           <p className="text-gray-500 text-center py-4 border rounded-lg bg-white shadow-sm">No comments yet. Be the first to add one!</p>
@@ -870,6 +933,7 @@ const resolved = tickets
                                 onReplyClick={handleReplyClick}
                                 onLikeToggle={handleLikeToggle}
                                 userLikedComments={userLikedComments}
+                                mentionableUsers={mentionableUsers}
                               />
                             ))}
                           </ul>
@@ -934,15 +998,84 @@ function CommentItem({
   onReplyClick,
   onLikeToggle,
   userLikedComments,
+  mentionableUsers,
 }) {
   const nestedReplies = allComments.filter(
     (c) => c.ReplyToCommentID === comment.CommentID
   ).sort((a, b) => new Date(a.CreatedAt) - new Date(b.CreatedAt));
 
+  // Helper for relative time
+  const formatRelativeTime = (dateString) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffSeconds = Math.floor((now - date) / 1000);
+    const diffMinutes = Math.floor(diffSeconds / 60);
+    const diffHours = Math.floor(diffMinutes / 60);
+    const diffDays = Math.floor(diffHours / 24);
+
+    if (diffMinutes < 1) return 'Just now';
+    if (diffMinutes < 60) return `${diffMinutes}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`;
+    if (diffDays < 365) return `${Math.floor(diffDays / 30)}mo ago`;
+    return `${Math.floor(diffDays / 365)}y ago`;
+  };
+
   const isImageAttachment = (fileType) => fileType && fileType.startsWith('image/');
   const isVideoAttachment = (fileType) => fileType && fileType.startsWith('video/');
   const isAudioAttachment = (fileType) => fileType && fileType.startsWith('audio/');
   const isPDFAttachment = (fileType) => fileType && fileType === 'application/pdf';
+
+  const renderCommentTextWithMentions = (text) => {
+    const parts = [];
+    // Sort mentionable users by length of FullName in descending order
+    const sortedMentionableUsers = [...mentionableUsers].sort((a, b) => b.FullName.length - a.FullName.length);
+
+    let segments = [{ type: 'text', value: text }];
+
+    for (const user of sortedMentionableUsers) {
+      const escapedFullName = user.FullName.replace(/[.*+?^${}()|[\]\\]/g, '\\\\$&'); // Correct escaping for regex
+      const mentionRegex = new RegExp(`@${escapedFullName}`, 'gi');
+      const newSegments = [];
+
+      for (const segment of segments) {
+        if (segment.type === 'mention') {
+          newSegments.push(segment); // Already a mention, keep it
+          continue;
+        }
+
+        let lastSplitIndex = 0;
+        let match;
+        while ((match = mentionRegex.exec(segment.value)) !== null) {
+          const preMatchText = segment.value.substring(lastSplitIndex, match.index);
+          if (preMatchText) {
+            newSegments.push({ type: 'text', value: preMatchText });
+          }
+          newSegments.push({ type: 'mention', value: match[0], user: user });
+          lastSplitIndex = match.index + match[0].length;
+        }
+        const remainingText = segment.value.substring(lastSplitIndex);
+        if (remainingText) {
+          newSegments.push({ type: 'text', value: remainingText });
+        }
+      }
+      segments = newSegments;
+    }
+
+    // Convert segments into JSX elements
+    return segments.map((segment, index) => {
+      if (segment.type === 'mention') {
+        return (
+          <span key={index} className="text-blue-600 font-semibold">
+            {segment.value}
+          </span>
+        );
+      } else {
+        return segment.value;
+      }
+    });
+  };
 
   return (
     <li className="border border-gray-200 rounded-lg bg-white p-4 flex flex-col shadow-md hover:shadow-lg transition-shadow duration-200 ease-in-out">
@@ -953,19 +1086,26 @@ function CommentItem({
           alt={comment.FullName}
           className="w-10 h-10 rounded-full mr-4 object-cover"
         />
-        <div className="flex-1">
-          <div className="font-bold text-lg text-gray-900 mb-1 flex items-center">
+        <div className="flex-1 flex flex-col">
+          <div className="font-bold text-base text-gray-900 flex items-center">
             {comment.FullName}
-            {/* The "in reply to" will be handled inside the comment content bubble */}
+            <span className="text-gray-500 font-normal ml-2 text-xs">• {formatRelativeTime(comment.CreatedAt)}</span>
           </div>
-          <div className={`mt-2 ${comment.RepliedToCommentID ? 'bg-gray-100 p-3 rounded-lg' : ''}`}> {/* Conditional styling for reply bubble */}
+          {/* Add reply-to information here */}
+          {comment.ReplyToCommentID && comment.RepliedToUserName && (
+            <div className="text-xs text-gray-600 mb-2 pl-3 border-l-2 border-blue-300 ml-1.5">
+              Replying to <span className="font-semibold text-blue-600">@{comment.RepliedToUserName}</span>
+            </div>
+          )}
+
+          <div className={`mt-1 text-sm ${comment.ReplyToCommentID ? 'bg-gray-50 p-2 rounded-lg' : ''}`}> {/* Conditional styling for reply bubble */}
             <div className="text-gray-800 leading-relaxed whitespace-pre-wrap text-base">
-              {comment.CommentText}
+              {renderCommentTextWithMentions(comment.CommentText)}
             </div>
           </div>
 
           {/* Display Attachment if exists */}
-          {comment.AttachmentFullUrl && ( 
+          {comment.AttachmentFullUrl && (
             <div className="mt-3 p-3 bg-gray-100 rounded-md border border-gray-200">
               <p className="text-sm text-gray-600 mb-2">Attachment:</p>
               {
@@ -987,7 +1127,7 @@ function CommentItem({
                 ) : (
                   <a href={comment.AttachmentFullUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline flex items-center gap-1">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M8 4a3 3 0 00-3 3v4a5 5 0 0010 0V7a1 1 0 112 0v4a7 7 0 11-14 0V7a5 5 0 0110 0v4a3 3 0 11-6 0V7a1 1 0 012 0v4a1 1 0 102 0V7a3 3 0 00-3-3z" clipRule="evenodd" />
+                      <path fillRule="evenodd" d="M8 4a3 3 0 00-3 3v4a5 5 0 0010 0V7a1 1 0 112 0v4a7 7 0 11-14 0V7a5 5 0 0110 0v4a3 3 0 11-6 0V7a1 1 0 012 0V7a3 3 0 00-3-3z" clipRule="evenodd" />
                     </svg>
                     {comment.AttachmentFileName}
                   </a>
@@ -996,28 +1136,41 @@ function CommentItem({
             </div>
           )}
 
-          <div className="flex items-center text-sm text-gray-500 mt-2 gap-4">
-            <span>{comment.LikesCount || 0} Likes</span>
+          <div className="flex items-center text-sm text-gray-500 mt-3 pt-3 border-t border-gray-100 gap-4">
+            <span className="flex items-center gap-1">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6.633 10.5c.834 0 1.5.666 1.5 1.5v2.25H9.75a3 3 0 0 1 3 3v1.5a3 3 0 0 1-3 3H5.25A3 3 0 0 1 2.25 18V7.5M14.25 10.5h2.25a2.25 2.25 0 0 0 2.25-2.25V6.108c0-1.133-.658-2.278-1.637-2.75A1.012 1.012 0 0 1 15.126 3c-.668 0-1.348.052-1.996.148A6 6 0 0 1 9.75 5.55v2.757m-3.956 2.109l-2.672 2.672a2.25 2.25 0 0 0 0 3.182l.967.967a2.25 2.25 0 0 0 3.182 0l2.672-2.672M15.75 10.5l-1.5-1.5m1.5 1.5l1.5 1.5m-1.5-1.5L12 9M9 12H4.5"
+                />
+              </svg>
+              {comment.LikesCount || 0} Likes
+            </span>
             <button
               onClick={() => onLikeToggle(comment.CommentID)}
-              className={`px-3 py-1 rounded-full text-xs font-medium ${userLikedComments[comment.CommentID] ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+              className={`inline-flex items-center gap-1 px-3 py-1 rounded-md text-xs font-medium transition-colors duration-200
+              ${userLikedComments[comment.CommentID] ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
             >
+              <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={`w-4 h-4 ${userLikedComments[comment.CommentID] ? 'text-white' : 'text-gray-500'}`}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.815 3 8.25c0 7.219 2.912 11.313 7.5 14.002 4.588-2.69 7.5-6.783 7.5-14.002z" />
+              </svg>
               {userLikedComments[comment.CommentID] ? 'Unlike' : 'Like'}
             </button>
             <button
               onClick={() => onReplyClick(comment.CommentID, comment.FullName)}
-              className="text-blue-600 hover:underline font-medium"
+              className="inline-flex items-center gap-1 px-3 py-1 rounded-md text-xs font-medium text-blue-600 hover:bg-blue-50 transition-colors duration-200"
             >
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9.602 18.25M9.813 15.904c.007 0 .011.127.006.167L6.913 18.79M9.813 15.904l3.183 2.11M7.643 14.048c.007.117.02.242.032.365.011.123.024.248.037.37.048.449.139.897.272 1.328m-6.428-1.328l1.676 1.676c.47.47.854 1.066 1.165 1.696m-6.428-1.328C1.868 12.636 1.5 10.59 1.5 8.25c0-4.757 3.08-8.75 7.5-8.75s7.5 3.993 7.5 8.75c0 2.34-1.18 4.672-3.187 6.075m-8.995-6.075L7.643 14.048M16.5 19.103V12M15 19.103H9m-3.857-2.052c-.011-.123-.024-.248-.037-.37a3.493 3.493 0 01-.272-1.328H2.25c.007 0 .011.127.006.167L.583 18.79M15 12V9.75M15 12H9.75" />
+              </svg>
               Reply
             </button>
           </div>
         </div>
       </div>
-      <div className="text-xs text-gray-500 mt-3 sm:mt-0 sm:ml-4 text-right flex-shrink-0 min-w-[140px]">
-        {new Date(comment.CreatedAt).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })}
+      <div className="text-xs text-gray-500 mt-3 sm:mt-0 sm:ml-4 text-right flex-shrink-0 min-w-[140px] hidden"> {/* Hidden as timestamp moved next to name */}
+        {formatRelativeTime(comment.CreatedAt)}
       </div>
       {nestedReplies.length > 0 && (
-        <ul className="mt-4 pl-12 w-full space-y-4 border-l-2 border-gray-200">
+        <ul className="mt-4 pl-10 w-full space-y-4 border-l-2 border-gray-200">
           {nestedReplies.map((reply) => (
             <CommentItem 
               key={reply.CommentID} 
@@ -1027,6 +1180,7 @@ function CommentItem({
               onReplyClick={onReplyClick} 
               onLikeToggle={onLikeToggle} 
               userLikedComments={userLikedComments}
+              mentionableUsers={mentionableUsers}
             />
           ))}
         </ul>
