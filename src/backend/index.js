@@ -782,9 +782,9 @@ app.get("/tickets", (req, res) => {
 });
 
 app.get("/getting/tickets", (req, res) => {
-    const { supervisorId, systemId } = req.query;
+  const { supervisorId, systemId } = req.query;
 
-    let sql = `
+  let sql = `
     SELECT 
       t.*, 
       asys.SystemName AS AsipiyaSystemName, 
@@ -795,26 +795,35 @@ app.get("/getting/tickets", (req, res) => {
     WHERE 1 = 1
   `;
 
-    const params = [];
+  const params = [];
 
-    if (supervisorId && supervisorId !== "all") {
-        sql += " AND t.SupervisorID = ?";
-        params.push(supervisorId);
+  if (supervisorId && supervisorId !== "all") {
+    const supId = parseInt(supervisorId, 10);
+    if (isNaN(supId)) {
+      return res.status(400).json({ error: "Invalid supervisor ID" });
     }
+    sql += " AND FIND_IN_SET(?, t.SupervisorID)";
+    params.push(supId);
+  }
 
-    if (systemId && systemId !== "all") {
-        sql += " AND t.AsipiyaSystemID = ?";
-        params.push(systemId);
+  if (systemId && systemId !== "all") {
+    const sysId = parseInt(systemId, 10);
+    if (isNaN(sysId)) {
+      return res.status(400).json({ error: "Invalid system ID" });
     }
+    sql += " AND t.AsipiyaSystemID = ?";
+    params.push(sysId);
+  }
 
-    db.query(sql, params, (err, results) => {
-        if (err) {
-            console.error("Error fetching tickets:", err);
-            return res.status(500).json({ error: "Error fetching tickets" });
-        }
-        res.json(results);
-    });
+  db.query(sql, params, (err, results) => {
+    if (err) {
+      console.error("Error fetching tickets:", err);
+      return res.status(500).json({ error: "Error fetching tickets" });
+    }
+    res.json(results);
+  });
 });
+
 
 app.put('/tickets/:id', (req, res) => {
     const { id } = req.params;
@@ -2245,6 +2254,9 @@ app.put('/api/tickets/:id/assign', (req, res) => {
         });
     }
 
+    const supervisorIds = supervisorId.split(',').map(id => id.trim());
+    const supervisorString = supervisorIds.join(',');
+
      db.query('SELECT Status, Priority, SupervisorID, UserId as ticketCreatorId FROM ticket WHERE TicketID = ?', [ticketId], async (err, currentTicketResults) => {
         if (err) {
             console.error('Error fetching current ticket details for assignment:', err);
@@ -2271,7 +2283,7 @@ app.put('/api/tickets/:id/assign', (req, res) => {
             WHERE TicketID = ?
         `;
 
-        db.query(updateQuery, [supervisorId, status, priority, ticketId], async (err, result) => {
+        db.query(updateQuery, [supervisorString, status, priority, ticketId], async (err, result) => {
             if (err) {
                 console.error('Error updating ticket during assignment:', err);
                 return res.status(500).json({
@@ -2359,7 +2371,7 @@ app.put('/api/tickets/:id/assign', (req, res) => {
                     // Notify new supervisor (handled below, keep for consistency)
                 }
 
-                 if (oldStatus !== status) {
+                if ((oldStatus || '').trim().toLowerCase() !== (status || '').trim().toLowerCase() || true) {
                     const statusLogDescription = `Status changed from ${oldStatus} to ${status}`;
                     const statusLogNote = `Updated by ${assignerName}`;
                     const logResult = await createTicketLog(
@@ -2392,9 +2404,15 @@ app.put('/api/tickets/:id/assign', (req, res) => {
                         );
                     }
                 }
+                
+                console.log("Old Status:", oldStatus, "| New Status:", status);
+                console.log("Old Priority:", oldPriority, "| New Priority:", priority);
+                console.log("Comparison result:",
+                (oldStatus || '').trim().toLowerCase() !== (status || '').trim().toLowerCase(),
+                (oldPriority || '').trim().toLowerCase() !== (priority || '').trim().toLowerCase());
 
 
-                if (oldPriority !== priority) {
+                if ((oldPriority || '').trim().toLowerCase() !== (priority || '').trim().toLowerCase() || true) {
                     const priorityLogDescription = `Priority changed from ${oldPriority} to ${priority}`;
                     const priorityLogNote = `Updated by ${assignerName}`;
                     const logResult = await createTicketLog(
@@ -2430,7 +2448,8 @@ app.put('/api/tickets/:id/assign', (req, res) => {
 
                 // Final notification to the assigned supervisor (if they are new or status/priority changed)
                 // This covers the initial assignment notification if no specific status/priority changes triggered other notifications to them.
-                if (oldSupervisorId !== supervisorId || oldStatus !== status || oldPriority !== priority) {
+                if (oldSupervisorId !== supervisorId ||(oldStatus || '').trim().toLowerCase() !== (status || '').trim().toLowerCase() ||(oldPriority || '').trim().toLowerCase() !== (priority || '').trim().toLowerCase())
+                {
                     await createNotification(
                         supervisorId,
                         `You have been assigned to ticket #${ticketId}. Status: ${status}, Priority: ${priority}.${assignerName ? ` Assigned by ${assignerName}` : ''}`,

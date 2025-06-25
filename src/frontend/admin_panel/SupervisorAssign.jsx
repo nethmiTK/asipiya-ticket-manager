@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import axios from 'axios';
 import { useParams, useNavigate } from 'react-router-dom';
 import AdminSideBar from '../../user_components/SideBar/AdminSideBar';
@@ -13,9 +13,11 @@ const SupervisorAssignPage = ({ ticketId }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [ticketData, setTicketData] = useState(null);
   const [supervisors, setSupervisors] = useState([]);
-  const [selectedSupervisor, setSelectedSupervisor] = useState('');
+  const [selectedSupervisors, setSelectedSupervisors] = useState([]);
   const [status, setStatus] = useState('Open');
   const [priority, setPriority] = useState('Low');
+  const [openDropdown, setOpenDropdown] = useState(false);
+  const dropdownRef = useRef(null);
 
   const id = ticketId || params.id;
 
@@ -23,9 +25,16 @@ const SupervisorAssignPage = ({ ticketId }) => {
     axios.get(`http://localhost:5000/api/ticket_view/${id}`)
       .then(res => {
         setTicketData(res.data);
-        setStatus(res.data.Status || 'Open');
-        setPriority(res.data.Priority || 'Low');
-        setSelectedSupervisor(res.data.SupervisorName || '');
+
+        const validStatuses = ['Open', 'In Progress', 'Resolved'];
+        const validPriorities = ['Low', 'Medium', 'High'];
+
+        setStatus(validStatuses.includes(res.data.Status) ? res.data.Status : 'Open');
+        setPriority(validPriorities.includes(res.data.Priority) ? res.data.Priority : 'Low');
+
+        const supervisorStr = res.data.SupervisorID || '';
+        const ids = supervisorStr.split(',').map(id => id.trim()).filter(Boolean);
+        setSelectedSupervisors(ids);
       })
       .catch(err => console.error('Error fetching ticket:', err));
 
@@ -40,40 +49,40 @@ const SupervisorAssignPage = ({ ticketId }) => {
       .catch(err => console.error('Error fetching supervisors:', err));
   }, [id]);
 
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setOpenDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   const handleAssign = () => {
-    if (!selectedSupervisor) {
-      toast.error("Please select a supervisor.");
+    if (!selectedSupervisors.length) {
+      toast.error("Please select at least one supervisor.");
       return;
     }
-
-    const supervisor = supervisors.find(s => s.UserID.toString() === selectedSupervisor.toString());
-    if (!supervisor) {
-      toast.error("Selected supervisor not found.");
-      return;
-    }
-
-    const finalStatus = ['Open', 'In Progress', 'Resolved'].includes(status) ? status : 'Open';
 
     axios.put(`http://localhost:5000/api/tickets/${id}/assign`, {
-      supervisorId: selectedSupervisor,
-      status: finalStatus,
+      supervisorId: selectedSupervisors.join(','),
+      status,
       priority,
       assignerId: user.UserID
     })
-    .then(response => {
-      if (response.data.status === 'success') {
-        toast.success('Supervisor assigned successfully!');
-        if (!ticketId) {
-          navigate(-1);
+      .then(response => {
+        if (response.data.status === 'success') {
+          toast.success('Supervisors assigned successfully!');
+          if (!ticketId) navigate(-1);
+        } else {
+          throw new Error(response.data.message || 'Failed to assign supervisors');
         }
-      } else {
-        throw new Error(response.data.message || 'Failed to assign supervisor');
-      }
-    })
-    .catch(err => {
-      console.error('Error assigning supervisor:', err);
-      toast.error(err.response?.data?.message || err.message || 'Failed to assign supervisor.');
-    });
+      })
+      .catch(err => {
+        console.error('Error assigning supervisors:', err);
+        toast.error(err.response?.data?.message || err.message || 'Failed to assign supervisors.');
+      });
   };
 
   if (!ticketData) return <div className="p-4">Loading...</div>;
@@ -81,7 +90,7 @@ const SupervisorAssignPage = ({ ticketId }) => {
   const content = (
     <div className="space-y-4">
       <h2 className="text-2xl font-semibold text-center mb-6">
-        Assign Supervisor for Ticket ID: {id}
+        Assign Supervisor(s) for Ticket ID: {id}
       </h2>
 
       <div className="space-y-4">
@@ -107,37 +116,68 @@ const SupervisorAssignPage = ({ ticketId }) => {
 
         <div>
           <label className="block font-medium">Status</label>
-            <select
-              value={status}
-              onChange={(e) => setStatus(e.target.value)}
-              className={`w-full mt-1 px-4 py-2 border rounded border-gray-300 appearance-none
-                ${status === 'Open' ? 'bg-blue-100 text-blue-800' :
-                  status === 'In Progress' ? 'bg-yellow-100 text-yellow-800' :
-                  status === 'Resolved' ? 'bg-green-100  text-green-800' :
-                  'bg-blue-100 text-blue-800' // fallback/default blue
-                }`}
-            >
-              <option className="bg-white text-gray-800" value="Open">Open</option>
-              <option className="bg-white text-gray-800" value="In Progress">In Progress</option>
-              <option className="bg-white text-gray-800" value="Resolved">Resolved</option>
-            </select>
+          <select
+            value={status}
+            onChange={(e) => setStatus(e.target.value)}
+            className={`w-full mt-1 px-4 py-2 border rounded border-gray-300 appearance-none
+              ${status === 'Open' ? 'bg-blue-100 text-blue-800' :
+                status === 'In Progress' ? 'bg-yellow-100 text-yellow-800' :
+                  status === 'Resolved' ? 'bg-green-100 text-green-800' :
+                    'bg-blue-100 text-blue-800'
+              }`}
+          >
+            <option value="Open">Open</option>
+            <option value="In Progress">In Progress</option>
+            <option value="Resolved">Resolved</option>
+          </select>
         </div>
 
+        {/* Supervisor dropdown with checkbox */}
+        <div ref={dropdownRef} className="relative">
+          <label className="block font-medium mb-2">Supervisor Name(s)</label>
 
-        <div>
-          <label className="block font-medium">Supervisor Name</label>
-          <select
-            value={selectedSupervisor}
-            onChange={e => setSelectedSupervisor(e.target.value)}
-            className="w-full mt-1 px-4 py-2 border border-gray-300 rounded"
+          {/* Toggle box */}
+          <div
+            onClick={() => setOpenDropdown(!openDropdown)}
+            className="w-full px-4 py-2 border border-gray-300 rounded cursor-pointer bg-white"
           >
-            <option value="">Select supervisor</option>
-            {supervisors.map((user) => (
-              <option key={user.UserID} value={user.UserID}>
-                {user.FullName}
-              </option>
-            ))}
-          </select>
+            {selectedSupervisors.length > 0
+              ? supervisors
+                  .filter((u) => selectedSupervisors.includes(String(u.UserID)))
+                  .map((u) => u.FullName)
+                  .join(', ')
+              : 'Select supervisors'}
+          </div>
+
+          {/* Dropdown content */}
+          {openDropdown && (
+            <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded shadow max-h-35 overflow-y-auto">
+              {supervisors.map((user) => {
+                const userIdStr = String(user.UserID);
+                return (
+                  <label key={user.UserID} className="flex items-center px-4 py-2 hover:bg-gray-100">
+                    <input
+                      type="checkbox"
+                      value={userIdStr}
+                      checked={selectedSupervisors.includes(userIdStr)}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        if (e.target.checked) {
+                          setSelectedSupervisors([...selectedSupervisors, value]);
+                        } else {
+                          setSelectedSupervisors(
+                            selectedSupervisors.filter((id) => id !== value)
+                          );
+                        }
+                      }}
+                      className="form-checkbox h-4 w-4 text-blue-600 mr-2"
+                    />
+                    {user.FullName}
+                  </label>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         <div>
@@ -148,16 +188,15 @@ const SupervisorAssignPage = ({ ticketId }) => {
             className={`w-full mt-1 px-4 py-2 border rounded appearance-none
               ${priority === 'Low' ? 'bg-green-100 border-green-300 text-green-800' :
                 priority === 'Medium' ? 'bg-yellow-100 border-yellow-300 text-yellow-800' :
-                priority === 'High' ? 'bg-red-100 border-red-300 text-red-800' :
-                'bg-white border-gray-300 text-gray-700'
+                  priority === 'High' ? 'bg-red-100 border-red-300 text-red-800' :
+                    'bg-white border-gray-300 text-gray-700'
               }`}
           >
-            <option className="bg-white text-gray-800" value="Low">Low</option>
-            <option className="bg-white text-gray-800" value="Medium">Medium</option>
-            <option className="bg-white text-gray-800" value="High">High</option>
+            <option value="Low">Low</option>
+            <option value="Medium">Medium</option>
+            <option value="High">High</option>
           </select>
         </div>
-
       </div>
 
       <div className="mt-8 flex justify-end">
@@ -171,11 +210,7 @@ const SupervisorAssignPage = ({ ticketId }) => {
     </div>
   );
 
-  if (ticketId) {
-    return content;
-  }
-
-  return (
+  return ticketId ? content : (
     <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
       <AdminSideBar open={isSidebarOpen} setOpen={setIsSidebarOpen} />
       <div className="bg-white p-8 rounded-xl shadow-lg max-w-xl w-full relative">
