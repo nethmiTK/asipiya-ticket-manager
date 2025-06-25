@@ -1714,24 +1714,23 @@ app.get('/api/tickets/status-distribution', (req, res) => {
     });
 });
 
-// API endpoint to fetch the last five activities
+// API endpoint to fetch the last 6 ticket log activities
 app.get('/api/tickets/recent-activities', (req, res) => {
     const query = `
         SELECT 
-            t.TicketID,
-            t.Description,
-            t.Status,
-            t.Priority,
-            t.DateTime
-        FROM ticket t
-        ORDER BY t.DateTime DESC
-        LIMIT 5
+            tl.TicketID,
+            tl.DateTime,
+            tl.Type,
+            tl.Description
+        FROM ticketlog tl
+        ORDER BY tl.DateTime DESC
+        LIMIT 6
     `;
 
     db.query(query, (err, results) => {
         if (err) {
-            console.error('Error fetching recent activities:', err);
-            return res.status(500).json({ error: 'Failed to fetch recent activities' });
+            console.error('Error fetching recent ticket log activities:', err);
+            return res.status(500).json({ error: 'Failed to fetch recent ticket log activities' });
         }
         res.json(results);
     });
@@ -3239,28 +3238,6 @@ app.get('/api/mentionable-users', (req, res) => {
       res.json(results);
     }
   );
-});
-
-// API endpoint to fetch the last five ticket logs
-app.get('/api/ticket-logs/recent', (req, res) => {
-    const query = `
-        SELECT 
-            TicketID,
-            DateTime,
-            Type,
-            Description
-        FROM ticketlog
-        ORDER BY TicketID DESC
-        LIMIT 5
-    `;
-
-    db.query(query, (err, results) => {
-        if (err) {
-            console.error('Error fetching recent ticket logs:', err);
-            return res.status(500).json({ error: 'Failed to fetch recent ticket logs' });
-        }
-        res.json(results);
-    });
 });
 
 // Endpoint to like a comment

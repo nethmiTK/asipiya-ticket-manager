@@ -22,7 +22,6 @@ import {
   Title
 } from "chart.js";
 import { format } from 'date-fns';
-import RecentlyActivity from "./RecentlyActivity";
 import { useAuth } from '../../App.jsx';
 import Ticket_secret from "./Ticket_secret";
 import NotificationPanel from "../components/NotificationPanel";
@@ -313,7 +312,7 @@ const Dashboard = () => {
     const fetchRecentData = async () => {
       try {
         const [logRes, usersRes] = await Promise.all([
-          axios.get("http://localhost:5000/api/ticket-logs/recent"),
+          axios.get("http://localhost:5000/api/tickets/recent-activities"),
           axios.get("http://localhost:5000/api/users/recent")
         ]);
         setRecentActivities(logRes.data);
@@ -413,16 +412,41 @@ const Dashboard = () => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {recentActivities.map((log) => (
-                  <tr key={log.TicketID + log.DateTime} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">#{log.TicketID}</td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                      {format(new Date(log.DateTime), 'yyyy-MM-dd HH:mm:ss')}
+                {recentActivities.length > 0 ? (
+                  recentActivities.map((log, index) => (
+                    <tr key={`${log.TicketID}-${log.DateTime}-${index}`} className="hover:bg-gray-50">
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">#{log.TicketID}</td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                        {log.DateTime ? (
+                          typeof log.DateTime === 'string' && log.DateTime.includes('-') ? 
+                            log.DateTime : 
+                            format(new Date(log.DateTime), 'yyyy-MM-dd HH:mm:ss')
+                        ) : 'N/A'}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm">
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                          log.Type === 'STATUS_CHANGE' ? 'bg-blue-100 text-blue-800' :
+                          log.Type === 'PRIORITY_CHANGE' ? 'bg-yellow-100 text-yellow-800' :
+                          log.Type === 'SUPERVISOR_CHANGE' ? 'bg-green-100 text-green-800' :
+                          log.Type === 'COMMENT' ? 'bg-purple-100 text-purple-800' :
+                          log.Type === 'ATTACHMENT' ? 'bg-orange-100 text-orange-800' :
+                          'bg-gray-100 text-gray-800'
+                        }`}>
+                          {log.Type}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-500 max-w-xs truncate" title={log.Description}>
+                        {log.Description || 'No description'}
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan="4" className="px-4 py-8 text-center text-gray-500">
+                      No recent activities found
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">{log.Type}</td>
-                    <td className="px-4 py-3 text-sm text-gray-500 max-w-xs truncate">{log.Description}</td>
                   </tr>
-                ))}
+                )}
               </tbody>
             </table>
           </div>
