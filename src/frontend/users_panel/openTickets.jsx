@@ -8,6 +8,7 @@ import NotificationPanel from "../components/NotificationPanel";
 import { toast } from 'react-toastify';
 import { useNavigate } from "react-router-dom";
 
+// Helper function to enhance files with preview URLs
 const enhanceFilesWithPreview = (acceptedFiles) =>
   acceptedFiles.map((file) =>
     Object.assign(file, {
@@ -15,66 +16,67 @@ const enhanceFilesWithPreview = (acceptedFiles) =>
     })
   );
 
-// Helper function to get file icon based on file type
+// Helper function to get file icon based on file type using image URLs
 const getFileIcon = (fileName) => {
   const extension = fileName.split('.').pop().toLowerCase();
+  const iconBaseUrl = "https://cdn-icons-png.flaticon.com/512/"; // Base URL for Flaticon 512x512 icons
 
   switch (extension) {
-    case 'pdf': return '📄';
-    case 'doc': case 'docx': return '📝';
-    case 'xls': case 'xlsx': return '📊';
-    case 'ppt': case 'pptx': return '📽️';
-    case 'txt': return '📃';
-    case 'zip': case 'rar': case '7z': return '🗜️';
-    case 'mp3': case 'wav': case 'flac': return '🎵';
-    case 'mp4': case 'avi': case 'mov': case 'mkv': return '🎬';
-    case 'jpg': case 'jpeg': case 'png': case 'gif': case 'bmp': return '🖼️';
-    default: return '📎';
+    case 'pdf': return <img src={`${iconBaseUrl}136/136522.png`} alt="PDF icon" className="w-5 h-5" />;
+    case 'doc':
+    case 'docx': return <img src={`${iconBaseUrl}888/888883.png`} alt="Word icon" className="w-5 h-5" />;
+    case 'xls':
+    case 'xlsx': return <img src={`${iconBaseUrl}732/732220.png`} alt="Excel icon" className="w-5 h-5" />;
+    case 'ppt':
+    case 'pptx': return <img src={`${iconBaseUrl}7817/7817494.png`} alt="PowerPoint icon" className="w-5 h-5" />;
+    case 'txt': return <img src={`${iconBaseUrl}8243/8243060.png`} alt="Text icon" className="w-5 h-5" />;
+    case 'zip':
+    case 'rar':
+    case '7z': return <img src={`${iconBaseUrl}337/337960.png`} alt="Archive icon" className="w-5 h-5" />;
+    case 'mp3':
+    case 'wav':
+    case 'flac': return <img src={`${iconBaseUrl}651/651717.png`} alt="Audio icon" className="w-5 h-5" />;
+    case 'mp4':
+    case 'avi':
+    case 'mov':
+    case 'mkv': return <img src={`${iconBaseUrl}10278/10278992.png`} alt="Video icon" className="w-5 h-5" />;
+    case 'jpg':
+    case 'jpeg':
+    case 'png':
+    case 'gif':
+    case 'bmp': return <img src={`${iconBaseUrl}1829/1829586.png`} alt="Image icon" className="w-5 h-5" />;
+    default: return <img src={`${iconBaseUrl}64/64522.png`} alt="File icon" className="w-5 h-5" />; 
   }
 };
 
 // Helper function to check if file can be previewed in browser
 const canPreviewFile = (file) => {
-  const previewableTypes = [
-    'application/pdf',
-    'text/plain',
-    'text/html',
-    'text/css',
-    'text/javascript',
-    'application/json',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // DOCX
-    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // XLSX
-    'application/vnd.openxmlformats-officedocument.presentationml.presentation', // PPTX
-    'application/msword', // DOC
-    'application/vnd.ms-excel', // XLS
-    'application/vnd.ms-powerpoint' // PPT
-  ];
-
+  // Only return true for file types that browsers natively support for direct preview.
   return file.type.startsWith('image/') ||
-    file.type.startsWith('video/') ||
-    file.type.startsWith('audio/') ||
-    previewableTypes.includes(file.type);
+         file.type.startsWith('video/') ||
+         file.type.startsWith('audio/') ||
+         file.type === 'application/pdf';
 };
 const PreviewModal = ({ previewFile, onClose }) => {
   const previewRef = useRef(null);
   const [loading, setLoading] = useState(true);
-  
+
   useEffect(() => {
     if (!previewFile) return;
 
     const renderOfficeDocument = async () => {
       try {
         setLoading(true);
-        
-        if (previewFile.type.includes('wordprocessingml.document') || 
-            previewFile.type === 'application/msword') {
+
+        if (previewFile.type.includes('wordprocessingml.document') ||
+          previewFile.type === 'application/msword') {
           // Word document preview
           const { renderAsync } = await import('docx-preview');
           const arrayBuffer = await previewFile.arrayBuffer();
           await renderAsync(arrayBuffer, previewRef.current);
-        } 
-        else if (previewFile.type.includes('spreadsheetml.sheet') || 
-                 previewFile.type === 'application/vnd.ms-excel') {
+        }
+        else if (previewFile.type.includes('spreadsheetml.sheet') ||
+          previewFile.type === 'application/vnd.ms-excel') {
           // Excel preview
           const XLSX = await import('xlsx');
           const arrayBuffer = await previewFile.arrayBuffer();
@@ -84,15 +86,11 @@ const PreviewModal = ({ previewFile, onClose }) => {
           const html = XLSX.utils.sheet_to_html(worksheet);
           previewRef.current.innerHTML = html;
         }
-        else if (previewFile.type.includes('presentationml.presentation') || 
-                 previewFile.type === 'application/vnd.ms-powerpoint') {
+        else if (previewFile.type.includes('presentationml.presentation') ||
+          previewFile.type === 'application/vnd.ms-powerpoint') {
           // PowerPoint preview
-          // const pptx = await import('pptxjs');
-          // const arrayBuffer = await previewFile.arrayBuffer();
-          // const presentation = await pptx.Presentation.load(arrayBuffer);
-          // await presentation.render(previewRef.current);
           previewRef.current.innerHTML = '<p class="text-yellow-500 text-center py-4">PowerPoint preview is not supported at the moment. Please download the file instead.</p>'; // Add a fallback message
-      }
+        }
       } catch (error) {
         console.error('Error rendering document:', error);
         previewRef.current.innerHTML = '<p class="text-red-500">Error previewing document. Please download instead.</p>';
@@ -101,15 +99,14 @@ const PreviewModal = ({ previewFile, onClose }) => {
       }
     };
 
-    if (previewFile.type.includes('officedocument') || 
-        previewFile.type === 'application/msword' ||
-        previewFile.type === 'application/vnd.ms-excel' ||
-        previewFile.type === 'application/vnd.ms-powerpoint') {
+    if (previewFile.type.includes('officedocument') ||
+      previewFile.type === 'application/msword' ||
+      previewFile.type === 'application/vnd.ms-excel' ||
+      previewFile.type === 'application/vnd.ms-powerpoint') {
       renderOfficeDocument();
     }
 
     return () => {
-      // Cleanup if needed
     };
   }, [previewFile]);
 
@@ -120,25 +117,27 @@ const PreviewModal = ({ previewFile, onClose }) => {
   const isPdf = previewFile.type === 'application/pdf';
   const isAudio = previewFile.type.startsWith('audio/');
   const isOfficeDoc = previewFile.type.includes('officedocument') ||
-                     previewFile.type === 'application/msword' ||
-                     previewFile.type === 'application/vnd.ms-excel';
+    previewFile.type === 'application/msword' ||
+    previewFile.type === 'application/vnd.ms-excel';
+
+  const iconBaseUrl = "https://cdn-icons-png.flaticon.com/512/";
 
   return (
-    <div 
+    <div
       className="fixed inset-0 backdrop-blur-sm bg-black/30 flex items-center justify-center z-50 p-4"
       onClick={onClose}
     >
-      <div 
+      <div
         className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex justify-between items-center border-b p-4">
           <h3 className="text-lg font-medium flex items-center">
-            {isImage && <span className="mr-2">🖼️</span>}
-            {isVideo && <span className="mr-2">🎬</span>}
-            {isPdf && <span className="mr-2">📄</span>}
-            {isAudio && <span className="mr-2">🎵</span>}
-            {isOfficeDoc && <span className="mr-2">📄</span>}
+            {isImage && <img src={`${iconBaseUrl}1829/1829586.png`} alt="Image icon" className="mr-2 w-5 h-5" />}
+            {isVideo && <img src={`${iconBaseUrl}10278/10278992.png`} alt="Video icon" className="mr-2 w-5 h-5" />}
+            {isPdf && <img src={`${iconBaseUrl}136/136522.png`} alt="PDF icon" className="mr-2 w-5 h-5" />}
+            {isAudio && <img src={`${iconBaseUrl}651/651717.png`} alt="Audio icon" className="mr-2 w-5 h-5" />}
+            {isOfficeDoc && <img src={`${iconBaseUrl}888/888883.png`} alt="Office document icon" className="mr-2 w-5 h-5" />}
             {previewFile.name}
           </h3>
           <button
@@ -157,7 +156,7 @@ const PreviewModal = ({ previewFile, onClose }) => {
               <span className="ml-2">Loading document...</span>
             </div>
           )}
-          
+
           {isImage && (
             <img
               src={previewFile.preview}
@@ -187,7 +186,7 @@ const PreviewModal = ({ previewFile, onClose }) => {
             />
           )}
           {isOfficeDoc && (
-            <div 
+            <div
               ref={previewRef}
               className="w-full h-[70vh] overflow-auto border p-4"
             ></div>
@@ -308,15 +307,15 @@ const OpenTickets = () => {
     }));
   };
 
-const handleFileOpen = async (file) => {
-  if (canPreviewFile(file)) {
-    setPreviewFile(file);
-    setIsPreviewOpen(true);
-  } else {
-    toast.info('This file type cannot be previewed. Please download it instead.');
-  }
-  setFileDropdownStates({});
-};
+  const handleFileOpen = async (file) => {
+    if (canPreviewFile(file)) {
+      setPreviewFile(file);
+      setIsPreviewOpen(true);
+    } else {
+      toast.info('This file type cannot be previewed. Please download it instead.');
+    }
+    setFileDropdownStates({});
+  };
 
   const handleFileDownload = (file) => {
     const link = document.createElement('a');
@@ -360,8 +359,6 @@ const handleFileOpen = async (file) => {
   useEffect(() => {
     return () => files.forEach(file => URL.revokeObjectURL(file.preview));
   }, [files]);
-
-  
 
   return (
     <div className="flex">
@@ -411,12 +408,12 @@ const handleFileOpen = async (file) => {
             </div>
           )}
 
-{isPreviewOpen && (
-        <PreviewModal 
-          previewFile={previewFile} 
-          onClose={() => setIsPreviewOpen(false)} 
-        />
-      )}
+          {isPreviewOpen && (
+            <PreviewModal
+              previewFile={previewFile}
+              onClose={() => setIsPreviewOpen(false)}
+            />
+          )}
 
           <h1 className="text-2xl font-bold mb-6">Create Your Tickets</h1>
           <div className="flex flex-col items-center justify-start">
@@ -513,7 +510,7 @@ const handleFileOpen = async (file) => {
                       setFileDropdownStates({});
                       setIsSubmitting(false);
                       setUploadProgress(0);
-                      navigate("/user-dashboard");
+                      navigate("/ticket-view");
                     }, 500);
 
                   } catch (err) {
