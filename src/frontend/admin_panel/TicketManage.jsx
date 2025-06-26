@@ -200,8 +200,7 @@ export default function TicketManage() {
 
   const handleCardClick = (ticket) => {
     setSelectedTicket(ticket);
-    setComment("");
-    setAttachments([]);
+    setSearchParams({ ticketId: String(ticket.id), tab: 'details' });
   };
 
   const closeModal = () => {
@@ -630,6 +629,15 @@ export default function TicketManage() {
     });
   };
 
+  // Sync selectedTicket from URL param when tickets loaded
+  useEffect(() => {
+    const idParam = searchParams.get('ticketId');
+    if (idParam && tickets.length) {
+      const t = tickets.find(tkt => String(tkt.id) === idParam);
+      if (t) setSelectedTicket(t);
+    }
+  }, [searchParams, tickets]);
+
   return (
     <div className="flex">
       <AdminSideBar open={isSidebarOpen} setOpen={setIsSidebarOpen} />
@@ -720,7 +728,7 @@ export default function TicketManage() {
                 <div className="border-b mb-4">
                   <nav className="flex gap-8">
                     <button
-                      onClick={() => { setActiveTab("details"); setSearchParams({ tab: 'details' }); }}
+                      onClick={() => { setActiveTab("details"); setSearchParams({ ticketId: searchParams.get('ticketId'), tab: 'details' }); }}
                       className={`pb-2 text-base font-medium ${
                         activeTab === "details"
                           ? "text-blue-600 border-b-2 border-blue-600"
@@ -730,7 +738,7 @@ export default function TicketManage() {
                       Details
                     </button>
                     <button
-                      onClick={() => { setActiveTab("activity"); setSearchParams({ tab: 'activity' }); }}
+                      onClick={() => { setActiveTab("activity"); setSearchParams({ ticketId: searchParams.get('ticketId'), tab: 'activity' }); }}
                       className={`pb-2 text-base font-medium ${
                         activeTab === "activity"
                           ? "text-blue-600 border-b-2 border-blue-600"
@@ -740,7 +748,7 @@ export default function TicketManage() {
                       Activity Log
                     </button>
                     <button
-                      onClick={() => { setActiveTab("comments"); setSearchParams({ tab: 'comments' }); }}
+                      onClick={() => { setActiveTab("comments"); setSearchParams({ ticketId: searchParams.get('ticketId'), tab: 'comments' }); }}
                       className={`pb-2 text-base font-medium ${
                         activeTab === "comments"
                           ? "text-blue-600 border-b-2 border-blue-600"
@@ -751,7 +759,7 @@ export default function TicketManage() {
                     </button>
                     {/* NEW CHAT TAB */}
                     <button
-                      onClick={() => { setActiveTab("chat"); setSearchParams({ tab: 'chat' }); }}
+                      onClick={() => { setActiveTab("chat"); setSearchParams({ ticketId: searchParams.get('ticketId'), tab: 'chat' }); }}
                       className={`pb-2 text-base font-medium ${
                         activeTab === "chat"
                           ? "text-blue-600 border-b-2 border-blue-600"
