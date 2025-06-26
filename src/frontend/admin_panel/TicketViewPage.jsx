@@ -3,6 +3,12 @@ import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { toast } from 'react-toastify';
 import { IoArrowBack, IoClose } from 'react-icons/io5';
+import {
+  FaRegFilePdf,
+  FaRegFileExcel,
+  FaRegFileWord,
+  FaRegFilePowerpoint
+} from "react-icons/fa";
 
 const TicketViewPage = ({ ticketId, popupMode = false, onClose }) => {
   const { id: routeId } = useParams();
@@ -16,7 +22,7 @@ const TicketViewPage = ({ ticketId, popupMode = false, onClose }) => {
   const [previewUrl, setPreviewUrl] = useState(null);
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [rejectReasonDropdown, setRejectReasonDropdown] = useState('');
-  const [rejectReasonText, setRejectReasonText] = useState('');
+  const [rejectNote, setRejectNote] = useState('');
 
   useEffect(() => {
     const fetchData = async () => {
@@ -58,12 +64,18 @@ const TicketViewPage = ({ ticketId, popupMode = false, onClose }) => {
   };
 
   const handleReject = async () => {
-    const combinedReason = `${rejectReasonDropdown}${rejectReasonText ? ': ' + rejectReasonText : ''}`;
+    const finalReason =
+      rejectReasonDropdown === 'Add Note' ? rejectNote.trim() : rejectReasonDropdown;
+
+    if (!finalReason) {
+      toast.error('Please provide a reason to reject.');
+      return;
+    }
 
     try {
       const response = await axios.put(`http://localhost:5000/api/ticket_status/${id}`, {
         status: 'Reject',
-        reason: combinedReason,
+        reason: finalReason,
       });
 
       if (response.status === 200 || response.status === 204) {
@@ -78,7 +90,7 @@ const TicketViewPage = ({ ticketId, popupMode = false, onClose }) => {
     } finally {
       setShowRejectModal(false);
       setRejectReasonDropdown('');
-      setRejectReasonText('');
+      setRejectNote('');
     }
   };
 
@@ -122,15 +134,20 @@ const TicketViewPage = ({ ticketId, popupMode = false, onClose }) => {
                 const isVideo = /\.(mp4|webm|ogg)$/i.test(fileName);
                 const isAudio = /\.(mp3|wav|ogg)$/i.test(fileName);
                 const isPdf = /\.pdf$/i.test(fileName);
+                const isExcel = /\.(xls|xlsx)$/i.test(fileName);
+                const isWord = /\.(doc|docx)$/i.test(fileName);
+                const isPpt = /\.(ppt|pptx)$/i.test(fileName);
+                const isPreviewable = isImage || isVideo || isAudio || isPdf;
 
                 return (
                   <div
                     key={evi.EvidenceID}
-                    className="w-28 h-28 border rounded-lg p-2 shadow-md bg-gray-100 flex flex-col items-center justify-between relative overflow-hidden"
+                    className="w-25 h-25 border rounded-lg p-2 shadow-md bg-gray-100 flex flex-col items-center justify-between relative overflow-hidden"
                   >
                     <div
                       className="w-full h-full flex items-center justify-center cursor-pointer"
-                      onClick={() =>
+                      onClick={() => {
+                        if (!isPreviewable) return;
                         setPreviewUrl({
                           url: fileUrl,
                           name: fileName,
@@ -143,9 +160,9 @@ const TicketViewPage = ({ ticketId, popupMode = false, onClose }) => {
                             : isPdf
                             ? 'pdf'
                             : 'other',
-                        })
-                      }
-                      title="Click to preview"
+                        });
+                      }}
+                      title={isPreviewable ? "Click to preview" : "Download only"}
                     >
                       {isImage ? (
                         <img src={fileUrl} alt={fileName} className="w-full h-full object-cover rounded" />
@@ -153,12 +170,18 @@ const TicketViewPage = ({ ticketId, popupMode = false, onClose }) => {
                         <video muted className="w-full h-full object-cover rounded">
                           <source src={fileUrl} />
                         </video>
-                      ) : isPdf ? (
-                        <div className="text-xs text-center truncate w-full px-1 text-red-600 font-semibold">PDF File</div>
                       ) : isAudio ? (
-                        <div className="text-xs text-center truncate w-full px-1">{fileName}</div>
+                        <div className="text-sm text-gray-700">🎵 Audio</div>
+                      ) : isPdf ? (
+                        <FaRegFilePdf className="text-4xl text-red-600" />
+                      ) : isExcel ? (
+                        <FaRegFileExcel className="text-4xl text-green-600" />
+                      ) : isWord ? (
+                        <FaRegFileWord className="text-4xl text-blue-600" />
+                      ) : isPpt ? (
+                        <FaRegFilePowerpoint className="text-4xl text-orange-500" />
                       ) : (
-                        <div className="text-xs text-center truncate w-full px-1">{fileName}</div>
+                        <div className="text-xs text-gray-600">No preview</div>
                       )}
                     </div>
 
@@ -176,14 +199,13 @@ const TicketViewPage = ({ ticketId, popupMode = false, onClose }) => {
         )}
       </div>
 
-      <div className="flex justify-center gap-4 mt-8 ml-85">
+      <div className="flex justify-center gap-4 mt-8 ml-86">
         <button
           onClick={() => setShowRejectModal(true)}
           className="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded"
         >
           Reject
         </button>
-
         <button
           onClick={() => navigate(`/supervisor_assign/${id}`)}
           className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded"
@@ -200,7 +222,7 @@ const TicketViewPage = ({ ticketId, popupMode = false, onClose }) => {
               onClick={() => {
                 setShowRejectModal(false);
                 setRejectReasonDropdown('');
-                setRejectReasonText('');
+                setRejectNote('');
               }}
               className="absolute top-2 right-2 text-gray-600 hover:text-black"
             >
@@ -211,7 +233,10 @@ const TicketViewPage = ({ ticketId, popupMode = false, onClose }) => {
             <label className="block font-medium mb-1">Select Reason</label>
             <select
               value={rejectReasonDropdown}
-              onChange={(e) => setRejectReasonDropdown(e.target.value)}
+              onChange={(e) => {
+                setRejectReasonDropdown(e.target.value);
+                if (e.target.value !== 'Add Note') setRejectNote('');
+              }}
               className="w-full mb-4 p-3 border border-black rounded"
             >
               <option value="">-- Choose Reason --</option>
@@ -221,23 +246,28 @@ const TicketViewPage = ({ ticketId, popupMode = false, onClose }) => {
               <option value="Not a Bug">Not a Bug</option>
               <option value="Already Fixed">Already Fixed</option>
               <option value="Feature Request Misclassified as Bug">Feature Request Misclassified as Bug</option>
+              <option value="Add Note">Add Note</option>
             </select>
 
-            <label className="block font-medium mb-1">Additional Notes (optional)</label>
-            <textarea
-              value={rejectReasonText}
-              onChange={(e) => setRejectReasonText(e.target.value)}
-              placeholder="Write more details if needed..."
-              className="w-full p-3 border border-black rounded mb-4"
-              rows={4}
-            />
+            {rejectReasonDropdown === 'Add Note' && (
+              <>
+                <label className="block font-medium mb-1">Custom Note</label>
+                <textarea
+                  value={rejectNote}
+                  onChange={(e) => setRejectNote(e.target.value)}
+                  className="w-full mb-4 p-3 border border-black rounded"
+                  rows={4}
+                  placeholder="Write your custom reason here..."
+                />
+              </>
+            )}
 
             <div className="flex justify-end gap-2">
               <button
                 onClick={() => {
                   setShowRejectModal(false);
                   setRejectReasonDropdown('');
-                  setRejectReasonText('');
+                  setRejectNote('');
                 }}
                 className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
               >
@@ -246,7 +276,7 @@ const TicketViewPage = ({ ticketId, popupMode = false, onClose }) => {
               <button
                 onClick={handleReject}
                 className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
-                disabled={!rejectReasonDropdown}
+                disabled={!rejectReasonDropdown || (rejectReasonDropdown === 'Add Note' && !rejectNote.trim())}
               >
                 Confirm Reject
               </button>
@@ -268,7 +298,7 @@ const TicketViewPage = ({ ticketId, popupMode = false, onClose }) => {
 
             <h4 className="text-lg font-semibold mb-4">{previewUrl.name}</h4>
 
-            <div className="mb-4 max-h-[400px] overflow-auto flex justify-center items-center">
+            <div className="mb-4 max-h-[400px] overflow-auto flex justify-center items-center w-full">
               {previewUrl.type === 'image' ? (
                 <img src={previewUrl.url} alt={previewUrl.name} className="max-w-full max-h-96" />
               ) : previewUrl.type === 'video' ? (
