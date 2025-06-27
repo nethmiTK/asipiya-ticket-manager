@@ -59,6 +59,23 @@ export default function SupervisorChatSection({ user, supportUser, ticketId, tic
     );
   };
 
+  // Helper: Group messages by date
+  const groupMessagesByDate = (messages) => {
+    const grouped = {};
+    messages.forEach((msg) => {
+      const messageDate = new Date(msg.timestamp).toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      });
+      if (!grouped[messageDate]) {
+        grouped[messageDate] = [];
+      }
+      grouped[messageDate].push(msg);
+    });
+    return grouped;
+  };
+
   useEffect(() => {
     if (!ticketId) return;
 
@@ -196,8 +213,15 @@ export default function SupervisorChatSection({ user, supportUser, ticketId, tic
     }
   };
 
+  const groupedMessages = groupMessagesByDate(chatMessages);
+  const sortedDates = Object.keys(groupedMessages).sort((a, b) => new Date(a) - new Date(b));
+
+  useEffect(() => {
+  chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+}, [chatMessages]);
+
   return (
-    <div className="flex flex-col h-full max-w-md w-3xl mx-auto border-gray-400 rounded-lg shadow-lg border">
+    <div className="flex flex-col h-full w-6xl mx-auto border-gray-400 rounded-lg shadow-lg border">
       <header className="p-4 rounded-lg border-b bg-gray-50 border-gray-400">
         <h2 className="text-lg font-bold">
           Chat for Ticket #{ticket?.id || ticketId}
@@ -211,126 +235,117 @@ export default function SupervisorChatSection({ user, supportUser, ticketId, tic
           </p>
         )}
 
-        {chatMessages.map((msg) => {
-          const isClient = msg.sender === "user";
+        {sortedDates.map((date) => (
+          <div key={date}>
+            <div className="text-center my-4">
+              <span className="inline-block bg-gray-200 text-gray-700 px-3 py-1 rounded-full text-sm font-medium">
+                {date}
+              </span>
+            </div>
+            {groupedMessages[date].map((msg) => {
+              const isClient = msg.sender === "user";
 
-          return (
-            <div
-              key={String(msg.id)}
-              className={`flex mb-3 ${
-                !isClient ? "justify-end" : "justify-start"
-              }`}
-            >
-              {isClient && (
-                <img
-                  src={
-                    supportUser?.avatar || "https://i.pravatar.cc/40?u=user1"
-                  }
-                  alt="avatar"
-                  className="w-8 h-8 rounded-full mr-2 self-end"
-                />
-              )}
+              return (
+                <div
+                  key={String(msg.id)}
+                  className={`flex mb-3 ${
+                    !isClient ? "justify-end" : "justify-start"
+                  }`}
+                >
+                  {isClient && (
+                    <img
+                      src={
+                        supportUser?.avatar || "https://i.pravatar.cc/40?u=user1"
+                      }
+                      alt="avatar"
+                      className="w-8 h-8 rounded-full mr-2 self-end"
+                    />
+                  )}
 
-              <div
-                className={`max-w-xs px-4 py-2 rounded-lg break-words whitespace-pre-wrap ${
-                  !isClient
-                    ? "bg-blue-300 text-gray-800 rounded-br-none"
-                    : "bg-gray-300 text-gray-800 rounded-bl-none"
-                }`}
-              >
-                {msg.file
-                  ? (() => {
-                      const fileUrl = msg.file.url;
-                      const fileName = msg.file.name.toLowerCase();
-
-                      if (fileName.match(/\.(jpg|jpeg|png|gif|bmp|webp)$/i)) {
-                        return (
-                          <div>
+                  <div
+                    className={`max-w-xs px-4 py-2 rounded-lg break-words whitespace-pre-wrap ${
+                      !isClient
+                        ? "bg-blue-300 text-gray-800 rounded-br-none"
+                        : "bg-gray-300 text-gray-800 rounded-bl-none"
+                    }`}
+                  >
+                    {msg.file ? (
+                      <div className="flex flex-col items-center">
+                        {/* Display an image or video preview if applicable */}
+                        {msg.file.name.toLowerCase().match(/\.(jpg|jpeg|png|gif|bmp|webp)$/i) ? (
                             <img
-                              src={fileUrl}
-                              alt={fileName}
-                              className="w-40 h-auto rounded-md mb-1"
+                              src={msg.file.url}
+                              alt={msg.file.name}
+                              className="w-40 h-auto rounded-md mb-1 object-contain"
                             />
-                            <p className="text-sm break-words">
-                              {msg.file.name}
-                            </p>
-                          </div>
-                        );
-                      } else if (fileName.match(/\.(mp4|webm|ogg|mov)$/i)) {
-                        return (
-                          <div>
+                        ) : msg.file.name.toLowerCase().match(/\.(mp4|webm|ogg|mov)$/i) ? (
                             <video
                               controls
-                              src={fileUrl}
-                              className="w-40 h-auto rounded-md mb-1"
+                              src={msg.file.url}
+                              className="w-40 h-auto rounded-md mb-1 object-contain"
                             />
-                            <p className="text-sm break-words">
-                              {msg.file.name}
-                            </p>
-                          </div>
-                        );
-                      } else if (fileName.match(/\.pdf$/i)) {
-                        return (
-                          <div>
+                        ) : msg.file.name.toLowerCase().endsWith(".pdf") ? (
                             <img
                               src="https://upload.wikimedia.org/wikipedia/commons/8/87/PDF_file_icon.svg"
-                              alt="PDF"
+                              alt="PDF Icon"
                               className="w-20 h-20 object-contain mb-1"
                             />
-                            <a
-                              href={fileUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-gray-800 underline text-xs"
-                            >
-                              View Full PDF
-                            </a>
-                          </div>
-                        );
-                      } else {
-                        return (
-                          <div>
-                            <p className="text-sm break-words font-semibold">
-                              {msg.file.name}
-                            </p>
-                            <a
-                              href={fileUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-gray-800 underline text-xs"
-                            >
-                              Download File
-                            </a>
-                          </div>
-                        );
-                      }
-                    })()
-                  : renderMessageWithLinks(msg.content)}
+                        ) : (
+                            <img
+                              src="https://freesoft.ru/storage/images/729/7282/728101/728101_normal.png" // Generic file icon
+                              alt="File Icon"
+                              className="w-20 h-20 object-contain mb-1"
+                            />
+                        )}
+                        {/* Always show file name below icon/preview */}
+                        <p className="text-sm font-medium text-gray-800 text-center break-words mb-2">
+                            {msg.file.name}
+                        </p>
 
-                <div className="flex justify-between text-xs mt-1 opacity-70">
-                  <span>{new Date(msg.timestamp).toLocaleString()}</span>
+                        {/* Dedicated Download Button */}
+                        <a
+                          href={msg.file.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          download={msg.file.name} // This attribute suggests a download filename
+                          className="inline-flex items-center px-3 py-1 bg-blue-500 text-white rounded-md text-xs hover:bg-blue-600 transition-colors duration-200"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                          </svg>
+                          Download
+                        </a>
+                      </div>
+                    ) : (
+                      renderMessageWithLinks(msg.content)
+                    )}
+
+                    <div className="flex justify-between text-xs mt-1 opacity-70">
+                      <span>{new Date(msg.timestamp).toLocaleTimeString()}</span>
+                      {!isClient && (
+                        <span>
+                          {msg.status === "sending"
+                            ? "🕓 Sending..."
+                            : msg.status === "failed"
+                            ? "❌ Failed"
+                            : "✓ Delivered"}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
                   {!isClient && (
-                    <span>
-                      {msg.status === "sending"
-                        ? "🕓 Sending..."
-                        : msg.status === "failed"
-                        ? "❌ Failed"
-                        : "✓ Delivered"}
-                    </span>
+                    <img
+                      src={user?.avatar || "https://i.pravatar.cc/40?u=support"}
+                      alt="avatar"
+                      className="w-8 h-8 rounded-full ml-2 self-end"
+                    />
                   )}
                 </div>
-              </div>
-
-              {!isClient && (
-                <img
-                  src={user?.avatar || "https://i.pravatar.cc/40?u=support"}
-                  alt="avatar"
-                  className="w-8 h-8 rounded-full ml-2 self-end"
-                />
-              )}
-            </div>
-          );
-        })}
+              );
+            })}
+          </div>
+        ))}
 
         {sendingFile && (
           <div className="flex justify-center mb-2">
