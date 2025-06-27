@@ -10,6 +10,8 @@ import { toast } from "react-toastify";
 import TicketLogView from "./TicketLogView";
 import TicketDetailsTab from "./TicketDetailsTab";
 import axios from "axios";
+import { FaFilePdf, FaFileWord, FaFileArchive, FaFileAlt, FaFileImage } from 'react-icons/fa';
+import { FiMoreVertical } from 'react-icons/fi';
 
 export const USER = {
   id: "user1",
@@ -51,11 +53,11 @@ export default function TicketManage() {
   });
   const [filteredMentions, setFilteredMentions] = useState([]);
   const textareaRef = useRef(null);
-  const [attachmentFile, setAttachmentFile] = useState(null);
   const [replyingTo, setReplyingTo] = useState(null);
   const [userLikedComments, setUserLikedComments] = useState({});
   const [showAllComments, setShowAllComments] = useState(false);
   const [expandedReplies, setExpandedReplies] = useState({});
+  const [previewMenuIndex, setPreviewMenuIndex] = useState(null);
 
   // This computes which supervisorId to use based on user role and selection
   const supervisorIdToUse =
@@ -231,7 +233,7 @@ export default function TicketManage() {
   };
 
   const handleAddComment = async () => {
-    if (!selectedTicket || (!comment.trim() && !attachmentFile)) {
+    if (!selectedTicket || (!comment.trim() && attachments.length === 0)) {
       toast.warn("Comment text or an attachment is required.");
       return;
     }
@@ -240,12 +242,8 @@ export default function TicketManage() {
     formData.append("ticketId", selectedTicket.id);
     formData.append("userId", user.UserID);
     formData.append("comment", comment.trim());
-    if (replyingTo) {
-      formData.append("replyToCommentId", replyingTo.commentId);
-    }
-    if (attachmentFile) {
-      formData.append("file", attachmentFile);
-    }
+    // Append each file under 'file' field for backend
+    attachments.forEach(file => formData.append('file', file));
 
     // Extract mentions from comment text (e.g., @FullName)
     let mentionedUserIds = [];
@@ -283,9 +281,10 @@ export default function TicketManage() {
         }
       );
       
+      // Clear attachments after successful upload
+      setAttachments([]);
       // Clear all form fields completely
       setComment("");
-      setAttachmentFile(null);
       setReplyingTo(null);
       
       // Clear file input field
@@ -315,6 +314,15 @@ export default function TicketManage() {
       console.error("Error adding comment:", error);
       toast.error("Failed to add comment");
     }
+  };
+
+  // Handler to accumulate selected files and reset input
+  const handleFileChange = (e) => {
+    const newFiles = Array.from(e.target.files || []);
+    if (newFiles.length) {
+      setAttachments(prev => [...prev, ...newFiles]);
+    }
+    e.target.value = null;
   };
 
   // Helper: Convert priority to a number for sorting
@@ -960,7 +968,8 @@ export default function TicketManage() {
                         <div className="mt-4 p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-400 transition-colors bg-gray-50 hover:bg-blue-50">
                           <input
                             type="file"
-                            onChange={(e) => setAttachmentFile(e.target.files[0])}
+                            multiple
+                            onChange={handleFileChange}
                             className="hidden"
                             id="file-upload"
                             accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.txt"
@@ -975,7 +984,7 @@ export default function TicketManage() {
                               </svg>
                             </div>
                             <span className="text-sm text-gray-700 font-medium">
-                              {attachmentFile ? `📎 ${attachmentFile.name}` : 'Click to attach file or drag and drop'}
+                              {attachments.length > 0 ? `📎 ${attachments.length} files selected` : 'Click to attach file or drag and drop'}
                             </span>
                             <span className="text-xs text-gray-500">
                               Images, Videos, Documents, PDFs supported (Max 10MB)
@@ -983,36 +992,50 @@ export default function TicketManage() {
                           </label>
                         </div>
                         
-                        {attachmentFile && (
-                          <div className="mt-3 p-4 bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-lg flex items-center gap-3 shadow-sm">
-                            <div className="flex items-center gap-3 flex-1">
-                              <div className="p-2 bg-green-100 rounded-full">
-                                <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
+                        {/* Preview selected attachments */}
+                        {attachments.length > 0 && (
+                          <div className="mt-3 grid grid-cols-4 gap-4">
+                            {attachments.map((file, idx) => {
+                            // Determine icon based on extension
+                            const ext = file.name.split('.').pop().toLowerCase();
+                            let FileIcon = FaFileAlt;
+                            if (['jpg','jpeg','png','gif','webp'].includes(ext)) FileIcon = FaFileImage;
+                            else if (ext === 'pdf') FileIcon = FaFilePdf;
+                            else if (['doc','docx'].includes(ext)) FileIcon = FaFileWord;
+                            else if (['zip','rar','7z'].includes(ext)) FileIcon = FaFileArchive;
+                              return (
+                              <div key={idx} className="relative">
+                                {/* index badge */}
+                                <div className="absolute top-1 left-1 bg-blue-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">{idx + 1}</div>
+                                {/* menu trigger */}
+                                <div className="absolute top-1 right-1">
+                                  <button onClick={() => setPreviewMenuIndex(previewMenuIndex===idx? null: idx)} className="text-gray-500 hover:text-gray-800 p-1">
+                                    <FiMoreVertical />
+                                  </button>
+                                  {previewMenuIndex === idx && (
+                                    <div className="absolute right-0 mt-2 bg-white border rounded shadow-lg z-10">
+                                      <button onClick={() => window.open(URL.createObjectURL(file), '_blank')} className="block px-4 py-2 text-sm hover:bg-gray-100">Open</button>
+                                      <button onClick={() => { const url=URL.createObjectURL(file); const a=document.createElement('a'); a.href=url; a.download=file.name; a.click(); }} className="block px-4 py-2 text-sm hover:bg-gray-100">Download</button>
+                                      <button onClick={() => setAttachments(prev=>prev.filter((_,i)=>i!==idx))} className="block px-4 py-2 text-sm text-red-600 hover:bg-gray-100">Remove</button>
+                                    </div>
+                                  )}
+                                </div>
+                                {file.type.startsWith('image') ? (
+                                  <img src={URL.createObjectURL(file)} alt={file.name} className="w-24 h-24 object-cover rounded shadow-sm" />
+                                ) : (
+                                  <div className="w-24 h-24 flex items-center justify-center bg-gray-100 rounded shadow-sm">
+                                    <FileIcon className="text-3xl text-gray-600" />
+                                  </div>
+                                )}
+                                // no hover controls; use menu
                               </div>
-                              <div className="flex-1">
-                                <span className="text-sm text-green-800 font-medium block">
-                                  File Ready to Upload
-                                </span>
-                                <span className="text-xs text-green-600">
-                                  📎 {attachmentFile.name} ({(attachmentFile.size / 1024).toFixed(1)} KB)
-                                </span>
-                              </div>
+                              );
+                            })}
+                            {/* Add More tile */}
+                            <div onClick={() => document.getElementById('file-upload').click()} className="relative cursor-pointer flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded w-24 h-24 text-gray-400 hover:border-blue-400 hover:text-blue-600">
+                              <span className="text-2xl">+</span>
+                              <span className="text-xs mt-1">Add More</span>
                             </div>
-                            <button
-                              onClick={() => {
-                                setAttachmentFile(null);
-                                const fileInput = document.getElementById('file-upload');
-                                if (fileInput) fileInput.value = '';
-                              }}
-                              className="p-1 text-green-600 hover:text-red-600 hover:bg-red-50 rounded-full transition-all duration-200"
-                              title="Remove file"
-                            >
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                              </svg>
-                            </button>
                           </div>
                         )}
                         
@@ -1081,7 +1104,7 @@ export default function TicketManage() {
                               </svg>
                               <span>Use @ to mention teammates</span>
                             </div>
-                            {attachmentFile && (
+                            {attachments.length > 0 && (
                               <div className="flex items-center gap-1 text-green-600">
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
@@ -1092,7 +1115,7 @@ export default function TicketManage() {
                           </div>
                           <button
                             onClick={handleAddComment}
-                            disabled={!comment.trim() && !attachmentFile}
+                            disabled={!comment.trim() && !attachments.length}
                             className="inline-flex items-center px-8 py-3 border border-transparent text-base font-semibold rounded-xl shadow-lg text-white bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 focus:outline-none focus:ring-4 focus:ring-blue-200 disabled:from-gray-400 disabled:to-gray-500 disabled:cursor-not-allowed transition-all duration-300 ease-in-out transform hover:scale-105 hover:shadow-xl"
                           >
                             <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
