@@ -8,6 +8,7 @@ import { useAuth } from "../../App";
 import AdminSideBar from "../../user_components/SideBar/AdminSideBar";
 import { toast } from "react-toastify";
 import TicketLogView from "./TicketLogView";
+import TicketDetailsTab from "./TicketDetailsTab";
 import axios from "axios";
 
 export const USER = {
@@ -783,232 +784,16 @@ export default function TicketManage() {
 
                 <div className="h-[580px] overflow-y-auto">
                   {activeTab === "details" ? (
-                    <div className="grid grid-cols-2 gap-6">
-                      <div className="space-y-3">
-                        <h2 className="text-xl font-bold text-gray-800 mb-4">
-                          Ticket #{selectedTicket.id} Details
-                        </h2>
-                        <p>
-                          <strong>Status:</strong> {selectedTicket.status}
-                        </p>
-                        <p>
-                          <strong>Date:</strong> {selectedTicket.date}
-                        </p>
-                        <p>
-                          <strong>Priority:</strong> {selectedTicket.priority}
-                        </p>
-                        <p className="text-sm">
-                          <strong>Problem:</strong>{" "}
-                          {selectedTicket.problem.length > 100 ? (
-                            <>
-                              {selectedTicket.problem.slice(0, 100)}...
-                              <button
-                                onClick={() => setShowProblemModal(true)}
-                                className="text-blue-600 hover:underline ml-1"
-                              >
-                                See More
-                              </button>
-                            </>
-                          ) : (
-                            selectedTicket.problem
-                          )}
-                        </p>
-                        {showProblemModal && (
-                          <div className="fixed inset-0 z-50 bg-black/40 bg-opacity-40 flex justify-center items-center">
-                            <div className="bg-white rounded-lg shadow-lg p-6 max-w-lg w-full max-h-[80vh]">
-                              <h2 className="text-lg font-semibold mb-4">
-                                Full Problem Description
-                              </h2>
-                              <div className="text-gray-800 whitespace-pre-wrap overflow-y-auto max-h-60 pr-2">
-                                {selectedTicket.problem}
-                              </div>
-                              <div className="text-right mt-4">
-                                <button
-                                  onClick={() => setShowProblemModal(false)}
-                                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-                                >
-                                  Close
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                        <p>
-                          <strong>System Name:</strong>{" "}
-                          {selectedTicket.systemName}
-                        </p>
-                        <p>
-                          <strong>User Name:</strong> {selectedTicket.userName}
-                        </p>
-
-                        <div>
-                          <label className="block text-sm font-medium mb-1">
-                            Change Status
-                          </label>
-                          <select
-                            value={selectedTicket.status}
-                            onChange={handleStatusChange}
-                            className="w-full px-3 py-2 border rounded-md"
-                          >
-                            <option>Open</option>
-                            <option>In Progress</option>
-                            <option>Resolved</option>
-                          </select>
-                        </div>
-
-                        <div>
-                          <label className="block text-sm font-medium mb-1">
-                            Due Date
-                          </label>
-                          <input
-                            type="date"
-                            value={selectedTicket.dueDate || ""}
-                            onChange={handleDueDateChange}
-                            className="w-full px-3 py-2 border rounded-md"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-sm font-medium mb-1">
-                            Resolution Summary
-                          </label>
-                          <textarea
-                            rows={3}
-                            value={selectedTicket.resolution || ""}
-                            onChange={(e) =>
-                              setSelectedTicket({
-                                ...selectedTicket,
-                                resolution: e.target.value,
-                              })
-                            }
-                            placeholder="Add summary..."
-                            className="w-full p-2 border rounded-md"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="space-y-4 h-[430px]">
-                        <h4 className="font-semibold mb-2">Evidence Files</h4>
-                        {evidenceList.length === 0 ? (
-                          <p className="text-sm text-gray-500">
-                            No evidence files available.
-                          </p>
-                        ) : (
-                          <div className=" overflow-y-auto grid grid-cols-2 gap-4 p-2 border rounded bg-gray-50">
-                            {evidenceList.map((evi, index) => {
-                              const fileUrl = `http://localhost:5000/${evi.FilePath}`;
-                              const fileName = evi.FilePath.split("/").pop();
-
-                              const isImage =
-                                /\.(jpg|jpeg|png|gif|bmp|webp)$/i.test(
-                                  fileName
-                                );
-                              const isPDF = /\.pdf$/i.test(fileName);
-                              const isVideo = /\.(mp4|webm|ogg)$/i.test(
-                                fileName
-                              );
-                              const isAudio = /\.(mp3|wav|ogg)$/i.test(
-                                fileName
-                              );
-                              const isDoc = /\.(docx?|xlsx?)$/i.test(fileName);
-
-                              return (
-                                <div
-                                  key={index}
-                                  className="border rounded p-2 bg-white shadow-sm flex flex-col items-center text-center"
-                                >
-                                  {isImage ? (
-                                    <a
-                                      href={fileUrl}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                    >
-                                      <img
-                                        src={fileUrl}
-                                        alt={fileName}
-                                        className="w-24 h-24 object-cover rounded hover:opacity-90 transition"
-                                      />
-                                    </a>
-                                  ) : isPDF ? (
-                                    <a
-                                      href={fileUrl}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="text-red-600 hover:underline"
-                                    >
-                                      📄 {fileName}
-                                    </a>
-                                  ) : isVideo ? (
-                                    <video
-                                      controls
-                                      className="w-24 h-24 rounded"
-                                      title={fileName}
-                                    >
-                                      <source
-                                        src={fileUrl}
-                                        type={`video/${fileName
-                                          .split(".")
-                                          .pop()}`}
-                                      />
-                                      Your browser does not support the video
-                                      tag.
-                                    </video>
-                                  ) : isAudio ? (
-                                    <audio
-                                      controls
-                                      className="w-full"
-                                      title={fileName}
-                                    >
-                                      <source
-                                        src={fileUrl}
-                                        type={`audio/${fileName
-                                          .split(".")
-                                          .pop()}`}
-                                      />
-                                      Your browser does not support the audio
-                                      element.
-                                    </audio>
-                                  ) : isDoc ? (
-                                    <a
-                                      href={fileUrl}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="text-purple-600 hover:underline"
-                                    >
-                                      📄 {fileName}
-                                    </a>
-                                  ) : (
-                                    <a
-                                      href={fileUrl}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="text-blue-600 hover:underline"
-                                    >
-                                      📎 {fileName}
-                                    </a>
-                                  )}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                        <div className="flex justify-between pt-2">
-                          <button
-                            onClick={handleUpdateTicket}
-                            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-                          >
-                            Save Changes
-                          </button>
-                          {/*<button
-                            onClick={() => setChatMode(!chatMode)}
-                            className="bg-green-600 text-white px-4 py-2 rounded flex items-center gap-2"
-                          >
-                            <MessageCircle size={20} />
-                            {chatMode ? "Close Chat" : "Open Chat"}
-                          </button>*/}
-                        </div>
-                      </div>
-                    </div>
+                    <TicketDetailsTab
+                      selectedTicket={selectedTicket}
+                      setSelectedTicket={setSelectedTicket}
+                      user={user} // Pass user if needed
+                      setTickets={setTickets} // Pass setTickets if updates need to propagate
+                      evidenceList={evidenceList}
+                      setShowProblemModal={setShowProblemModal}
+                      showProblemModal={showProblemModal}
+                      // Pass any other state variables or functions that TicketDetailsTab needs
+                    />
                   ) : activeTab === "activity" ? (
                     <div className="space-y-4">
                       {selectedTicket && (
@@ -1388,29 +1173,6 @@ export default function TicketManage() {
               </div>
             )}
           </div>
-
-          {/* Chat Modal 
-          {chatMode && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-              <div className="relative max-w-lg h-[600px] p-4 bg-gray-200 rounded-lg shadow-lg flex flex-col">
-                <button
-                  onClick={() => setChatMode(false)}
-                  className="absolute top-2 right-2 text-gray-500 hover:text-red-600 text-xl"
-                  aria-label="Close Chat"
-                >
-                  🗙
-                </button>
-                <ChatSection
-                  user={selectedTicket.user}
-                  supportUser={selectedTicket.assignedBy}
-                  initialMessages={initialMessages}
-                  ticket={selectedTicket}
-                  ticketId={selectedTicket.id}
-                  role={"Supervisor"}
-                />
-              </div>
-            </div>
-          )}*/}
         </div>
       </div>
     </div>
