@@ -2,9 +2,6 @@ import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import AdminSideBar from "../../user_components/SideBar/AdminSideBar";
-import { FaEye, FaEdit } from 'react-icons/fa';
-import Ticket_secret from "./Ticket_secret";
-import TicketViewPage from "./TicketViewPage";
 import TicketTable from "./components/TicketTable";
 import SearchBar from "./components/SearchBar";
 import Pagination from "./components/Pagination";
@@ -18,7 +15,6 @@ const Tickets = () => {
   const type = searchParams.get("type");
   const ticketId = searchParams.get("id");
   const navigate = useNavigate();
-  const [selectedTicket, setSelectedTicket] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
@@ -52,13 +48,6 @@ const Tickets = () => {
         }
         
         setTickets(filteredTickets);
-        
-        if (ticketId) {
-          const ticket = filteredTickets.find(t => t.TicketID.toString() === ticketId);
-          if (ticket) {
-            setSelectedTicket(ticket);
-          }
-        }
         
         setLoading(false);
       } catch (error) {
@@ -123,10 +112,6 @@ const Tickets = () => {
     const hours = Math.floor(duration / (1000 * 60 * 60));
     const minutes = Math.floor((duration % (1000 * 60 * 60)) / (1000 * 60));
     return `${hours}h ${minutes}m`;
-  };
-
-  const handleViewTicket = (ticket) => {
-    setSelectedTicket(ticket);
   };
 
   const handleSystemFilterChange = (selected) => {
@@ -234,7 +219,6 @@ const Tickets = () => {
 
           <TicketTable
             tickets={paginatedTickets}
-            onTicketClick={handleViewTicket}
             showStatus={type !== 'pending' && type !== 'resolved'}
             showPriority={type !== 'pending'}
           />
@@ -249,24 +233,6 @@ const Tickets = () => {
             showingFrom={showingFrom}
             showingTo={showingTo}
           />
-
-          {selectedTicket && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-              <div className="bg-white rounded-lg shadow-xl w-[90%] max-w-4xl p-6 relative max-h-[90vh] overflow-y-auto">
-                <button
-                  className="absolute top-3 right-4 text-2xl font-bold text-gray-500 hover:text-red-600"
-                  onClick={() => setSelectedTicket(null)}
-                >
-                  ×
-                </button>
-                {type === 'pending' ? (
-                  <TicketViewPage ticketId={selectedTicket.TicketID} popupMode={true} onClose={() => setSelectedTicket(null)} />
-                ) : (
-                  <Ticket_secret ticket={selectedTicket} onClose={() => setSelectedTicket(null)} />
-                )}
-              </div>
-            </div>
-          )}
         </div>
       </main>
     </div>

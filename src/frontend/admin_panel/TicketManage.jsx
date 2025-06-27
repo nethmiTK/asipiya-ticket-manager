@@ -191,10 +191,18 @@ export default function TicketManage() {
 
   useEffect(() => {
     if (selectedTicket) {
-      fetch("http://localhost:5000/api/mentionable-users")
-        .then((res) => res.json())
+      fetch(`http://localhost:5000/api/mentionable-users?ticketId=${selectedTicket.id}`)
+        .then((res) => {
+          if (!res.ok) {
+            throw new Error('Failed to fetch mentionable users');
+          }
+          return res.json();
+        })
         .then(setMentionableUsers)
-        .catch(console.error);
+        .catch((error) => {
+          console.error('Error fetching mentionable users:', error);
+          setMentionableUsers([]); // Fallback to empty array
+        });
     }
   }, [selectedTicket]);
 
@@ -231,8 +239,9 @@ export default function TicketManage() {
     const processedComment = comment.trim(); // Keep original comment text for context
     const lowerCaseComment = processedComment.toLowerCase(); // Convert comment to lowercase once for efficiency
 
-    // Sort mentionable users by length of FullName in descending order
-    const sortedMentionableUsers = [...mentionableUsers].sort((a, b) => b.FullName.length - a.FullName.length);
+    // Sort mentionable users by length of FullName in descending order - with safety check
+    const safeUsers = Array.isArray(mentionableUsers) ? mentionableUsers : [];
+    const sortedMentionableUsers = [...safeUsers].sort((a, b) => b.FullName.length - a.FullName.length);
 
     for (const user of sortedMentionableUsers) {
       const lowerCaseFullName = user.FullName.toLowerCase().trim();
@@ -489,7 +498,7 @@ export default function TicketManage() {
         left: e.target.offsetLeft,
       });
       setFilteredMentions(
-        mentionableUsers.filter((u) =>
+        (Array.isArray(mentionableUsers) ? mentionableUsers : []).filter((u) =>
           u.FullName.toLowerCase().includes(match[1].toLowerCase())
         )
       );
@@ -581,8 +590,9 @@ export default function TicketManage() {
 
   const renderCommentTextWithMentions = (text) => {
     const parts = [];
-    // Sort mentionable users by length of FullName in descending order
-    const sortedMentionableUsers = [...mentionableUsers].sort((a, b) => b.FullName.length - a.FullName.length);
+    // Sort mentionable users by length of FullName in descending order - with safety check
+    const safeUsers = Array.isArray(mentionableUsers) ? mentionableUsers : [];
+    const sortedMentionableUsers = [...safeUsers].sort((a, b) => b.FullName.length - a.FullName.length);
 
     let segments = [{ type: 'text', value: text }];
 
@@ -1083,8 +1093,9 @@ export default function TicketManage() {
                                 }}
                               >
                                 {(() => {
-                                  // Sort mentionable users by length of FullName in descending order for better matching
-                                  const sortedMentionableUsers = [...mentionableUsers].sort((a, b) => b.FullName.length - a.FullName.length);
+                                  // Sort mentionable users by length of FullName in descending order for better matching - with safety check
+                                  const safeUsers = Array.isArray(mentionableUsers) ? mentionableUsers : [];
+                                  const sortedMentionableUsers = [...safeUsers].sort((a, b) => b.FullName.length - a.FullName.length);
                                   
                                   let segments = [{ type: 'text', value: comment }];
 
@@ -1463,8 +1474,10 @@ function CommentItem({
 
   const renderCommentTextWithMentions = (text) => {
     const parts = [];
+    // Ensure mentionableUsers is an array before spreading
+    const safeUsers = Array.isArray(mentionableUsers) ? mentionableUsers : [];
     // Sort mentionable users by length of FullName in descending order
-    const sortedMentionableUsers = [...mentionableUsers].sort((a, b) => b.FullName.length - a.FullName.length);
+    const sortedMentionableUsers = [...safeUsers].sort((a, b) => b.FullName.length - a.FullName.length);
 
     let segments = [{ type: 'text', value: text }];
 

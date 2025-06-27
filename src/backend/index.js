@@ -3252,13 +3252,35 @@ app.get('/api/tickets/:ticketId/comments', (req, res) => {
 });
 
 app.get('/api/mentionable-users', (req, res) => {
-  db.query(
-    "SELECT UserID, FullName, Role, ProfileImagePath FROM appuser WHERE Role IN ('Admin', 'Supervisor', 'Developer')",
-    (err, results) => {
-      if (err) return res.status(500).json({ error: 'Failed to fetch users' });
-      res.json(results);
+  const { ticketId } = req.query;
+  
+  if (!ticketId) {
+    return res.status(400).json({ error: 'Ticket ID is required' });
+  }
+
+  // Query to get all admins and the supervisor(s) assigned to the specific ticket
+  const sql = `
+    SELECT DISTINCT u.UserID, u.FullName, u.Role, u.ProfileImagePath 
+    FROM appuser u
+    WHERE u.Role = 'Admin'
+    
+    UNION
+    
+    SELECT DISTINCT u.UserID, u.FullName, u.Role, u.ProfileImagePath 
+    FROM appuser u
+    INNER JOIN ticket t ON FIND_IN_SET(u.UserID, t.SupervisorID) > 0
+    WHERE t.TicketID = ? AND u.Role = 'Supervisor'
+    
+    ORDER BY Role DESC, FullName ASC
+  `;
+  
+  db.query(sql, [ticketId], (err, results) => {
+    if (err) {
+      console.error('Error fetching mentionable users:', err);
+      return res.status(500).json({ error: 'Failed to fetch users' });
     }
-  );
+    res.json(results);
+  });
 });
 
 // Endpoint to like a comment

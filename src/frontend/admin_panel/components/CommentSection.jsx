@@ -50,10 +50,18 @@ const CommentSection = ({
   // Fetch mentionable users when selectedTicket changes
   useEffect(() => {
     if (selectedTicket) {
-      fetch("http://localhost:5000/api/mentionable-users")
-        .then((res) => res.json())
+      fetch(`http://localhost:5000/api/mentionable-users?ticketId=${selectedTicket.id}`)
+        .then((res) => {
+          if (!res.ok) {
+            throw new Error('Failed to fetch mentionable users');
+          }
+          return res.json();
+        })
         .then(setMentionableUsers)
-        .catch(console.error);
+        .catch((error) => {
+          console.error('Error fetching mentionable users:', error);
+          setMentionableUsers([]); // Fallback to empty array
+        });
     }
   }, [selectedTicket]);
 
@@ -78,7 +86,8 @@ const CommentSection = ({
     let mentionedUserIds = [];
     const processedComment = comment.trim();
     const lowerCaseComment = processedComment.toLowerCase();
-    const sortedMentionableUsers = [...mentionableUsers].sort((a, b) => b.FullName.length - a.FullName.length);
+    const safeUsers = Array.isArray(mentionableUsers) ? mentionableUsers : [];
+    const sortedMentionableUsers = [...safeUsers].sort((a, b) => b.FullName.length - a.FullName.length);
 
     for (const mentionUser of sortedMentionableUsers) {
       const lowerCaseFullName = mentionUser.FullName.toLowerCase().trim();
@@ -149,7 +158,7 @@ const CommentSection = ({
         left: e.target.offsetLeft,
       });
       setFilteredMentions(
-        mentionableUsers.filter((u) =>
+        (Array.isArray(mentionableUsers) ? mentionableUsers : []).filter((u) =>
           u.FullName.toLowerCase().includes(match[1].toLowerCase())
         )
       );
