@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { FaBell } from "react-icons/fa6";
 import { MessageCircle } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import TicketCard from "./TicketCard";
 import ChatSection from "./ChatSection";
 import { useAuth } from "../../App";
@@ -25,6 +25,7 @@ export const SUPPORT = {
 export default function TicketManage() {
   const navigate = useNavigate();
   const { loggedInUser: user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [tickets, setTickets] = useState([]);
   const [selectedTicket, setSelectedTicket] = useState(null);
@@ -38,7 +39,7 @@ export default function TicketManage() {
   const [systems, setSystems] = useState([]);
   const [selectedSupervisorId, setSelectedSupervisorId] = useState("");
   const [selectedSystem, setSelectedSystem] = useState("");
-  const [activeTab, setActiveTab] = useState("details");
+  const [activeTab, setActiveTab] = useState(() => searchParams.get('tab') || "details");
   const [commentsList, setCommentsList] = useState([]);
   const [mentionableUsers, setMentionableUsers] = useState([]);
   const [mentionQuery, setMentionQuery] = useState("");
@@ -199,8 +200,7 @@ export default function TicketManage() {
 
   const handleCardClick = (ticket) => {
     setSelectedTicket(ticket);
-    setComment("");
-    setAttachments([]);
+    setSearchParams({ ticketId: String(ticket.id), tab: 'details' });
   };
 
   const closeModal = () => {
@@ -629,6 +629,15 @@ export default function TicketManage() {
     });
   };
 
+  // Sync selectedTicket from URL param when tickets loaded
+  useEffect(() => {
+    const idParam = searchParams.get('ticketId');
+    if (idParam && tickets.length) {
+      const t = tickets.find(tkt => String(tkt.id) === idParam);
+      if (t) setSelectedTicket(t);
+    }
+  }, [searchParams, tickets]);
+
   return (
     <div className="flex">
       <AdminSideBar open={isSidebarOpen} setOpen={setIsSidebarOpen} />
@@ -719,7 +728,7 @@ export default function TicketManage() {
                 <div className="border-b mb-4">
                   <nav className="flex gap-8">
                     <button
-                      onClick={() => setActiveTab("details")}
+                      onClick={() => { setActiveTab("details"); setSearchParams({ ticketId: searchParams.get('ticketId'), tab: 'details' }); }}
                       className={`pb-2 text-base font-medium ${
                         activeTab === "details"
                           ? "text-blue-600 border-b-2 border-blue-600"
@@ -729,7 +738,7 @@ export default function TicketManage() {
                       Details
                     </button>
                     <button
-                      onClick={() => setActiveTab("activity")}
+                      onClick={() => { setActiveTab("activity"); setSearchParams({ ticketId: searchParams.get('ticketId'), tab: 'activity' }); }}
                       className={`pb-2 text-base font-medium ${
                         activeTab === "activity"
                           ? "text-blue-600 border-b-2 border-blue-600"
@@ -739,7 +748,7 @@ export default function TicketManage() {
                       Activity Log
                     </button>
                     <button
-                      onClick={() => setActiveTab("comments")}
+                      onClick={() => { setActiveTab("comments"); setSearchParams({ ticketId: searchParams.get('ticketId'), tab: 'comments' }); }}
                       className={`pb-2 text-base font-medium ${
                         activeTab === "comments"
                           ? "text-blue-600 border-b-2 border-blue-600"
@@ -750,7 +759,7 @@ export default function TicketManage() {
                     </button>
                     {/* NEW CHAT TAB */}
                     <button
-                      onClick={() => setActiveTab("chat")}
+                      onClick={() => { setActiveTab("chat"); setSearchParams({ ticketId: searchParams.get('ticketId'), tab: 'chat' }); }}
                       className={`pb-2 text-base font-medium ${
                         activeTab === "chat"
                           ? "text-blue-600 border-b-2 border-blue-600"
