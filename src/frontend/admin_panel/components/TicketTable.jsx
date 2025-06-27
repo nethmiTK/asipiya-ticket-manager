@@ -1,13 +1,16 @@
 import React, { useState } from 'react';
-import { FaEdit } from 'react-icons/fa';
+import { FaEdit, FaEye } from 'react-icons/fa';
 import TicketViewPage from '../TicketViewPage';
+import Ticket_secret from '../Ticket_secret';
 
 const TicketTable = ({ 
   tickets, 
   showStatus = true, 
   showPriority = true,
+  onTicketClick
 }) => {
   const [selectedTicket, setSelectedTicket] = useState(null);
+  const [showSecretModal, setShowSecretModal] = useState(false);
 
   const getStatusColor = (status) => {
     switch (status?.toLowerCase()) {
@@ -38,6 +41,23 @@ const TicketTable = ({
         return "text-green-500";
       default:
         return "text-gray-500";
+    }
+  };
+
+  const handleTicketAction = (ticket) => {
+    if (ticket.Status?.toLowerCase() === 'pending') {
+      // For pending tickets, show TicketViewPage
+      setSelectedTicket(ticket);
+      setShowSecretModal(false);
+    } else {
+      // For non-pending tickets, show Ticket_secret
+      setSelectedTicket(ticket);
+      setShowSecretModal(true);
+    }
+    
+    // If onTicketClick is provided, call it as well
+    if (onTicketClick) {
+      onTicketClick(ticket);
     }
   };
 
@@ -111,11 +131,15 @@ const TicketTable = ({
                 )}
                 <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm">
                   <button
-                    onClick={() => setSelectedTicket(ticket)}
+                    onClick={() => handleTicketAction(ticket)}
                     className="text-blue-600 hover:text-blue-800 transition-colors"
-                    title="View Ticket Details"
+                    title={ticket.Status?.toLowerCase() === 'pending' ? "Edit Ticket" : "View Ticket Details"}
                   >
-                    <FaEdit className="w-5 h-5" />
+                    {ticket.Status?.toLowerCase() === 'pending' ? (
+                      <FaEdit className="w-5 h-5" />
+                    ) : (
+                      <FaEye className="w-5 h-5" />
+                    )}
                   </button>
                 </td>
               </tr>
@@ -126,13 +150,29 @@ const TicketTable = ({
 
       {selectedTicket && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setSelectedTicket(null)}></div>
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => {
+            setSelectedTicket(null);
+            setShowSecretModal(false);
+          }}></div>
           <div className="bg-white rounded-xl shadow-lg w-[800px] max-h-[90vh] overflow-y-auto relative z-10">
-            <TicketViewPage
-              ticketId={selectedTicket.TicketID}
-              popupMode={true}
-              onClose={() => setSelectedTicket(null)}
-            />
+            {showSecretModal ? (
+              <Ticket_secret 
+                ticket={selectedTicket} 
+                onClose={() => {
+                  setSelectedTicket(null);
+                  setShowSecretModal(false);
+                }} 
+              />
+            ) : (
+              <TicketViewPage
+                ticketId={selectedTicket.TicketID}
+                popupMode={true}
+                onClose={() => {
+                  setSelectedTicket(null);
+                  setShowSecretModal(false);
+                }}
+              />
+            )}
           </div>
         </div>
       )}
