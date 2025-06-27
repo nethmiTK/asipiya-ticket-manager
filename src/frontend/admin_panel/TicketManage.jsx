@@ -193,19 +193,31 @@ export default function TicketManage() {
   useEffect(() => {
     if (selectedTicket) {
       fetch(`http://localhost:5000/api/mentionable-users?ticketId=${selectedTicket.id}`)
-        .then((res) => {
-          if (!res.ok) {
-            throw new Error('Failed to fetch mentionable users');
-          }
+        .then(res => {
+          if (!res.ok) throw new Error('Failed to fetch mentionable users');
           return res.json();
         })
-        .then(setMentionableUsers)
-        .catch((error) => {
-          console.error('Error fetching mentionable users:', error);
-          setMentionableUsers([]); // Fallback to empty array
+        .then(data => {
+          // ensure array
+          const fetched = Array.isArray(data) ? data : [];
+          let users = [...fetched];
+          // add assigned supervisor
+          const sup = supervisors.find(s => s.UserID === selectedTicket.assignedBy);
+          if (sup && !users.some(u => u.UserID === sup.UserID)) {
+            users.unshift(sup);
+          }
+          // add 'All Admins' option if admin
+          if (user.Role === 'Admin') {
+            users.unshift({ UserID: 'all-admins', FullName: 'All Admins' });
+          }
+          setMentionableUsers(users);
+        })
+        .catch(err => {
+          console.error('Error fetching mentionable users:', err);
+          setMentionableUsers([]);
         });
     }
-  }, [selectedTicket]);
+  }, [selectedTicket, supervisors, user.Role]);
 
   const handleCardClick = (ticket) => {
     setSelectedTicket(ticket);
@@ -591,8 +603,9 @@ export default function TicketManage() {
 
   const renderCommentTextWithMentions = (text) => {
     const parts = [];
-    // Sort mentionable users by length of FullName in descending order - with safety check
+    // Ensure mentionableUsers is an array before spreading
     const safeUsers = Array.isArray(mentionableUsers) ? mentionableUsers : [];
+    // Sort mentionable users by length of FullName in descending order
     const sortedMentionableUsers = [...safeUsers].sort((a, b) => b.FullName.length - a.FullName.length);
 
     let segments = [{ type: 'text', value: text }];
@@ -649,6 +662,9 @@ export default function TicketManage() {
     }
   }, [searchParams, tickets]);
 
+  // Filter supervisors to only those assigned to tickets
+  const availableSupervisors = supervisors.filter(s => tickets.some(t => t.assignedBy === s.UserID));
+
   return (
     <div className="flex">
       <AdminSideBar open={isSidebarOpen} setOpen={setIsSidebarOpen} />
@@ -672,7 +688,7 @@ export default function TicketManage() {
                   onChange={(e) => setSelectedSupervisorId(e.target.value)}
                 >
                   <option value={"all"}>All Supervisors</option>
-                  {supervisors.map((sup) => (
+                  {availableSupervisors.map((sup) => (
                     <option key={sup.UserID} value={sup.UserID}>
                       {sup.FullName}
                     </option>

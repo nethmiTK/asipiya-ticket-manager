@@ -25,7 +25,7 @@ const db = mysql.createConnection({
     host: 'localhost',
     user: 'root',
     password: '',
-    database: 'ticketmanager'
+    database: '1010'
 });
 
 // Connect to the database
