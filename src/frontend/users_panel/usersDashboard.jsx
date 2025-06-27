@@ -139,6 +139,24 @@ const usersDashboard = () => {
         navigate('/user-profile');
     };
 
+    const [activeTooltip, setActiveTooltip] = useState(null);
+    const tooltipRefs = useRef([]);
+
+    // Add this effect to handle clicks outside
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (activeTooltip &&
+                !tooltipRefs.current.some(ref => ref && ref.contains(event.target))) {
+                setActiveTooltip(null);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [activeTooltip]);
+
     return (
         <div className="flex">
             <title>User Dashboard</title>
@@ -180,22 +198,54 @@ const usersDashboard = () => {
                     <div className="mb-8">
                         {/* Mobile View - Icon + Number Only */}
                         <div className="flex justify-around items-center md:hidden">
-                            <div className="flex flex-col items-center">
-                                <LuTicketCheck className="text-3xl text-blue-500" />
-                                <p className="mt-1 text-sm font-bold text-gray-700">{ticketCounts.total}</p>
-                            </div>
-                            <div className="flex flex-col items-center">
-                                <LuTicketX className="text-3xl text-yellow-500" />
-                                <p className="mt-1 text-sm font-bold text-gray-700">{ticketCounts.pending}</p>
-                            </div>
-                            <div className="flex flex-col items-center">
-                                <LuTicket className="text-3xl text-green-500" />
-                                <p className="mt-1 text-sm font-bold text-gray-700">{ticketCounts.resolved}</p>
-                            </div>
-                            <div className="flex flex-col items-center">
-                                <LuStar className="text-3xl text-purple-500" />
-                                <p className="mt-1 text-sm font-bold text-gray-700">{ticketCounts.ongoing}</p>
-                            </div>
+                            {[
+                                {
+                                    icon: <LuTicketCheck className="text-3xl text-blue-500" />,
+                                    count: ticketCounts.total,
+                                    label: 'Total Tickets',
+                                    id: 'total'
+                                },
+                                {
+                                    icon: <LuTicketX className="text-3xl text-yellow-500" />,
+                                    count: ticketCounts.pending,
+                                    label: 'Pending Tickets',
+                                    id: 'pending'
+                                },
+                                {
+                                    icon: <LuTicket className="text-3xl text-green-500" />,
+                                    count: ticketCounts.resolved,
+                                    label: 'Resolved Tickets',
+                                    id: 'resolved'
+                                },
+                                {
+                                    icon: <LuStar className="text-3xl text-purple-500" />,
+                                    count: ticketCounts.ongoing,
+                                    label: 'Ongoing Tickets',
+                                    id: 'ongoing'
+                                }
+                            ].map((item, index) => (
+                                <div
+                                    key={item.id}
+                                    ref={el => tooltipRefs.current[index] = el}
+                                    className="flex flex-col items-center relative"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setActiveTooltip(activeTooltip === item.id ? null : item.id);
+                                    }}
+                                    onMouseLeave={() => setActiveTooltip(null)}
+                                >
+                                    {item.icon}
+                                    <p className="mt-1 text-sm font-bold text-gray-700">{item.count}</p>
+                                    <span className={`
+                absolute -bottom-8 left-1/2 transform -translate-x-1/2 
+                bg-gray-800 text-white text-xs rounded py-1 px-2 whitespace-nowrap
+                transition-opacity duration-200
+                ${activeTooltip === item.id ? 'opacity-100' : 'opacity-0'}
+            `}>
+                                        {item.label}
+                                    </span>
+                                </div>
+                            ))}
                         </div>
 
                         {/* Desktop View - Full Cards */}
