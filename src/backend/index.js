@@ -1393,19 +1393,9 @@ app.put('/api/tickets/:ticketId/priority', async (req, res) => {
 });
 
 // Add comment to ticket
-app.post('/api/tickets/:ticketId/comments', commentAttachmentUpload.single('file'), async (req, res) => { // Added multer middleware
+app.post('/api/tickets/:ticketId/comments', commentAttachmentUpload.array('file', 10), async (req, res) => { // Changed from 'files' to 'file' to match frontend
   const { ticketId } = req.params;
-  let { userId, comment, mentionedUserIds, replyToCommentId } = req.body; // Added replyToCommentId
-
-  let attachmentFilePath = null;
-  let attachmentFileName = null;
-  let attachmentFileType = null;
-
-  if (req.file) {
-    attachmentFilePath = path.join('uploads', 'comment_attachments', req.file.filename).replace(/\\/g, '/'); // Normalize path for DB storage
-    attachmentFileName = req.file.originalname;
-    attachmentFileType = req.file.mimetype;
-  }
+  let { userId, comment, mentionedUserIds, replyToCommentId } = req.body;
 
   try {
     // Process mentions: Extract mentioned user IDs
@@ -1419,21 +1409,59 @@ app.post('/api/tickets/:ticketId/comments', commentAttachmentUpload.single('file
     // The mentioned user IDs are still separately stored in the Mentions column.
 
     const sql = `
-      INSERT INTO comments (TicketID, UserID, CommentText, Mentions, ReplyToCommentID, AttachmentFilePath, AttachmentFileName, AttachmentFileType)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO comments (TicketID, UserID, CommentText, Mentions, ReplyToCommentID)
+      VALUES (?, ?, ?, ?, ?)
     `;
     const result = await db.promise().query(sql, [
       ticketId,
       userId,
       comment.trim(), // Store original comment text
       processedMentions.length > 0 ? processedMentions.join(',') : null, // Store only user IDs
-      replyToCommentId || null,
-      attachmentFilePath,
-      attachmentFileName,
-      attachmentFileType
+      replyToCommentId || null
     ]);
 
     const newCommentId = result[0].insertId;
+    let attachmentFilePath = null;
+
+    // Handle multiple file attachments
+    if (req.files && req.files.length > 0) {
+      for (const file of req.files) {
+        attachmentFilePath = path.join('uploads', 'comment_attachments', file.filename).replace(/\\/g, '/');
+        const attachmentFileName = file.originalname;
+        const attachmentFileType = file.mimetype;
+
+        // Check if comment_attachments table exists, if not create it
+        const createTableSql = `
+          CREATE TABLE IF NOT EXISTS comment_attachments (
+            AttachmentID int(11) NOT NULL AUTO_INCREMENT,
+            CommentID int(11) NOT NULL,
+            FilePath varchar(255) NOT NULL,
+            FileName varchar(255) NOT NULL,
+            FileType varchar(50) NOT NULL,
+            PRIMARY KEY (AttachmentID),
+            KEY fk_comment_attachments_comment (CommentID),
+            FOREIGN KEY (CommentID) REFERENCES comments (CommentID) ON DELETE CASCADE
+          ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+        `;
+        
+        try {
+          await db.promise().query(createTableSql);
+        } catch (tableError) {
+          console.log('Table already exists or creation failed:', tableError.message);
+        }
+
+        const attachmentSql = `
+          INSERT INTO comment_attachments (CommentID, FilePath, FileName, FileType)
+          VALUES (?, ?, ?, ?)
+        `;
+        await db.promise().query(attachmentSql, [
+          newCommentId,
+          attachmentFilePath,
+          attachmentFileName,
+          attachmentFileType
+        ]);
+      }
+    }
 
     // Add to ticketlog
     const logSql = `
@@ -1444,7 +1472,7 @@ app.post('/api/tickets/:ticketId/comments', commentAttachmentUpload.single('file
     const [userResult] = await db.promise().query('SELECT FullName FROM appuser WHERE UserID = ?', [userId]);
     const userName = userResult.length > 0 ? userResult[0].FullName : 'Unknown User';
     
-    const logDescription = `Comment added by ${userName}: "${comment.substring(0, 100)}..."`; // Use original comment for log description
+    const logDescription = `Comment added by ${userName}: "${comment.substring(0, 100)}${comment.length > 100 ? '...' : ''}"`; // Use original comment for log description
     await db.promise().query(logSql, [ticketId, logDescription, userId]); // Use await for logging
 
     // Notify mentioned users

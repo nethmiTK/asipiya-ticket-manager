@@ -881,7 +881,7 @@ export default function TicketManage() {
                               onKeyUp={handleMentionKeyUp}
                               className="block w-full rounded-2xl border-2 border-gray-200 shadow-sm focus:border-blue-500 focus:ring-4 focus:ring-blue-100 resize-none p-4 text-base transition duration-300 ease-in-out placeholder-gray-400 bg-gray-50 focus:bg-white"
                               placeholder="Share your thoughts... Use @ to mention team members"
-                              style={{ 
+                              style={{
                                 minHeight: 120,
                                 fontFamily: 'system-ui, -apple-system, sans-serif',
                                 fontSize: '16px',
@@ -890,9 +890,9 @@ export default function TicketManage() {
                             />
                             {/* Live mention preview overlay */}
                             {comment && (
-                              <div 
+                              <div
                                 className="absolute inset-0 pointer-events-none p-4 text-base rounded-xl overflow-hidden"
-                                style={{ 
+                                style={{
                                   background: 'transparent',
                                   color: 'transparent',
                                   whiteSpace: 'pre-wrap',
@@ -984,7 +984,7 @@ export default function TicketManage() {
                               </svg>
                             </div>
                             <span className="text-sm text-gray-700 font-medium">
-                              {attachments.length > 0 ? `📎 ${attachments.length} files selected` : 'Click to attach file or drag and drop'}
+                              Click to attach file or drag and drop
                             </span>
                             <span className="text-xs text-gray-500">
                               Images, Videos, Documents, PDFs supported (Max 10MB)
@@ -994,47 +994,63 @@ export default function TicketManage() {
                         
                         {/* Preview selected attachments */}
                         {attachments.length > 0 && (
-                          <div className="mt-3 grid grid-cols-4 gap-4">
-                            {attachments.map((file, idx) => {
-                            // Determine icon based on extension
-                            const ext = file.name.split('.').pop().toLowerCase();
-                            let FileIcon = FaFileAlt;
-                            if (['jpg','jpeg','png','gif','webp'].includes(ext)) FileIcon = FaFileImage;
-                            else if (ext === 'pdf') FileIcon = FaFilePdf;
-                            else if (['doc','docx'].includes(ext)) FileIcon = FaFileWord;
-                            else if (['zip','rar','7z'].includes(ext)) FileIcon = FaFileArchive;
-                              return (
-                              <div key={idx} className="relative">
-                                {/* index badge */}
-                                <div className="absolute top-1 left-1 bg-blue-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">{idx + 1}</div>
-                                {/* menu trigger */}
-                                <div className="absolute top-1 right-1">
-                                  <button onClick={() => setPreviewMenuIndex(previewMenuIndex===idx? null: idx)} className="text-gray-500 hover:text-gray-800 p-1">
-                                    <FiMoreVertical />
-                                  </button>
-                                  {previewMenuIndex === idx && (
-                                    <div className="absolute right-0 mt-2 bg-white border rounded shadow-lg z-10">
-                                      <button onClick={() => window.open(URL.createObjectURL(file), '_blank')} className="block px-4 py-2 text-sm hover:bg-gray-100">Open</button>
-                                      <button onClick={() => { const url=URL.createObjectURL(file); const a=document.createElement('a'); a.href=url; a.download=file.name; a.click(); }} className="block px-4 py-2 text-sm hover:bg-gray-100">Download</button>
-                                      <button onClick={() => setAttachments(prev=>prev.filter((_,i)=>i!==idx))} className="block px-4 py-2 text-sm text-red-600 hover:bg-gray-100">Remove</button>
+                          <div className="mt-3 py-3 px-4 border border-gray-200 rounded-xl bg-white shadow-sm">
+                            <div className="flex items-center gap-2 mb-3">
+                              <svg className="w-5 h-5 text-gray-500" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M8 4a3 3 0 00-3 3v4a5 5 0 0010 0V7a1 1 0 112 0v4a7 7 0 11-14 0V7a5 5 0 0110 0v4a3 3 0 11-6 0V7a1 1 0 012 0V7a3 3 0 00-3-3z" clipRule="evenodd" />
+                              </svg>
+                              <span className="text-sm font-medium text-gray-700">{attachments.length} files selected</span>
+                            </div>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                              {attachments.map((file, idx) => {
+                                // Determine icon based on extension and file type
+                                const ext = file.name.split('.').pop().toLowerCase();
+                                let FileIcon = FaFileAlt; // Default generic file icon
+
+                                if (file.type.startsWith('image/')) FileIcon = FaFileImage;
+                                else if (file.type.startsWith('video/')) FileIcon = FaFileAlt; // No specific video icon in Fa set, use generic for now
+                                else if (ext === 'pdf') FileIcon = FaFilePdf;
+                                else if (['doc', 'docx'].includes(ext)) FileIcon = FaFileWord;
+                                else if (['zip', 'rar', '7z'].includes(ext)) FileIcon = FaFileArchive;
+                                else if (['txt', 'csv'].includes(ext)) FileIcon = FaFileAlt;
+                                else if (['pptx', 'ppt'].includes(ext)) FileIcon = FaFileAlt;
+                                else if (['xls', 'xlsx'].includes(ext)) FileIcon = FaFileAlt;
+
+                                return (
+                                  <div key={idx} className="relative bg-gray-50 border border-gray-200 rounded-lg p-3 flex items-center space-x-3 group hover:bg-gray-100 transition-colors duration-200">
+                                    <div className="flex-shrink-0">
+                                      <FileIcon className="text-3xl text-blue-500" />
                                     </div>
-                                  )}
-                                </div>
-                                {file.type.startsWith('image') ? (
-                                  <img src={URL.createObjectURL(file)} alt={file.name} className="w-24 h-24 object-cover rounded shadow-sm" />
-                                ) : (
-                                  <div className="w-24 h-24 flex items-center justify-center bg-gray-100 rounded shadow-sm">
-                                    <FileIcon className="text-3xl text-gray-600" />
+                                    <div className="flex-grow min-w-0">
+                                      <p className="text-sm font-medium text-gray-800 truncate">{file.name}</p>
+                                      <p className="text-xs text-gray-500">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
+                                    </div>
+                                    <div className="flex-shrink-0">
+                                      <button onClick={() => setPreviewMenuIndex(previewMenuIndex === idx ? null : idx)} className="text-gray-500 hover:text-gray-800 p-1 rounded-full hover:bg-gray-200 transition-colors">
+                                        <FiMoreVertical />
+                                      </button>
+                                      {previewMenuIndex === idx && (
+                                        <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg z-10 w-36">
+                                          <button onClick={() => window.open(URL.createObjectURL(file), '_blank')} className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-t-md">Open</button>
+                                          <button onClick={() => { const url = URL.createObjectURL(file); const a = document.createElement('a'); a.href = url; a.download = file.name; a.click(); }} className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Download</button>
+                                          <button onClick={() => setAttachments(prev => prev.filter((_, i) => i !== idx))} className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100 rounded-b-md">Remove</button>
+                                        </div>
+                                      )}
+                                    </div>
                                   </div>
-                                )}
-                                // no hover controls; use menu
-                              </div>
-                              );
-                            })}
-                            {/* Add More tile */}
-                            <div onClick={() => document.getElementById('file-upload').click()} className="relative cursor-pointer flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded w-24 h-24 text-gray-400 hover:border-blue-400 hover:text-blue-600">
-                              <span className="text-2xl">+</span>
-                              <span className="text-xs mt-1">Add More</span>
+                                );
+                              })}
+                              {/* Add More button - new style */}
+                              <button
+                                onClick={() => document.getElementById('file-upload').click()}
+                                className="flex flex-col items-center justify-center p-3 border-2 border-dashed border-gray-300 rounded-lg text-gray-500 hover:border-blue-400 hover:text-blue-600 transition-colors duration-200 aspect-square"
+                                title="Add more attachments"
+                              >
+                                <svg className="w-8 h-8 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                </svg>
+                                <span className="text-sm font-medium">Add More</span>
+                              </button>
                             </div>
                           </div>
                         )}
