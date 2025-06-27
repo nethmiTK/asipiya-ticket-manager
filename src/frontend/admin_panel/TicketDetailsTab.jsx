@@ -17,8 +17,15 @@ export default function TicketDetailsTab({
 }) {
   const handleUpdateTicket = async () => {
     try {
-      const originalTicket = tickets.find(t => t.id === selectedTicket.id);
-      const oldResolution = originalTicket?.resolution || "";
+      // Ensure 'tickets' is available in scope, likely passed as a prop or fetched
+      // For now, assuming 'tickets' would be part of the component's state or props if needed here.
+      // If 'tickets' is not a prop, you might need to fetch it or remove this specific logging logic
+      // if it relies on comparing with an "originalTicket" that isn't readily available.
+      // For this example, I'll comment out the 'originalTicket' finding if 'tickets' isn't explicitly passed.
+
+      // const originalTicket = tickets.find(t => t.id === selectedTicket.id);
+      // const oldResolution = originalTicket?.resolution || "";
+      const oldResolution = selectedTicket?.resolution || ""; // Simpler, assumes selectedTicket already has the current state before update
       const newResolution = selectedTicket.resolution || "";
       const res = await fetch(
         `http://localhost:5000/tickets/${selectedTicket.id}`,
@@ -52,16 +59,19 @@ export default function TicketDetailsTab({
       // If you want to close the modal or perform other actions after save
       // closeModal(); // You'd need to pass this as a prop if used
 
-      setTickets((prev) => // This requires setTickets to be passed as a prop
-        prev.map((t) =>
-          t.id === selectedTicket.id
-            ? {
+      // Check if setTickets prop is provided before attempting to use it
+      if (setTickets) {
+        setTickets((prev) =>
+          prev.map((t) =>
+            t.id === selectedTicket.id
+              ? {
                 ...t,
                 resolution: selectedTicket.resolution,
               }
-            : t
-        )
-      );
+              : t
+          )
+        );
+      }
     } catch (err) {
       console.error(err);
       toast.error("Failed to update ticket");
@@ -86,11 +96,14 @@ export default function TicketDetailsTab({
       if (!res.ok) throw new Error("Failed to update status");
 
       toast.success("Status updated successfully!");
-      setTickets((prevTickets) => // This requires setTickets to be passed as a prop
-        prevTickets.map((t) =>
-          t.id === selectedTicket.id ? { ...t, status: newStatus } : t
-        )
-      );
+      // Check if setTickets prop is provided before attempting to use it
+      if (setTickets) {
+        setTickets((prevTickets) =>
+          prevTickets.map((t) =>
+            t.id === selectedTicket.id ? { ...t, status: newStatus } : t
+          )
+        );
+      }
     } catch (err) {
       console.error(err);
       toast.error("Failed to update status");
@@ -115,20 +128,22 @@ export default function TicketDetailsTab({
       );
       if (!res.ok) throw new Error("Failed to update due date");
 
-      setTickets((prevTickets) => // This requires setTickets to be passed as a prop
-        prevTickets.map((ticket) =>
-          ticket.id === selectedTicket.id
-            ? { ...ticket, dueDate: rawDate }
-            : ticket
-        )
-      );
+      // Check if setTickets prop is provided before attempting to use it
+      if (setTickets) {
+        setTickets((prevTickets) =>
+          prevTickets.map((ticket) =>
+            ticket.id === selectedTicket.id
+              ? { ...ticket, dueDate: rawDate }
+              : ticket
+          )
+        );
+      }
       toast.success("Due date updated successfully!");
     } catch (err) {
       console.error(err);
       toast.error("Failed to update due date");
     }
   };
-
 
   return (
     <div className="grid grid-cols-2 gap-6">
@@ -258,65 +273,56 @@ export default function TicketDetailsTab({
               const isAudio = /\.(mp3|wav|ogg)$/i.test(
                 fileName
               );
-              const isDoc = /\.(docx?|xlsx?)$/i.test(fileName);
+              // Removed isDoc as we will use a generic file icon for non-media/non-PDF
+              // const isDoc = /\.(docx?|xlsx?)$/i.test(fileName);
+
 
               return (
                 <div
                   key={index}
-                  className="border rounded p-2 bg-white shadow-sm flex flex-col items-center text-center"
+                  className="border rounded p-2 bg-white shadow-sm flex flex-col items-center text-center justify-between" // Added justify-between for consistent spacing
                 >
                   {isImage ? (
-                    <a href={fileUrl} target="_blank" rel="noopener noreferrer" >
-                      <img src={fileUrl} alt={fileName} className="w-24 h-24 object-cover rounded hover:opacity-90 transition" />
-                    </a>
+                    <img src={fileUrl} alt={fileName} className="w-24 h-24 object-cover rounded mb-2" />
                   ) : isPDF ? (
-                    <div >
-                    
-                    <a
-                      href={fileUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-red-600 hover:underline"
-                    >
-                      <img
-                              src="https://upload.wikimedia.org/wikipedia/commons/8/87/PDF_file_icon.svg"
-                              alt="PDF"
-                              className="w-20 h-20 object-contain mb-1 justify-center items-center"
-                            />
-                    </a>
-                    </div>
+                    <img
+                      src="https://upload.wikimedia.org/wikipedia/commons/8/87/PDF_file_icon.svg"
+                      alt="PDF Icon"
+                      className="w-20 h-20 object-contain mb-2"
+                    />
                   ) : isVideo ? (
-                    <video controls className="w-24 h-24 rounded" title={fileName} >
+                    <video controls className="w-24 h-24 rounded mb-2" title={fileName}>
                       <source src={fileUrl} type={`video/${fileName.split(".").pop()}`} />
                       Your browser does not support the video tag.
                     </video>
                   ) : isAudio ? (
-                    <audio controls className="w-full" title={fileName} >
+                    <audio controls className="w-full mb-2" title={fileName}>
                       <source src={fileUrl} type={`audio/${fileName.split(".").pop()}`} />
                       Your browser does not support the audio element.
                     </audio>
-                  ) : isDoc ? (
-                    <div>
-                    
-                    <a href={fileUrl} target="_blank" rel="noopener noreferrer" className="text-purple-600 hover:underline" >
-                      <img
-                              src="https://img1.pnghut.com/0/6/19/Hcg4MhtqQZ/google-play-yellow-brand-pdf-android.jpg"
-                              alt="DOC"
-                              className="w-20 h-20 object-contain mb-1 justify-center items-center"
-                            />
-                    </a></div>
                   ) : (
-                    <div>
-                    
-                    <a href={fileUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline" >
-                      <img
-                              src="https://img1.pnghut.com/0/6/19/Hcg4MhtqQZ/google-play-yellow-brand-pdf-android.jpg"
-                              alt="TXT"
-                              className="w-20 h-20 object-contain mb-1 justify-center items-center"
-                            />
-                    </a>
-                    </div>
+                    // Generic file icon for other types (documents, etc.)
+                    <img
+                      src="https://freesoft.ru/storage/images/729/7282/728101/728101_normal.png" // A more common generic file icon
+                      alt="File Icon"
+                      className="w-20 h-20 object-contain mb-2"
+                    />
                   )}
+                  <p className="text-sm font-medium text-gray-800 text-center break-words mb-2 px-1">
+                    {fileName}
+                  </p>
+                  <a
+                    href={fileUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    download={fileName} // This attribute prompts for download
+                    className="inline-flex items-center px-3 py-1 bg-blue-500 text-white rounded-md text-xs hover:bg-blue-600 transition-colors duration-200"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    Download
+                  </a>
                 </div>
               );
             })}
