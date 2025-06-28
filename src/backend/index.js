@@ -1393,19 +1393,9 @@ app.put('/api/tickets/:ticketId/priority', async (req, res) => {
 });
 
 // Add comment to ticket
-app.post('/api/tickets/:ticketId/comments', commentAttachmentUpload.single('file'), async (req, res) => { // Added multer middleware
+app.post('/api/tickets/:ticketId/comments', commentAttachmentUpload.array('file', 10), async (req, res) => { // Changed to 'file' to match frontend
   const { ticketId } = req.params;
   let { userId, comment, mentionedUserIds, replyToCommentId } = req.body; // Added replyToCommentId
-
-  let attachmentFilePath = null;
-  let attachmentFileName = null;
-  let attachmentFileType = null;
-
-  if (req.file) {
-    attachmentFilePath = path.join('uploads', 'comment_attachments', req.file.filename).replace(/\\/g, '/'); // Normalize path for DB storage
-    attachmentFileName = req.file.originalname;
-    attachmentFileType = req.file.mimetype;
-  }
 
   try {
     // Process mentions: Extract mentioned user IDs
@@ -1419,53 +1409,82 @@ app.post('/api/tickets/:ticketId/comments', commentAttachmentUpload.single('file
     // The mentioned user IDs are still separately stored in the Mentions column.
 
     const sql = `
-      INSERT INTO comments (TicketID, UserID, CommentText, Mentions, ReplyToCommentID, AttachmentFilePath, AttachmentFileName, AttachmentFileType)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO comments (TicketID, UserID, CommentText, Mentions, ReplyToCommentID)
+      VALUES (?, ?, ?, ?, ?)
     `;
     const result = await db.promise().query(sql, [
       ticketId,
       userId,
       comment.trim(), // Store original comment text
       processedMentions.length > 0 ? processedMentions.join(',') : null, // Store only user IDs
-      replyToCommentId || null,
-      attachmentFilePath,
-      attachmentFileName,
-      attachmentFileType
+      replyToCommentId || null
     ]);
 
     const newCommentId = result[0].insertId;
 
-    // Add to ticketlog
-    const logSql = `
-      INSERT INTO ticketlog (TicketID, DateTime, Type, Description, UserID)
-      VALUES (?, NOW(), 'COMMENT', ?, ?)
-    `;
-    // Fetch user's name for the log description
-    const [userResult] = await db.promise().query('SELECT FullName FROM appuser WHERE UserID = ?', [userId]);
-    const userName = userResult.length > 0 ? userResult[0].FullName : 'Unknown User';
-    
-    const logDescription = `Comment added by ${userName}: "${comment.substring(0, 100)}..."`; // Use original comment for log description
-    await db.promise().query(logSql, [ticketId, logDescription, userId]); // Use await for logging
+    // Handle multiple file attachments
+    if (req.files && req.files.length > 0) {
+      for (const file of req.files) {
+        const attachmentFilePath = path.join('uploads', 'comment_attachments', file.filename).replace(/\\/g, '/');
+        const attachmentFileName = file.originalname;
+        const attachmentFileType = file.mimetype;
 
-    // Notify mentioned users
-    if (processedMentions.length > 0) {
-      for (const mentionedUserId of processedMentions) {
-        await createNotification(
-          mentionedUserId,
-          `You were mentioned in a comment on ticket #${ticketId}`,
-          'MENTION',
-          newCommentId // Link notification to the new comment
-        );
+        const attachmentSql = `
+          INSERT INTO comment_attachments (CommentID, FilePath, FileName, FileType)
+          VALUES (?, ?, ?, ?)
+        `;
+        await db.promise().query(attachmentSql, [
+          newCommentId,
+          attachmentFilePath,
+          attachmentFileName,
+          attachmentFileType
+        ]);
       }
     }
 
-    res.status(201).json({ 
+    // IMPORTANT: Log and notify asynchronously after sending success response
+    // This ensures the frontend gets a success message even if logging/notifications fail.
+    // Errors in this section will be logged on the server but won't block the frontend response.
+    res.status(201).json({
       message: 'Comment added successfully',
-      commentId: newCommentId,
-      filePath: attachmentFilePath // Return file path for frontend
+      commentId: newCommentId
     });
+
+    // Perform logging and notifications AFTER sending the response
+    try {
+      // Add to ticketlog
+      const logSql = `
+        INSERT INTO ticketlog (TicketID, DateTime, Type, Description, UserID)
+        VALUES (?, NOW(), 'COMMENT', ?, ?)
+      `;
+      // Fetch user's name for the log description
+      const [userResult] = await db.promise().query('SELECT FullName FROM appuser WHERE UserID = ?', [userId]);
+      const userName = userResult.length > 0 ? userResult[0].FullName : 'Unknown User';
+      
+      const logDescription = `Comment added by ${userName}: "${comment.substring(0, 100)}..."`; // Use original comment for log description
+      await db.promise().query(logSql, [ticketId, logDescription, userId]); // Use await for logging
+
+      // Notify mentioned users
+      if (processedMentions.length > 0) {
+        for (const mentionedUserId of processedMentions) {
+          // Exclude the user who made the comment from receiving a mention notification for their own comment
+          if (mentionedUserId !== parseInt(userId)) { // Ensure userId is compared as a number
+            await createNotification(
+              mentionedUserId,
+              `You were mentioned in a comment on ticket #${ticketId}`,
+              'MENTION',
+              newCommentId // Link notification to the new comment
+            );
+          }
+        }
+      }
+    } catch (logOrNotifyError) {
+      console.error('Error during post-comment logging or notification:', logOrNotifyError);
+      // Do not send an error response to frontend here, as the comment itself was saved.
+    }
+
   } catch (err) {
-    console.error('Error adding comment:', err);
+    console.error('Error adding comment (main flow):', err);
     res.status(500).json({ message: 'Failed to add comment', error: err.message });
   }
 });
@@ -3208,47 +3227,83 @@ app.get('/api/companies', (req, res) => {
   });
 });
 
-app.get('/api/tickets/:ticketId/comments', (req, res) => {
+app.get('/api/tickets/:ticketId/comments', async (req, res) => {
   const { ticketId } = req.params;
   const { userId } = req.query; // Get userId from query parameters
-  const sql = `
-    SELECT 
-      c.CommentID, 
-      c.CommentText, 
-      c.CreatedAt, 
-      c.Mentions, 
-      c.ReplyToCommentID, 
-      c.AttachmentFilePath, 
-      c.AttachmentFileName, 
-      c.AttachmentFileType, 
-      u.FullName,
-      u.ProfileImagePath, 
-      (SELECT COUNT(*) FROM comment_likes cl WHERE cl.CommentID = c.CommentID) as LikesCount, 
-      ${userId ? `(SELECT COUNT(*) FROM comment_likes cl WHERE cl.CommentID = c.CommentID AND cl.UserID = ${db.escape(userId)})` : '0'} as UserHasLiked, 
-      ru.FullName as RepliedToUserName 
-    FROM comments c
-    JOIN appuser u ON c.UserID = u.UserID
-    LEFT JOIN comments rc ON c.ReplyToCommentID = rc.CommentID 
-    LEFT JOIN appuser ru ON rc.UserID = ru.UserID 
-    WHERE c.TicketID = ?
-    ORDER BY c.CreatedAt ASC
-  `;
-  db.query(sql, [ticketId], (err, results) => {
-    if (err) {
-      console.error('Error fetching comments:', err);
-      return res.status(500).json({ message: 'Failed to fetch comments' });
+  
+  try {
+    // First get all comments for the ticket
+    const commentsQuery = `
+      SELECT 
+        c.CommentID, 
+        c.CommentText, 
+        c.CreatedAt, 
+        c.Mentions, 
+        c.ReplyToCommentID, 
+        u.FullName,
+        u.ProfileImagePath, 
+        (SELECT COUNT(*) FROM comment_likes cl WHERE cl.CommentID = c.CommentID) as LikesCount, 
+        ${userId ? `(SELECT COUNT(*) FROM comment_likes cl WHERE cl.CommentID = c.CommentID AND cl.UserID = ${db.escape(userId)})` : '0'} as UserHasLiked, 
+        ru.FullName as RepliedToUserName 
+      FROM comments c
+      JOIN appuser u ON c.UserID = u.UserID
+      LEFT JOIN comments rc ON c.ReplyToCommentID = rc.CommentID 
+      LEFT JOIN appuser ru ON rc.UserID = ru.UserID 
+      WHERE c.TicketID = ?
+      ORDER BY c.CreatedAt ASC
+    `;
+    
+    const [comments] = await db.promise().query(commentsQuery, [ticketId]);
+    
+    // Get all attachments for these comments
+    const commentIds = comments.map(c => c.CommentID);
+    let attachments = [];
+    
+    if (commentIds.length > 0) {
+      const attachmentsQuery = `
+        SELECT 
+          CommentID,
+          FilePath as AttachmentFilePath,
+          FileName as AttachmentFileName,
+          FileType as AttachmentFileType
+        FROM comment_attachments 
+        WHERE CommentID IN (${commentIds.map(() => '?').join(',')})
+      `;
+      
+      const [attachmentResults] = await db.promise().query(attachmentsQuery, commentIds);
+      attachments = attachmentResults;
     }
-
-    const commentsWithFullUrls = results.map(comment => {
-      const formattedComment = { ...comment };
-      if (formattedComment.AttachmentFilePath) {
-        formattedComment.AttachmentFullUrl = `http://localhost:5000/${formattedComment.AttachmentFilePath.replace(/\\/g, '/')}`;
+    
+    // Group attachments by comment ID and add them to comments
+    const commentsWithAttachments = comments.map(comment => {
+      const commentAttachments = attachments.filter(att => att.CommentID === comment.CommentID);
+      
+      // For backward compatibility, if there's an attachment, add the first one as single properties
+      let formattedComment = { ...comment };
+      if (commentAttachments.length > 0) {
+        const firstAttachment = commentAttachments[0];
+        formattedComment.AttachmentFilePath = firstAttachment.AttachmentFilePath;
+        formattedComment.AttachmentFileName = firstAttachment.AttachmentFileName;
+        formattedComment.AttachmentFileType = firstAttachment.AttachmentFileType;
+        formattedComment.AttachmentFullUrl = `http://localhost:5000/${firstAttachment.AttachmentFilePath.replace(/\\/g, '/')}`;
       }
+      
+      // Add all attachments as an array for complete access
+      formattedComment.attachments = commentAttachments.map(att => ({
+        filePath: att.AttachmentFilePath,
+        fileName: att.AttachmentFileName,
+        fileType: att.AttachmentFileType,
+        fullUrl: `http://localhost:5000/${att.AttachmentFilePath.replace(/\\/g, '/')}`
+      }));
+      
       return formattedComment;
     });
 
-    res.json(commentsWithFullUrls);
-  });
+    res.json(commentsWithAttachments);
+  } catch (err) {
+    console.error('Error fetching comments:', err);
+    res.status(500).json({ message: 'Failed to fetch comments' });
+  }
 });
 
 app.get('/api/mentionable-users', (req, res) => {
