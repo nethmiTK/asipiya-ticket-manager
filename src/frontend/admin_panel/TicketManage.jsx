@@ -59,11 +59,73 @@ export default function TicketManage() {
   const [expandedReplies, setExpandedReplies] = useState({});
   const [previewMenuIndex, setPreviewMenuIndex] = useState(null);
 
+  // Utility function to set cursor position reliably
+  const setCursorPosition = (textarea, position) => {
+    if (!textarea) return;
+    
+    try {
+      textarea.focus();
+      
+      // Multiple attempts with different timing for better reliability
+      const setPosition = () => {
+        if (textarea.setSelectionRange) {
+          textarea.setSelectionRange(position, position);
+        }
+      };
+      
+      // Immediate attempt
+      setPosition();
+      
+      // Delayed attempts as fallback
+      setTimeout(setPosition, 10);
+      setTimeout(setPosition, 50);
+      
+    } catch (error) {
+      console.warn('Could not set cursor position:', error);
+    }
+  };
+
   // This computes which supervisorId to use based on user role and selection
   const supervisorIdToUse =
     user.Role === "Admin" && selectedSupervisorId
       ? selectedSupervisorId
       : user.UserID;
+
+  // Handle cursor positioning after comment changes (especially for mentions)
+  useEffect(() => {
+    if (textareaRef.current && textareaRef.current.pendingCursorPosition !== undefined) {
+      const textarea = textareaRef.current;
+      const position = textarea.pendingCursorPosition;
+      
+      // Clear the pending position
+      delete textarea.pendingCursorPosition;
+      
+      // Set cursor position with multiple timing strategies for maximum reliability
+      const setCursor = () => {
+        if (textarea) {
+          textarea.focus();
+          try {
+            textarea.setSelectionRange(position, position);
+          } catch (e) {
+            console.warn('Could not set cursor position:', e);
+          }
+        }
+      };
+      
+      // Immediate attempt
+      setCursor();
+      
+      // requestAnimationFrame for next repaint
+      requestAnimationFrame(() => {
+        setCursor();
+      });
+      
+      // Additional fallbacks with timeouts
+      setTimeout(setCursor, 10);
+      setTimeout(setCursor, 50);
+      setTimeout(setCursor, 100);
+    }
+  }, [comment]);
 
   // Fetch tickets for the current supervisorIdToUse whenever it changes
   useEffect(() => {
@@ -505,19 +567,28 @@ export default function TicketManage() {
   };
 
   function handleCommentChange(e) {
-    setComment(e.target.value);
+    const newValue = e.target.value;
+    const caretPosition = e.target.selectionStart;
+    
+    setComment(newValue);
 
     // Detect if user is typing @mention
-    const caret = e.target.selectionStart;
-    const text = e.target.value.slice(0, caret);
+    const text = newValue.slice(0, caretPosition);
     const match = text.match(/@([\w\s]*)$/);
+    
     if (match) {
       setMentionQuery(match[1]);
       setShowMentionDropdown(true);
+      
+      // Calculate dropdown position relative to textarea
+      const textarea = e.target;
+      const rect = textarea.getBoundingClientRect();
+      
       setMentionDropdownPos({
-        top: e.target.offsetTop + e.target.offsetHeight,
-        left: e.target.offsetLeft,
+        top: rect.bottom - rect.top + 10,
+        left: rect.left - rect.left + 10,
       });
+      
       setFilteredMentions(
         (Array.isArray(mentionableUsers) ? mentionableUsers : []).filter((u) =>
           u.FullName.toLowerCase().includes(match[1].toLowerCase())
@@ -527,35 +598,114 @@ export default function TicketManage() {
       setShowMentionDropdown(false);
       setMentionQuery("");
     }
+    
+    // Store the current caret position for potential use
+    if (textareaRef.current) {
+      textareaRef.current.lastCaretPosition = caretPosition;
+    }
   }
 
   function handleMentionKeyUp(e) {
-    // If dropdown is open and user presses ArrowDown/ArrowUp/Enter, handle navigation/selection
-    // (Optional: for keyboard navigation)
+    // Handle keyboard navigation in mention dropdown
+    if (showMentionDropdown && filteredMentions.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        // Could add keyboard navigation logic here
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        // Could add keyboard navigation logic here
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        if (filteredMentions.length > 0) {
+          handleMentionSelect(filteredMentions[0]);
+        }
+      } else if (e.key === 'Escape') {
+        setShowMentionDropdown(false);
+        setMentionQuery("");
+      }
+    }
   }
 
   function handleMentionSelect(user) {
-    // Insert @FullName at the current caret position
+    if (!textareaRef.current) return;
+    
     const textarea = textareaRef.current;
-    const caret = textarea.selectionStart;
-    const text = comment;
-    const match = text.slice(0, caret).match(/@([\w\s]*)$/);
+    const currentCaretPosition = textarea.selectionStart;
+    const currentText = comment;
+    
+    // Find the @ symbol and the text after it up to the caret
+    const textBeforeCaret = currentText.slice(0, currentCaretPosition);
+    const match = textBeforeCaret.match(/@([\w\s]*)$/);
+    
     if (match) {
-      const before = text.slice(0, caret - match[0].length);
-      const after = text.slice(caret);
+      const mentionStartIndex = currentCaretPosition - match[0].length;
+      const textBefore = currentText.slice(0, mentionStartIndex);
+      const textAfter = currentText.slice(currentCaretPosition);
       const mentionText = `@${user.FullName} `;
-      const newComment = before + mentionText + after;
-      setComment(newComment);
+      
+      // Create the new comment text
+      const newComment = textBefore + mentionText + textAfter;
+      const newCaretPosition = textBefore.length + mentionText.length;
+      
+      // Debug logging
+      console.log('Mention Selection Debug:', {
+        mentionText,
+        textBefore,
+        textAfter,
+        newCaretPosition,
+        newCommentLength: newComment.length
+      });
+      
+      // Close mention dropdown first
       setShowMentionDropdown(false);
       setMentionQuery("");
-      // Move caret after inserted mention
-      setTimeout(() => {
-        textarea.focus();
-        textarea.setSelectionRange(
-          before.length + mentionText.length,
-          before.length + mentionText.length
-        );
-      }, 0);
+      
+      // Store the cursor position for later use
+      textarea.pendingCursorPosition = newCaretPosition;
+      
+      // Update the comment state
+      setComment(newComment);
+      
+      // Use a more reliable cursor positioning approach
+      // This ensures the cursor is set after React has updated the DOM
+      Promise.resolve().then(() => {
+        if (textarea && textarea.pendingCursorPosition !== undefined) {
+          const targetPosition = textarea.pendingCursorPosition;
+          
+          // Ensure textarea is focused and positioned correctly
+          textarea.focus();
+          
+          // Use multiple attempts with different timing
+          const setCursor = () => {
+            try {
+              if (document.activeElement === textarea) {
+                textarea.setSelectionRange(targetPosition, targetPosition);
+                // Force cursor visibility
+                textarea.style.caretColor = '#ef4444';
+                // Debug: Verify cursor position was set correctly
+                console.log('Cursor set to position:', targetPosition, 'Actual position:', textarea.selectionStart);
+                // Clear pending position on success
+                delete textarea.pendingCursorPosition;
+                return true;
+              }
+            } catch (e) {
+              console.warn('Cursor positioning attempt failed:', e);
+            }
+            return false;
+          };
+          
+          // Immediate attempt
+          if (!setCursor()) {
+            // Fallback with requestAnimationFrame
+            requestAnimationFrame(() => {
+              if (!setCursor()) {
+                // Final fallback with timeout
+                setTimeout(setCursor, 10);
+              }
+            });
+          }
+        }
+      });
     }
   }
 
@@ -592,8 +742,55 @@ export default function TicketManage() {
   // Function to initiate a reply
   const handleReplyClick = (commentId, userName) => {
     setReplyingTo({ commentId, userName });
-    setComment(`@${userName} `); // Pre-fill textarea with mention
-    textareaRef.current.focus();
+    const mentionText = `@${userName} `;
+    const position = mentionText.length;
+    
+    // Set the comment text first
+    setComment(mentionText);
+    
+    // Store pending cursor position
+    if (textareaRef.current) {
+      textareaRef.current.pendingCursorPosition = position;
+    }
+    
+    // Use the same reliable cursor positioning approach as mention select
+    Promise.resolve().then(() => {
+      if (textareaRef.current && textareaRef.current.pendingCursorPosition !== undefined) {
+        const textarea = textareaRef.current;
+        const targetPosition = textarea.pendingCursorPosition;
+        
+        // Ensure textarea is focused and positioned correctly
+        textarea.focus();
+        
+        // Use multiple attempts with different timing
+        const setCursor = () => {
+          try {
+            if (document.activeElement === textarea) {
+              textarea.setSelectionRange(targetPosition, targetPosition);
+              // Force cursor visibility
+              textarea.style.caretColor = '#ef4444';
+              // Clear pending position on success
+              delete textarea.pendingCursorPosition;
+              return true;
+            }
+          } catch (e) {
+            console.warn('Cursor positioning attempt failed:', e);
+          }
+          return false;
+        };
+        
+        // Immediate attempt
+        if (!setCursor()) {
+          // Fallback with requestAnimationFrame
+          requestAnimationFrame(() => {
+            if (!setCursor()) {
+              // Final fallback with timeout
+              setTimeout(setCursor, 10);
+            }
+          });
+        }
+      }
+    });
   };
 
   // Function to cancel a reply
@@ -651,7 +848,7 @@ export default function TicketManage() {
     return segments.map((segment, index) => {
       if (segment.type === 'mention') {
         return (
-          <span key={index} className="text-blue-600 font-semibold bg-blue-50 px-1 rounded">
+          <span key={index} style={{ color: '#1e40af', fontWeight: '600' }}>
             {segment.value}
           </span>
         );
@@ -871,38 +1068,58 @@ export default function TicketManage() {
                             </button>
                           </div>
                         )}
-                        <div className="flex flex-col gap-4">
-                          <div className="relative">
-                            <textarea
-                              ref={textareaRef}
-                              rows={4}
-                              value={comment}
-                              onChange={handleCommentChange}
-                              onKeyUp={handleMentionKeyUp}
-                              className="block w-full rounded-2xl border-2 border-gray-200 shadow-sm focus:border-blue-500 focus:ring-4 focus:ring-blue-100 resize-none p-4 text-base transition duration-300 ease-in-out placeholder-gray-400 bg-gray-50 focus:bg-white"
-                              placeholder="Share your thoughts... Use @ to mention team members"
-                              style={{
-                                minHeight: 120,
-                                fontFamily: 'system-ui, -apple-system, sans-serif',
-                                fontSize: '16px',
-                                lineHeight: '1.5'
-                              }}
-                            />
-                            {/* Live mention preview overlay */}
-                            {comment && (
-                              <div
-                                className="absolute inset-0 pointer-events-none p-4 text-base rounded-xl overflow-hidden"
+                        <div className="space-y-6">
+                          {/* Comment Text Area Section */}
+                          <div className="bg-white border-2 border-gray-200 rounded-2xl p-1 shadow-sm focus-within:border-blue-500 focus-within:shadow-lg transition-all duration-300">
+                            <div className="relative">
+                              {/* Hidden textarea for input */}
+                              <textarea
+                                ref={textareaRef}
+                                rows={4}
+                                value={comment}
+                                onChange={handleCommentChange}
+                                onKeyUp={handleMentionKeyUp}
+                                onFocus={(e) => {
+                                  // Handle pending cursor position when textarea gains focus
+                                  if (e.target.pendingCursorPosition !== undefined) {
+                                    const position = e.target.pendingCursorPosition;
+                                    delete e.target.pendingCursorPosition;
+                                    setTimeout(() => {
+                                      try {
+                                        e.target.setSelectionRange(position, position);
+                                      } catch (err) {
+                                        console.warn('Could not set cursor position on focus:', err);
+                                      }
+                                    }, 0);
+                                  }
+                                }}
+                                className="block w-full rounded-xl border-0 resize-none p-4 text-base placeholder-gray-400 focus:ring-0 focus:outline-none bg-transparent relative z-10"
+                                placeholder="Share your thoughts... Use @ to mention team members"
+                                spellCheck="false"
                                 style={{
-                                  background: 'transparent',
+                                  minHeight: 120,
+                                  fontFamily: 'system-ui, -apple-system, sans-serif',
+                                  fontSize: '16px',
+                                  lineHeight: '1.5',
                                   color: 'transparent',
+                                  caretColor: '#374151',
+                                }}
+                              />
+                              
+                              {/* Visible text with mention highlighting */}
+                              <div
+                                className="absolute inset-0 p-4 text-base rounded-xl overflow-hidden pointer-events-none"
+                                style={{
+                                  fontFamily: 'system-ui, -apple-system, sans-serif',
+                                  fontSize: '16px',
+                                  lineHeight: '1.5',
+                                  color: '#374151',
                                   whiteSpace: 'pre-wrap',
                                   wordBreak: 'break-word',
-                                  fontFamily: 'system-ui, -apple-system, sans-serif',
-                                  lineHeight: '1.5'
+                                  zIndex: 5,
                                 }}
                               >
-                                {(() => {
-                                  // Sort mentionable users by length of FullName in descending order for better matching - with safety check
+                                {comment ? (() => {
                                   const safeUsers = Array.isArray(mentionableUsers) ? mentionableUsers : [];
                                   const sortedMentionableUsers = [...safeUsers].sort((a, b) => b.FullName.length - a.FullName.length);
                                   
@@ -942,8 +1159,7 @@ export default function TicketManage() {
                                       return (
                                         <span 
                                           key={index} 
-                                          className="bg-blue-200 text-blue-800 px-1 rounded font-semibold"
-                                          style={{ color: '#1e40af' }}
+                                          className="bg-blue-100 text-blue-700 px-1 py-0.5 rounded font-semibold"
                                         >
                                           {segment.value}
                                         </span>
@@ -952,105 +1168,141 @@ export default function TicketManage() {
                                       return segment.value;
                                     }
                                   });
-                                })()}
+                                })() : (
+                                  <span className="text-gray-400">Share your thoughts... Use @ to mention team members</span>
+                                )}
                               </div>
-                            )}
-                            {comment.trim() && (
-                              <div className="absolute bottom-3 right-3 px-2 py-1 bg-white bg-opacity-90 rounded-lg shadow-sm">
-                                <span className="text-xs text-gray-500 font-medium">
-                                  {comment.length} characters
+                              
+                              {comment.trim() && (
+                                <div className="absolute bottom-3 right-3 px-3 py-1 bg-gray-100 rounded-lg z-20">
+                                  <span className="text-xs text-gray-500 font-medium">
+                                    {comment.length} characters
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* File Upload Section */}
+                          <div className="bg-gradient-to-br from-gray-50 to-blue-50 border-2 border-dashed border-gray-300 rounded-2xl hover:border-blue-400 hover:from-blue-50 hover:to-indigo-50 transition-all duration-300">
+                            <input
+                              type="file"
+                              multiple
+                              onChange={handleFileChange}
+                              className="hidden"
+                              id="file-upload"
+                              accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.txt"
+                            />
+                            <label
+                              htmlFor="file-upload"
+                              className="cursor-pointer flex flex-col items-center justify-center gap-3 py-8 px-6"
+                            >
+                              <div className="p-4 bg-white rounded-full shadow-md hover:shadow-lg transition-shadow duration-300">
+                                <svg className="w-8 h-8 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                                </svg>
+                              </div>
+                              <div className="text-center">
+                                <span className="text-base text-gray-700 font-semibold block mb-1">
+                                  Click to attach files or drag and drop
+                                </span>
+                                <span className="text-sm text-gray-500">
+                                  Images, Videos, Documents, PDFs supported (Max 10MB each)
                                 </span>
                               </div>
-                            )}
+                            </label>
                           </div>
                         </div>
                         
-                        <div className="mt-4 p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-400 transition-colors bg-gray-50 hover:bg-blue-50">
-                          <input
-                            type="file"
-                            multiple
-                            onChange={handleFileChange}
-                            className="hidden"
-                            id="file-upload"
-                            accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.txt"
-                          />
-                          <label
-                            htmlFor="file-upload"
-                            className="cursor-pointer flex flex-col items-center justify-center gap-2 py-4"
-                          >
-                            <div className="p-3 bg-white rounded-full shadow-sm">
-                              <svg className="w-8 h-8 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-                              </svg>
-                            </div>
-                            <span className="text-sm text-gray-700 font-medium">
-                              Click to attach file or drag and drop
-                            </span>
-                            <span className="text-xs text-gray-500">
-                              Images, Videos, Documents, PDFs supported (Max 10MB)
-                            </span>
-                          </label>
-                        </div>
-                        
-                        {/* Preview selected attachments */}
+                        {/* File Previews */}
                         {attachments.length > 0 && (
-                          <div className="mt-3 py-3 px-4 border border-gray-200 rounded-xl bg-white shadow-sm">
-                            <div className="flex items-center gap-2 mb-3">
-                              <svg className="w-5 h-5 text-gray-500" fill="currentColor" viewBox="0 0 20 20">
-                                <path fillRule="evenodd" d="M8 4a3 3 0 00-3 3v4a5 5 0 0010 0V7a1 1 0 112 0v4a7 7 0 11-14 0V7a5 5 0 0110 0v4a3 3 0 11-6 0V7a1 1 0 012 0V7a3 3 0 00-3-3z" clipRule="evenodd" />
-                              </svg>
-                              <span className="text-sm font-medium text-gray-700">{attachments.length} files selected</span>
+                          <div className="mt-4 p-4 bg-white border border-gray-200 rounded-xl shadow-sm">
+                            <div className="flex items-center justify-between mb-4">
+                              <div className="flex items-center gap-2">
+                                <svg className="w-5 h-5 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M8 4a3 3 0 00-3 3v4a5 5 0 0010 0V7a1 1 0 112 0v4a7 7 0 11-14 0V7a5 5 0 0110 0v4a3 3 0 11-6 0V7a1 1 0 012 0V7a3 3 0 00-3-3z" clipRule="evenodd" />
+                                </svg>
+                                <span className="text-sm font-semibold text-gray-800">{attachments.length} files selected</span>
+                              </div>
+                              <button
+                                onClick={() => setAttachments([])}
+                                className="text-red-600 hover:text-red-800 text-sm font-medium flex items-center gap-1 hover:bg-red-50 px-2 py-1 rounded-md transition-colors"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                                Clear all
+                              </button>
                             </div>
-                            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                            
+                            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
                               {attachments.map((file, idx) => {
-                                // Determine icon based on extension and file type
-                                const ext = file.name.split('.').pop().toLowerCase();
-                                let FileIcon = FaFileAlt; // Default generic file icon
-
-                                if (file.type.startsWith('image/')) FileIcon = FaFileImage;
-                                else if (file.type.startsWith('video/')) FileIcon = FaFileAlt; // No specific video icon in Fa set, use generic for now
-                                else if (ext === 'pdf') FileIcon = FaFilePdf;
-                                else if (['doc', 'docx'].includes(ext)) FileIcon = FaFileWord;
-                                else if (['zip', 'rar', '7z'].includes(ext)) FileIcon = FaFileArchive;
-                                else if (['txt', 'csv'].includes(ext)) FileIcon = FaFileAlt;
-                                else if (['pptx', 'ppt'].includes(ext)) FileIcon = FaFileAlt;
-                                else if (['xls', 'xlsx'].includes(ext)) FileIcon = FaFileAlt;
-
+                                const isImage = file.type.startsWith('image/');
+                                const isVideo = file.type.startsWith('video/');
+                                const ext = file.name.split('.').pop()?.toLowerCase() || '';
+                                const isPDF = ext === 'pdf';
+                                const isDoc = ['doc', 'docx'].includes(ext);
+                                
                                 return (
-                                  <div key={idx} className="relative bg-gray-50 border border-gray-200 rounded-lg p-3 flex items-center space-x-3 group hover:bg-gray-100 transition-colors duration-200">
-                                    <div className="flex-shrink-0">
-                                      <FileIcon className="text-3xl text-blue-500" />
-                                    </div>
-                                    <div className="flex-grow min-w-0">
-                                      <p className="text-sm font-medium text-gray-800 truncate">{file.name}</p>
-                                      <p className="text-xs text-gray-500">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
-                                    </div>
-                                    <div className="flex-shrink-0">
-                                      <button onClick={() => setPreviewMenuIndex(previewMenuIndex === idx ? null : idx)} className="text-gray-500 hover:text-gray-800 p-1 rounded-full hover:bg-gray-200 transition-colors">
-                                        <FiMoreVertical />
-                                      </button>
-                                      {previewMenuIndex === idx && (
-                                        <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg z-10 w-36">
-                                          <button onClick={() => window.open(URL.createObjectURL(file), '_blank')} className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-t-md">Open</button>
-                                          <button onClick={() => { const url = URL.createObjectURL(file); const a = document.createElement('a'); a.href = url; a.download = file.name; a.click(); }} className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Download</button>
-                                          <button onClick={() => setAttachments(prev => prev.filter((_, i) => i !== idx))} className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100 rounded-b-md">Remove</button>
+                                  <div key={idx} className="relative group bg-gray-50 border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-all">
+                                    {/* Remove button */}
+                                    <button
+                                      onClick={() => setAttachments(prev => prev.filter((_, i) => i !== idx))}
+                                      className="absolute top-1 right-1 z-10 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
+                                    >
+                                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                      </svg>
+                                    </button>
+                                    
+                                    {/* File preview */}
+                                    <div className="aspect-square flex items-center justify-center p-2">
+                                      {isImage ? (
+                                        <img 
+                                          src={URL.createObjectURL(file)} 
+                                          alt={file.name}
+                                          className="w-full h-full object-cover rounded"
+                                        />
+                                      ) : (
+                                        <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${
+                                          isPDF ? 'bg-red-100 text-red-600' :
+                                          isDoc ? 'bg-blue-100 text-blue-600' :
+                                          isVideo ? 'bg-purple-100 text-purple-600' :
+                                          'bg-gray-100 text-gray-600'
+                                        }`}>
+                                          {isPDF ? (
+                                            <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                                              <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0113 3.414L16.586 7A2 2 0 0118 8.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd" />
+                                            </svg>
+                                          ) : isDoc ? (
+                                            <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                                              <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0113 3.414L16.586 7A2 2 0 0118 8.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd" />
+                                            </svg>
+                                          ) : isVideo ? (
+                                            <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                                              <path fillRule="evenodd" d="M2 6a2 2 0 012-2h6a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V6zM14.553 7.106A1 1 0 0014 8v4a1 1 0 00.553.894l2 1A1 1 0 0018 13V7a1 1 0 00-1.447-.894l-2 1z" clipRule="evenodd" />
+                                            </svg>
+                                          ) : (
+                                            <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                                              <path fillRule="evenodd" d="M8 4a3 3 0 00-3 3v4a5 5 0 0010 0V7a1 1 0 112 0v4a7 7 0 11-14 0V7a5 5 0 0110 0v4a3 3 0 11-6 0V7a1 1 0 012 0V7a3 3 0 00-3-3z" clipRule="evenodd" />
+                                            </svg>
+                                          )}
                                         </div>
                                       )}
+                                    </div>
+                                    
+                                    {/* File info */}
+                                    <div className="px-2 pb-2">
+                                      <p className="text-xs text-gray-600 font-medium truncate" title={file.name}>
+                                        {file.name}
+                                      </p>
+                                      <p className="text-xs text-gray-400">
+                                        {(file.size / 1024 / 1024).toFixed(1)} MB
+                                      </p>
                                     </div>
                                   </div>
                                 );
                               })}
-                              {/* Add More button - new style */}
-                              <button
-                                onClick={() => document.getElementById('file-upload').click()}
-                                className="flex flex-col items-center justify-center p-3 border-2 border-dashed border-gray-300 rounded-lg text-gray-500 hover:border-blue-400 hover:text-blue-600 transition-colors duration-200 aspect-square"
-                                title="Add more attachments"
-                              >
-                                <svg className="w-8 h-8 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                                </svg>
-                                <span className="text-sm font-medium">Add More</span>
-                              </button>
                             </div>
                           </div>
                         )}
@@ -1331,7 +1583,7 @@ function CommentItem({
     return segments.map((segment, index) => {
       if (segment.type === 'mention') {
         return (
-          <span key={index} className="text-blue-600 font-semibold bg-blue-50 px-1 rounded">
+          <span key={index} style={{ color: '#1e40af', fontWeight: '600' }}>
             {segment.value}
           </span>
         );
@@ -1383,57 +1635,160 @@ function CommentItem({
 
           {/* Display Attachments if exist */}
           {comment.attachments && comment.attachments.length > 0 && (
-            <div className="mt-3 p-4 bg-gray-50 rounded-lg border border-gray-200">
-              <p className="text-sm text-gray-600 mb-3 font-medium">
-                📎 {comment.attachments.length > 1 ? `${comment.attachments.length} Attachments:` : 'Attachment:'}
-              </p>
-              <div className="space-y-3">
-                {comment.attachments.map((attachment, index) => {
-                  const isImage = attachment.fileType && attachment.fileType.startsWith('image/');
-                  const isVideo = attachment.fileType && attachment.fileType.startsWith('video/');
-                  const isAudio = attachment.fileType && attachment.fileType.startsWith('audio/');
-                  const isPDF = attachment.fileType && attachment.fileType === 'application/pdf';
-                  
-                  return (
-                    <div key={index} className="border border-gray-200 rounded-lg p-3 bg-white">
-                      {isImage ? (
-                        <a href={attachment.fullUrl} target="_blank" rel="noopener noreferrer" className="block">
-                          <img 
-                            src={attachment.fullUrl} 
-                            alt={attachment.fileName} 
-                            className="max-w-sm h-auto rounded-lg shadow-sm hover:shadow-md transition-shadow" 
-                          />
-                        </a>
-                      ) : isVideo ? (
-                        <video controls src={attachment.fullUrl} className="max-w-sm h-auto rounded-lg shadow-sm">
-                          Your browser does not support the video tag.
-                        </video>
-                      ) : isAudio ? (
-                        <audio controls src={attachment.fullUrl} className="w-full max-w-sm">
-                          Your browser does not support the audio tag.
-                        </audio>
-                      ) : isPDF ? (
-                        <a href={attachment.fullUrl} target="_blank" rel="noopener noreferrer" 
-                           className="inline-flex items-center gap-2 px-4 py-2 bg-red-50 text-red-700 rounded-lg hover:bg-red-100 transition-colors">
-                          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0113 3.414L16.586 7A2 2 0 0118 8.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd" />
-                          </svg>
-                          {attachment.fileName}
-                        </a>
-                      ) : (
-                        <a href={attachment.fullUrl} target="_blank" rel="noopener noreferrer" 
-                           className="inline-flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors">
-                          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M8 4a3 3 0 00-3 3v4a5 5 0 0010 0V7a1 1 0 112 0v4a7 7 0 11-14 0V7a5 5 0 0110 0v4a3 3 0 11-6 0V7a1 1 0 012 0V7a3 3 0 00-3-3z" clipRule="evenodd" />
-                          </svg>
-                          {attachment.fileName}
-                        </a>
-                      )}
-                      <p className="text-xs text-gray-500 mt-2">{attachment.fileName}</p>
-                    </div>
-                  );
-                })}
+            <div className="mt-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200">
+              <div className="flex items-center mb-4">
+                <svg className="w-5 h-5 text-blue-600 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M8 4a3 3 0 00-3 3v4a5 5 0 0010 0V7a1 1 0 112 0v4a7 7 0 11-14 0V7a5 5 0 0110 0v4a3 3 0 11-6 0V7a1 1 0 012 0V7a3 3 0 00-3-3z" clipRule="evenodd" />
+                </svg>
+                <span className="text-sm font-semibold text-blue-800">
+                  {comment.attachments.length > 1 ? `${comment.attachments.length} Attachments` : '1 Attachment'}
+                </span>
               </div>
+              
+              {/* Separate media and documents */}
+              {(() => {
+                const mediaFiles = comment.attachments.filter(att => 
+                  att.fileType && (att.fileType.startsWith('image/') || att.fileType.startsWith('video/'))
+                );
+                const documentFiles = comment.attachments.filter(att => 
+                  !att.fileType || (!att.fileType.startsWith('image/') && !att.fileType.startsWith('video/'))
+                );
+
+                return (
+                  <div className="space-y-4">
+                    {/* Media Files Grid */}
+                    {mediaFiles.length > 0 && (
+                      <div>
+                        <h4 className="text-xs font-medium text-gray-600 mb-2 uppercase tracking-wide">Media</h4>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                          {mediaFiles.map((attachment, index) => {
+                            const isImage = attachment.fileType && attachment.fileType.startsWith('image/');
+                            const isVideo = attachment.fileType && attachment.fileType.startsWith('video/');
+                            
+                            return (
+                              <div key={index} className="relative group">
+                                {isImage ? (
+                                  <a href={attachment.fullUrl} target="_blank" rel="noopener noreferrer" className="block">
+                                    <div className="relative overflow-hidden rounded-lg border-2 border-white shadow-md hover:shadow-lg transition-all duration-300 group-hover:scale-105">
+                                      <img 
+                                        src={attachment.fullUrl} 
+                                        alt={attachment.fileName} 
+                                        className="w-full h-32 object-cover"
+                                      />
+                                      <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-300 flex items-center justify-center">
+                                        <svg className="w-8 h-8 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                        </svg>
+                                      </div>
+                                    </div>
+                                    <p className="text-xs text-gray-600 mt-1 truncate">{attachment.fileName}</p>
+                                  </a>
+                                ) : isVideo ? (
+                                  <div className="relative overflow-hidden rounded-lg border-2 border-white shadow-md">
+                                    <video 
+                                      controls 
+                                      src={attachment.fullUrl} 
+                                      className="w-full h-32 object-cover rounded-lg"
+                                      poster=""
+                                    >
+                                      Your browser does not support the video tag.
+                                    </video>
+                                    <p className="text-xs text-gray-600 mt-1 truncate">{attachment.fileName}</p>
+                                  </div>
+                                ) : null}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Document Files */}
+                    {documentFiles.length > 0 && (
+                      <div>
+                        <h4 className="text-xs font-medium text-gray-600 mb-2 uppercase tracking-wide">Documents</h4>
+                        <div className="space-y-2">
+                          {documentFiles.map((attachment, index) => {
+                            const isPDF = attachment.fileType && attachment.fileType === 'application/pdf';
+                            const isDoc = attachment.fileType && (
+                              attachment.fileType === 'application/msword' || 
+                              attachment.fileType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+                            );
+                            const isAudio = attachment.fileType && attachment.fileType.startsWith('audio/');
+                            
+                            return (
+                              <div key={index} className="bg-white rounded-lg border border-gray-200 p-3 hover:border-blue-300 hover:shadow-md transition-all duration-200">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center flex-1 min-w-0">
+                                    {/* File Type Icon */}
+                                    <div className={`flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center mr-3 ${
+                                      isPDF ? 'bg-red-100 text-red-600' :
+                                      isDoc ? 'bg-blue-100 text-blue-600' :
+                                      isAudio ? 'bg-green-100 text-green-600' :
+                                      'bg-gray-100 text-gray-600'
+                                    }`}>
+                                      {isPDF ? (
+                                        <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                                          <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0113 3.414L16.586 7A2 2 0 0118 8.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd" />
+                                        </svg>
+                                      ) : isDoc ? (
+                                        <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                                          <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0113 3.414L16.586 7A2 2 0 0118 8.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd" />
+                                        </svg>
+                                      ) : isAudio ? (
+                                        <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                                          <path fillRule="evenodd" d="M18 3a1 1 0 00-1.196-.98l-10 2A1 1 0 006 5v9.114A4.369 4.369 0 005 14c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V7.82l8-1.6v5.894A4.37 4.37 0 0015 12c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V3z" clipRule="evenodd" />
+                                        </svg>
+                                      ) : (
+                                        <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                                          <path fillRule="evenodd" d="M8 4a3 3 0 00-3 3v4a5 5 0 0010 0V7a1 1 0 112 0v4a7 7 0 11-14 0V7a5 5 0 0110 0v4a3 3 0 11-6 0V7a1 1 0 012 0V7a3 3 0 00-3-3z" clipRule="evenodd" />
+                                        </svg>
+                                      )}
+                                    </div>
+                                    
+                                    {/* File Info */}
+                                    <div className="min-w-0 flex-1">
+                                      <p className="text-sm font-medium text-gray-900 truncate">{attachment.fileName}</p>
+                                      <p className="text-xs text-gray-500">
+                                        {isPDF ? 'PDF Document' :
+                                         isDoc ? 'Word Document' :
+                                         isAudio ? 'Audio File' :
+                                         'File'}
+                                      </p>
+                                    </div>
+                                  </div>
+                                  
+                                  {/* Download/Open Button */}
+                                  <a 
+                                    href={attachment.fullUrl} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    className="flex-shrink-0 ml-3 inline-flex items-center px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-md hover:bg-blue-700 transition-colors duration-200"
+                                  >
+                                    <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                    </svg>
+                                    Open
+                                  </a>
+                                </div>
+                                
+                                {/* Audio Player for audio files */}
+                                {isAudio && (
+                                  <div className="mt-3 pt-3 border-t border-gray-100">
+                                    <audio controls src={attachment.fullUrl} className="w-full">
+                                      Your browser does not support the audio tag.
+                                    </audio>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           )}
 
