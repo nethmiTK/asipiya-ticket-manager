@@ -1381,35 +1381,59 @@ function CommentItem({
             </div>
           </div>
 
-          {/* Display Attachment if exists */}
-          {comment.AttachmentFullUrl && (
+          {/* Display Attachments if exist */}
+          {comment.attachments && comment.attachments.length > 0 && (
             <div className="mt-3 p-4 bg-gray-50 rounded-lg border border-gray-200">
-              <p className="text-sm text-gray-600 mb-2 font-medium">📎 Attachment:</p>
-              {
-                isImageAttachment(comment.AttachmentFileType) ? (
-                  <a href={comment.AttachmentFullUrl} target="_blank" rel="noopener noreferrer" className="block">
-                    <img src={comment.AttachmentFullUrl} alt={comment.AttachmentFileName} className="max-w-sm h-auto rounded-lg shadow-sm hover:shadow-md transition-shadow" />
-                  </a>
-                ) : isVideoAttachment(comment.AttachmentFileType) ? (
-                  <video controls src={comment.AttachmentFullUrl} className="max-w-sm h-auto rounded-lg shadow-sm"></video>
-                ) : isAudioAttachment(comment.AttachmentFileType) ? (
-                  <audio controls src={comment.AttachmentFullUrl} className="w-full max-w-sm"></audio>
-                ) : isPDFAttachment(comment.AttachmentFileType) ? (
-                  <a href={comment.AttachmentFullUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 px-4 py-2 bg-red-50 text-red-700 rounded-lg hover:bg-red-100 transition-colors">
-                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0113 3.414L16.586 7A2 2 0 0118 8.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd" />
-                    </svg>
-                    {comment.AttachmentFileName}
-                  </a>
-                ) : (
-                  <a href={comment.AttachmentFullUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors">
-                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M8 4a3 3 0 00-3 3v4a5 5 0 0010 0V7a1 1 0 112 0v4a7 7 0 11-14 0V7a5 5 0 0110 0v4a3 3 0 11-6 0V7a1 1 0 012 0V7a3 3 0 00-3-3z" clipRule="evenodd" />
-                    </svg>
-                    {comment.AttachmentFileName}
-                  </a>
-                )
-              }
+              <p className="text-sm text-gray-600 mb-3 font-medium">
+                📎 {comment.attachments.length > 1 ? `${comment.attachments.length} Attachments:` : 'Attachment:'}
+              </p>
+              <div className="space-y-3">
+                {comment.attachments.map((attachment, index) => {
+                  const isImage = attachment.fileType && attachment.fileType.startsWith('image/');
+                  const isVideo = attachment.fileType && attachment.fileType.startsWith('video/');
+                  const isAudio = attachment.fileType && attachment.fileType.startsWith('audio/');
+                  const isPDF = attachment.fileType && attachment.fileType === 'application/pdf';
+                  
+                  return (
+                    <div key={index} className="border border-gray-200 rounded-lg p-3 bg-white">
+                      {isImage ? (
+                        <a href={attachment.fullUrl} target="_blank" rel="noopener noreferrer" className="block">
+                          <img 
+                            src={attachment.fullUrl} 
+                            alt={attachment.fileName} 
+                            className="max-w-sm h-auto rounded-lg shadow-sm hover:shadow-md transition-shadow" 
+                          />
+                        </a>
+                      ) : isVideo ? (
+                        <video controls src={attachment.fullUrl} className="max-w-sm h-auto rounded-lg shadow-sm">
+                          Your browser does not support the video tag.
+                        </video>
+                      ) : isAudio ? (
+                        <audio controls src={attachment.fullUrl} className="w-full max-w-sm">
+                          Your browser does not support the audio tag.
+                        </audio>
+                      ) : isPDF ? (
+                        <a href={attachment.fullUrl} target="_blank" rel="noopener noreferrer" 
+                           className="inline-flex items-center gap-2 px-4 py-2 bg-red-50 text-red-700 rounded-lg hover:bg-red-100 transition-colors">
+                          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0113 3.414L16.586 7A2 2 0 0118 8.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd" />
+                          </svg>
+                          {attachment.fileName}
+                        </a>
+                      ) : (
+                        <a href={attachment.fullUrl} target="_blank" rel="noopener noreferrer" 
+                           className="inline-flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors">
+                          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M8 4a3 3 0 00-3 3v4a5 5 0 0010 0V7a1 1 0 112 0v4a7 7 0 11-14 0V7a5 5 0 0110 0v4a3 3 0 11-6 0V7a1 1 0 012 0V7a3 3 0 00-3-3z" clipRule="evenodd" />
+                          </svg>
+                          {attachment.fileName}
+                        </a>
+                      )}
+                      <p className="text-xs text-gray-500 mt-2">{attachment.fileName}</p>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
 
