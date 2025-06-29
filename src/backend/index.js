@@ -25,7 +25,7 @@ const db = mysql.createConnection({
     host: 'localhost',
     user: 'root',
     password: '',
-    database: 'ticketmanager'
+    database: '1010'
 });
 
 // Connect to the database
@@ -1135,9 +1135,9 @@ app.get('/api/ticket_view/:id', (req, res) => {
     t.TicketDuration,
     t.UserNote
   FROM ticket t
-  JOIN appuser u ON t.UserId = u.UserID
-  JOIN asipiyasystem s ON t.AsipiyaSystemID = s.AsipiyaSystemID
-  JOIN ticketcategory c ON t.TicketCategoryID = c.TicketCategoryID
+  LEFT JOIN appuser u ON t.UserId = u.UserID
+  LEFT JOIN asipiyasystem s ON t.AsipiyaSystemID = s.AsipiyaSystemID
+  LEFT JOIN ticketcategory c ON t.TicketCategoryID = c.TicketCategoryID
   WHERE t.TicketID = ?`;
 
     db.query(query, [ticketId], (err, results) => {
@@ -1876,19 +1876,29 @@ app.get('/api/notifications/count/:id', (req, res) => {
 
 // API endpoint to get user's notifications
 app.get('/api/notifications/:userId', (req, res) => {
-    const userId = req.params.userId;
+    const { userId } = req.params;
     const query = `
-        SELECT 
-            NotificationID,
-            Message,
-            Type,
-            IsRead,
-            CreatedAt,
-            TicketLogID
-        FROM notifications 
-        WHERE UserID = ? AND IsRead = FALSE
-        ORDER BY CreatedAt DESC
-        LIMIT 50
+        SELECT
+            n.NotificationID,
+            n.UserID,
+            n.Message,
+            n.Type,
+            n.IsRead,
+            n.CreatedAt,
+            tl.TicketID,
+            tl.UserID AS SourceUserID,
+            au.FullName AS SourceUserFullName,
+            au.ProfileImagePath AS SourceUserProfileImagePath
+        FROM
+            notifications n
+        LEFT JOIN
+            ticketlog tl ON n.TicketLogID = tl.TicketLogID
+        LEFT JOIN
+            appuser au ON tl.UserID = au.UserID
+        WHERE
+            n.UserID = ?
+        ORDER BY
+            n.CreatedAt DESC;
     `;
 
     db.query(query, [userId], (err, results) => {
