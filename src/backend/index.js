@@ -695,22 +695,17 @@ function isImageFile(filename) {
 app.get("/messages/:ticketId", (req, res) => {
   const ticketId = req.params.ticketId;
   const sql = `
-    SELECT TicketChatID as id, TicketID, Type, Note as content,
-           UserID, Path, Role, CreatedAt as timestamp
+    SELECT TicketChatID AS id, TicketID, Type, Note AS content,
+           UserID, Path, Role, CreatedAt AS timestamp, Seen
     FROM ticketchat
     WHERE TicketID = ?
     ORDER BY CreatedAt ASC
   `;
-
   db.query(sql, [ticketId], (err, rows) => {
-    if (err) {
-      console.error("Fetch error:", err);
-      return res.status(500).json({ error: "Failed to fetch messages" });
-    }
+    if (err) return res.status(500).json({ error: "Failed to fetch messages" });
 
     const baseUrl = `${req.protocol}://${req.get("host")}`;
-
-    const formatted = rows.map((r) => ({
+    const formatted = rows.map(r => ({
       id: r.id,
       ticketid: r.TicketID,
       type: r.Type,
@@ -718,19 +713,17 @@ app.get("/messages/:ticketId", (req, res) => {
       userid: r.UserID,
       role: r.Role,
       timestamp: r.timestamp ? new Date(r.timestamp).toISOString() : null,
-      file: r.Path
-        ? {
-            name: path.basename(r.Path),
-            url: `${baseUrl}/uploads/profile_images/${r.Path}`,
-            isImage: isImageFile(r.Path),
-          }
-        : null,
-      status: "delivered",
+      file: r.Path ? {
+        name: path.basename(r.Path),
+        url: `${baseUrl}/uploads/profile_images/${r.Path}`,
+        isImage: isImageFile(r.Path),
+      } : null,
+      status: r.Seen ? "seen" : "✓ delivered",
     }));
-
     res.json(formatted);
   });
 });
+
 
 // POST message (text or file) - single endpoint for both user/admin
 app.post("/ticketchat", upload.single("file"), (req, res) => {
@@ -780,7 +773,7 @@ app.post("/ticketchat", upload.single("file"), (req, res) => {
             name: file.originalname,
           }
         : null,
-      status: "delivered",
+      status: "✓ delivered",
     };
 
     io.to(TicketID.toString()).emit("receiveTicketMessage", newMessage);
@@ -840,7 +833,7 @@ app.post("/api/ticketchatUser", upload.single("file"), (req, res) => {
             name: file.originalname,
           }
         : null,
-      status: "delivered",
+      status: "✓ delivered",
     };
 
     io.to(TicketID.toString()).emit("receiveTicketMessage", newMessage);
@@ -888,7 +881,7 @@ app.get("/api/ticketchatUser/:ticketID", (req, res) => {
             name: path.basename(msg.Path),
           }
         : null,
-      status: "delivered",
+      status: "✓ delivered",
     }));
 
     res.status(200).json(formatted);
@@ -904,6 +897,23 @@ app.get("/download/:filename", (req, res) => {
       console.error("Download error:", err);
       res.status(404).send("File not found.");
     }
+  });
+});
+
+// Mark messages as seen
+app.post("/ticketchat/markSeen", (req, res) => {
+  const { TicketID, Role } = req.body;
+  if (!TicketID || !Role) return res.status(400).json({ error: "TicketID and Role required" });
+
+  const sql = `
+    UPDATE ticketchat
+    SET Seen = 1
+    WHERE TicketID = ? AND Role != ? AND Seen = 0
+  `;
+  db.query(sql, [TicketID, Role], (err, result) => {
+    if (err) return res.status(500).json({ error: "Failed to update seen status" });
+    io.to(String(TicketID)).emit("messagesSeen", { TicketID, Role });
+    res.status(200).json({ message: "Messages marked as seen." });
   });
 });
 

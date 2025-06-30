@@ -23,6 +23,22 @@ const ChatUI = ({ ticketID: propTicketID }) => {
   const fileInputRef = useRef(null);
   const canvasRef = useRef(null);
 
+  const markMessagesAsSeen = async () => {
+    if (!ticketID || !role) return;
+
+    try {
+      const res = await fetch("http://localhost:5000/ticketchat/markSeen", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ TicketID: ticketID, Role: role }),
+      });
+      if (!res.ok) throw new Error("Failed to mark messages as seen");
+      console.log("Messages marked as seen");
+    } catch (err) {
+      console.error("Error marking messages as seen:", err);
+    }
+  };
+
   useEffect(() => {
     const storedUser = JSON.parse(localStorage.getItem("user"));
     if (storedUser) {
@@ -42,24 +58,29 @@ const ChatUI = ({ ticketID: propTicketID }) => {
   const fetchMessages = async () => {
     if (!userID || !ticketID) return;
     try {
-      const res = await fetch(`http://localhost:5000/api/ticketchatUser/${ticketID}`);
+      const res = await fetch(
+        `http://localhost:5000/api/ticketchatUser/${ticketID}`
+      );
       const data = await res.json();
-      console.log("Fetched messages:", data); // Debug
       if (Array.isArray(data)) {
-        setMessages(
-          data.map((msg) => ({
-            id: msg.id,
-            ticketid: msg.ticketid,
-            sender: String(msg.userid) === String(userID) ? "user" : "agent",
-            text: msg.content,
-            filePath: msg.file?.url ?? null,
-            fileName: msg.file?.name ?? "",
-            type: msg.type || "text",
-            role: msg.role || "",
-            timestamp: msg.timestamp || new Date().toISOString(),
-            status: "delivered",
-          }))
+        setMessages((prev) =>
+          data.map((msg) => {
+            const existingMsg = prev.find((m) => m.id === msg.id);
+            return {
+              id: msg.id,
+              ticketid: msg.ticketid,
+              sender: String(msg.userid) === String(userID) ? "user" : "agent",
+              text: msg.content,
+              filePath: msg.file?.url ?? null,
+              fileName: msg.file?.name ?? "",
+              type: msg.type || "text",
+              role: msg.role || "",
+              timestamp: msg.timestamp || new Date().toISOString(),
+              status: existingMsg?.status === "seen" ? "seen" : "✓ delivered",
+            };
+          })
         );
+        markMessagesAsSeen();
       }
     } catch (err) {
       console.error("Failed to fetch messages", err);
@@ -76,7 +97,14 @@ const ChatUI = ({ ticketID: propTicketID }) => {
 
   const addMessage = (message) => {
     setMessages((prev) => {
-      if (prev.some((m) => m.id === message.id)) return prev;
+      const existingMsg = prev.find((m) => m.id === message.id);
+      if (existingMsg) {
+        return prev.map((m) =>
+          m.id === message.id
+            ? { ...m, status: m.status === "seen" ? "seen" : message.status }
+            : m
+        );
+      }
       return [...prev, message];
     });
   };
@@ -97,18 +125,57 @@ const ChatUI = ({ ticketID: propTicketID }) => {
         type: message.type || "text",
         role: message.role || "",
         timestamp: message.timestamp || new Date().toISOString(),
-        status: message.status || "delivered",
+        status: message.status || "✓ delivered",
       };
 
       addMessage(formattedMessage);
+
+      if (
+        (role.toLowerCase() === "supervisor" &&
+          formattedMessage.sender === "user") ||
+        (role.toLowerCase() !== "supervisor" &&
+          formattedMessage.sender === "agent")
+      ) {
+        markMessagesAsSeen();
+      }
+    };
+
+    const handleSeenMessage = (seenData) => {
+      setMessages((prev) =>
+        prev.map((msg) =>
+          String(msg.ticketid) === String(seenData.TicketID) &&
+          msg.role !== seenData.Role
+            ? { ...msg, status: "✓✓ seen" }
+            : msg
+        )
+      );
     };
 
     socket.on("receiveTicketMessage", handleIncomingMessage);
+    socket.on("messagesSeen", handleSeenMessage);
 
     return () => {
       socket.off("receiveTicketMessage", handleIncomingMessage);
+      socket.off("messagesSeen", handleSeenMessage);
     };
-  }, [ticketID, userID]);
+  }, [ticketID, userID, role]);
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (
+        document.visibilityState === "visible" &&
+        ticketID &&
+        role &&
+        messages.length > 0
+      ) {
+        markMessagesAsSeen();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () =>
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, [ticketID, role, messages]);
 
   const generatePdfPreview = async (file) => {
     if (!file || !canvasRef.current) return;
@@ -210,9 +277,13 @@ const ChatUI = ({ ticketID: propTicketID }) => {
   return (
     <div className="flex flex-col h-150 border-none rounded-md bg-white">
       <div className="flex-1 overflow-y-auto space-y-2 p-2 mt-2">
-        {messages.length === 0 && <p className="text-center text-gray-500 mt-4">No messages yet</p>}
+        {messages.length === 0 && (
+          <p className="text-center text-gray-500 mt-60">No messages yet</p>
+        )}
         {messages.map((msg, idx) => {
-          const isImage = msg.filePath?.match(/\.(jpeg|jpg|png|gif|webp|bmp|svg)$/i);
+          const isImage = msg.filePath?.match(
+            /\.(jpeg|jpg|png|gif|webp|bmp|svg)$/i
+          );
           const isVideo = msg.filePath?.match(/\.(mp4|webm|ogg)$/i);
           const isPDF = msg.filePath?.match(/\.pdf$/i);
           const isExcel = msg.filePath?.match(/\.(xls|xlsx)$/i);
@@ -221,7 +292,9 @@ const ChatUI = ({ ticketID: propTicketID }) => {
           return (
             <div
               key={msg.id || idx}
-              className={`flex ${msg.sender === "user" ? "justify-end" : "justify-start"}`}
+              className={`flex ${
+                msg.sender === "user" ? "justify-end" : "justify-start"
+              }`}
               style={{ marginBottom: 8 }}
             >
               <div
@@ -229,7 +302,8 @@ const ChatUI = ({ ticketID: propTicketID }) => {
                   maxWidth: "70%",
                   padding: "10px 16px",
                   borderRadius: 20,
-                  backgroundColor: msg.sender === "user" ? "#90cdf4" : "#e2e8f0",
+                  backgroundColor:
+                    msg.sender === "user" ? "#90cdf4" : "#e2e8f0",
                   color: "#1a202c",
                   whiteSpace: "pre-wrap",
                   wordBreak: "break-word",
@@ -238,7 +312,6 @@ const ChatUI = ({ ticketID: propTicketID }) => {
                   boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
                 }}
               >
-                {/* {msg.role && <p style={{ fontWeight: "600", marginBottom: 6, color: "white" }}>{msg.role}</p>} */}
                 {msg.filePath ? (
                   <>
                     {isImage && (
@@ -246,7 +319,13 @@ const ChatUI = ({ ticketID: propTicketID }) => {
                         <img
                           src={msg.filePath}
                           alt="Sent"
-                          style={{ maxWidth: "100%", maxHeight: 180, borderRadius: 12, marginBottom: 8, objectFit: "contain" }}
+                          style={{
+                            maxWidth: "100%",
+                            maxHeight: 180,
+                            borderRadius: 12,
+                            marginBottom: 8,
+                            objectFit: "contain",
+                          }}
                         />
                         <button
                           onClick={() => handleFileDownload(msg.filePath)}
@@ -265,7 +344,14 @@ const ChatUI = ({ ticketID: propTicketID }) => {
                     )}
                     {isVideo && (
                       <>
-                        <video controls style={{ maxWidth: "100%", maxHeight: 180, marginBottom: 8 }}>
+                        <video
+                          controls
+                          style={{
+                            maxWidth: "100%",
+                            maxHeight: 180,
+                            marginBottom: 8,
+                          }}
+                        >
                           <source src={msg.filePath} />
                         </video>
                         <button
@@ -285,11 +371,20 @@ const ChatUI = ({ ticketID: propTicketID }) => {
                     )}
                     {isPDF && (
                       <>
-                        <a href={msg.filePath} target="_blank" rel="noopener noreferrer" style={{ display: "block", marginBottom: 4 }}>
+                        <a
+                          href={msg.filePath}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{ display: "block", marginBottom: 4 }}
+                        >
                           <img
                             src="https://upload.wikimedia.org/wikipedia/commons/8/87/PDF_file_icon.svg"
                             alt="PDF"
-                            style={{ width: 60, height: 60, objectFit: "contain" }}
+                            style={{
+                              width: 60,
+                              height: 60,
+                              objectFit: "contain",
+                            }}
                           />
                         </a>
                         <button
@@ -309,11 +404,20 @@ const ChatUI = ({ ticketID: propTicketID }) => {
                     )}
                     {isExcel && (
                       <>
-                        <a href={msg.filePath} target="_blank" rel="noopener noreferrer" style={{ display: "block", marginBottom: 4 }}>
+                        <a
+                          href={msg.filePath}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{ display: "block", marginBottom: 4 }}
+                        >
                           <img
                             src="https://cdn-icons-png.flaticon.com/512/732/732220.png"
                             alt="Excel"
-                            style={{ width: 60, height: 60, objectFit: "contain" }}
+                            style={{
+                              width: 60,
+                              height: 60,
+                              objectFit: "contain",
+                            }}
                           />
                         </a>
                         <button
@@ -333,11 +437,20 @@ const ChatUI = ({ ticketID: propTicketID }) => {
                     )}
                     {isWord && (
                       <>
-                        <a href={msg.filePath} target="_blank" rel="noopener noreferrer" style={{ display: "block", marginBottom: 4 }}>
+                        <a
+                          href={msg.filePath}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{ display: "block", marginBottom: 4 }}
+                        >
                           <img
                             src="https://cdn-icons-png.flaticon.com/512/732/732221.png"
                             alt="Word"
-                            style={{ width: 60, height: 60, objectFit: "contain" }}
+                            style={{
+                              width: 60,
+                              height: 60,
+                              objectFit: "contain",
+                            }}
                           />
                         </a>
                         <button
@@ -361,7 +474,11 @@ const ChatUI = ({ ticketID: propTicketID }) => {
                           href={msg.filePath}
                           target="_blank"
                           rel="noopener noreferrer"
-                          style={{ fontSize: 14, textDecoration: "underline", color: "#1a202c" }}
+                          style={{
+                            fontSize: 14,
+                            textDecoration: "underline",
+                            color: "#1a202c",
+                          }}
                         >
                           📎 {msg.fileName || msg.text}
                         </a>
@@ -386,8 +503,25 @@ const ChatUI = ({ ticketID: propTicketID }) => {
                 ) : (
                   <span>{linkifyText(msg.text)}</span>
                 )}
-                <div style={{ textAlign: "right", fontSize: 11, marginTop: 6, color: "#4a5568" }}>
-                  {new Date(msg.timestamp).toLocaleString()} - {msg.status}
+
+                <div
+                  style={{
+                    textAlign: "right",
+                    fontSize: 11,
+                    marginTop: 6,
+                    color: "#4a5568",
+                  }}
+                >
+                  {new Date(msg.timestamp).toLocaleString(undefined, {
+                    year: "numeric",
+                    month: "2-digit",
+                    day: "2-digit",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                  {msg.role && msg.role.toLowerCase() !== "supervisor"
+                    ? `  ${msg.status}`
+                    : null}
                 </div>
               </div>
             </div>
@@ -399,19 +533,29 @@ const ChatUI = ({ ticketID: propTicketID }) => {
       {selectedFile && (
         <div className="flex items-center justify-between p-2 border border-zinc-300 rounded bg-zinc-50 m-2">
           {selectedFile.type.startsWith("image/") ? (
-            <img src={URL.createObjectURL(selectedFile)} alt="Preview" className="h-20 object-contain rounded" />
+            <img
+              src={URL.createObjectURL(selectedFile)}
+              alt="Preview"
+              className="h-20 object-contain rounded"
+            />
           ) : selectedFile.type.startsWith("video/") ? (
-            <video className="h-20 object-contain rounded" src={URL.createObjectURL(selectedFile)} controls />
+            <video
+              className="h-20 object-contain rounded"
+              src={URL.createObjectURL(selectedFile)}
+              controls
+            />
           ) : selectedFile.type === "application/pdf" ? (
             <canvas ref={canvasRef} className="h-20 rounded border shadow" />
-          ) : selectedFile.type === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
+          ) : selectedFile.type ===
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
             selectedFile.type === "application/vnd.ms-excel" ? (
             <img
               src="https://cdn-icons-png.flaticon.com/512/732/732220.png"
               alt="Excel file"
               className="h-20 object-contain rounded"
             />
-          ) : selectedFile.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+          ) : selectedFile.type ===
+              "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
             selectedFile.type === "application/msword" ? (
             <img
               src="https://cdn-icons-png.flaticon.com/512/732/732221.png"
@@ -426,7 +570,7 @@ const ChatUI = ({ ticketID: propTicketID }) => {
           )}
           <button
             onClick={() => setSelectedFile(null)}
-            className="text-red-500 text-sm ml-4 cursor-pointer mr-5"
+            className="bg-red-500 text-white rounded px-2 py-1 hover:bg-red-700 mr-3"
           >
             Remove
           </button>
