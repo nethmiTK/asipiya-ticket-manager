@@ -1200,7 +1200,7 @@ app.get('/api/ticket_view/:id', (req, res) => {
 });
 
 // PUT: Update supervisors for a ticket
-app.put("/update-supervisors/:id", (req, res) => {
+app.put("/update-supervisors/:id", async (req, res) => {
   const { id } = req.params;
   const { supervisorIds } = req.body;
 
@@ -1221,19 +1221,149 @@ app.put("/update-supervisors/:id", (req, res) => {
     return res.status(400).json({ error: "No valid supervisor IDs provided." });
   }
 
-  const supervisorIdString = validSupervisorIds.join(",");
+  try {
+    // Get current ticket data and old supervisors
+    const getTicketQuery = `
+      SELECT SupervisorID, UserId as ticketCreatorId 
+      FROM ticket 
+      WHERE TicketID = ?
+    `;
+    
+    const currentTicketData = await new Promise((resolve, reject) => {
+      db.query(getTicketQuery, [id], (err, results) => {
+        if (err) reject(err);
+        else resolve(results[0]);
+      });
+    });
 
-  // Update the ticket table
-  const sql = "UPDATE ticket SET SupervisorID = ? WHERE TicketID = ?";
-  db.query(sql, [supervisorIdString, id], (err, result) => {
-    if (err) {
-      console.error("Error updating supervisors:", err);
-      return res.status(500).json({ error: "Failed to update supervisors." });
+    if (!currentTicketData) {
+      return res.status(404).json({ error: "Ticket not found." });
     }
 
-    console.log("Supervisors updated:", result);
+    const oldSupervisorIds = currentTicketData.SupervisorID 
+      ? currentTicketData.SupervisorID.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id))
+      : [];
+    
+    const newSupervisorIds = validSupervisorIds;
+    const ticketCreatorId = currentTicketData.ticketCreatorId;
+
+    // Find added and removed supervisors
+    const addedSupervisorIds = newSupervisorIds.filter(id => !oldSupervisorIds.includes(id));
+    const removedSupervisorIds = oldSupervisorIds.filter(id => !newSupervisorIds.includes(id));
+
+    console.log("Old supervisors:", oldSupervisorIds);
+    console.log("New supervisors:", newSupervisorIds);
+    console.log("Added supervisors:", addedSupervisorIds);
+    console.log("Removed supervisors:", removedSupervisorIds);
+
+    // Update the ticket table
+    const supervisorIdString = validSupervisorIds.join(",");
+    await new Promise((resolve, reject) => {
+      db.query("UPDATE ticket SET SupervisorID = ? WHERE TicketID = ?", [supervisorIdString, id], (err, result) => {
+        if (err) reject(err);
+        else resolve(result);
+      });
+    });
+
+    // Get supervisor names for notifications
+    const getSupervisorNamesQuery = `
+      SELECT UserID, FullName 
+      FROM appuser 
+      WHERE UserID IN (${[...addedSupervisorIds, ...removedSupervisorIds].map(() => '?').join(',')})
+    `;
+    
+    let supervisorNames = {};
+    if (addedSupervisorIds.length > 0 || removedSupervisorIds.length > 0) {
+      const nameResults = await new Promise((resolve, reject) => {
+        db.query(getSupervisorNamesQuery, [...addedSupervisorIds, ...removedSupervisorIds], (err, results) => {
+          if (err) reject(err);
+          else resolve(results);
+        });
+      });
+      
+      nameResults.forEach(supervisor => {
+        supervisorNames[supervisor.UserID] = supervisor.FullName;
+      });
+    }
+
+    // Create logs and notifications for changes
+    if (addedSupervisorIds.length > 0) {
+      const addedNames = addedSupervisorIds.map(id => supervisorNames[id] || `Supervisor ${id}`);
+      const logDescription = `Supervisors added: ${addedNames.join(', ')}`;
+      
+      const logResult = await createTicketLog(
+        id,
+        'SUPERVISOR_ADDED',
+        logDescription,
+        null, // No specific user for this action from EditSupervisors
+        null,
+        addedSupervisorIds.join(','),
+        'Supervisors added via edit'
+      );
+
+      // Notify ticket creator about added supervisors
+      if (ticketCreatorId) {
+        await createNotification(
+          ticketCreatorId,
+          `New supervisors added to your ticket #${id}: ${addedNames.join(', ')}`,
+          'SUPERVISOR_ADDED',
+          logResult.insertId
+        );
+      }
+
+      // Notify newly added supervisors
+      for (const supervisorId of addedSupervisorIds) {
+        await createNotification(
+          supervisorId,
+          `You have been assigned to ticket #${id}`,
+          'SUPERVISOR_ASSIGNED',
+          logResult.insertId
+        );
+      }
+    }
+
+    if (removedSupervisorIds.length > 0) {
+      const removedNames = removedSupervisorIds.map(id => supervisorNames[id] || `Supervisor ${id}`);
+      const logDescription = `Supervisors removed: ${removedNames.join(', ')}`;
+      
+      const logResult = await createTicketLog(
+        id,
+        'SUPERVISOR_REMOVED',
+        logDescription,
+        null,
+        removedSupervisorIds.join(','),
+        null,
+        'Supervisors removed via edit'
+      );
+
+      // Notify ticket creator about removed supervisors
+      if (ticketCreatorId) {
+        await createNotification(
+          ticketCreatorId,
+          `Supervisors removed from your ticket #${id}: ${removedNames.join(', ')}`,
+          'SUPERVISOR_REMOVED',
+          logResult.insertId
+        );
+      }
+
+      // Notify removed supervisors
+      for (const supervisorId of removedSupervisorIds) {
+        await createNotification(
+          supervisorId,
+          `You have been removed from ticket #${id}`,
+          'SUPERVISOR_UNASSIGNED',
+          logResult.insertId
+        );
+      }
+    }
+
+    console.log("Supervisors updated successfully");
     res.json({ message: "Supervisors updated successfully" });
-  });
+
+  } catch (error) {
+    console.error("Error updating supervisors:", error);
+    res.status(500).json({ error: "Failed to update supervisors." });
+  }
 });
 
 
@@ -3006,6 +3136,18 @@ app.post('/api/clients', async (req, res) => {
     // 3. Fetch inserted client
     const insertedClientID = insertResult.insertId;
     const clientRows = await query('SELECT * FROM client WHERE ClientID = ?', [insertedClientID]);
+
+    // 4. Send notification to all admins about new client registration
+    try {
+      await sendNotificationsByRoles(
+        ['admin', 'manager'],
+        `New client registered: ${CompanyName} (Contact: ${ContactPersonEmail})`,
+        'NEW_CLIENT_REGISTRATION'
+      );
+    } catch (notificationError) {
+      console.error('Error sending client registration notifications:', notificationError);
+      // Don't fail the registration if notification fails
+    }
 
     res.status(200).json({
       message: 'Client registered successfully',

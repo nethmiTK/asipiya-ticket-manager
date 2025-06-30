@@ -82,13 +82,37 @@ const NotificationPanel = ({ userId, role, onClose }) => {
                     {notification.Message}
                 </span>
             );
+        } else if (notification.Type === 'SUPERVISOR_ADDED') {
+            // Handle supervisor addition notifications
+            return (
+                <span>
+                    <span className="text-green-600 font-medium">Supervisors Added</span><br />
+                    {notification.Message}
+                </span>
+            );
+        } else if (notification.Type === 'SUPERVISOR_REMOVED') {
+            // Handle supervisor removal notifications
+            return (
+                <span>
+                    <span className="text-red-600 font-medium">Supervisors Removed</span><br />
+                    {notification.Message}
+                </span>
+            );
+        } else if (notification.Type === 'NEW_CLIENT_REGISTRATION') {
+            // Handle client registration notifications
+            return (
+                <span>
+                    <span className="text-blue-600 font-medium">New Client Registered</span><br />
+                    {notification.Message}
+                </span>
+            );
         }
         return notification.Message;
     };
 
     const getNotificationProfilePic = (notification) => {
-        const systemNotificationTypes = ['NEW_SYSTEM_ADDED', 'NEW_CATEGORY_ADDED', 'NEW_USER_REGISTRATION'];
-        const supervisorNotificationTypes = ['SUPERVISOR_ASSIGNED', 'SUPERVISOR_UNASSIGNED', 'TICKET_UPDATED'];
+        const systemNotificationTypes = ['NEW_SYSTEM_ADDED', 'NEW_CATEGORY_ADDED', 'NEW_USER_REGISTRATION', 'NEW_CLIENT_REGISTRATION'];
+        const supervisorNotificationTypes = ['SUPERVISOR_ASSIGNED', 'SUPERVISOR_UNASSIGNED', 'TICKET_UPDATED', 'SUPERVISOR_ADDED', 'SUPERVISOR_REMOVED'];
         
         if (systemNotificationTypes.includes(notification.Type)) {
             // Use a specific icon or image for system notifications
@@ -99,11 +123,27 @@ const NotificationPanel = ({ userId, role, onClose }) => {
                     return { icon: <FaLayerGroup className="w-6 h-6 text-purple-500" />, bgColor: 'bg-purple-100' };
                 case 'NEW_USER_REGISTRATION':
                     return { icon: <FaUserPlus className="w-6 h-6 text-green-500" />, bgColor: 'bg-green-100' };
+                case 'NEW_CLIENT_REGISTRATION':
+                    return { icon: <FaUserPlus className="w-6 h-6 text-blue-500" />, bgColor: 'bg-blue-100' };
                 default:
                     return { icon: <FaLaptopCode className="w-6 h-6 text-gray-500" />, bgColor: 'bg-gray-100' };
             }
         } else if (supervisorNotificationTypes.includes(notification.Type)) {
             // Use specific icons for supervisor-related notifications
+            switch (notification.Type) {
+                case 'SUPERVISOR_ASSIGNED':
+                    return { icon: <FaUserCheck className="w-6 h-6 text-green-500" />, bgColor: 'bg-green-100' };
+                case 'SUPERVISOR_UNASSIGNED':
+                    return { icon: <FaUserTimes className="w-6 h-6 text-orange-500" />, bgColor: 'bg-orange-100' };
+                case 'SUPERVISOR_ADDED':
+                    return { icon: <FaUserCheck className="w-6 h-6 text-green-500" />, bgColor: 'bg-green-100' };
+                case 'SUPERVISOR_REMOVED':
+                    return { icon: <FaUserTimes className="w-6 h-6 text-red-500" />, bgColor: 'bg-red-100' };
+                case 'TICKET_UPDATED':
+                    return { icon: <FaUserCheck className="w-6 h-6 text-blue-500" />, bgColor: 'bg-blue-100' };
+                default:
+                    return { icon: <FaUserCheck className="w-6 h-6 text-gray-500" />, bgColor: 'bg-gray-100' };
+            }
             switch (notification.Type) {
                 case 'SUPERVISOR_ASSIGNED':
                     return { icon: <FaUserCheck className="w-6 h-6 text-green-500" />, bgColor: 'bg-green-100' };
@@ -172,10 +212,18 @@ const NotificationPanel = ({ userId, role, onClose }) => {
     };
 
     const getNotificationLink = (notification) => {
-        const nonNavigatingTypes = ['NEW_SYSTEM_ADDED', 'NEW_CATEGORY_ADDED', 'NEW_USER_REGISTRATION'];
+        const nonNavigatingTypes = [
+            'NEW_SYSTEM_ADDED', 
+            'NEW_CATEGORY_ADDED', 
+            'NEW_USER_REGISTRATION',
+            'NEW_CLIENT_REGISTRATION',
+            'SUPERVISOR_ADDED',
+            'SUPERVISOR_REMOVED',
+            'SUPERVISOR_UNASSIGNED'
+        ];
         
         if (nonNavigatingTypes.includes(notification.Type)) {
-            return '#'; // Do not navigate for system notifications
+            return '#'; // Do not navigate for these notification types
         } else if (notification.TicketID) {
             // For ticket-related notifications, navigate to the TicketManage page with the ticket ID
             // And potentially set the tab to 'details' or 'comments' depending on the notification type
@@ -185,8 +233,7 @@ const NotificationPanel = ({ userId, role, onClose }) => {
                 return `/ticket-manage?ticketId=${notification.TicketID}&tab=comments`;
             } else if (notification.Type === 'TICKET_REJECTED' || 
                        notification.Type === 'TICKET_UPDATED' || 
-                       notification.Type === 'SUPERVISOR_ASSIGNED' || 
-                       notification.Type === 'SUPERVISOR_UNASSIGNED') {
+                       notification.Type === 'SUPERVISOR_ASSIGNED') {
                 return `/ticket-manage?ticketId=${notification.TicketID}&tab=details`;
             }
             // Default for other ticket-related types
