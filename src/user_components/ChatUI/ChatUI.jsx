@@ -310,6 +310,9 @@ const ChatUI = ({ ticketID: propTicketID }) => {
                   borderTopRightRadius: msg.sender === "user" ? 0 : 20,
                   borderTopLeftRadius: msg.sender === "user" ? 20 : 0,
                   boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: msg.sender === "user" ? "" : "flex-start",
                 }}
               >
                 {msg.filePath ? (
@@ -319,13 +322,24 @@ const ChatUI = ({ ticketID: propTicketID }) => {
                         <img
                           src={msg.filePath}
                           alt="Sent"
+                          loading="lazy"
                           style={{
                             maxWidth: "100%",
                             maxHeight: 180,
                             borderRadius: 12,
                             marginBottom: 8,
                             objectFit: "contain",
+                            cursor: "pointer",
+                            boxShadow: "0 4px 8px rgba(0,0,0,0.15)",
+                            transition: "transform 0.3s ease",
                           }}
+                          onClick={() => window.open(msg.filePath, "_blank")}
+                          onMouseOver={(e) =>
+                            (e.currentTarget.style.transform = "scale(1.05)")
+                          }
+                          onMouseOut={(e) =>
+                            (e.currentTarget.style.transform = "scale(1)")
+                          }
                         />
                         <button
                           onClick={() => handleFileDownload(msg.filePath)}
@@ -336,6 +350,7 @@ const ChatUI = ({ ticketID: propTicketID }) => {
                             backgroundColor: "rgba(255,255,255,0.7)",
                             borderRadius: 4,
                             cursor: "pointer",
+                            alignSelf: "flex-start",
                           }}
                         >
                           Download Image
@@ -350,6 +365,7 @@ const ChatUI = ({ ticketID: propTicketID }) => {
                             maxWidth: "100%",
                             maxHeight: 180,
                             marginBottom: 8,
+                            borderRadius: 12,
                           }}
                         >
                           <source src={msg.filePath} />
@@ -363,6 +379,7 @@ const ChatUI = ({ ticketID: propTicketID }) => {
                             backgroundColor: "rgba(255,255,255,0.7)",
                             borderRadius: 4,
                             cursor: "pointer",
+                            alignSelf: "flex-start",
                           }}
                         >
                           Download Video
@@ -396,6 +413,7 @@ const ChatUI = ({ ticketID: propTicketID }) => {
                             backgroundColor: "rgba(255,255,255,0.7)",
                             borderRadius: 4,
                             cursor: "pointer",
+                            alignSelf: "flex-start",
                           }}
                         >
                           Download PDF
@@ -429,6 +447,7 @@ const ChatUI = ({ ticketID: propTicketID }) => {
                             backgroundColor: "rgba(255,255,255,0.7)",
                             borderRadius: 4,
                             cursor: "pointer",
+                            alignSelf: "flex-start",
                           }}
                         >
                           Download Excel
@@ -462,6 +481,7 @@ const ChatUI = ({ ticketID: propTicketID }) => {
                             backgroundColor: "rgba(255,255,255,0.7)",
                             borderRadius: 4,
                             cursor: "pointer",
+                            alignSelf: "flex-start",
                           }}
                         >
                           Download Word
@@ -493,6 +513,7 @@ const ChatUI = ({ ticketID: propTicketID }) => {
                             cursor: "pointer",
                             marginTop: 4,
                             display: "block",
+                            alignSelf: "flex-start",
                           }}
                         >
                           Download File
@@ -510,6 +531,7 @@ const ChatUI = ({ ticketID: propTicketID }) => {
                     fontSize: 11,
                     marginTop: 6,
                     color: "#4a5568",
+                    userSelect: "none",
                   }}
                 >
                   {new Date(msg.timestamp).toLocaleString(undefined, {
@@ -536,7 +558,8 @@ const ChatUI = ({ ticketID: propTicketID }) => {
             <img
               src={URL.createObjectURL(selectedFile)}
               alt="Preview"
-              className="h-20 object-contain rounded"
+              className="h-20 object-contain rounded cursor-pointer"
+              onClick={() => window.open(URL.createObjectURL(selectedFile), "_blank")}
             />
           ) : selectedFile.type.startsWith("video/") ? (
             <video
