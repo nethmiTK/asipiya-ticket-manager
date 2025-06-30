@@ -1132,37 +1132,112 @@ app.put('/tickets/accept/:ticketID', (req, res) => {
 
 //View ticket details
 app.get('/api/ticket_view/:id', (req, res) => {
-    const ticketId = req.params.id;
-    const query = `SELECT t.TicketID, u.FullName AS UserName, u.Email AS UserEmail,    
-    s.SystemName,
-    c.CategoryName,
-    t.Description,
-    t.DateTime,
-    t.Status,
-    t.Priority,
-    t.FirstRespondedTime,
-    t.LastRespondedTime,
-    t.TicketDuration,
-    t.UserNote
-  FROM ticket t
-  LEFT JOIN appuser u ON t.UserId = u.UserID
-  LEFT JOIN asipiyasystem s ON t.AsipiyaSystemID = s.AsipiyaSystemID
-  LEFT JOIN ticketcategory c ON t.TicketCategoryID = c.TicketCategoryID
-  WHERE t.TicketID = ?`;
+  const ticketId = req.params.id;
 
-    db.query(query, [ticketId], (err, results) => {
-        if (err) {
-            console.error("Error in ticket_view query:", err);
-            return res.status(500).json({ error: "Database query failed" });
-        }
+  const ticketQuery = `
+    SELECT 
+      t.TicketID,
+      u.FullName AS UserName,
+      u.Email AS UserEmail,    
+      s.SystemName,
+      c.CategoryName,
+      t.Description,
+      t.DateTime,
+      t.Status,
+      t.Priority,
+      t.FirstRespondedTime,
+      t.LastRespondedTime,
+      t.TicketDuration,
+      t.UserNote,
+      t.SupervisorID
+    FROM ticket t
+    JOIN appuser u ON t.UserId = u.UserID
+    JOIN asipiyasystem s ON t.AsipiyaSystemID = s.AsipiyaSystemID
+    JOIN ticketcategory c ON t.TicketCategoryID = c.TicketCategoryID
+    WHERE t.TicketID = ?
+  `;
 
-        if (results.length === 0) {
-            return res.status(404).json({ error: "Ticket not found" });
-        }
+  db.query(ticketQuery, [ticketId], (err, results) => {
+    if (err) {
+      console.error("Error in ticket_view query:", err);
+      return res.status(500).json({ error: "Database query failed" });
+    }
 
-        res.json(results[0]);
+    if (results.length === 0) {
+      return res.status(404).json({ error: "Ticket not found" });
+    }
+
+    const ticket = results[0];
+
+    // ✅ FIX: Use SupervisorID from DB result, not supervisor_id
+    const supervisorIds = ticket.SupervisorID
+      ? ticket.SupervisorID.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id))
+      : [];
+
+    if (supervisorIds.length === 0) {
+      return res.status(200).json({ ...ticket, supervisor_id: [], supervisor_name: null });
+    }
+
+    const placeholders = supervisorIds.map(() => '?').join(',');
+    const nameQuery = `SELECT UserID, FullName FROM appuser WHERE UserID IN (${placeholders})`;
+
+    db.query(nameQuery, supervisorIds, (err, nameResults) => {
+      if (err) {
+        console.error("Error fetching supervisor names:", err);
+        return res.status(500).json({ error: "Error fetching supervisor names" });
+      }
+
+      const fullNames = nameResults.map(row => row.FullName);
+
+      // ✅ Append parsed supervisor info to response
+      res.json({
+        ...ticket,
+        supervisor_id: supervisorIds,
+        supervisor_name: fullNames.join(', '),
+      });
     });
+  });
 });
+
+// PUT: Update supervisors for a ticket
+app.put("/update-supervisors/:id", (req, res) => {
+  const { id } = req.params;
+  const { supervisorIds } = req.body;
+
+  console.log("Received ticket ID:", id);
+  console.log("Received supervisor IDs:", supervisorIds);
+
+  // Validate input
+  if (!Array.isArray(supervisorIds) || supervisorIds.length === 0) {
+    return res.status(400).json({ error: "At least one supervisor is required." });
+  }
+
+  // Clean and format supervisor IDs
+  const validSupervisorIds = supervisorIds
+    .map(id => parseInt(id))
+    .filter(id => !isNaN(id) && id > 0);
+
+  if (validSupervisorIds.length === 0) {
+    return res.status(400).json({ error: "No valid supervisor IDs provided." });
+  }
+
+  const supervisorIdString = validSupervisorIds.join(",");
+
+  // Update the ticket table
+  const sql = "UPDATE ticket SET SupervisorID = ? WHERE TicketID = ?";
+  db.query(sql, [supervisorIdString, id], (err, result) => {
+    if (err) {
+      console.error("Error updating supervisors:", err);
+      return res.status(500).json({ error: "Failed to update supervisors." });
+    }
+
+    console.log("Supervisors updated:", result);
+    res.json({ message: "Supervisors updated successfully" });
+  });
+});
+
+
+
 
 
 app.get('/api/supervisors', (req, res) => {

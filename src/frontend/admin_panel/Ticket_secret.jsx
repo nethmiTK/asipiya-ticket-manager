@@ -1,7 +1,10 @@
 import React from 'react';
 import { IoArrowBack } from 'react-icons/io5';
+import { useNavigate } from 'react-router-dom';
 
 const Ticket_secret = ({ ticket, onClose }) => {
+  const navigate = useNavigate();
+
   const getStatusColor = (status) => {
     switch (status?.toLowerCase()) {
       case "open":
@@ -108,6 +111,16 @@ const Ticket_secret = ({ ticket, onClose }) => {
             </div>
           </div>
 
+          {/* ✅ Edit Supervisor Button */}
+          <div>
+            <button
+              onClick={() => navigate(`/edit_supervisors/${ticket.TicketID}`)}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded"
+            >
+              Edit Supervisor
+            </button>
+          </div>
+
           {ticket.UserNote && (
             <div>
               <label className="block text-sm font-medium text-gray-600 mb-1">
@@ -124,4 +137,4 @@ const Ticket_secret = ({ ticket, onClose }) => {
   );
 };
 
-export default Ticket_secret; 
+export default Ticket_secret;
