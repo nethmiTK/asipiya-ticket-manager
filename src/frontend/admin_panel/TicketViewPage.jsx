@@ -9,10 +9,12 @@ import {
   FaRegFileWord,
   FaRegFilePowerpoint
 } from "react-icons/fa";
+import { useAuth } from '../../App.jsx';
 
 const TicketViewPage = ({ ticketId, popupMode = false, onClose }) => {
   const { id: routeId } = useParams();
   const navigate = useNavigate();
+  const { loggedInUser: user } = useAuth();
   const id = popupMode ? ticketId : routeId;
 
   const [ticketData, setTicketData] = useState(null);
@@ -74,8 +76,9 @@ const TicketViewPage = ({ ticketId, popupMode = false, onClose }) => {
 
     try {
       const response = await axios.put(`http://localhost:5000/api/ticket_status/${id}`, {
-        status: 'Reject',
+        status: 'Rejected',
         reason: finalReason,
+        userId: user?.UserID
       });
 
       if (response.status === 200 || response.status === 204) {

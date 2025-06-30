@@ -50,6 +50,14 @@ const NotificationPanel = ({ userId, role, onClose }) => {
                     </span>
                 );
             }
+        } else if (notification.Type === 'TICKET_REJECTED') {
+            // Handle ticket rejection notifications with special styling
+            return (
+                <span>
+                    <span className="text-red-600 font-medium">Ticket Rejected</span><br />
+                    {notification.Message}
+                </span>
+            );
         }
         return notification.Message;
     };
@@ -137,6 +145,8 @@ const NotificationPanel = ({ userId, role, onClose }) => {
                 return `/ticket-manage?ticketId=${notification.TicketID}&tab=details`;
             } else if (notification.Type === 'MENTION' || notification.Type === 'COMMENT_ADDED') {
                 return `/ticket-manage?ticketId=${notification.TicketID}&tab=comments`;
+            } else if (notification.Type === 'TICKET_REJECTED') {
+                return `/ticket-manage?ticketId=${notification.TicketID}&tab=details`;
             }
             // Default for other ticket-related types
             return `/ticket-manage?ticketId=${notification.TicketID}&tab=details`;
