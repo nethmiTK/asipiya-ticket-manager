@@ -1,11 +1,14 @@
 import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import { io } from "socket.io-client";
+import { IoMdAttach } from "react-icons/io";
+import { MdSend } from "react-icons/md";
 
 function renderMessageWithLinks(text) {
   if (typeof text !== "string") return text;
 
-  const urlRegex = /((https?:\/\/)?(www\.)?[\w\-]+\.[\w]{2,}([\/\w\-\.?=&%]*)?)/gi;
+  const urlRegex =
+    /((https?:\/\/)?(www\.)?[\w\-]+\.[\w]{2,}([\/\w\-\.?=&%]*)?)/gi;
 
   return text.split(urlRegex).map((part, i) => {
     if (
@@ -44,7 +47,13 @@ function renderMessageWithLinks(text) {
   });
 }
 
-export default function SupervisorChatSection({ user, supportUser, ticketId, ticket, role }) {
+export default function SupervisorChatSection({
+  user,
+  supportUser,
+  ticketId,
+  ticket,
+  role,
+}) {
   const [chatMessages, setChatMessages] = useState([]);
   const [chatInput, setChatInput] = useState("");
   const [sendingFile, setSendingFile] = useState(null);
@@ -57,6 +66,19 @@ export default function SupervisorChatSection({ user, supportUser, ticketId, tic
       (msg, index, self) =>
         index === self.findIndex((m) => String(m.id) === String(msg.id))
     );
+  };
+
+  // Mark messages as seen on server
+  const markMessagesAsSeen = async () => {
+    if (!ticketId || !role) return;
+    try {
+      await axios.post("http://localhost:5000/ticketchat/markSeen", {
+        TicketID: ticketId,
+        Role: role,
+      });
+    } catch (error) {
+      console.error("Failed to mark messages as seen:", error);
+    }
   };
 
   // Helper: Group messages by date
@@ -76,26 +98,36 @@ export default function SupervisorChatSection({ user, supportUser, ticketId, tic
     return grouped;
   };
 
+  // Initialize socket, join room, listen to events
   useEffect(() => {
     if (!ticketId) return;
 
-    // Connect to socket and join room
     socketRef.current = io("http://localhost:5000");
     socketRef.current.emit("joinTicketRoom", ticketId);
 
-    // Listen for incoming messages
     socketRef.current.on("receiveTicketMessage", (message) => {
       if (String(message.ticketid) !== String(ticketId)) return;
-
-      // Map role to sender properly
-      const sender = (message.role || "").toLowerCase() === "user" ? "user" : "agent";
-
+      const sender =
+        (message.role || "").toLowerCase() === "user" ? "user" : "agent";
       setChatMessages((prevMsgs) => {
-        // Prevent duplicates by ID
-        if (prevMsgs.find((m) => String(m.id) === String(message.id))) return prevMsgs;
-        const combined = [...prevMsgs, { ...message, sender }];
-        return deduplicateMessages(combined);
+        if (prevMsgs.find((m) => String(m.id) === String(message.id)))
+          return prevMsgs;
+        return deduplicateMessages([...prevMsgs, { ...message, sender }]);
       });
+    });
+
+    socketRef.current.on("messagesSeen", (seenData) => {
+      if (String(seenData.TicketID) !== String(ticketId)) return;
+
+      setChatMessages((prevMsgs) =>
+        prevMsgs.map((msg) =>
+          String(msg.ticketid) === String(seenData.TicketID) &&
+          msg.role !== seenData.Role &&
+          msg.status !== "seen"
+            ? { ...msg, status: "seen" }
+            : msg
+        )
+      );
     });
 
     return () => {
@@ -107,30 +139,38 @@ export default function SupervisorChatSection({ user, supportUser, ticketId, tic
     };
   }, [ticketId]);
 
+  // Fetch messages on ticket change, mark them as seen immediately
   useEffect(() => {
     if (!ticketId) return;
 
     axios
       .get(`http://localhost:5000/messages/${ticketId}`)
       .then((res) => {
-        // Map role to sender for each message
         const formattedMessages = res.data.map((msg) => ({
           ...msg,
           sender: (msg.role || "").toLowerCase() === "user" ? "user" : "agent",
         }));
-
-        // Deduplicate messages by ID before setting state
-        const uniqueMessages = deduplicateMessages(formattedMessages);
-
-        setChatMessages(uniqueMessages);
+        setChatMessages(deduplicateMessages(formattedMessages));
+      })
+      .then(() => {
+        markMessagesAsSeen();
       })
       .catch(console.error);
-  }, [ticketId]);
+  }, [ticketId, role]);
 
+  // Mark messages as seen when tab/window regains focus
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [chatMessages]);
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        markMessagesAsSeen();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () =>
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, [ticketId, role]);
 
+  // Handle send message (text or file)
   const handleSendMessage = async () => {
     if (!chatInput.trim() && !sendingFile) return;
 
@@ -143,15 +183,10 @@ export default function SupervisorChatSection({ user, supportUser, ticketId, tic
       userid: supportUser || null,
       role: role || "Supervisor",
       sender: "agent",
-      content: chatInput || (sendingFile && sendingFile.name),
+      content: chatInput || sendingFile?.name,
       timestamp: new Date().toISOString(),
       type: sendingFile ? "file" : "text",
-      file: sendingFile
-        ? {
-            name: sendingFile.name,
-            url: localFileUrl,
-          }
-        : null,
+      file: sendingFile ? { name: sendingFile.name, url: localFileUrl } : null,
       status: "sending",
     };
 
@@ -164,9 +199,7 @@ export default function SupervisorChatSection({ user, supportUser, ticketId, tic
       formData.append("Note", chatInput || sendingFile.name);
       formData.append("UserID", supportUser || "");
       formData.append("Role", role || "Supervisor");
-      if (sendingFile) {
-        formData.append("file", sendingFile);
-      }
+      if (sendingFile) formData.append("file", sendingFile);
 
       const res = await axios.post(
         "http://localhost:5000/ticketchat",
@@ -214,11 +247,13 @@ export default function SupervisorChatSection({ user, supportUser, ticketId, tic
   };
 
   const groupedMessages = groupMessagesByDate(chatMessages);
-  const sortedDates = Object.keys(groupedMessages).sort((a, b) => new Date(a) - new Date(b));
+  const sortedDates = Object.keys(groupedMessages).sort(
+    (a, b) => new Date(a) - new Date(b)
+  );
 
   useEffect(() => {
-  chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-}, [chatMessages]);
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [chatMessages]);
 
   return (
     <div className="flex flex-col h-full w-6xl mx-auto border-gray-400 rounded-lg shadow-lg border">
@@ -230,7 +265,7 @@ export default function SupervisorChatSection({ user, supportUser, ticketId, tic
 
       <div className="flex-1 overflow-y-auto bg-gray-50 p-4">
         {chatMessages.length === 0 && (
-          <p className="text-center text-gray-400 mt-20">
+          <p className="text-center text-gray-400 mt-50">
             No chat messages yet.
           </p>
         )}
@@ -255,7 +290,8 @@ export default function SupervisorChatSection({ user, supportUser, ticketId, tic
                   {isClient && (
                     <img
                       src={
-                        supportUser?.avatar || "https://i.pravatar.cc/40?u=user1"
+                        supportUser?.avatar ||
+                        "https://i.pravatar.cc/40?u=user1"
                       }
                       alt="avatar"
                       className="w-8 h-8 rounded-full mr-2 self-end"
@@ -272,34 +308,38 @@ export default function SupervisorChatSection({ user, supportUser, ticketId, tic
                     {msg.file ? (
                       <div className="flex flex-col items-center">
                         {/* Display an image or video preview if applicable */}
-                        {msg.file.name.toLowerCase().match(/\.(jpg|jpeg|png|gif|bmp|webp)$/i) ? (
-                            <img
-                              src={msg.file.url}
-                              alt={msg.file.name}
-                              className="w-40 h-auto rounded-md mb-1 object-contain"
-                            />
-                        ) : msg.file.name.toLowerCase().match(/\.(mp4|webm|ogg|mov)$/i) ? (
-                            <video
-                              controls
-                              src={msg.file.url}
-                              className="w-40 h-auto rounded-md mb-1 object-contain"
-                            />
+                        {msg.file.name
+                          .toLowerCase()
+                          .match(/\.(jpg|jpeg|png|gif|bmp|webp)$/i) ? (
+                          <img
+                            src={msg.file.url}
+                            alt={msg.file.name}
+                            className="w-40 h-auto rounded-md mb-1 object-contain"
+                          />
+                        ) : msg.file.name
+                            .toLowerCase()
+                            .match(/\.(mp4|webm|ogg|mov)$/i) ? (
+                          <video
+                            controls
+                            src={msg.file.url}
+                            className="w-40 h-auto rounded-md mb-1 object-contain"
+                          />
                         ) : msg.file.name.toLowerCase().endsWith(".pdf") ? (
-                            <img
-                              src="https://upload.wikimedia.org/wikipedia/commons/8/87/PDF_file_icon.svg"
-                              alt="PDF Icon"
-                              className="w-20 h-20 object-contain mb-1"
-                            />
+                          <img
+                            src="https://upload.wikimedia.org/wikipedia/commons/8/87/PDF_file_icon.svg"
+                            alt="PDF Icon"
+                            className="w-20 h-20 object-contain mb-1"
+                          />
                         ) : (
-                            <img
-                              src="https://freesoft.ru/storage/images/729/7282/728101/728101_normal.png" // Generic file icon
-                              alt="File Icon"
-                              className="w-20 h-20 object-contain mb-1"
-                            />
+                          <img
+                            src="https://freesoft.ru/storage/images/729/7282/728101/728101_normal.png" // Generic file icon
+                            alt="File Icon"
+                            className="w-20 h-20 object-contain mb-1"
+                          />
                         )}
                         {/* Always show file name below icon/preview */}
                         <p className="text-sm font-medium text-gray-800 text-center break-words mb-2">
-                            {msg.file.name}
+                          {msg.file.name}
                         </p>
 
                         {/* Dedicated Download Button */}
@@ -310,8 +350,19 @@ export default function SupervisorChatSection({ user, supportUser, ticketId, tic
                           download={msg.file.name} // This attribute suggests a download filename
                           className="inline-flex items-center px-3 py-1 bg-blue-500 text-white rounded-md text-xs hover:bg-blue-600 transition-colors duration-200"
                         >
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            className="h-4 w-4 mr-1"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                            />
                           </svg>
                           Download
                         </a>
@@ -321,14 +372,24 @@ export default function SupervisorChatSection({ user, supportUser, ticketId, tic
                     )}
 
                     <div className="flex justify-between text-xs mt-1 opacity-70">
-                      <span>{new Date(msg.timestamp).toLocaleTimeString()}</span>
+                      <span>
+                        {new Date(msg.timestamp).toLocaleString(undefined, {
+                          year: "numeric",
+                          month: "2-digit",
+                          day: "2-digit",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </span>
                       {!isClient && (
                         <span>
                           {msg.status === "sending"
-                            ? "🕓 Sending..."
+                            ? "🕓 sending..."
                             : msg.status === "failed"
-                            ? "❌ Failed"
-                            : "✓ Delivered"}
+                            ? "❌ failed"
+                            : msg.status === "seen"
+                            ? "  ✓✓ seen"
+                            : "  ✓ delivered"}
                         </span>
                       )}
                     </div>
@@ -408,10 +469,10 @@ export default function SupervisorChatSection({ user, supportUser, ticketId, tic
       <div className="mt-3 flex items-center space-x-2 p-3 border-t border-gray-300 bg-white rounded-b-lg">
         <label
           htmlFor="file-upload"
-          className="cursor-pointer p-2 border rounded-md hover:bg-gray-200"
+          className="cursor-pointer "
           title="Attach file"
         >
-          📎
+          <IoMdAttach className="text-xl text-gray-900 size-7 cursor-pointer hover:text-gray-700" />
         </label>
         <input
           type="file"
@@ -424,7 +485,7 @@ export default function SupervisorChatSection({ user, supportUser, ticketId, tic
           value={chatInput}
           onChange={(e) => setChatInput(e.target.value)}
           placeholder="Type your message..."
-          className="flex-1 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="flex-1 px-3 py-2 border border-zinc-300 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500"
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
@@ -434,10 +495,9 @@ export default function SupervisorChatSection({ user, supportUser, ticketId, tic
         />
         <button
           onClick={handleSendMessage}
-          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:opacity-50"
           disabled={!chatInput.trim() && !sendingFile}
         >
-          Send
+          <MdSend className="text-gray-900 hover:text-gray-700 size-8 cursor-pointer" />
         </button>
       </div>
     </div>
