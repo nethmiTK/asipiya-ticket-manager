@@ -3,7 +3,7 @@ import axios from 'axios';
 import { formatDistanceToNow } from 'date-fns';
 import { IoClose } from 'react-icons/io5';
 import { Link } from 'react-router-dom';
-import { FaLaptopCode, FaUserPlus, FaLayerGroup } from 'react-icons/fa';
+import { FaLaptopCode, FaUserPlus, FaLayerGroup, FaUserCheck, FaUserTimes } from 'react-icons/fa';
 
 const NotificationPanel = ({ userId, role, onClose }) => {
     const [notifications, setNotifications] = useState([]);
@@ -58,12 +58,38 @@ const NotificationPanel = ({ userId, role, onClose }) => {
                     {notification.Message}
                 </span>
             );
+        } else if (notification.Type === 'TICKET_UPDATED') {
+            // Handle consolidated ticket update notifications
+            return (
+                <span>
+                    <span className="text-blue-600 font-medium">Ticket Updated</span><br />
+                    {notification.Message}
+                </span>
+            );
+        } else if (notification.Type === 'SUPERVISOR_ASSIGNED') {
+            // Handle supervisor assignment notifications
+            return (
+                <span>
+                    <span className="text-green-600 font-medium">Assigned to Ticket</span><br />
+                    {notification.Message}
+                </span>
+            );
+        } else if (notification.Type === 'SUPERVISOR_UNASSIGNED') {
+            // Handle supervisor unassignment notifications
+            return (
+                <span>
+                    <span className="text-orange-600 font-medium">Unassigned from Ticket</span><br />
+                    {notification.Message}
+                </span>
+            );
         }
         return notification.Message;
     };
 
     const getNotificationProfilePic = (notification) => {
         const systemNotificationTypes = ['NEW_SYSTEM_ADDED', 'NEW_CATEGORY_ADDED', 'NEW_USER_REGISTRATION'];
+        const supervisorNotificationTypes = ['SUPERVISOR_ASSIGNED', 'SUPERVISOR_UNASSIGNED', 'TICKET_UPDATED'];
+        
         if (systemNotificationTypes.includes(notification.Type)) {
             // Use a specific icon or image for system notifications
             switch (notification.Type) {
@@ -75,6 +101,18 @@ const NotificationPanel = ({ userId, role, onClose }) => {
                     return { icon: <FaUserPlus className="w-6 h-6 text-green-500" />, bgColor: 'bg-green-100' };
                 default:
                     return { icon: <FaLaptopCode className="w-6 h-6 text-gray-500" />, bgColor: 'bg-gray-100' };
+            }
+        } else if (supervisorNotificationTypes.includes(notification.Type)) {
+            // Use specific icons for supervisor-related notifications
+            switch (notification.Type) {
+                case 'SUPERVISOR_ASSIGNED':
+                    return { icon: <FaUserCheck className="w-6 h-6 text-green-500" />, bgColor: 'bg-green-100' };
+                case 'SUPERVISOR_UNASSIGNED':
+                    return { icon: <FaUserTimes className="w-6 h-6 text-orange-500" />, bgColor: 'bg-orange-100' };
+                case 'TICKET_UPDATED':
+                    return { icon: <FaUserCheck className="w-6 h-6 text-blue-500" />, bgColor: 'bg-blue-100' };
+                default:
+                    return { icon: <FaUserCheck className="w-6 h-6 text-gray-500" />, bgColor: 'bg-gray-100' };
             }
         } else if (notification.SourceUserProfileImagePath) {
             // Use the source user's profile picture
@@ -145,7 +183,10 @@ const NotificationPanel = ({ userId, role, onClose }) => {
                 return `/ticket-manage?ticketId=${notification.TicketID}&tab=details`;
             } else if (notification.Type === 'MENTION' || notification.Type === 'COMMENT_ADDED') {
                 return `/ticket-manage?ticketId=${notification.TicketID}&tab=comments`;
-            } else if (notification.Type === 'TICKET_REJECTED') {
+            } else if (notification.Type === 'TICKET_REJECTED' || 
+                       notification.Type === 'TICKET_UPDATED' || 
+                       notification.Type === 'SUPERVISOR_ASSIGNED' || 
+                       notification.Type === 'SUPERVISOR_UNASSIGNED') {
                 return `/ticket-manage?ticketId=${notification.TicketID}&tab=details`;
             }
             // Default for other ticket-related types
