@@ -1075,7 +1075,7 @@ app.get("/evidence/:ticketId", (req, res) => {
 });
 
 app.get("/supervisors", (req, res) => {
-    const sql = "SELECT UserID, FullName FROM appuser WHERE Role = 'supervisor'";
+    const sql = "SELECT UserID, FullName FROM appuser WHERE Role = 'Supervisor'";
     db.query(sql, (err, results) => {
         if (err) {
             console.error("Error fetching supervisors:", err);
