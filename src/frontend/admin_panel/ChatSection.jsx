@@ -57,8 +57,10 @@ export default function SupervisorChatSection({
   const [chatMessages, setChatMessages] = useState([]);
   const [chatInput, setChatInput] = useState("");
   const [sendingFile, setSendingFile] = useState(null);
+  const [stickyDate, setStickyDate] = useState(""); // New state for sticky date
   const chatEndRef = useRef(null);
   const socketRef = useRef(null);
+  const messagesContainerRef = useRef(null); // Ref for the scrollable messages container
 
   // Helper: Deduplicate messages by id
   const deduplicateMessages = (messages) => {
@@ -81,7 +83,28 @@ export default function SupervisorChatSection({
     }
   };
 
-  // Helper: Group messages by date
+  // Helper: Format date for display (Today, Yesterday, or actual date)
+  const formatDateForDisplay = (dateString) => {
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    const messageDate = new Date(dateString);
+
+    if (messageDate.toDateString() === today.toDateString()) {
+      return "Today";
+    } else if (messageDate.toDateString() === yesterday.toDateString()) {
+      return "Yesterday";
+    } else {
+      return messageDate.toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      });
+    }
+  };
+
+  // Helper: Group messages by date with dynamic formatting
   const groupMessagesByDate = (messages) => {
     const grouped = {};
     messages.forEach((msg) => {
@@ -89,13 +112,26 @@ export default function SupervisorChatSection({
         year: "numeric",
         month: "long",
         day: "numeric",
-      });
+      }); // This will be the key for grouping
+      
+      const displayDate = formatDateForDisplay(msg.timestamp); // This will be the string shown to the user
+
       if (!grouped[messageDate]) {
-        grouped[messageDate] = [];
+        grouped[messageDate] = {
+          displayDate: displayDate,
+          messages: [],
+        };
       }
-      grouped[messageDate].push(msg);
+      grouped[messageDate].messages.push(msg);
     });
     return grouped;
+  };
+
+  // Scroll to bottom function
+  const scrollToBottom = () => {
+    if (chatEndRef.current) {
+      chatEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
   };
 
   // Initialize socket, join room, listen to events
@@ -251,42 +287,105 @@ export default function SupervisorChatSection({
     (a, b) => new Date(a) - new Date(b)
   );
 
+  // Scroll to bottom when messages change
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    scrollToBottom();
   }, [chatMessages]);
+
+  // --- Sticky Date Header Logic ---
+  useEffect(() => {
+    const messagesContainer = messagesContainerRef.current;
+    if (!messagesContainer) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        let currentStickyDate = "";
+        // Iterate in reverse to find the topmost visible date
+        for (let i = entries.length - 1; i >= 0; i--) {
+          const entry = entries[i];
+          if (entry.isIntersecting && entry.target.dataset.date) {
+            currentStickyDate = entry.target.dataset.date;
+            break; // Found the topmost intersecting date, so we can stop
+          }
+        }
+        setStickyDate(currentStickyDate);
+      },
+      {
+        root: messagesContainer,
+        rootMargin: "-1px 0px 0px 0px", // Trigger when the date separator hits the very top
+        threshold: 0, // Trigger as soon as any part of the element is visible
+      }
+    );
+
+    // Observe each date separator
+    sortedDates.forEach((date) => {
+      const dateElement = messagesContainer.querySelector(`[data-date-key="${date}"]`);
+      if (dateElement) {
+        observer.observe(dateElement);
+      }
+    });
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [groupedMessages, sortedDates]); // Re-run when grouped messages or sorted dates change
 
   return (
     <div className="flex flex-col h-full w-6xl mx-auto border-gray-400 rounded-lg shadow-lg border">
-      <header className="p-4 rounded-lg border-b bg-gray-50 border-gray-400">
-        <h2 className="text-lg font-bold">
+      {/* Header - WhatsApp style */}
+      <header className="p-4 rounded-t-lg border-b bg-gray-400 text-white shadow-md">
+        <h2 className="text-lg font-bold text-gray-700">
           Chat for Ticket #{ticket?.id || ticketId}
         </h2>
+        {/* You could add participant names here, e.g., "Chat with {user?.name}" */}
       </header>
 
-      <div className="flex-1 overflow-y-auto bg-gray-50 p-4">
+      {/* Sticky Date Header */}
+      {stickyDate && (
+        <div className="sticky top-0 z-10 text-center py-2 bg-green-200 text-gray-700 text-sm font-medium shadow-sm border-b">
+          {stickyDate}
+        </div>
+      )}
+
+      {/* Chat Messages Area - WhatsApp style */}
+      <div
+        className="flex-1 overflow-y-auto p-4 relative" // Added relative for sticky child positioning
+        style={{
+          backgroundImage:
+            "url('https://www.transparenttextures.com/patterns/clean-textile.png')",
+          backgroundColor: "#0000",
+        }}
+        ref={messagesContainerRef} // Assign ref to the scrollable container
+      >
         {chatMessages.length === 0 && (
-          <p className="text-center text-gray-400 mt-50">
-            No chat messages yet.
+          <p className="text-center text-gray-600 mt-50">
+            No chat messages yet. Start the conversation!
           </p>
         )}
 
-        {sortedDates.map((date) => (
-          <div key={date}>
-            <div className="text-center my-4">
-              <span className="inline-block bg-gray-200 text-gray-700 px-3 py-1 rounded-full text-sm font-medium">
-                {date}
+        {sortedDates.map((dateKey) => (
+          <div key={dateKey}>
+            {/* Date Separator */}
+            <div
+              className="text-center my-4"
+              data-date-key={dateKey} // Use data attribute for Intersection Observer
+              data-date={groupedMessages[dateKey].displayDate} // Store the display string here
+            >
+              <span className="inline-block bg-green-200 text-gray-700 px-3 py-1 rounded-full text-sm font-medium shadow-sm">
+                {groupedMessages[dateKey].displayDate}
               </span>
             </div>
-            {groupedMessages[date].map((msg) => {
+            {groupedMessages[dateKey].messages.map((msg) => {
               const isClient = msg.sender === "user";
 
               return (
                 <div
                   key={String(msg.id)}
-                  className={`flex mb-3 ${
+                  className={`flex mb-2 ${
                     !isClient ? "justify-end" : "justify-start"
                   }`}
                 >
+                  {/* Client Avatar (if applicable and desired) */}
                   {isClient && (
                     <img
                       src={
@@ -294,27 +393,33 @@ export default function SupervisorChatSection({
                         "https://i.pravatar.cc/40?u=user1"
                       }
                       alt="avatar"
-                      className="w-8 h-8 rounded-full mr-2 self-end"
+                      className="w-8 h-8 rounded-full mr-2 self-end shadow-md"
                     />
                   )}
 
+                  {/* Message Bubble */}
                   <div
-                    className={`max-w-xs px-4 py-2 rounded-lg break-words whitespace-pre-wrap ${
+                    className={`relative max-w-[75%] px-3 py-2 rounded-lg shadow-md break-words whitespace-pre-wrap text-sm ${
                       !isClient
-                        ? "bg-blue-300 text-gray-800 rounded-br-none"
-                        : "bg-gray-300 text-gray-800 rounded-bl-none"
+                        ? "bg-[#D9FDD3] text-gray-900 rounded-br-none ml-auto"
+                        : "bg-white text-gray-900 rounded-bl-none mr-auto"
                     }`}
+                    style={
+                      !isClient
+                        ? { borderBottomRightRadius: "0.25rem" }
+                        : { borderBottomLeftRadius: "0.25rem" }
+                    }
                   >
+                    {/* Message Content */}
                     {msg.file ? (
-                      <div className="flex flex-col items-center">
-                        {/* Display an image or video preview if applicable */}
+                      <div className="flex flex-col items-center p-2">
                         {msg.file.name
                           .toLowerCase()
                           .match(/\.(jpg|jpeg|png|gif|bmp|webp)$/i) ? (
                           <img
                             src={msg.file.url}
                             alt={msg.file.name}
-                            className="w-40 h-auto rounded-md mb-1 object-contain"
+                            className="max-h-40 object-contain rounded-md mb-1 shadow-sm"
                           />
                         ) : msg.file.name
                             .toLowerCase()
@@ -322,37 +427,34 @@ export default function SupervisorChatSection({
                           <video
                             controls
                             src={msg.file.url}
-                            className="w-40 h-auto rounded-md mb-1 object-contain"
+                            className="max-h-40 object-contain rounded-md mb-1 shadow-sm"
                           />
                         ) : msg.file.name.toLowerCase().endsWith(".pdf") ? (
                           <img
                             src="https://upload.wikimedia.org/wikipedia/commons/8/87/PDF_file_icon.svg"
                             alt="PDF Icon"
-                            className="w-20 h-20 object-contain mb-1"
+                            className="w-12 h-12 object-contain mb-1"
                           />
                         ) : (
                           <img
                             src="https://freesoft.ru/storage/images/729/7282/728101/728101_normal.png" // Generic file icon
                             alt="File Icon"
-                            className="w-20 h-20 object-contain mb-1"
+                            className="w-12 h-12 object-contain mb-1"
                           />
                         )}
-                        {/* Always show file name below icon/preview */}
-                        <p className="text-sm font-medium text-gray-800 text-center break-words mb-2">
+                        <p className="text-sm font-medium text-gray-800 text-center break-words mb-1">
                           {msg.file.name}
                         </p>
-
-                        {/* Dedicated Download Button */}
                         <a
                           href={msg.file.url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          download={msg.file.name} // This attribute suggests a download filename
-                          className="inline-flex items-center px-3 py-1 bg-blue-500 text-white rounded-md text-xs hover:bg-blue-600 transition-colors duration-200"
+                          download={msg.file.name}
+                          className="inline-flex items-center px-2 py-0.5 bg-blue-500 text-white rounded-md text-xs hover:bg-blue-600 transition-colors duration-200"
                         >
                           <svg
                             xmlns="http://www.w3.org/2000/svg"
-                            className="h-4 w-4 mr-1"
+                            className="h-3 w-3 mr-1"
                             fill="none"
                             viewBox="0 0 24 24"
                             stroke="currentColor"
@@ -371,35 +473,50 @@ export default function SupervisorChatSection({
                       renderMessageWithLinks(msg.content)
                     )}
 
-                    <div className="flex justify-between text-xs mt-1 opacity-70">
-                      <span>
-                        {new Date(msg.timestamp).toLocaleString(undefined, {
-                          year: "numeric",
-                          month: "2-digit",
-                          day: "2-digit",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </span>
+                    {/* Timestamp and Status */}
+                    <div
+                      className={`text-[10px] mt-1 ${
+                        !isClient ? "text-right" : "text-left"
+                      } text-gray-500`}
+                    >
+                      {new Date(msg.timestamp).toLocaleTimeString("en-US", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        hour12: true, // Use AM/PM format
+                      })}
                       {!isClient && (
-                        <span>
+                        <span className="ml-1">
                           {msg.status === "sending"
-                            ? "🕓 sending..."
+                            ? "🕓"
                             : msg.status === "failed"
-                            ? "❌ failed"
+                            ? "❌"
                             : msg.status === "seen"
-                            ? "  ✓✓ seen"
-                            : "  ✓ delivered"}
+                            ? "✓✓" // Double tick for seen
+                            : "✓"}
                         </span>
                       )}
                     </div>
+
+                    {/* WhatsApp-like "tail" for the bubble */}
+                    {!isClient ? (
+                      <div
+                        className="absolute -right-2 bottom-0 w-3 h-3 bg-[#D9FDD3] transform rotate-45 origin-bottom-left rounded-sm"
+                        style={{ boxShadow: "1px 1px 2px rgba(0,0,0,0.1)" }}
+                      ></div>
+                    ) : (
+                      <div
+                        className="absolute -left-2 bottom-0 w-3 h-3 bg-white transform -rotate-45 origin-bottom-right rounded-sm"
+                        style={{ boxShadow: "-1px 1px 2px rgba(0,0,0,0.1)" }}
+                      ></div>
+                    )}
                   </div>
 
+                  {/* Agent/Supervisor Avatar */}
                   {!isClient && (
                     <img
                       src={user?.avatar || "https://i.pravatar.cc/40?u=support"}
                       alt="avatar"
-                      className="w-8 h-8 rounded-full ml-2 self-end"
+                      className="w-8 h-8 rounded-full ml-2 self-end shadow-md"
                     />
                   )}
                 </div>
@@ -409,51 +526,40 @@ export default function SupervisorChatSection({
         ))}
 
         {sendingFile && (
-          <div className="flex justify-center mb-2">
-            <div className="relative bg-yellow-100 rounded-lg p-2 shadow-md max-w-[200px] max-h-[200px] overflow-hidden">
-              {(() => {
-                const fileUrl = URL.createObjectURL(sendingFile);
-                const fileName = sendingFile.name.toLowerCase();
-
-                if (sendingFile.type.startsWith("image/")) {
-                  return (
-                    <img
-                      src={fileUrl}
-                      alt="preview"
-                      className="w-full h-full object-cover rounded"
-                    />
-                  );
-                } else if (sendingFile.type.startsWith("video/")) {
-                  return (
-                    <video
-                      src={fileUrl}
-                      controls
-                      className="w-full h-full object-cover rounded"
-                    />
-                  );
-                } else if (fileName.endsWith(".pdf")) {
-                  return (
-                    <img
-                      src="https://upload.wikimedia.org/wikipedia/commons/8/87/PDF_file_icon.svg"
-                      alt="PDF"
-                      className="w-20 h-20 object-contain mb-1"
-                    />
-                  );
-                } else {
-                  return (
-                    <div className="flex flex-col items-center justify-center h-full">
-                      <span className="text-sm font-medium text-gray-800 text-center break-words">
-                        {sendingFile.name}
-                      </span>
-                      <span className="text-xs text-blue-500">
-                        (File ready to send)
-                      </span>
-                    </div>
-                  );
-                }
-              })()}
+          <div className="flex justify-end mb-2">
+            {" "}
+            {/* Align to right like sent messages */}
+            <div className="relative bg-blue-50 border border-blue-200 rounded-lg p-2 shadow-md max-w-xs w-full flex flex-col items-center">
+              {sendingFile.type && sendingFile.type.startsWith("image/") ? (
+                <img
+                  src={URL.createObjectURL(sendingFile)}
+                  alt="preview"
+                  className="max-h-32 object-contain rounded mb-2"
+                />
+              ) : sendingFile.type && sendingFile.type.startsWith("video/") ? (
+                <video
+                  src={URL.createObjectURL(sendingFile)}
+                  controls
+                  className="max-h-32 object-contain rounded mb-2"
+                />
+              ) : (
+                <img
+                  src={getFileIcon(sendingFile.type || '', sendingFile.name || '')} // Pass default empty strings
+                  alt="File Icon"
+                  className="w-16 h-16 object-contain mb-1"
+                />
+              )}
+              <p className="text-sm font-medium text-gray-800 text-center break-words">
+                {sendingFile.name}
+              </p>
+              <span className="text-xs text-blue-500 mb-2">
+                (File ready to send)
+              </span>
               <button
-                onClick={() => setSendingFile(null)}
+                onClick={() => {
+                  URL.revokeObjectURL(URL.createObjectURL(sendingFile)); // Clean up URL
+                  setSendingFile(null);
+                }}
                 className="absolute top-1 right-2 text-red-600 hover:text-red-800 text-lg font-bold"
                 title="Remove file"
               >
@@ -463,16 +569,19 @@ export default function SupervisorChatSection({
           </div>
         )}
 
+        {/* --- Key change: Ensure chatEndRef is the last element within the scrollable container --- */}
         <div ref={chatEndRef} />
       </div>
 
-      <div className="mt-3 flex items-center space-x-2 p-3 border-t border-gray-300 bg-white rounded-b-lg">
+      {/* Input Area - WhatsApp style */}
+      <div className="flex items-center space-x-2 p-3 bg-gray-100 border-t border-gray-200 rounded-b-lg">
+        {/* Attach Button */}
         <label
           htmlFor="file-upload"
-          className="cursor-pointer "
+          className="cursor-pointer p-2 rounded-full hover:bg-gray-200 transition-colors duration-200"
           title="Attach file"
         >
-          <IoMdAttach className="text-xl text-gray-900 size-7 cursor-pointer hover:text-gray-700" />
+          <IoMdAttach className="text-xl text-gray-600 size-7" />
         </label>
         <input
           type="file"
@@ -480,12 +589,14 @@ export default function SupervisorChatSection({
           className="hidden"
           onChange={(e) => setSendingFile(e.target.files[0])}
         />
+
+        {/* Text Input */}
         <input
           type="text"
           value={chatInput}
           onChange={(e) => setChatInput(e.target.value)}
-          placeholder="Type your message..."
-          className="flex-1 px-3 py-2 border border-zinc-300 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500"
+          placeholder="Message"
+          className="flex-1 px-4 py-2 bg-white border border-gray-300 rounded-full focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-sm"
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
@@ -493,11 +604,14 @@ export default function SupervisorChatSection({
             }
           }}
         />
+
+        {/* Send Button */}
         <button
           onClick={handleSendMessage}
           disabled={!chatInput.trim() && !sendingFile}
+          className="p-2 rounded-full bg-blue-500 text-white hover:bg-blue-600 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
         >
-          <MdSend className="text-gray-900 hover:text-gray-700 size-8 cursor-pointer" />
+          <MdSend className="size-7" />
         </button>
       </div>
     </div>
