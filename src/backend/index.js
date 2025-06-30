@@ -2694,44 +2694,68 @@ app.put('/api/tickets/:id/assign', (req, res) => {
             }
 
             try {
-                // Fetch supervisor and assigner names for logging and notifications
-                const getNamesQuery = `
-                    SELECT
-                        (SELECT FullName FROM appuser WHERE UserID = ?) as newSupervisorName,
-                        (SELECT FullName FROM appuser WHERE UserID = ?) as oldSupervisorName,
-                        (SELECT FullName FROM appuser WHERE UserID = ?) as assignerFullName;
-                `;
-                const [namesQueryResult] = await new Promise((resolve, reject) => {
-                    db.query(getNamesQuery, [supervisorId, oldSupervisorId, assignerId], (err, results) => {
+                // Get all supervisor IDs as an array
+                const supervisorIds = supervisorString.split(',').map(id => id.trim()).filter(Boolean);
+                const oldSupervisorIds = (oldSupervisorId || '').split(',').map(id => id.trim()).filter(Boolean);
+
+                // Fetch names for all supervisors and assigner
+                let getAllNamesQuery = `SELECT UserID, FullName FROM appuser WHERE `;
+                const queryParams = [];
+                const conditions = [];
+
+                // Add new supervisor IDs
+                if (supervisorIds.length > 0) {
+                    conditions.push(`UserID IN (${supervisorIds.map(() => '?').join(',')})`);
+                    queryParams.push(...supervisorIds);
+                }
+
+                // Add old supervisor IDs if they exist
+                if (oldSupervisorIds.length > 0) {
+                    conditions.push(`UserID IN (${oldSupervisorIds.map(() => '?').join(',')})`);
+                    queryParams.push(...oldSupervisorIds);
+                }
+
+                // Add assigner ID if it exists
+                if (assignerId) {
+                    conditions.push(`UserID = ?`);
+                    queryParams.push(assignerId);
+                }
+
+                getAllNamesQuery += conditions.join(' OR ');
+
+                const allNamesResult = await new Promise((resolve, reject) => {
+                    db.query(getAllNamesQuery, queryParams, (err, results) => {
                         if (err) reject(err);
-                        else resolve(results);
+                        else resolve(results || []);
                     });
                 });
 
-                console.log('Assign endpoint: Raw names query result:', namesQueryResult);
-
-                let currentSupervisorName = 'unassigned';
-                let newSupervisorName = 'Unknown Supervisor';
-                const assignerName = namesQueryResult && namesQueryResult.length > 0 ? (namesQueryResult[0].assignerFullName || null) : null;
-
-
-                if (namesQueryResult && namesQueryResult.length > 0) {
-                    const names = namesQueryResult[0];
-                    console.log('Assign endpoint: Type of names.oldSupervisorName:', typeof names.oldSupervisorName, 'Value:', names.oldSupervisorName);
-                    console.log('Assign endpoint: Type of names.newSupervisorName:', typeof names.newSupervisorName, 'Value:', names.newSupervisorName);
-
-                    if (names.oldSupervisorName !== null && names.oldSupervisorName !== undefined) {
-                        currentSupervisorName = names.oldSupervisorName.trim();
-                    }
-                    if (names.newSupervisorName !== null && names.newSupervisorName !== undefined) {
-                        newSupervisorName = names.newSupervisorName.trim();
-                    }
+                // Create name mappings
+                const nameMap = {};
+                if (allNamesResult) {
+                    allNamesResult.forEach(user => {
+                        nameMap[user.UserID] = user.FullName;
+                    });
                 }
-                // Log the values after the assignment logic
-                console.log('Assign endpoint: Names after explicit logic - current:', currentSupervisorName, 'new:', newSupervisorName, 'assigner:', assignerName);
 
-                 if (oldSupervisorId != supervisorId) {
-                    const supervisorLogDescription = `Supervisor changed from ${currentSupervisorName} to ${newSupervisorName}`;
+                const newSupervisorNames = supervisorIds.map(id => nameMap[id] || `User ${id}`);
+                const oldSupervisorNames = oldSupervisorIds.map(id => nameMap[id] || `User ${id}`);
+                const assignerName = assignerId ? (nameMap[assignerId] || 'Unknown') : 'System';
+
+                console.log('Assign endpoint: New supervisor names:', newSupervisorNames);
+                console.log('Assign endpoint: Old supervisor names:', oldSupervisorNames);
+                console.log('Assign endpoint: Assigner name:', assignerName);
+
+                // Track what changed for a single comprehensive notification
+                const changes = [];
+                let logResults = [];
+
+                // Log supervisor change if it occurred
+                if (oldSupervisorId != supervisorString) {
+                    const oldNamesStr = oldSupervisorNames.length > 0 ? oldSupervisorNames.join(', ') : 'unassigned';
+                    const newNamesStr = newSupervisorNames.join(', ');
+                    
+                    const supervisorLogDescription = `Supervisor changed from ${oldNamesStr} to ${newNamesStr}`;
                     const supervisorLogNote = `Assigned by ${assignerName}`;
                     const logResult = await createTicketLog(
                         ticketId,
@@ -2739,34 +2763,27 @@ app.put('/api/tickets/:id/assign', (req, res) => {
                         supervisorLogDescription,
                         assignerId,
                         oldSupervisorId,
-                        supervisorId,
+                        supervisorString,
                         supervisorLogNote
                     );
+                    logResults.push(logResult);
+                    changes.push(`supervisor(s) changed to ${newNamesStr}`);
 
-                    // Notify ticket creator about supervisor change
-                    if (ticketCreatorId) {
-                        await createNotification(
-                            ticketCreatorId,
-                            `The supervisor for your ticket #${ticketId} has changed from ${currentSupervisorName} to ${newSupervisorName}${assignerName ? ` by ${assignerName}` : ''}.`,
-                            'SUPERVISOR_UPDATED',
-                            logResult.insertId
-                        );
+                    // Notify old supervisors if they were unassigned
+                    for (const oldId of oldSupervisorIds) {
+                        if (!supervisorIds.includes(oldId)) {
+                            await createNotification(
+                                oldId,
+                                `You have been unassigned from ticket #${ticketId}${assignerName ? ` by ${assignerName}` : ''}.`,
+                                'SUPERVISOR_UNASSIGNED',
+                                logResult.insertId
+                            );
+                        }
                     }
-
-                    // Notify old supervisor if they were assigned
-                    if (oldSupervisorId && oldSupervisorId !== supervisorId) {
-                        await createNotification(
-                            oldSupervisorId,
-                            `You have been unassigned from ticket #${ticketId}${assignerName ? ` by ${assignerName}` : ''}.`,
-                            'SUPERVISOR_UNASSIGNED',
-                            logResult.insertId
-                        );
-                    }
-
-                    // Notify new supervisor (handled below, keep for consistency)
                 }
 
-                if ((oldStatus || '').trim().toLowerCase() !== (status || '').trim().toLowerCase() || true) {
+                // Log status change if it occurred
+                if ((oldStatus || '').trim().toLowerCase() !== (status || '').trim().toLowerCase()) {
                     const statusLogDescription = `Status changed from ${oldStatus} to ${status}`;
                     const statusLogNote = `Updated by ${assignerName}`;
                     const logResult = await createTicketLog(
@@ -2778,36 +2795,12 @@ app.put('/api/tickets/:id/assign', (req, res) => {
                         status,
                         statusLogNote
                     );
-
-                    // Notify ticket creator about status change
-                    if (ticketCreatorId) {
-                        await createNotification(
-                            ticketCreatorId,
-                            `Your ticket #${ticketId} status has been changed from ${oldStatus} to ${status}${assignerName ? ` by ${assignerName}` : ''}.`,
-                            'STATUS_UPDATE',
-                            logResult.insertId
-                        );
-                    }
-
-                    // Notify new supervisor if they were just assigned or are currently assigned
-                    if (supervisorId && supervisorId !== assignerId) { // Avoid double notification if assigner is new supervisor
-                        await createNotification(
-                            supervisorId,
-                            `Ticket #${ticketId} status has been changed from ${oldStatus} to ${status}${assignerName ? ` by ${assignerName}` : ''}.`,
-                            'STATUS_UPDATE',
-                            logResult.insertId
-                        );
-                    }
+                    logResults.push(logResult);
+                    changes.push(`status changed to ${status}`);
                 }
-                
-                console.log("Old Status:", oldStatus, "| New Status:", status);
-                console.log("Old Priority:", oldPriority, "| New Priority:", priority);
-                console.log("Comparison result:",
-                (oldStatus || '').trim().toLowerCase() !== (status || '').trim().toLowerCase(),
-                (oldPriority || '').trim().toLowerCase() !== (priority || '').trim().toLowerCase());
 
-
-                if ((oldPriority || '').trim().toLowerCase() !== (priority || '').trim().toLowerCase() || true) {
+                // Log priority change if it occurred
+                if ((oldPriority || '').trim().toLowerCase() !== (priority || '').trim().toLowerCase()) {
                     const priorityLogDescription = `Priority changed from ${oldPriority} to ${priority}`;
                     const priorityLogNote = `Updated by ${assignerName}`;
                     const logResult = await createTicketLog(
@@ -2819,37 +2812,44 @@ app.put('/api/tickets/:id/assign', (req, res) => {
                         priority,
                         priorityLogNote
                     );
-
-                    // Notify ticket creator about priority change
-                    if (ticketCreatorId) {
-                        await createNotification(
-                            ticketCreatorId,
-                            `Your ticket #${ticketId} priority has been changed from ${oldPriority} to ${priority}${assignerName ? ` by ${assignerName}` : ''}.`,
-                            'PRIORITY_UPDATE',
-                            logResult.insertId
-                        );
-                    }
-
-                    // Notify new supervisor if they were just assigned or are currently assigned
-                    if (supervisorId && supervisorId !== assignerId) { // Avoid double notification if assigner is new supervisor
-                        await createNotification(
-                            supervisorId,
-                            `Ticket #${ticketId} priority has been changed from ${oldPriority} to ${priority}${assignerName ? ` by ${assignerName}` : ''}.`,
-                            'PRIORITY_UPDATE',
-                            logResult.insertId
-                        );
-                    }
+                    logResults.push(logResult);
+                    changes.push(`priority changed to ${priority}`);
                 }
 
-                // Final notification to the assigned supervisor (if they are new or status/priority changed)
-                // This covers the initial assignment notification if no specific status/priority changes triggered other notifications to them.
-                if (oldSupervisorId !== supervisorId ||(oldStatus || '').trim().toLowerCase() !== (status || '').trim().toLowerCase() ||(oldPriority || '').trim().toLowerCase() !== (priority || '').trim().toLowerCase())
-                {
+                // Send a single comprehensive notification to ticket creator if any changes occurred
+                if (changes.length > 0 && ticketCreatorId) {
+                    const changeMessage = changes.join(', ');
                     await createNotification(
-                        supervisorId,
-                        `You have been assigned to ticket #${ticketId}. Status: ${status}, Priority: ${priority}.${assignerName ? ` Assigned by ${assignerName}` : ''}`,
-                        'SUPERVISOR_ASSIGNED'
+                        ticketCreatorId,
+                        `Your ticket #${ticketId} has been updated: ${changeMessage}${assignerName ? ` by ${assignerName}` : ''}.`,
+                        'TICKET_UPDATED',
+                        logResults[0]?.insertId || null
                     );
+                }
+
+                // Send notifications to assigned supervisors
+                for (const supId of supervisorIds) {
+                    if (supId !== assignerId) { // Don't notify the assigner
+                        if (!oldSupervisorIds.includes(supId)) {
+                            // New assignment
+                            const supervisorName = nameMap[supId] || `User ${supId}`;
+                            await createNotification(
+                                supId,
+                                `You have been assigned to ticket #${ticketId}. Status: ${status}, Priority: ${priority}.${assignerName ? ` Assigned by ${assignerName}` : ''}`,
+                                'SUPERVISOR_ASSIGNED',
+                                logResults[0]?.insertId || null
+                            );
+                        } else if (changes.length > 0) {
+                            // Changes to existing assignment
+                            const changeMessage = changes.join(', ');
+                            await createNotification(
+                                supId,
+                                `Ticket #${ticketId} assigned to you has been updated: ${changeMessage}${assignerName ? ` by ${assignerName}` : ''}.`,
+                                'TICKET_UPDATED',
+                                logResults[0]?.insertId || null
+                            );
+                        }
+                    }
                 }
 
 
