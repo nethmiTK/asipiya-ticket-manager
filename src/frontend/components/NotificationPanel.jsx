@@ -3,6 +3,7 @@ import axios from 'axios';
 import { formatDistanceToNow } from 'date-fns';
 import { IoClose } from 'react-icons/io5';
 import { Link } from 'react-router-dom';
+import { FaLaptopCode, FaUserPlus, FaLayerGroup } from 'react-icons/fa';
 
 const NotificationPanel = ({ userId, role, onClose }) => {
     const [notifications, setNotifications] = useState([]);
@@ -39,12 +40,57 @@ const NotificationPanel = ({ userId, role, onClose }) => {
                     </span>
                 );
             }
+        } else if (notification.Type === 'RESOLUTION_UPDATE') {
+            const match = notification.Message.match(/Resolution summary updated: (.*)/);
+            if (match) {
+                const [, resolutionText] = match;
+                return (
+                    <span>
+                        Ticket #{notification.TicketID} resolution updated: <span className="italic">"{resolutionText}"</span>
+                    </span>
+                );
+            }
         }
         return notification.Message;
     };
 
+    const getNotificationProfilePic = (notification) => {
+        const systemNotificationTypes = ['NEW_SYSTEM_ADDED', 'NEW_CATEGORY_ADDED', 'NEW_USER_REGISTRATION'];
+        if (systemNotificationTypes.includes(notification.Type)) {
+            // Use a specific icon or image for system notifications
+            switch (notification.Type) {
+                case 'NEW_SYSTEM_ADDED':
+                    return { icon: <FaLaptopCode className="w-6 h-6 text-indigo-500" />, bgColor: 'bg-indigo-100' };
+                case 'NEW_CATEGORY_ADDED':
+                    return { icon: <FaLayerGroup className="w-6 h-6 text-purple-500" />, bgColor: 'bg-purple-100' };
+                case 'NEW_USER_REGISTRATION':
+                    return { icon: <FaUserPlus className="w-6 h-6 text-green-500" />, bgColor: 'bg-green-100' };
+                default:
+                    return { icon: <FaLaptopCode className="w-6 h-6 text-gray-500" />, bgColor: 'bg-gray-100' };
+            }
+        } else if (notification.SourceUserProfileImagePath) {
+            // Use the source user's profile picture
+            return {
+                imgSrc: `http://localhost:5000/uploads/profile_images/${notification.SourceUserProfileImagePath}`,
+                altText: notification.SourceUserFullName || 'User',
+            };
+        } else if (notification.SourceUserFullName) {
+             // Fallback to UI-avatars if path is missing but name exists
+            return {
+                imgSrc: `https://ui-avatars.com/api/?name=${encodeURIComponent(notification.SourceUserFullName)}&background=random&color=fff`,
+                altText: notification.SourceUserFullName,
+            };
+        }
+         else {
+            // Default icon if no specific user or system type is matched
+            return { icon: <FaUserPlus className="w-6 h-6 text-gray-500" />, bgColor: 'bg-gray-100' };
+        }
+    };
+
     const fetchNotifications = async () => {
         try {
+            // Assuming backend provides SourceUserProfileImagePath and SourceUserFullName for relevant notifications
+            // The backend API should be updated to include these fields in its response
             const response = await axios.get(`http://localhost:5000/api/notifications/${userId}`);
             setNotifications(response.data);
             setLoading(false);
@@ -80,12 +126,22 @@ const NotificationPanel = ({ userId, role, onClose }) => {
     };
 
     const getNotificationLink = (notification) => {
-        if (notification.TicketID) {
-            return role.toLowerCase() === 'admin' 
-                ? `/ticket-manage/${notification.TicketID}`
-                : `/my-tickets/${notification.TicketID}`;
+        const nonNavigatingTypes = ['NEW_SYSTEM_ADDED', 'NEW_CATEGORY_ADDED', 'NEW_USER_REGISTRATION'];
+        
+        if (nonNavigatingTypes.includes(notification.Type)) {
+            return '#'; // Do not navigate for system notifications
+        } else if (notification.TicketID) {
+            // For ticket-related notifications, navigate to the TicketManage page with the ticket ID
+            // And potentially set the tab to 'details' or 'comments' depending on the notification type
+            if (notification.Type === 'NEW_TICKET') {
+                return `/ticket-manage?ticketId=${notification.TicketID}&tab=details`;
+            } else if (notification.Type === 'MENTION' || notification.Type === 'COMMENT_ADDED') {
+                return `/ticket-manage?ticketId=${notification.TicketID}&tab=comments`;
+            }
+            // Default for other ticket-related types
+            return `/ticket-manage?ticketId=${notification.TicketID}&tab=details`;
         }
-        return '#';
+        return '#'; // Default fallback
     };
 
     const markAllAsRead = async () => {
@@ -146,26 +202,52 @@ const NotificationPanel = ({ userId, role, onClose }) => {
                     </div>
                 ) : (
                     <div className="divide-y">
-                        {notifications.map(notification => (
-                            <Link
-                                key={notification.NotificationID}
-                                to={getNotificationLink(notification)}
-                                className={`block p-4 hover:bg-gray-50 transition-colors ${
-                                    !notification.IsRead ? 'bg-blue-50' : ''
-                                }`}
-                                onClick={() => !notification.IsRead && markAsRead(notification.NotificationID)}
-                            >
-                                <p className="text-sm text-gray-800">{formatNotificationMessage(notification)}</p>
-                                <div className="mt-2 flex justify-between items-center">
-                                    <span className="text-xs text-gray-500">
-                                        {formatDistanceToNow(new Date(notification.CreatedAt), { addSuffix: true })}
-                                    </span>
-                                    {!notification.IsRead && (
-                                        <span className="inline-block w-2 h-2 bg-blue-500 rounded-full"></span>
+                        {notifications.map(notification => {
+                            const { imgSrc, altText, icon, bgColor } = getNotificationProfilePic(notification);
+                            const notificationLink = getNotificationLink(notification);
+                            const isClickable = notificationLink !== '#';
+
+                            return (
+                                <Link
+                                    key={notification.NotificationID}
+                                    to={notificationLink}
+                                    className={`flex items-start p-4 hover:bg-gray-50 transition-colors ${
+                                        !notification.IsRead ? 'bg-blue-50' : ''
+                                    } ${isClickable ? 'cursor-pointer' : 'cursor-default'}`}
+                                    onClick={(e) => {
+                                        if (!isClickable) {
+                                            e.preventDefault(); // Prevent navigation if not clickable
+                                        }
+                                        if (!notification.IsRead) {
+                                            markAsRead(notification.NotificationID);
+                                        }
+                                    }}
+                                >
+                                    {imgSrc ? (
+                                        <img
+                                            src={imgSrc}
+                                            alt={altText}
+                                            className="w-10 h-10 rounded-full mr-3 object-cover shadow-sm"
+                                        />
+                                    ) : (
+                                        <div className={`w-10 h-10 rounded-full flex items-center justify-center mr-3 ${bgColor} shadow-sm`}>
+                                            {icon}
+                                        </div>
                                     )}
-                                </div>
-                            </Link>
-                        ))}
+                                    <div className="flex-1">
+                                        <p className="text-sm text-gray-800 leading-snug">{formatNotificationMessage(notification)}</p>
+                                        <div className="mt-1 flex justify-between items-center">
+                                            <span className="text-xs text-gray-500">
+                                                {formatDistanceToNow(new Date(notification.CreatedAt), { addSuffix: true })}
+                                            </span>
+                                            {!notification.IsRead && (
+                                                <span className="inline-block w-2 h-2 bg-blue-500 rounded-full"></span>
+                                            )}
+                                        </div>
+                                    </div>
+                                </Link>
+                            );
+                        })}
                     </div>
                 )}
             </div>
