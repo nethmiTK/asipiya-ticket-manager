@@ -718,7 +718,7 @@ app.get("/messages/:ticketId", (req, res) => {
         url: `${baseUrl}/uploads/profile_images/${r.Path}`,
         isImage: isImageFile(r.Path),
       } : null,
-      status: r.Seen ? "seen" : "✓ delivered",
+      status: r.Seen ? "seen" : "✓",
     }));
     res.json(formatted);
   });
@@ -773,7 +773,7 @@ app.post("/ticketchat", upload.single("file"), (req, res) => {
             name: file.originalname,
           }
         : null,
-      status: "✓ delivered",
+      status: "✓",
     };
 
     io.to(TicketID.toString()).emit("receiveTicketMessage", newMessage);
@@ -833,7 +833,7 @@ app.post("/api/ticketchatUser", upload.single("file"), (req, res) => {
             name: file.originalname,
           }
         : null,
-      status: "✓ delivered",
+      status: "✓",
     };
 
     io.to(TicketID.toString()).emit("receiveTicketMessage", newMessage);
@@ -881,7 +881,7 @@ app.get("/api/ticketchatUser/:ticketID", (req, res) => {
             name: path.basename(msg.Path),
           }
         : null,
-      status: "✓ delivered",
+      status: "✓",
     }));
 
     res.status(200).json(formatted);
