@@ -57,12 +57,12 @@ export default function SupervisorChatSection({
   const [chatMessages, setChatMessages] = useState([]);
   const [chatInput, setChatInput] = useState("");
   const [sendingFile, setSendingFile] = useState(null);
-  const [stickyDate, setStickyDate] = useState(""); // New state for sticky date
+  const [stickyDate, setStickyDate] = useState("");
+  const [hasNewUnseenMessage, setHasNewUnseenMessage] = useState(false); // New state variable
   const chatEndRef = useRef(null);
   const socketRef = useRef(null);
-  const messagesContainerRef = useRef(null); // Ref for the scrollable messages container
+  const messagesContainerRef = useRef(null);
 
-  // Helper: Deduplicate messages by id
   const deduplicateMessages = (messages) => {
     return messages.filter(
       (msg, index, self) =>
@@ -70,7 +70,6 @@ export default function SupervisorChatSection({
     );
   };
 
-  // Mark messages as seen on server
   const markMessagesAsSeen = async () => {
     if (!ticketId || !role) return;
     try {
@@ -78,12 +77,13 @@ export default function SupervisorChatSection({
         TicketID: ticketId,
         Role: role,
       });
+      // Once messages are marked seen, reset the new unseen message flag
+      setHasNewUnseenMessage(false);
     } catch (error) {
       console.error("Failed to mark messages as seen:", error);
     }
   };
 
-  // Helper: Format date for display (Today, Yesterday, or actual date)
   const formatDateForDisplay = (dateString) => {
     const today = new Date();
     const yesterday = new Date(today);
@@ -104,7 +104,6 @@ export default function SupervisorChatSection({
     }
   };
 
-  // Helper: Group messages by date with dynamic formatting
   const groupMessagesByDate = (messages) => {
     const grouped = {};
     messages.forEach((msg) => {
@@ -112,9 +111,9 @@ export default function SupervisorChatSection({
         year: "numeric",
         month: "long",
         day: "numeric",
-      }); // This will be the key for grouping
-      
-      const displayDate = formatDateForDisplay(msg.timestamp); // This will be the string shown to the user
+      });
+
+      const displayDate = formatDateForDisplay(msg.timestamp);
 
       if (!grouped[messageDate]) {
         grouped[messageDate] = {
@@ -127,14 +126,12 @@ export default function SupervisorChatSection({
     return grouped;
   };
 
-  // Scroll to bottom function
   const scrollToBottom = () => {
     if (chatEndRef.current) {
       chatEndRef.current.scrollIntoView({ behavior: "smooth" });
     }
   };
 
-  // Initialize socket, join room, listen to events
   useEffect(() => {
     if (!ticketId) return;
 
@@ -145,11 +142,25 @@ export default function SupervisorChatSection({
       if (String(message.ticketid) !== String(ticketId)) return;
       const sender =
         (message.role || "").toLowerCase() === "user" ? "user" : "agent";
+
       setChatMessages((prevMsgs) => {
+        // Check if the message is already present to avoid duplicates
         if (prevMsgs.find((m) => String(m.id) === String(message.id)))
           return prevMsgs;
+
+        // If the message is from the other party (the client in this case, since this is SupervisorChatSection)
+        // and it's a new message, set the flag.
+        if (sender === "user" && document.visibilityState === "hidden") {
+          setHasNewUnseenMessage(true);
+        }
+        
         return deduplicateMessages([...prevMsgs, { ...message, sender }]);
       });
+
+      // You might also want to mark as seen immediately if the chat is open and visible
+      if (document.visibilityState === "visible") {
+        markMessagesAsSeen();
+      }
     });
 
     socketRef.current.on("messagesSeen", (seenData) => {
@@ -158,7 +169,7 @@ export default function SupervisorChatSection({
       setChatMessages((prevMsgs) =>
         prevMsgs.map((msg) =>
           String(msg.ticketid) === String(seenData.TicketID) &&
-          msg.role !== seenData.Role &&
+          msg.role !== seenData.Role && // Only mark as seen if it's a message from the other role
           msg.status !== "seen"
             ? { ...msg, status: "seen" }
             : msg
@@ -173,9 +184,8 @@ export default function SupervisorChatSection({
         socketRef.current = null;
       }
     };
-  }, [ticketId]);
+  }, [ticketId, role]); // Added role to dependency array as it's used inside the effect
 
-  // Fetch messages on ticket change, mark them as seen immediately
   useEffect(() => {
     if (!ticketId) return;
 
@@ -189,12 +199,12 @@ export default function SupervisorChatSection({
         setChatMessages(deduplicateMessages(formattedMessages));
       })
       .then(() => {
+        // After fetching, immediately mark them as seen as they are now loaded
         markMessagesAsSeen();
       })
       .catch(console.error);
   }, [ticketId, role]);
 
-  // Mark messages as seen when tab/window regains focus
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") {
@@ -206,7 +216,6 @@ export default function SupervisorChatSection({
       document.removeEventListener("visibilitychange", handleVisibilityChange);
   }, [ticketId, role]);
 
-  // Handle send message (text or file)
   const handleSendMessage = async () => {
     if (!chatInput.trim() && !sendingFile) return;
 
@@ -287,12 +296,10 @@ export default function SupervisorChatSection({
     (a, b) => new Date(a) - new Date(b)
   );
 
-  // Scroll to bottom when messages change
   useEffect(() => {
     scrollToBottom();
   }, [chatMessages]);
 
-  // --- Sticky Date Header Logic ---
   useEffect(() => {
     const messagesContainer = messagesContainerRef.current;
     if (!messagesContainer) return;
@@ -300,24 +307,22 @@ export default function SupervisorChatSection({
     const observer = new IntersectionObserver(
       (entries) => {
         let currentStickyDate = "";
-        // Iterate in reverse to find the topmost visible date
         for (let i = entries.length - 1; i >= 0; i--) {
           const entry = entries[i];
           if (entry.isIntersecting && entry.target.dataset.date) {
             currentStickyDate = entry.target.dataset.date;
-            break; // Found the topmost intersecting date, so we can stop
+            break;
           }
         }
         setStickyDate(currentStickyDate);
       },
       {
         root: messagesContainer,
-        rootMargin: "-1px 0px 0px 0px", // Trigger when the date separator hits the very top
-        threshold: 0, // Trigger as soon as any part of the element is visible
+        rootMargin: "-1px 0px 0px 0px",
+        threshold: 0,
       }
     );
 
-    // Observe each date separator
     sortedDates.forEach((date) => {
       const dateElement = messagesContainer.querySelector(`[data-date-key="${date}"]`);
       if (dateElement) {
@@ -328,34 +333,30 @@ export default function SupervisorChatSection({
     return () => {
       observer.disconnect();
     };
-  }, [groupedMessages, sortedDates]); // Re-run when grouped messages or sorted dates change
+  }, [groupedMessages, sortedDates]);
 
   return (
     <div className="flex flex-col h-full w-6xl mx-auto border-gray-400 rounded-lg shadow-lg border">
-      {/* Header - WhatsApp style */}
       <header className="p-4 rounded-t-lg border-b bg-gray-400 text-white shadow-md">
         <h2 className="text-lg font-bold text-gray-700">
           Chat for Ticket #{ticket?.id || ticketId}
         </h2>
-        {/* You could add participant names here, e.g., "Chat with {user?.name}" */}
+        {/* Display indicator for new unseen messages */}
+        {hasNewUnseenMessage && (
+          <p className="text-sm text-yellow-600 font-semibold mt-1">
+            New messages received!
+          </p>
+        )}
       </header>
 
-      {/* Sticky Date Header */}
-      {stickyDate && (
-        <div className="sticky top-0 z-10 text-center py-2 bg-green-200 text-gray-700 text-sm font-medium shadow-sm border-b">
-          {stickyDate}
-        </div>
-      )}
-
-      {/* Chat Messages Area - WhatsApp style */}
       <div
-        className="flex-1 overflow-y-auto p-4 relative" // Added relative for sticky child positioning
+        className="flex-1 overflow-y-auto p-4 relative"
         style={{
           backgroundImage:
             "url('https://www.transparenttextures.com/patterns/clean-textile.png')",
           backgroundColor: "#0000",
         }}
-        ref={messagesContainerRef} // Assign ref to the scrollable container
+        ref={messagesContainerRef}
       >
         {chatMessages.length === 0 && (
           <p className="text-center text-gray-600 mt-50">
@@ -365,11 +366,10 @@ export default function SupervisorChatSection({
 
         {sortedDates.map((dateKey) => (
           <div key={dateKey}>
-            {/* Date Separator */}
             <div
               className="text-center my-4"
-              data-date-key={dateKey} // Use data attribute for Intersection Observer
-              data-date={groupedMessages[dateKey].displayDate} // Store the display string here
+              data-date-key={dateKey}
+              data-date={groupedMessages[dateKey].displayDate}
             >
               <span className="inline-block bg-green-200 text-gray-700 px-3 py-1 rounded-full text-sm font-medium shadow-sm">
                 {groupedMessages[dateKey].displayDate}
@@ -385,7 +385,6 @@ export default function SupervisorChatSection({
                     !isClient ? "justify-end" : "justify-start"
                   }`}
                 >
-                  {/* Client Avatar (if applicable and desired) */}
                   {isClient && (
                     <img
                       src={
@@ -397,7 +396,6 @@ export default function SupervisorChatSection({
                     />
                   )}
 
-                  {/* Message Bubble */}
                   <div
                     className={`relative max-w-[75%] px-3 py-2 rounded-lg shadow-md break-words whitespace-pre-wrap text-sm ${
                       !isClient
@@ -410,7 +408,6 @@ export default function SupervisorChatSection({
                         : { borderBottomLeftRadius: "0.25rem" }
                     }
                   >
-                    {/* Message Content */}
                     {msg.file ? (
                       <div className="flex flex-col items-center p-2">
                         {msg.file.name
@@ -473,7 +470,6 @@ export default function SupervisorChatSection({
                       renderMessageWithLinks(msg.content)
                     )}
 
-                    {/* Timestamp and Status */}
                     <div
                       className={`text-[10px] mt-1 ${
                         !isClient ? "text-right" : "text-left"
@@ -482,7 +478,7 @@ export default function SupervisorChatSection({
                       {new Date(msg.timestamp).toLocaleTimeString("en-US", {
                         hour: "2-digit",
                         minute: "2-digit",
-                        hour12: true, // Use AM/PM format
+                        hour12: true,
                       })}
                       {!isClient && (
                         <span className="ml-1">
@@ -491,13 +487,12 @@ export default function SupervisorChatSection({
                             : msg.status === "failed"
                             ? "❌"
                             : msg.status === "seen"
-                            ? "✓✓" // Double tick for seen
+                            ? "✓✓"
                             : "✓"}
                         </span>
                       )}
                     </div>
 
-                    {/* WhatsApp-like "tail" for the bubble */}
                     {!isClient ? (
                       <div
                         className="absolute -right-2 bottom-0 w-3 h-3 bg-[#D9FDD3] transform rotate-45 origin-bottom-left rounded-sm"
@@ -511,7 +506,6 @@ export default function SupervisorChatSection({
                     )}
                   </div>
 
-                  {/* Agent/Supervisor Avatar */}
                   {!isClient && (
                     <img
                       src={user?.avatar || "https://i.pravatar.cc/40?u=support"}
@@ -528,7 +522,6 @@ export default function SupervisorChatSection({
         {sendingFile && (
           <div className="flex justify-end mb-2">
             {" "}
-            {/* Align to right like sent messages */}
             <div className="relative bg-blue-50 border border-blue-200 rounded-lg p-2 shadow-md max-w-xs w-full flex flex-col items-center">
               {sendingFile.type && sendingFile.type.startsWith("image/") ? (
                 <img
@@ -544,7 +537,7 @@ export default function SupervisorChatSection({
                 />
               ) : (
                 <img
-                  src={getFileIcon(sendingFile.type || '', sendingFile.name || '')} // Pass default empty strings
+                  src="https://upload.wikimedia.org/wikipedia/commons/8/87/PDF_file_icon.svg"
                   alt="File Icon"
                   className="w-16 h-16 object-contain mb-1"
                 />
@@ -557,7 +550,7 @@ export default function SupervisorChatSection({
               </span>
               <button
                 onClick={() => {
-                  URL.revokeObjectURL(URL.createObjectURL(sendingFile)); // Clean up URL
+                  URL.revokeObjectURL(URL.createObjectURL(sendingFile));
                   setSendingFile(null);
                 }}
                 className="absolute top-1 right-2 text-red-600 hover:text-red-800 text-lg font-bold"
@@ -569,13 +562,10 @@ export default function SupervisorChatSection({
           </div>
         )}
 
-        {/* --- Key change: Ensure chatEndRef is the last element within the scrollable container --- */}
         <div ref={chatEndRef} />
       </div>
 
-      {/* Input Area - WhatsApp style */}
       <div className="flex items-center space-x-2 p-3 bg-gray-100 border-t border-gray-200 rounded-b-lg">
-        {/* Attach Button */}
         <label
           htmlFor="file-upload"
           className="cursor-pointer p-2 rounded-full hover:bg-gray-200 transition-colors duration-200"
@@ -590,7 +580,6 @@ export default function SupervisorChatSection({
           onChange={(e) => setSendingFile(e.target.files[0])}
         />
 
-        {/* Text Input */}
         <input
           type="text"
           value={chatInput}
@@ -605,7 +594,6 @@ export default function SupervisorChatSection({
           }}
         />
 
-        {/* Send Button */}
         <button
           onClick={handleSendMessage}
           disabled={!chatInput.trim() && !sendingFile}
