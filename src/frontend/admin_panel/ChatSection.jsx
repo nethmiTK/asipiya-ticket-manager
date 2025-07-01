@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import axios from "axios";
 import { io } from "socket.io-client";
 import { IoMdAttach } from "react-icons/io";
 import { MdSend } from "react-icons/md";
+import { FaFilter, FaTimes } from "react-icons/fa"; // Added FaTimes for closing filters
 
 function renderMessageWithLinks(text) {
   if (typeof text !== "string") return text;
@@ -11,29 +12,16 @@ function renderMessageWithLinks(text) {
     /((https?:\/\/)?(www\.)?[\w\-]+\.[\w]{2,}([\/\w\-\.?=&%]*)?)/gi;
 
   return text.split(urlRegex).map((part, i) => {
-    if (
-      part &&
-      typeof part === "string" &&
-      part.match(urlRegex) &&
-      !part.startsWith("http://") &&
-      !part.startsWith("https://")
-    ) {
+    if (part && typeof part === "string" && part.match(urlRegex)) {
+      // Ensure a protocol exists
+      const href =
+        part.startsWith("http://") || part.startsWith("https://")
+          ? part
+          : `https://${part}`;
       return (
         <a
           key={i}
-          href={`https://${part}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-blue-600 underline"
-        >
-          {part}
-        </a>
-      );
-    } else if (typeof part === "string" && part.startsWith("http")) {
-      return (
-        <a
-          key={i}
-          href={part}
+          href={href}
           target="_blank"
           rel="noopener noreferrer"
           className="text-blue-600 underline"
@@ -48,17 +36,25 @@ function renderMessageWithLinks(text) {
 }
 
 export default function SupervisorChatSection({
-  user,
-  supportUser,
+  user, // This should be the current supervisor/agent's info (loggedInUser)
+  supportUser, // This is the client/user's info (selectedTicket.user)
   ticketId,
   ticket,
   role,
+  onNewMessageStatusChange, // Renamed prop as discussed earlier
 }) {
   const [chatMessages, setChatMessages] = useState([]);
   const [chatInput, setChatInput] = useState("");
   const [sendingFile, setSendingFile] = useState(null);
   const [stickyDate, setStickyDate] = useState("");
-  const [hasNewUnseenMessage, setHasNewUnseenMessage] = useState(false); // New state variable
+  const [hasNewUnseenMessage, setHasNewUnseenMessage] = useState(false);
+
+  // NEW FILTER STATES FOR INLINE FILTERING
+  const [showFilters, setShowFilters] = useState(false); // To toggle visibility of filter section
+  const [filterSender, setFilterSender] = useState("all"); // 'all', 'user', 'agent'
+  const [filterType, setFilterType] = useState("all"); // 'all', 'text', 'file'
+  const [filterKeyword, setFilterKeyword] = useState("");
+
   const chatEndRef = useRef(null);
   const socketRef = useRef(null);
   const messagesContainerRef = useRef(null);
@@ -77,8 +73,11 @@ export default function SupervisorChatSection({
         TicketID: ticketId,
         Role: role,
       });
-      // Once messages are marked seen, reset the new unseen message flag
       setHasNewUnseenMessage(false);
+      // Inform the parent component that new messages have been seen
+      if (onNewMessageStatusChange) {
+        onNewMessageStatusChange(false);
+      }
     } catch (error) {
       console.error("Failed to mark messages as seen:", error);
     }
@@ -144,20 +143,20 @@ export default function SupervisorChatSection({
         (message.role || "").toLowerCase() === "user" ? "user" : "agent";
 
       setChatMessages((prevMsgs) => {
-        // Check if the message is already present to avoid duplicates
         if (prevMsgs.find((m) => String(m.id) === String(message.id)))
           return prevMsgs;
 
-        // If the message is from the other party (the client in this case, since this is SupervisorChatSection)
-        // and it's a new message, set the flag.
         if (sender === "user" && document.visibilityState === "hidden") {
           setHasNewUnseenMessage(true);
+          // Notify parent about new message when tab is hidden
+          if (onNewMessageStatusChange) {
+            onNewMessageStatusChange(true);
+          }
         }
-        
+
         return deduplicateMessages([...prevMsgs, { ...message, sender }]);
       });
 
-      // You might also want to mark as seen immediately if the chat is open and visible
       if (document.visibilityState === "visible") {
         markMessagesAsSeen();
       }
@@ -169,7 +168,7 @@ export default function SupervisorChatSection({
       setChatMessages((prevMsgs) =>
         prevMsgs.map((msg) =>
           String(msg.ticketid) === String(seenData.TicketID) &&
-          msg.role !== seenData.Role && // Only mark as seen if it's a message from the other role
+          msg.role !== seenData.Role &&
           msg.status !== "seen"
             ? { ...msg, status: "seen" }
             : msg
@@ -184,7 +183,7 @@ export default function SupervisorChatSection({
         socketRef.current = null;
       }
     };
-  }, [ticketId, role]); // Added role to dependency array as it's used inside the effect
+  }, [ticketId, role, onNewMessageStatusChange]);
 
   useEffect(() => {
     if (!ticketId) return;
@@ -199,7 +198,6 @@ export default function SupervisorChatSection({
         setChatMessages(deduplicateMessages(formattedMessages));
       })
       .then(() => {
-        // After fetching, immediately mark them as seen as they are now loaded
         markMessagesAsSeen();
       })
       .catch(console.error);
@@ -225,9 +223,9 @@ export default function SupervisorChatSection({
     const newMsg = {
       id: optimisticId,
       ticketid: ticketId,
-      userid: supportUser || null,
+      userid: role === "Supervisor" ? user?.id : supportUser?.id,
       role: role || "Supervisor",
-      sender: "agent",
+      sender: role === "Supervisor" ? "agent" : "user",
       content: chatInput || sendingFile?.name,
       timestamp: new Date().toISOString(),
       type: sendingFile ? "file" : "text",
@@ -241,8 +239,14 @@ export default function SupervisorChatSection({
       const formData = new FormData();
       formData.append("TicketID", ticketId);
       formData.append("Type", sendingFile ? "file" : "text");
-      formData.append("Note", chatInput || sendingFile.name);
-      formData.append("UserID", supportUser || "");
+      formData.append(
+        "Note",
+        chatInput || (sendingFile ? sendingFile.name : "")
+      );
+      formData.append(
+        "UserID",
+        role === "Supervisor" ? user?.id : supportUser?.id
+      );
       formData.append("Role", role || "Supervisor");
       if (sendingFile) formData.append("file", sendingFile);
 
@@ -291,14 +295,42 @@ export default function SupervisorChatSection({
     }
   };
 
-  const groupedMessages = groupMessagesByDate(chatMessages);
+  const filteredMessages = useMemo(() => {
+    let messagesToFilter = chatMessages;
+
+    if (filterSender !== "all") {
+      messagesToFilter = messagesToFilter.filter(
+        (msg) => msg.sender === filterSender
+      );
+    }
+
+    if (filterType !== "all") {
+      messagesToFilter = messagesToFilter.filter((msg) =>
+        filterType === "file" ? msg.type === "file" : msg.type === "text"
+      );
+    }
+
+    if (filterKeyword.trim() !== "") {
+      const lowercasedKeyword = filterKeyword.toLowerCase();
+      messagesToFilter = messagesToFilter.filter(
+        (msg) =>
+          (msg.content &&
+            msg.content.toLowerCase().includes(lowercasedKeyword)) ||
+          (msg.file && msg.file.name.toLowerCase().includes(lowercasedKeyword))
+      );
+    }
+
+    return messagesToFilter;
+  }, [chatMessages, filterSender, filterType, filterKeyword]);
+
+  const groupedMessages = groupMessagesByDate(filteredMessages);
   const sortedDates = Object.keys(groupedMessages).sort(
     (a, b) => new Date(a) - new Date(b)
   );
 
   useEffect(() => {
     scrollToBottom();
-  }, [chatMessages]);
+  }, [chatMessages, filteredMessages]);
 
   useEffect(() => {
     const messagesContainer = messagesContainerRef.current;
@@ -324,7 +356,9 @@ export default function SupervisorChatSection({
     );
 
     sortedDates.forEach((date) => {
-      const dateElement = messagesContainer.querySelector(`[data-date-key="${date}"]`);
+      const dateElement = messagesContainer.querySelector(
+        `[data-date-key="${date}"]`
+      );
       if (dateElement) {
         observer.observe(dateElement);
       }
@@ -333,21 +367,93 @@ export default function SupervisorChatSection({
     return () => {
       observer.disconnect();
     };
-  }, [groupedMessages, sortedDates]);
+  }, [groupedMessages, sortedDates, filteredMessages]);
 
   return (
     <div className="flex flex-col h-full w-6xl mx-auto border-gray-400 rounded-lg shadow-lg border">
-      <header className="p-4 rounded-t-lg border-b bg-gray-400 text-white shadow-md">
+      <header className="p-4 rounded-t-lg border-b bg-gray-400 text-white shadow-md flex justify-between items-center">
         <h2 className="text-lg font-bold text-gray-700">
           Chat for Ticket #{ticket?.id || ticketId}
         </h2>
-        {/* Display indicator for new unseen messages */}
-        {hasNewUnseenMessage && (
-          <p className="text-sm text-yellow-600 font-semibold mt-1">
-            New messages received!
-          </p>
-        )}
+        {/* Toggle filter visibility */}
+        <button
+          onClick={() => setShowFilters(!showFilters)}
+          className="p-2 rounded-full bg-gray-200 text-gray-700 hover:bg-gray-300 transition-colors duration-200"
+          title={showFilters ? "Hide Filters" : "Show Filters"}
+        >
+          {showFilters ? (
+            <FaTimes className="size-5" />
+          ) : (
+            <FaFilter className="size-5" />
+          )}
+        </button>
       </header>
+
+      {/* NEW: Inline Filter Section - Conditionally rendered based on showFilters */}
+      {showFilters && (
+        <div className="p-4 bg-gray-50 border-b border-gray-200 grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700">
+              Sender:
+            </label>
+            <select
+              value={filterSender}
+              onChange={(e) => setFilterSender(e.target.value)}
+              className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
+            >
+              <option value="all">All</option>
+              <option value="user">Client</option>
+              <option value="agent">Agent (You)</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700">
+              Message Type:
+            </label>
+            <select
+              value={filterType}
+              onChange={(e) => setFilterType(e.target.value)}
+              className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
+            >
+              <option value="all">All</option>
+              <option value="text">Text</option>
+              <option value="file">File</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700">
+              Keyword:
+            </label>
+            <input
+              type="text"
+              value={filterKeyword}
+              onChange={(e) => setFilterKeyword(e.target.value)}
+              placeholder="Search keywords..."
+              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+            />
+          </div>
+
+          {/* Optional: Add a "Reset Filters" button if desired */}
+          {(filterSender !== "all" ||
+            filterType !== "all" ||
+            filterKeyword !== "") && (
+            <div className="col-span-full text-right mt-2">
+              <button
+                onClick={() => {
+                  setFilterSender("all");
+                  setFilterType("all");
+                  setFilterKeyword("");
+                }}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300"
+              >
+                Reset Filters
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       <div
         className="flex-1 overflow-y-auto p-4 relative"
@@ -358,9 +464,11 @@ export default function SupervisorChatSection({
         }}
         ref={messagesContainerRef}
       >
-        {chatMessages.length === 0 && (
+        {filteredMessages.length === 0 && (
           <p className="text-center text-gray-600 mt-50">
-            No chat messages yet. Start the conversation!
+            {chatMessages.length === 0
+              ? "No chat messages yet. Start the conversation!"
+              : "No messages match your filter criteria."}
           </p>
         )}
 
@@ -408,7 +516,7 @@ export default function SupervisorChatSection({
                         : { borderBottomLeftRadius: "0.25rem" }
                     }
                   >
-                    {msg.file ? (
+                    {msg.type === "file" && msg.file ? (
                       <div className="flex flex-col items-center p-2">
                         {msg.file.name
                           .toLowerCase()
@@ -451,16 +559,16 @@ export default function SupervisorChatSection({
                         >
                           <svg
                             xmlns="http://www.w3.org/2000/svg"
-                            className="h-3 w-3 mr-1"
+                            className="h-3 w-3 mr-1" // Make sure h-3 w-3 give you the desired size
                             fill="none"
                             viewBox="0 0 24 24"
                             stroke="currentColor"
-                            strokeWidth="2"
+                            strokeWidth="1.5" // Often 1.5 is used for Heroicons outlined style
                           >
                             <path
                               strokeLinecap="round"
                               strokeLinejoin="round"
-                              d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                              d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75v-2.25M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"
                             />
                           </svg>
                           Download
