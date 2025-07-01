@@ -35,7 +35,7 @@ export default function AddMemberModal({ onClose, onSuccess }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 bg-opacity-40">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-lg p-6 relative">
         <button
           onClick={onClose}

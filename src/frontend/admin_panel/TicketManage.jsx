@@ -1805,7 +1805,7 @@ function CommentItem({
                                   <div className="flex items-center justify-between">
                                     <p className="text-xs text-white font-medium truncate">{attachment.fileName}</p>
                                     <div className="flex gap-1 ml-2">
-                                      <span className="bg-black/50 text-white text-[10px] px-1 py-0.5 rounded">
+                                      <span className="bg-black/55 text-white text-[10px] px-1 py-0.5 rounded">
                                         {isImage ? 'IMAGE' : isVideo ? 'VIDEO' : 'FILE'}
                                       </span>
                                     </div>

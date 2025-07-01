@@ -3,13 +3,49 @@ import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { toast } from 'react-toastify';
 import { IoArrowBack, IoClose } from 'react-icons/io5';
-import {
-  FaRegFilePdf,
-  FaRegFileExcel,
-  FaRegFileWord,
-  FaRegFilePowerpoint
-} from "react-icons/fa";
 import { useAuth } from '../../App.jsx';
+
+const getFileIcon = (fileName) => {
+  const extension = fileName.split('.').pop().toLowerCase();
+  const iconBaseUrl = "https://cdn-icons-png.flaticon.com/512/";
+
+  const iconMap = {
+    pdf: "136/136522.png",
+    doc: "888/888883.png",
+    docx: "888/888883.png",
+    xls: "732/732220.png",
+    xlsx: "732/732220.png",
+    ppt: "7817/7817494.png",
+    pptx: "7817/7817494.png",
+    txt: "8243/8243060.png",
+    zip: "337/337960.png",
+    rar: "337/337960.png",
+    "7z": "337/337960.png",
+    mp3: "651/651717.png",
+    wav: "651/651717.png",
+    flac: "651/651717.png",
+    mp4: "10278/10278992.png",
+    avi: "10278/10278992.png",
+    mov: "10278/10278992.png",
+    mkv: "10278/10278992.png",
+    jpg: "1829/1829586.png",
+    jpeg: "1829/1829586.png",
+    png: "1829/1829586.png",
+    gif: "1829/1829586.png",
+    bmp: "1829/1829586.png",
+    default: "64/64522.png"
+  };
+
+  const iconPath = iconMap[extension] || iconMap.default;
+
+  return (
+    <img
+      src={`${iconBaseUrl}${iconPath}`}
+      alt={`${extension.toUpperCase()} icon`}
+      className="w-6 h-6"
+    />
+  );
+};
 
 const TicketViewPage = ({ ticketId, popupMode = false, onClose }) => {
   const { id: routeId } = useParams();
@@ -137,9 +173,6 @@ const TicketViewPage = ({ ticketId, popupMode = false, onClose }) => {
                 const isVideo = /\.(mp4|webm|ogg)$/i.test(fileName);
                 const isAudio = /\.(mp3|wav|ogg)$/i.test(fileName);
                 const isPdf = /\.pdf$/i.test(fileName);
-                const isExcel = /\.(xls|xlsx)$/i.test(fileName);
-                const isWord = /\.(doc|docx)$/i.test(fileName);
-                const isPpt = /\.(ppt|pptx)$/i.test(fileName);
                 const isPreviewable = isImage || isVideo || isAudio || isPdf;
 
                 return (
@@ -167,24 +200,10 @@ const TicketViewPage = ({ ticketId, popupMode = false, onClose }) => {
                       }}
                       title={isPreviewable ? "Click to preview" : "Download only"}
                     >
-                      {isImage ? (
-                        <img src={fileUrl} alt={fileName} className="w-full h-full object-cover rounded" />
-                      ) : isVideo ? (
-                        <video muted className="w-full h-full object-cover rounded">
-                          <source src={fileUrl} />
-                        </video>
-                      ) : isAudio ? (
-                        <div className="text-sm text-gray-700">🎵 Audio</div>
-                      ) : isPdf ? (
-                        <FaRegFilePdf className="text-4xl text-red-600" />
-                      ) : isExcel ? (
-                        <FaRegFileExcel className="text-4xl text-green-600" />
-                      ) : isWord ? (
-                        <FaRegFileWord className="text-4xl text-blue-600" />
-                      ) : isPpt ? (
-                        <FaRegFilePowerpoint className="text-4xl text-orange-500" />
+                      {isPreviewable ? (
+                        getFileIcon(fileName)
                       ) : (
-                        <div className="text-xs text-gray-600">No preview</div>
+                        getFileIcon(fileName)
                       )}
                     </div>
 
@@ -217,9 +236,8 @@ const TicketViewPage = ({ ticketId, popupMode = false, onClose }) => {
         </button>
       </div>
 
-      {/* Reject Modal */}
       {showRejectModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/25">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/55">
           <div className="bg-gray-200 p-6 rounded-lg w-full max-w-md relative">
             <button
               onClick={() => {
@@ -288,9 +306,8 @@ const TicketViewPage = ({ ticketId, popupMode = false, onClose }) => {
         </div>
       )}
 
-      {/* Preview Modal */}
       {previewUrl && (
-        <div className="fixed inset-0 z-50 flex bg-black/25 items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 flex bg-black/55 items-center justify-center p-4">
           <div className="bg-gray-100 rounded-lg p-4 w-full max-w-2xl mx-auto relative">
             <button
               onClick={() => setPreviewUrl(null)}
