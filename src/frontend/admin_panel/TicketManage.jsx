@@ -62,24 +62,24 @@ export default function TicketManage() {
   // Utility function to set cursor position reliably
   const setCursorPosition = (textarea, position) => {
     if (!textarea) return;
-    
+
     try {
       textarea.focus();
-      
+
       // Multiple attempts with different timing for better reliability
       const setPosition = () => {
         if (textarea.setSelectionRange) {
           textarea.setSelectionRange(position, position);
         }
       };
-      
+
       // Immediate attempt
       setPosition();
-      
+
       // Delayed attempts as fallback
       setTimeout(setPosition, 10);
       setTimeout(setPosition, 50);
-      
+
     } catch (error) {
       console.warn('Could not set cursor position:', error);
     }
@@ -96,10 +96,10 @@ export default function TicketManage() {
     if (textareaRef.current && textareaRef.current.pendingCursorPosition !== undefined) {
       const textarea = textareaRef.current;
       const position = textarea.pendingCursorPosition;
-      
+
       // Clear the pending position
       delete textarea.pendingCursorPosition;
-      
+
       // Set cursor position with multiple timing strategies for maximum reliability
       const setCursor = () => {
         if (textarea) {
@@ -111,15 +111,15 @@ export default function TicketManage() {
           }
         }
       };
-      
+
       // Immediate attempt
       setCursor();
-      
+
       // requestAnimationFrame for next repaint
       requestAnimationFrame(() => {
         setCursor();
       });
-      
+
       // Additional fallbacks with timeouts
       setTimeout(setCursor, 10);
       setTimeout(setCursor, 50);
@@ -337,7 +337,7 @@ export default function TicketManage() {
         mentionedUserIds.push(user.UserID);
       }
     }
-    
+
     // Ensure unique IDs if a user is mentioned multiple times
     mentionedUserIds = [...new Set(mentionedUserIds)];
     console.log("Frontend - Mentions to send:", mentionedUserIds); // Debugging log
@@ -356,30 +356,30 @@ export default function TicketManage() {
           },
         }
       );
-      
+
       // Clear attachments after successful upload
       setAttachments([]);
       // Clear all form fields completely
       setComment("");
       setReplyingTo(null);
-      
+
       // Clear file input field
       const fileInput = document.getElementById('file-upload');
       if (fileInput) {
         fileInput.value = '';
       }
-      
+
       // Reset textarea
       if (textareaRef.current) {
         textareaRef.current.value = '';
       }
-      
+
       toast.success("Comment added successfully");
-      
+
       // Refresh comments after adding
       const res = await axios.get(`http://localhost:5000/api/tickets/${selectedTicket.id}/comments?userId=${user.UserID}`); // Pass userId for likes
       setCommentsList(res.data);
-      
+
       // Initialize userLikedComments state from refreshed data
       const likedStatus = {};
       for (const commentData of res.data) {
@@ -462,7 +462,7 @@ export default function TicketManage() {
       const originalTicket = tickets.find(t => t.id === selectedTicket.id);
       const oldResolution = originalTicket?.resolution || "";
       const newResolution = selectedTicket.resolution || "";
-      
+
       const res = await fetch(
         `http://localhost:5000/tickets/${selectedTicket.id}`,
         {
@@ -501,9 +501,9 @@ export default function TicketManage() {
         prev.map((t) =>
           t.id === selectedTicket.id
             ? {
-                ...t,
-                resolution: selectedTicket.resolution,
-              }
+              ...t,
+              resolution: selectedTicket.resolution,
+            }
             : t
         )
       );
@@ -583,26 +583,26 @@ export default function TicketManage() {
   function handleCommentChange(e) {
     const newValue = e.target.value;
     const caretPosition = e.target.selectionStart;
-    
+
     setComment(newValue);
 
     // Detect if user is typing @mention
     const text = newValue.slice(0, caretPosition);
     const match = text.match(/@([\w\s]*)$/);
-    
+
     if (match) {
       setMentionQuery(match[1]);
       setShowMentionDropdown(true);
-      
+
       // Calculate dropdown position relative to textarea
       const textarea = e.target;
       const rect = textarea.getBoundingClientRect();
-      
+
       setMentionDropdownPos({
         top: rect.bottom - rect.top + 10,
         left: rect.left - rect.left + 10,
       });
-      
+
       setFilteredMentions(
         (Array.isArray(mentionableUsers) ? mentionableUsers : []).filter((u) =>
           u.FullName.toLowerCase().includes(match[1].toLowerCase())
@@ -612,7 +612,7 @@ export default function TicketManage() {
       setShowMentionDropdown(false);
       setMentionQuery("");
     }
-    
+
     // Store the current caret position for potential use
     if (textareaRef.current) {
       textareaRef.current.lastCaretPosition = caretPosition;
@@ -642,25 +642,25 @@ export default function TicketManage() {
 
   function handleMentionSelect(user) {
     if (!textareaRef.current) return;
-    
+
     const textarea = textareaRef.current;
     const currentCaretPosition = textarea.selectionStart;
     const currentText = comment;
-    
+
     // Find the @ symbol and the text after it up to the caret
     const textBeforeCaret = currentText.slice(0, currentCaretPosition);
     const match = textBeforeCaret.match(/@([\w\s]*)$/);
-    
+
     if (match) {
       const mentionStartIndex = currentCaretPosition - match[0].length;
       const textBefore = currentText.slice(0, mentionStartIndex);
       const textAfter = currentText.slice(currentCaretPosition);
       const mentionText = `@${user.FullName} `;
-      
+
       // Create the new comment text
       const newComment = textBefore + mentionText + textAfter;
       const newCaretPosition = textBefore.length + mentionText.length;
-      
+
       // Debug logging
       console.log('Mention Selection Debug:', {
         mentionText,
@@ -669,26 +669,26 @@ export default function TicketManage() {
         newCaretPosition,
         newCommentLength: newComment.length
       });
-      
+
       // Close mention dropdown first
       setShowMentionDropdown(false);
       setMentionQuery("");
-      
+
       // Store the cursor position for later use
       textarea.pendingCursorPosition = newCaretPosition;
-      
+
       // Update the comment state
       setComment(newComment);
-      
+
       // Use a more reliable cursor positioning approach
       // This ensures the cursor is set after React has updated the DOM
       Promise.resolve().then(() => {
         if (textarea && textarea.pendingCursorPosition !== undefined) {
           const targetPosition = textarea.pendingCursorPosition;
-          
+
           // Ensure textarea is focused and positioned correctly
           textarea.focus();
-          
+
           // Use multiple attempts with different timing
           const setCursor = () => {
             try {
@@ -707,7 +707,7 @@ export default function TicketManage() {
             }
             return false;
           };
-          
+
           // Immediate attempt
           if (!setCursor()) {
             // Fallback with requestAnimationFrame
@@ -758,24 +758,24 @@ export default function TicketManage() {
     setReplyingTo({ commentId, userName });
     const mentionText = `@${userName} `;
     const position = mentionText.length;
-    
+
     // Set the comment text first
     setComment(mentionText);
-    
+
     // Store pending cursor position
     if (textareaRef.current) {
       textareaRef.current.pendingCursorPosition = position;
     }
-    
+
     // Use the same reliable cursor positioning approach as mention select
     Promise.resolve().then(() => {
       if (textareaRef.current && textareaRef.current.pendingCursorPosition !== undefined) {
         const textarea = textareaRef.current;
         const targetPosition = textarea.pendingCursorPosition;
-        
+
         // Ensure textarea is focused and positioned correctly
         textarea.focus();
-        
+
         // Use multiple attempts with different timing
         const setCursor = () => {
           try {
@@ -792,7 +792,7 @@ export default function TicketManage() {
           }
           return false;
         };
-        
+
         // Immediate attempt
         if (!setCursor()) {
           // Fallback with requestAnimationFrame
@@ -902,9 +902,8 @@ export default function TicketManage() {
     <div className="flex">
       <AdminSideBar open={isSidebarOpen} setOpen={setIsSidebarOpen} />
       <div
-        className={`flex-1 min-h-screen bg-gray-100 p-8 transition-all duration-300 ${
-          isSidebarOpen ? "ml-72" : "ml-20"
-        }`}
+        className={`flex-1 min-h-screen bg-gray-100 p-8 transition-all duration-300 ${isSidebarOpen ? "ml-72" : "ml-20"
+          }`}
       >
         <div className="min-h-screen bg-gray-50">
           {/* Top Navigation */}
@@ -921,7 +920,7 @@ export default function TicketManage() {
                   onChange={(e) => setSelectedSupervisorId(e.target.value)}
                 >
                   <option value={"all"}>All Supervisors</option>
-                  {availableSupervisors.map((sup) => (
+                  {supervisors.map((sup) => (
                     <option key={sup.UserID} value={sup.UserID}>
                       {sup.FullName}
                     </option>
@@ -989,42 +988,38 @@ export default function TicketManage() {
                   <nav className="flex gap-8">
                     <button
                       onClick={() => { setActiveTab("details"); setSearchParams({ ticketId: searchParams.get('ticketId'), tab: 'details' }); }}
-                      className={`pb-2 text-base font-medium ${
-                        activeTab === "details"
-                          ? "text-blue-600 border-b-2 border-blue-600"
-                          : "text-gray-500 hover:text-gray-700"
-                      }`}
+                      className={`pb-2 text-base font-medium ${activeTab === "details"
+                        ? "text-blue-600 border-b-2 border-blue-600"
+                        : "text-gray-500 hover:text-gray-700"
+                        }`}
                     >
                       Details
                     </button>
                     <button
                       onClick={() => { setActiveTab("activity"); setSearchParams({ ticketId: searchParams.get('ticketId'), tab: 'activity' }); }}
-                      className={`pb-2 text-base font-medium ${
-                        activeTab === "activity"
-                          ? "text-blue-600 border-b-2 border-blue-600"
-                          : "text-gray-500 hover:text-gray-700"
-                      }`}
+                      className={`pb-2 text-base font-medium ${activeTab === "activity"
+                        ? "text-blue-600 border-b-2 border-blue-600"
+                        : "text-gray-500 hover:text-gray-700"
+                        }`}
                     >
                       Activity Log
                     </button>
                     <button
                       onClick={() => { setActiveTab("comments"); setSearchParams({ ticketId: searchParams.get('ticketId'), tab: 'comments' }); }}
-                      className={`pb-2 text-base font-medium ${
-                        activeTab === "comments"
-                          ? "text-blue-600 border-b-2 border-blue-600"
-                          : "text-gray-500 hover:text-gray-700"
-                      }`}
+                      className={`pb-2 text-base font-medium ${activeTab === "comments"
+                        ? "text-blue-600 border-b-2 border-blue-600"
+                        : "text-gray-500 hover:text-gray-700"
+                        }`}
                     >
                       Comments
                     </button>
                     {/* NEW CHAT TAB */}
                     <button
                       onClick={() => { setActiveTab("chat"); setSearchParams({ ticketId: searchParams.get('ticketId'), tab: 'chat' }); }}
-                      className={`pb-2 text-base font-medium ${
-                        activeTab === "chat"
-                          ? "text-blue-600 border-b-2 border-blue-600"
-                          : "text-gray-500 hover:text-gray-700"
-                      }`}
+                      className={`pb-2 text-base font-medium ${activeTab === "chat"
+                        ? "text-blue-600 border-b-2 border-blue-600"
+                        : "text-gray-500 hover:text-gray-700"
+                        }`}
                     >
                       Chat
                     </button>
@@ -1041,7 +1036,7 @@ export default function TicketManage() {
                       evidenceList={evidenceList}
                       setShowProblemModal={setShowProblemModal}
                       showProblemModal={showProblemModal}
-                      // Pass any other state variables or functions that TicketDetailsTab needs
+                    // Pass any other state variables or functions that TicketDetailsTab needs
                     />
                   ) : activeTab === "activity" ? (
                     <div className="space-y-4">
@@ -1133,7 +1128,7 @@ export default function TicketManage() {
                                   caretColor: '#374151',
                                 }}
                               />
-                              
+
                               {/* Visible text with mention highlighting */}
                               <div
                                 className="absolute inset-0 p-4 text-base rounded-xl overflow-hidden pointer-events-none"
@@ -1150,7 +1145,7 @@ export default function TicketManage() {
                                 {comment ? (() => {
                                   const safeUsers = Array.isArray(mentionableUsers) ? mentionableUsers : [];
                                   const sortedMentionableUsers = [...safeUsers].sort((a, b) => b.FullName.length - a.FullName.length);
-                                  
+
                                   let segments = [{ type: 'text', value: comment }];
 
                                   for (const mentionUser of sortedMentionableUsers) {
@@ -1185,8 +1180,8 @@ export default function TicketManage() {
                                   return segments.map((segment, index) => {
                                     if (segment.type === 'mention') {
                                       return (
-                                        <span 
-                                          key={index} 
+                                        <span
+                                          key={index}
                                           className="bg-blue-100 text-blue-700 px-1 py-0.5 rounded font-semibold"
                                         >
                                           {segment.value}
@@ -1200,7 +1195,7 @@ export default function TicketManage() {
                                   <span className="text-gray-400">Share your thoughts... Use @ to mention team members</span>
                                 )}
                               </div>
-                              
+
                               {comment.trim() && (
                                 <div className="absolute bottom-3 right-3 px-3 py-1 bg-gray-100 rounded-lg z-20">
                                   <span className="text-xs text-gray-500 font-medium">
@@ -1219,7 +1214,7 @@ export default function TicketManage() {
                               onChange={handleFileChange}
                               className="hidden"
                               id="file-upload"
-                              accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.txt"
+                              accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt"
                             />
                             <label
                               htmlFor="file-upload"
@@ -1241,10 +1236,10 @@ export default function TicketManage() {
                             </label>
                           </div>
                         </div>
-                        
+
                         {/* File Previews */}
                         {attachments.length > 0 && (
-                          <div className="mt-4 p-4 bg-white border border-gray-200 rounded-xl shadow-sm">
+                          <div className="mt-4 p-4 bg-white border border-gray-200 rounded-xl shadow-sm max-h-64 overflow-y-auto">
                             <div className="flex items-center justify-between mb-4">
                               <div className="flex items-center gap-2">
                                 <svg className="w-5 h-5 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
@@ -1262,7 +1257,7 @@ export default function TicketManage() {
                                 Clear all
                               </button>
                             </div>
-                            
+
                             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
                               {attachments.map((file, idx) => {
                                 const isImage = file.type.startsWith('image/');
@@ -1275,7 +1270,7 @@ export default function TicketManage() {
                                 const isText = ['txt', 'rtf'].includes(ext);
                                 const isArchive = ['zip', 'rar', '7z', 'tar', 'gz'].includes(ext);
                                 const isAudio = file.type.startsWith('audio/');
-                                
+
                                 const getFileIcon = () => {
                                   if (isPDF) return <FaFilePdf className="w-6 h-6" />;
                                   if (isDoc) return <FaFileWord className="w-6 h-6" />;
@@ -1287,7 +1282,7 @@ export default function TicketManage() {
                                   if (isVideo) return <FaFileAlt className="w-6 h-6 text-red-600" />;
                                   return <FaFileAlt className="w-6 h-6" />;
                                 };
-                                
+
                                 const getBackgroundColor = () => {
                                   if (isPDF) return 'bg-red-100 text-red-600';
                                   if (isDoc) return 'bg-blue-100 text-blue-600';
@@ -1299,7 +1294,7 @@ export default function TicketManage() {
                                   if (isVideo) return 'bg-red-100 text-red-600';
                                   return 'bg-gray-100 text-gray-600';
                                 };
-                                
+
                                 return (
                                   <div key={idx} className="relative group bg-white border-2 border-gray-200 rounded-xl overflow-hidden hover:shadow-lg hover:border-blue-300 transition-all duration-300">
                                     {/* Remove button */}
@@ -1311,13 +1306,13 @@ export default function TicketManage() {
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                                       </svg>
                                     </button>
-                                    
+
                                     {/* File preview */}
                                     <div className="aspect-square flex flex-col items-center justify-center p-4">
                                       {isImage ? (
                                         <div className="relative w-full h-full group-hover:scale-105 transition-transform duration-300">
-                                          <img 
-                                            src={URL.createObjectURL(file)} 
+                                          <img
+                                            src={URL.createObjectURL(file)}
                                             alt={file.name}
                                             className="w-full h-full object-cover rounded-lg shadow-md"
                                           />
@@ -1331,8 +1326,8 @@ export default function TicketManage() {
                                         </div>
                                       ) : isVideo ? (
                                         <div className="relative w-full h-full group-hover:scale-105 transition-transform duration-300">
-                                          <video 
-                                            src={URL.createObjectURL(file)} 
+                                          <video
+                                            src={URL.createObjectURL(file)}
                                             className="w-full h-full object-cover rounded-lg shadow-md"
                                             muted
                                           />
@@ -1357,7 +1352,7 @@ export default function TicketManage() {
                                         </div>
                                       )}
                                     </div>
-                                    
+
                                     {/* File info footer */}
                                     <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-3">
                                       <p className="text-xs text-white font-medium truncate" title={file.name}>
@@ -1412,7 +1407,7 @@ export default function TicketManage() {
                             </div>
                           </div>
                         )}
-                        
+
                         {showMentionDropdown && filteredMentions.length > 0 && (
                           <div
                             className="absolute z-50 bg-white border border-gray-200 rounded-2xl shadow-2xl mt-2 max-h-64 overflow-y-auto backdrop-blur-sm"
@@ -1428,9 +1423,8 @@ export default function TicketManage() {
                             {filteredMentions.map((user, index) => (
                               <div
                                 key={user.UserID}
-                                className={`px-4 py-3 hover:bg-blue-50 cursor-pointer flex items-center gap-3 transition-all duration-200 ${
-                                  index === filteredMentions.length - 1 ? 'rounded-b-2xl' : 'border-b border-gray-50'
-                                }`}
+                                className={`px-4 py-3 hover:bg-blue-50 cursor-pointer flex items-center gap-3 transition-all duration-200 ${index === filteredMentions.length - 1 ? 'rounded-b-2xl' : 'border-b border-gray-50'
+                                  }`}
                                 onMouseDown={(e) => {
                                   e.preventDefault();
                                   handleMentionSelect(user);
@@ -1453,11 +1447,10 @@ export default function TicketManage() {
                                     <span className="font-semibold text-blue-700">
                                       @{user.FullName}
                                     </span>
-                                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${
-                                      user.Role === 'Admin' ? 'bg-red-100 text-red-700' :
+                                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${user.Role === 'Admin' ? 'bg-red-100 text-red-700' :
                                       user.Role === 'Supervisor' ? 'bg-yellow-100 text-yellow-700' :
-                                      'bg-green-100 text-green-700'
-                                    }`}>
+                                        'bg-green-100 text-green-700'
+                                      }`}>
                                       {user.Role}
                                     </span>
                                   </div>
@@ -1469,7 +1462,7 @@ export default function TicketManage() {
                             ))}
                           </div>
                         )}
-                        
+
                         <div className="flex justify-between items-center mt-6 pt-4 border-t border-gray-100">
                           <div className="flex items-center gap-3 text-sm text-gray-500">
                             <div className="flex items-center gap-1">
@@ -1540,21 +1533,21 @@ export default function TicketManage() {
                               .slice().reverse()
                               .slice(0, showAllComments ? undefined : 5)
                               .map((c) => (
-                              <CommentItem
-                                key={c.CommentID}
-                                comment={c}
-                                allComments={commentsList}
-                                currentUser={user}
-                                onReplyClick={handleReplyClick}
-                                onLikeToggle={handleLikeToggle}
-                                userLikedComments={userLikedComments}
-                                mentionableUsers={mentionableUsers}
-                                toggleExpandedReplies={toggleExpandedReplies}
-                                expandedReplies={expandedReplies}
-                                previewMenuIndex={previewMenuIndex}
-                                setPreviewMenuIndex={setPreviewMenuIndex}
-                              />
-                            ))}
+                                <CommentItem
+                                  key={c.CommentID}
+                                  comment={c}
+                                  allComments={commentsList}
+                                  currentUser={user}
+                                  onReplyClick={handleReplyClick}
+                                  onLikeToggle={handleLikeToggle}
+                                  userLikedComments={userLikedComments}
+                                  mentionableUsers={mentionableUsers}
+                                  toggleExpandedReplies={toggleExpandedReplies}
+                                  expandedReplies={expandedReplies}
+                                  previewMenuIndex={previewMenuIndex}
+                                  setPreviewMenuIndex={setPreviewMenuIndex}
+                                />
+                              ))}
                           </ul>
                         )}
                         {commentsList.filter(comment => !comment.ReplyToCommentID).length > 5 && !showAllComments && (
@@ -1719,13 +1712,13 @@ function CommentItem({
           />
           {/* Online status indicator could be added here */}
         </div>
-        
+
         <div className="flex-1 flex flex-col">
           <div className="flex items-center mb-1">
             <span className="font-semibold text-gray-900 mr-2">{comment.FullName}</span>
             <span className="text-gray-500 text-sm">• {formatRelativeTime(comment.CreatedAt)}</span>
           </div>
-          
+
           {/* Reply-to information */}
           {comment.ReplyToCommentID && comment.RepliedToUserName && (
             <div className="text-sm text-blue-600 mb-2 flex items-center">
@@ -1754,89 +1747,130 @@ function CommentItem({
                   {comment.attachments.length > 1 ? `${comment.attachments.length} Attachments` : '1 Attachment'}
                 </span>
               </div>
-              
+
               {/* Separate media and documents */}
               {(() => {
-                const mediaFiles = comment.attachments.filter(att => 
+                const mediaFiles = comment.attachments.filter(att =>
                   att.fileType && (att.fileType.startsWith('image/') || att.fileType.startsWith('video/'))
                 );
-                const documentFiles = comment.attachments.filter(att => 
+                const documentFiles = comment.attachments.filter(att =>
                   !att.fileType || (!att.fileType.startsWith('image/') && !att.fileType.startsWith('video/'))
                 );
 
                 return (
                   <div className="space-y-4">
-                    {/* Media Files Grid */}
+                    {/* Media Files */}
                     {mediaFiles.length > 0 && (
                       <div>
                         <h4 className="text-xs font-medium text-gray-600 mb-2 uppercase tracking-wide">Media</h4>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                        <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-2 relative overflow-visible">
                           {mediaFiles.map((attachment, index) => {
                             const isImage = attachment.fileType && attachment.fileType.startsWith('image/');
                             const isVideo = attachment.fileType && attachment.fileType.startsWith('video/');
-                            
+
                             return (
-                              <div key={index} className="relative group">
-                                {isImage ? (
-                                  <div className="relative overflow-hidden rounded-xl border-2 border-white shadow-lg hover:shadow-xl transition-all duration-300 group-hover:scale-105">
-                                    <img 
-                                      src={attachment.fullUrl} 
-                                      alt={attachment.fileName} 
-                                      className="w-full h-48 object-cover"
+                              <div
+                                key={index}
+                                className="w-32 h-32 relative group bg-white rounded-xl border border-gray-200 overflow-visible shadow-sm hover:shadow-lg transition-all duration-300"
+                              >
+                                {/* Media thumbnail */}
+                                <div className="w-full h-full flex items-center justify-center bg-gray-100 overflow-hidden">
+                                  {isImage ? (
+                                    <img
+                                      src={attachment.fullUrl}
+                                      alt={attachment.fileName}
+                                      className="w-full h-full object-cover"
                                     />
-                                    
-                                    {/* Overlay with actions */}
-                                    <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-40 transition-all duration-300 flex items-center justify-center">
-                                      <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                                        <button
-                                          onClick={() => window.open(attachment.fullUrl, '_blank')}
-                                          className="bg-white bg-opacity-90 text-gray-800 rounded-full p-2 hover:bg-white transition-colors shadow-lg"
-                                          title="View Full Size"
-                                        >
-                                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                  ) : isVideo ? (
+                                    <div className="relative w-full h-full">
+                                      <video
+                                        className="w-full h-full object-cover"
+                                        src={attachment.fullUrl}
+                                        muted
+                                        playsInline
+                                      />
+                                      <div className="absolute inset-0 flex items-center justify-center">
+                                        <div className="w-10 h-10 bg-black bg-opacity-50 rounded-full flex items-center justify-center">
+                                          <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                            <path d="M6.3 2.841A1.5 1.5 0 004 4.11v11.78a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
                                           </svg>
-                                        </button>
-                                        <a
-                                          href={attachment.fullUrl}
-                                          download={attachment.fileName}
-                                          className="bg-white bg-opacity-90 text-gray-800 rounded-full p-2 hover:bg-white transition-colors shadow-lg"
-                                          title="Download"
-                                        >
-                                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                          </svg>
-                                        </a>
-                                      </div>
-                                    </div>
-                                    
-                                    {/* File name footer */}
-                                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-3">
-                                      <p className="text-xs text-white font-medium truncate">{attachment.fileName}</p>
-                                    </div>
-                                  </div>
-                                ) : isVideo ? (
-                                  <div className="relative overflow-hidden rounded-xl border-2 border-white shadow-lg hover:shadow-xl transition-all duration-300">
-                                    <video 
-                                      controls 
-                                      src={attachment.fullUrl} 
-                                      className="w-full h-48 object-cover rounded-xl"
-                                      poster=""
-                                    >
-                                      Your browser does not support the video tag.
-                                    </video>
-                                    
-                                    {/* File info */}
-                                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-3">
-                                      <div className="flex items-center justify-between">
-                                        <p className="text-xs text-white font-medium truncate flex-1">{attachment.fileName}</p>
-                                        <div className="flex gap-1 ml-2">
-                                          <span className="bg-black/50 text-white text-xs px-2 py-1 rounded">VIDEO</span>
                                         </div>
                                       </div>
                                     </div>
+                                  ) : null}
+                                </div>
+
+                                {/* File info footer */}
+                                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-2">
+                                  <div className="flex items-center justify-between">
+                                    <p className="text-xs text-white font-medium truncate">{attachment.fileName}</p>
+                                    <div className="flex gap-1 ml-2">
+                                      <span className="bg-black/50 text-white text-[10px] px-1 py-0.5 rounded">
+                                        {isImage ? 'IMAGE' : isVideo ? 'VIDEO' : 'FILE'}
+                                      </span>
+                                    </div>
                                   </div>
-                                ) : null}
+                                </div>
+
+                                {/* 3-dot Menu Button */}
+                                <div className="absolute top-2 right-2">
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setPreviewMenuIndex(previewMenuIndex === index ? null : index);
+                                    }}
+                                    className="flex items-center justify-center w-6 h-6 bg-white bg-opacity-80 text-gray-500 rounded-full hover:bg-opacity-100 hover:text-gray-700 transition-all duration-200 shadow-sm"
+                                  >
+                                    <FiMoreVertical className="w-4 h-4" />
+                                  </button>
+                                </div>
+
+                                {/* Dropdown Menu */}
+                                {previewMenuIndex === index && (
+                                  <div className="absolute z-50 top-10 right-0 w-44 bg-white border border-gray-200 rounded-lg shadow-xl">
+                                    <div className="py-1">
+                                      <button
+                                        onClick={() => {
+                                          window.open(attachment.fullUrl, '_blank');
+                                          setPreviewMenuIndex(null);
+                                        }}
+                                        className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                                      >
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                        </svg>
+                                        Open in New Tab
+                                      </button>
+
+                                      <a
+                                        href={attachment.fullUrl}
+                                        download={attachment.fileName}
+                                        onClick={() => setPreviewMenuIndex(null)}
+                                        className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                                      >
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                        </svg>
+                                        Download File
+                                      </a>
+
+                                      <button
+                                        onClick={() => {
+                                          navigator.clipboard.writeText(attachment.fullUrl);
+                                          setPreviewMenuIndex(null);
+                                          toast.success('File URL copied to clipboard!');
+                                        }}
+                                        className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                                      >
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                        </svg>
+                                        Copy Link
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
                               </div>
                             );
                           })}
@@ -1848,155 +1882,110 @@ function CommentItem({
                     {documentFiles.length > 0 && (
                       <div>
                         <h4 className="text-xs font-medium text-gray-600 mb-2 uppercase tracking-wide">Documents</h4>
-                        <div className="space-y-2">
+                        <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-2 relative overflow-visible">
                           {documentFiles.map((attachment, index) => {
                             const isPDF = attachment.fileType && attachment.fileType === 'application/pdf';
                             const isDoc = attachment.fileType && (
-                              attachment.fileType === 'application/msword' || 
+                              attachment.fileType === 'application/msword' ||
                               attachment.fileType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
                             );
                             const isAudio = attachment.fileType && attachment.fileType.startsWith('audio/');
-                            
+
                             return (
-                              <div key={index} className="bg-white rounded-xl border border-gray-200 p-4 hover:border-blue-300 hover:shadow-lg transition-all duration-300 group">
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center flex-1 min-w-0">
-                                    {/* File Type Icon */}
-                                    <div className={`flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center mr-4 shadow-sm ${
-                                      isPDF ? 'bg-red-100 text-red-600' :
-                                      isDoc ? 'bg-blue-100 text-blue-600' :
-                                      isAudio ? 'bg-green-100 text-green-600' :
-                                      'bg-gray-100 text-gray-600'
-                                    }`}>
-                                      {isPDF ? (
-                                        <FaFilePdf className="w-7 h-7" />
-                                      ) : isDoc ? (
-                                        <FaFileWord className="w-7 h-7" />
-                                      ) : isAudio ? (
-                                        <svg className="w-7 h-7" fill="currentColor" viewBox="0 0 20 20">
-                                          <path fillRule="evenodd" d="M18 3a1 1 0 00-1.196-.98l-10 2A1 1 0 006 5v9.114A4.369 4.369 0 005 14c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V7.82l8-1.6v5.894A4.37 4.37 0 0015 12c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V3z" clipRule="evenodd" />
-                                        </svg>
-                                      ) : (
-                                        <FaFileAlt className="w-7 h-7" />
-                                      )}
-                                    </div>
-                                    
-                                    {/* File Info */}
-                                    <div className="min-w-0 flex-1">
-                                      <div className="flex items-center gap-2 mb-1">
-                                        <p className="text-sm font-semibold text-gray-900 truncate">{attachment.fileName}</p>
-                                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                                          isPDF ? 'bg-red-100 text-red-700' :
-                                          isDoc ? 'bg-blue-100 text-blue-700' :
-                                          isAudio ? 'bg-green-100 text-green-700' :
-                                          'bg-gray-100 text-gray-700'
-                                        }`}>
-                                          {isPDF ? 'PDF' :
-                                           isDoc ? 'DOC' :
-                                           isAudio ? 'AUDIO' :
-                                           'FILE'}
-                                        </span>
-                                      </div>
-                                      <p className="text-xs text-gray-500">
-                                        {isPDF ? 'PDF Document' :
-                                         isDoc ? 'Word Document' :
-                                         isAudio ? 'Audio File' :
-                                         'Document'} • Click to download or view
-                                      </p>
-                                    </div>
-                                  </div>
-                                  
-                                  {/* Action Buttons */}
-                                  <div className="flex items-center gap-2 ml-4">
-                                    {/* Preview Button */}
-                                    <button 
-                                      onClick={() => window.open(attachment.fullUrl, '_blank')}
-                                      className="flex items-center gap-1 px-3 py-2 bg-blue-50 text-blue-700 text-xs font-medium rounded-lg hover:bg-blue-100 transition-colors duration-200 group-hover:shadow-md"
-                                      title="Preview"
-                                    >
-                                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                              <div
+                                key={index}
+                                className="w-32 h-32 relative group bg-white rounded-xl border border-gray-200 overflow-visible shadow-sm hover:shadow-lg transition-all duration-300"
+                              >
+                                {/* File Icon and Name */}
+                                <div className="flex flex-col items-center justify-center h-full p-2 text-center">
+                                  {/* File Type Icon */}
+                                  <div
+                                    className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center mb-2 ${isPDF
+                                      ? 'bg-red-100 text-red-600'
+                                      : isDoc
+                                        ? 'bg-blue-100 text-blue-600'
+                                        : isAudio
+                                          ? 'bg-green-100 text-green-600'
+                                          : 'bg-gray-100 text-gray-600'
+                                      }`}
+                                  >
+                                    {isPDF ? (
+                                      <FaFilePdf className="w-6 h-6" />
+                                    ) : isDoc ? (
+                                      <FaFileWord className="w-6 h-6" />
+                                    ) : isAudio ? (
+                                      <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                                        <path
+                                          fillRule="evenodd"
+                                          d="M18 3a1 1 0 00-1.196-.98l-10 2A1 1 0 006 5v9.114A4.369 4.369 0 005 14c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V7.82l8-1.6v5.894A4.37 4.37 0 0015 12c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V3z"
+                                          clipRule="evenodd"
+                                        />
                                       </svg>
-                                      <span className="hidden sm:inline">Preview</span>
-                                    </button>
-                                    
-                                    {/* Download Button */}
-                                    <a 
-                                      href={attachment.fullUrl} 
-                                      download={attachment.fileName}
-                                      className="flex items-center gap-1 px-3 py-2 bg-green-50 text-green-700 text-xs font-medium rounded-lg hover:bg-green-100 transition-colors duration-200 group-hover:shadow-md"
-                                      title="Download"
-                                    >
-                                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                      </svg>
-                                      <span className="hidden sm:inline">Download</span>
-                                    </a>
-                                    
-                                    {/* More Options */}
-                                    <div className="relative">
-                                      <button 
-                                        onClick={() => setPreviewMenuIndex(previewMenuIndex === index ? null : index)}
-                                        className="flex items-center justify-center w-8 h-8 bg-gray-50 text-gray-500 rounded-lg hover:bg-gray-100 transition-colors duration-200"
-                                      >
-                                        <FiMoreVertical className="w-4 h-4" />
-                                      </button>
-                                      
-                                      {/* Dropdown Menu */}
-                                      {previewMenuIndex === index && (
-                                        <div className="absolute right-0 top-10 bg-white border border-gray-200 rounded-lg shadow-lg z-50 min-w-[160px]">
-                                          <div className="py-1">
-                                            <button
-                                              onClick={() => {
-                                                window.open(attachment.fullUrl, '_blank');
-                                                setPreviewMenuIndex(null);
-                                              }}
-                                              className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                                            >
-                                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                              </svg>
-                                              Open in New Tab
-                                            </button>
-                                            <a
-                                              href={attachment.fullUrl}
-                                              download={attachment.fileName}
-                                              onClick={() => setPreviewMenuIndex(null)}
-                                              className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                                            >
-                                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                              </svg>
-                                              Download File
-                                            </a>
-                                            <button
-                                              onClick={() => {
-                                                navigator.clipboard.writeText(attachment.fullUrl);
-                                                setPreviewMenuIndex(null);
-                                                toast.success('File URL copied to clipboard!');
-                                              }}
-                                              className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                                            >
-                                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                                              </svg>
-                                              Copy Link
-                                            </button>
-                                          </div>
-                                        </div>
-                                      )}
-                                    </div>
+                                    ) : (
+                                      <FaFileAlt className="w-6 h-6" />
+                                    )}
                                   </div>
+
+                                  {/* File Name */}
+                                  <p className="text-xs font-semibold text-gray-900 truncate w-full px-1">{attachment.fileName}</p>
                                 </div>
-                                
-                                {/* Audio Player for audio files */}
-                                {isAudio && (
-                                  <div className="mt-4 pt-4 border-t border-gray-100">
-                                    <audio controls src={attachment.fullUrl} className="w-full h-10">
-                                      Your browser does not support the audio tag.
-                                    </audio>
+
+                                {/* 3-dot Menu Button */}
+                                <div className="absolute top-2 right-2">
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setPreviewMenuIndex(previewMenuIndex === index ? null : index);
+                                    }}
+                                    className="flex items-center justify-center w-6 h-6 bg-white bg-opacity-80 text-gray-500 rounded-full hover:bg-opacity-100 hover:text-gray-700 transition-all duration-200 shadow-sm"
+                                    title="More options"
+                                  >
+                                    <FiMoreVertical className="w-4 h-4" />
+                                  </button>
+                                </div>
+
+                                {/* Dropdown Menu */}
+                                {previewMenuIndex === index && (
+                                  <div className="absolute z-50 top-10 right-0 w-44 bg-white border border-gray-200 rounded-lg shadow-xl">
+                                    <div className="py-1">
+                                      <button
+                                        onClick={() => {
+                                          window.open(attachment.fullUrl, '_blank');
+                                          setPreviewMenuIndex(null);
+                                        }}
+                                        className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                                      >
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                        </svg>
+                                        Open in New Tab
+                                      </button>
+                                      <a
+                                        href={attachment.fullUrl}
+                                        download={attachment.fileName}
+                                        onClick={() => setPreviewMenuIndex(null)}
+                                        className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                                      >
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                        </svg>
+                                        Download File
+                                      </a>
+                                      <button
+                                        onClick={() => {
+                                          navigator.clipboard.writeText(attachment.fullUrl);
+                                          setPreviewMenuIndex(null);
+                                          toast.success('File URL copied to clipboard!');
+                                        }}
+                                        className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                                      >
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                        </svg>
+                                        Copy Link
+                                      </button>
+                                    </div>
                                   </div>
                                 )}
                               </div>
@@ -2005,6 +1994,7 @@ function CommentItem({
                         </div>
                       </div>
                     )}
+
                   </div>
                 );
               })()}
@@ -2016,11 +2006,10 @@ function CommentItem({
             <div className="flex items-center gap-2">
               <button
                 onClick={() => onLikeToggle(comment.CommentID)}
-                className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-all duration-200 ${
-                  userLikedComments[comment.CommentID] 
-                    ? 'bg-red-100 text-red-700 hover:bg-red-200' 
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
+                className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-all duration-200 ${userLikedComments[comment.CommentID]
+                  ? 'bg-red-100 text-red-700 hover:bg-red-200'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
               >
                 <svg className={`w-4 h-4 ${userLikedComments[comment.CommentID] ? 'fill-current text-red-600' : 'fill-none'}`} stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
@@ -2028,7 +2017,7 @@ function CommentItem({
                 {comment.LikesCount || 0}
               </button>
             </div>
-            
+
             <button
               onClick={() => onReplyClick(comment.CommentID, comment.FullName)}
               className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium text-gray-600 hover:bg-gray-100 transition-colors duration-200"
@@ -2041,13 +2030,13 @@ function CommentItem({
           </div>
         </div>
       </div>
-      
+
       {/* Nested replies */}
       {nestedReplies.length > 0 && (
         <div className="mt-4 pl-16">
           <div className="border-l-2 border-gray-200 pl-6">
             {nestedReplies.length > 2 && (
-              <button 
+              <button
                 onClick={() => toggleExpandedReplies(comment.CommentID)}
                 className="text-blue-600 hover:text-blue-800 text-sm font-medium mb-4 flex items-center gap-1 transition-colors"
               >
