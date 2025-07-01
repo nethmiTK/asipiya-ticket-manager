@@ -11,7 +11,7 @@ const AdminProfile = () => {
     const { loggedInUser: user, setLoggedInUser } = useAuth();
     const [profileImage, setProfileImage] = useState(null);
     const [previewUrl, setPreviewUrl] = useState(null);
-    const [isOpen, setIsOpen] = useState(true);
+    const [isOpen, setIsOpen] = useState(false);
 
     const [profileData, setProfileData] = useState({
         FullName: '',

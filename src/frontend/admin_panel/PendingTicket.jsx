@@ -6,7 +6,7 @@ import { FaEdit } from 'react-icons/fa';
 import Select from "react-select";
 
 const PendingTicket = () => {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [tickets, setTickets] = useState([]);
   const [filteredTickets, setFilteredTickets] = useState([]);
   const [loading, setLoading] = useState(true);
