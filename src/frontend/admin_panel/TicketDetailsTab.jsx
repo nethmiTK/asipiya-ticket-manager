@@ -50,6 +50,17 @@ export default function TicketDetailsTab({
             oldValue: oldResolution,
             newValue: newResolution
           });
+
+          // Send notifications to all admins and assigned supervisors
+          try {
+            await axios.post('http://localhost:5000/api/notifications/resolution-update', {
+              ticketId: selectedTicket.id,
+              updatedByUserId: user.UserID,
+              resolutionText: newResolution.substring(0, 100) + (newResolution.length > 100 ? '...' : '')
+            });
+          } catch (notificationError) {
+            console.error("Failed to send resolution update notifications:", notificationError);
+          }
         } catch (logError) {
           console.error("Failed to log resolution update:", logError);
         }
@@ -80,6 +91,7 @@ export default function TicketDetailsTab({
 
   const handleStatusChange = async (e) => {
     const newStatus = e.target.value;
+    const oldStatus = selectedTicket.status;
     setSelectedTicket((prev) => ({
       ...prev,
       status: newStatus,
@@ -94,6 +106,18 @@ export default function TicketDetailsTab({
         }
       );
       if (!res.ok) throw new Error("Failed to update status");
+
+      // Send notifications to all admins and assigned supervisors
+      try {
+        await axios.post('http://localhost:5000/api/notifications/status-update', {
+          ticketId: selectedTicket.id,
+          updatedByUserId: user.UserID,
+          oldStatus: oldStatus,
+          newStatus: newStatus
+        });
+      } catch (notificationError) {
+        console.error("Failed to send status update notifications:", notificationError);
+      }
 
       toast.success("Status updated successfully!");
       // Check if setTickets prop is provided before attempting to use it
@@ -113,6 +137,7 @@ export default function TicketDetailsTab({
   const handleDueDateChange = async (e) => {
     const rawDate = e.target.value;
     const newDueDate = rawDate;
+    const oldDueDate = selectedTicket.dueDate;
     setSelectedTicket((prev) => ({
       ...prev,
       dueDate: rawDate,
@@ -127,6 +152,18 @@ export default function TicketDetailsTab({
         }
       );
       if (!res.ok) throw new Error("Failed to update due date");
+
+      // Send notifications to all admins and assigned supervisors
+      try {
+        await axios.post('http://localhost:5000/api/notifications/due-date-update', {
+          ticketId: selectedTicket.id,
+          updatedByUserId: user.UserID,
+          oldDueDate: oldDueDate,
+          newDueDate: newDueDate
+        });
+      } catch (notificationError) {
+        console.error("Failed to send due date update notifications:", notificationError);
+      }
 
       // Check if setTickets prop is provided before attempting to use it
       if (setTickets) {
