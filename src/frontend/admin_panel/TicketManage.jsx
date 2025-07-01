@@ -921,7 +921,7 @@ export default function TicketManage() {
                   onChange={(e) => setSelectedSupervisorId(e.target.value)}
                 >
                   <option value={"all"}>All Supervisors</option>
-                  {availableSupervisors.map((sup) => (
+                  {supervisors.map((sup) => (
                     <option key={sup.UserID} value={sup.UserID}>
                       {sup.FullName}
                     </option>
