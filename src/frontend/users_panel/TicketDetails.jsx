@@ -170,7 +170,7 @@ const TicketDetails = () => {
             </div>
           )}
 
-          <h2 className="text-2xl font-bold mb-4">Ticket Details</h2>
+          {/* <h2 className="text-2xl font-bold mb-4">Ticket Details</h2> */}
 
           <div className="flex lg:hidden justify-between border-b mb-4">
             <button
@@ -225,7 +225,7 @@ const TicketDetails = () => {
                   {ticket.supervisor_name || "Not Assigned"}
                 </p>
                 <p>
-                  <strong>Last Responded Time:</strong>{" "}
+                  <strong>Supervisor Last Responded Time:</strong>{" "}
                   {ticket.LastRespondedTime
                     ? new Date(ticket.LastRespondedTime).toLocaleString()
                     : "No responses yet"}
@@ -349,6 +349,7 @@ const TicketDetails = () => {
             <div
               className="bg-gray-100 border h-180 border-zinc-300 rounded-lg shadow-lg p-4 overflow-auto"
             >
+              <h2 className="text-2xl font-bold mb-4">Ticket Details</h2>
               <div className="space-y-3 text-lg text-justify">
                 <p>
                   <strong>Ticket ID:</strong> {ticket.id}
@@ -374,7 +375,7 @@ const TicketDetails = () => {
                   {ticket.supervisor_name || "Not Assigned"}
                 </p>
                 <p>
-                  <strong>Last Responded Time:</strong>{" "}
+                  <strong>Supervisor Last Responded Time:</strong>{" "}
                   {ticket.LastRespondedTime
                     ? new Date(ticket.LastRespondedTime).toLocaleString()
                     : "No responses yet"}
@@ -487,7 +488,7 @@ const TicketDetails = () => {
             <div
               className="bg-white border h-180 border-zinc-300 rounded-lg shadow-lg p-4 overflow-auto"
             >
-              <h2 className="font-bold text-xl mb-2">Chat</h2>
+              <h2 className="text-2xl font-bold mb-4">Chat</h2>
               <ChatUI ticketID={ticket.id} />
             </div>
           </div>
