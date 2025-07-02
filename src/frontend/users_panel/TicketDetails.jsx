@@ -5,6 +5,7 @@ import ChatUI from "../../user_components/ChatUI/ChatUI";
 import SideBar from "../../user_components/SideBar/SideBar";
 import NavBar from "../../user_components/NavBar/NavBar";
 import NotificationPanel from "../components/NotificationPanel";
+import { IoClose } from "react-icons/io5";
 
 const TicketDetails = () => {
   const { ticketId } = useParams();
@@ -22,6 +23,8 @@ const TicketDetails = () => {
 
   const [activeTab, setActiveTab] = useState("details");
 
+  const [previewUrl, setPreviewUrl] = useState(null);
+
   const storedUser = localStorage.getItem("user");
   let parsedUser = null;
   try {
@@ -29,6 +32,25 @@ const TicketDetails = () => {
   } catch (err) {
     console.error("Failed to parse localStorage user:", err);
   }
+
+  const iconBaseUrl = "https://cdn-icons-png.flaticon.com/512/";
+
+  const getIconUrl = (fileName) => {
+    const extension = fileName.split(".").pop().toLowerCase();
+
+    const iconMap = {
+      pdf: "136/136522.png",
+      xls: "732/732220.png",
+      xlsx: "732/732220.png",
+      doc: "888/888883.png",
+      docx: "888/888883.png",
+      ppt: "7817/7817494.png",
+      pptx: "7817/7817494.png",
+    };
+
+    const iconPath = iconMap[extension] || null;
+    return iconPath ? `${iconBaseUrl}${iconPath}` : null;
+  };
 
   useEffect(() => {
     if (!ticketId) return;
@@ -87,158 +109,120 @@ const TicketDetails = () => {
     return () => clearInterval(interval);
   }, [parsedUser]);
 
-return (
-  <div className="flex">
-    <SideBar open={isSidebarOpen} setOpen={setIsSidebarOpen} />
+  const handleFileDownload = async (fileName) => {
+    try {
+      const response = await fetch(
+        `http://localhost:5000/download_evidence/${fileName}`
+      );
+      if (!response.ok) throw new Error("Download failed");
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
 
-    <div
-      className={`flex-1 flex flex-col h-screen overflow-y-auto transition-all duration-300
-        ml-0 
-        lg:ml-20 ${isSidebarOpen ? 'lg:ml-72' : ''}`}
-    >
-      <NavBar
-        isSidebarOpen={isSidebarOpen}
-        showNotifications={showNotifications}
-        unreadNotifications={unreadNotifications}
-        setShowNotifications={setShowNotifications}
-        notificationRef={notificationRef}
-        setOpen={setIsSidebarOpen}
-      />
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Download error:", error);
+      alert("Download failed.");
+    }
+  };
 
-      <div className="p-6 mt-[60px]">
-        {showNotifications && (
-          <div
-            ref={notificationRef}
-            className="absolute right-4 top-[70px] z-50"
-          >
-            <NotificationPanel
-              userId={parsedUser?.UserID}
-              role={parsedUser?.Role}
-              onClose={() => setShowNotifications(false)}
-            />
-          </div>
-        )}
+  if (ticketLoading) return <p>Loading ticket details...</p>;
+  if (ticketError) return <p className="text-red-600">{ticketError}</p>;
+  if (!ticket) return <p>No ticket found.</p>;
 
-        <h2 className="text-2xl font-bold mb-4">Ticket Details</h2>
+  return (
+    <div className="flex">
+      <SideBar open={isSidebarOpen} setOpen={setIsSidebarOpen} />
 
-        {/* Tabs for Mobile View */}
-        <div className="flex lg:hidden justify-between border-b mb-4">
-          <button
-            onClick={() => setActiveTab("details")}
-            className={`w-1/2 py-2 text-center font-medium ${
-              activeTab === "details"
-                ? "border-b-2 border-blue-600 text-blue-600"
-                : "text-gray-600"
-            }`}
-          >
-            Details
-          </button>
-          <button
-            onClick={() => setActiveTab("chat")}
-            className={`w-1/2 py-2 text-center font-medium ${
-              activeTab === "chat"
-                ? "border-b-2 border-blue-600 text-blue-600"
-                : "text-gray-600"
-            }`}
-          >
-            Chat
-          </button>
-        </div>
+      <div
+        className={`flex-1 flex flex-col h-screen overflow-y-auto transition-all duration-300
+          ml-0 
+          lg:ml-20 ${isSidebarOpen ? "lg:ml-72" : ""}`}
+      >
+        <NavBar
+          isSidebarOpen={isSidebarOpen}
+          showNotifications={showNotifications}
+          unreadNotifications={unreadNotifications}
+          setShowNotifications={setShowNotifications}
+          notificationRef={notificationRef}
+          setOpen={setIsSidebarOpen}
+        />
 
-        {ticketLoading ? (
-          <p>Loading ticket details...</p>
-        ) : ticketError ? (
-          <p className="text-red-600">{ticketError}</p>
-        ) : !ticket ? (
-          <p>No ticket found.</p>
-        ) : (
-          <>
-            {/* Mobile View */}
-            <div className="lg:hidden">
-              {activeTab === "details" && (
-                <div className="bg-gray-100 border border-zinc-300 rounded-lg shadow-lg p-4 mb-4">
-                  <div className="space-y-3 text-lg text-justify">
-                    <p><strong>Ticket ID:</strong> {ticket.id}</p>
-                    <p><strong>Status:</strong> {ticket.status}</p>
-                    <p><strong>Description:</strong> {ticket.description}</p>
-                    <p><strong>System Name:</strong> {ticket.system_name}</p>
-                    <p><strong>Category:</strong> {ticket.category}</p>
-                    <p><strong>Date & Time:</strong> {new Date(ticket.datetime).toLocaleString()}</p>
-                    <p><strong>Supervisor:</strong> {ticket.supervisor_name || "Not Assigned"}</p>
-                  </div>
-
-                  <div className="mt-6">
-                    <h3 className="text-lg font-bold mb-2">Evidence</h3>
-                    {evidenceLoading ? (
-                      <p>Loading evidence files...</p>
-                    ) : evidenceError ? (
-                      <p className="text-red-600">{evidenceError}</p>
-                    ) : evidenceFiles.length === 0 ? (
-                      <p>No evidence files available.</p>
-                    ) : (
-                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                        {evidenceFiles.map((file, index) => {
-                          const filePath = file.FilePath || file.filepath || "";
-                          const fileUrl = `http://localhost:5000/${filePath}`;
-                          const lowerPath = filePath.toLowerCase();
-
-                          if (/\.(jpg|jpeg|png|gif)$/i.test(lowerPath)) {
-                            return (
-                              <div key={index} className="rounded p-1 bg-white shadow-sm">
-                                <img src={fileUrl} alt={`Evidence ${index + 1}`} className="w-full h-20 object-cover rounded" />
-                                <a href={fileUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline block mt-1 text-center text-sm">View File</a>
-                              </div>
-                            );
-                          } else if (/\.(pdf)$/i.test(lowerPath)) {
-                            return (
-                              <div key={index} className="rounded p-2 bg-white shadow-sm flex flex-col items-center justify-center text-center">
-                                <a href={fileUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline font-semibold">📄 PDF Document {index + 1}</a>
-                              </div>
-                            );
-                          } else if (/\.(mp4|webm|ogg)$/i.test(lowerPath)) {
-                            return (
-                              <div key={index} className="rounded p-1 bg-white shadow-sm">
-                                <video src={fileUrl} controls className="w-full h-32 rounded object-cover" />
-                                <a href={fileUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline block mt-1 text-center text-sm">View Video</a>
-                              </div>
-                            );
-                          } else {
-                            return (
-                              <div key={index} className="rounded p-2 bg-white shadow-sm flex items-center justify-center">
-                                <a href={fileUrl} target="_blank" rel="noopener noreferrer" className="text-gray-700 underline font-medium">📁 File {index + 1}</a>
-                              </div>
-                            );
-                          }
-                        })}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {activeTab === "chat" && (
-                <div className="bg-white border border-zinc-300 rounded-lg shadow-lg p-4">
-                  <h2 className="font-bold text-xl mb-2">Chat</h2>
-                  <ChatUI ticketID={ticket.id} />
-                </div>
-              )}
+        <div className="p-6 mt-[60px]">
+          {showNotifications && (
+            <div
+              ref={notificationRef}
+              className="absolute right-4 top-[70px] z-50"
+            >
+              <NotificationPanel
+                userId={parsedUser?.UserID}
+                role={parsedUser?.Role}
+                onClose={() => setShowNotifications(false)}
+              />
             </div>
+          )}
 
-            {/* Desktop View */}
-            <div className="hidden lg:grid grid-cols-2 gap-4">
-              <div className="bg-gray-100 border border-zinc-300 rounded-lg shadow-lg p-4">
+          <h2 className="text-2xl font-bold mb-4">Ticket Details</h2>
+
+          <div className="flex lg:hidden justify-between border-b mb-4">
+            <button
+              onClick={() => setActiveTab("details")}
+              className={`w-1/2 py-2 text-center font-medium ${
+                activeTab === "details"
+                  ? "border-b-2 border-blue-600 text-blue-600"
+                  : "text-gray-600"
+              }`}
+            >
+              Details
+            </button>
+            <button
+              onClick={() => setActiveTab("chat")}
+              className={`w-1/2 py-2 text-center font-medium ${
+                activeTab === "chat"
+                  ? "border-b-2 border-blue-600 text-blue-600"
+                  : "text-gray-600"
+              }`}
+            >
+              Chat
+            </button>
+          </div>
+
+          {activeTab === "details" && (
+            <div className="lg:hidden">
+              <div className="bg-gray-100 border border-zinc-300 rounded-lg shadow-lg p-4 mb-4">
                 <div className="space-y-3 text-lg text-justify">
-                  <p><strong>Ticket ID:</strong> {ticket.id}</p>
-                  <p><strong>Status:</strong> {ticket.status}</p>
-                  <p><strong>Description:</strong> {ticket.description}</p>
-                  <p><strong>System Name:</strong> {ticket.system_name}</p>
-                  <p><strong>Category:</strong> {ticket.category}</p>
-                  <p><strong>Date & Time:</strong> {new Date(ticket.datetime).toLocaleString()}</p>
-                  <p><strong>Supervisor:</strong> {ticket.supervisor_name || "Not Assigned"}</p>
+                  <p>
+                    <strong>Ticket ID:</strong> {ticket.id}
+                  </p>
+                  <p>
+                    <strong>Status:</strong> {ticket.status}
+                  </p>
+                  <p>
+                    <strong>Description:</strong> {ticket.description}
+                  </p>
+                  <p>
+                    <strong>System Name:</strong> {ticket.system_name}
+                  </p>
+                  <p>
+                    <strong>Category:</strong> {ticket.category}
+                  </p>
+                  <p>
+                    <strong>Date & Time:</strong>{" "}
+                    {new Date(ticket.datetime).toLocaleString()}
+                  </p>
+                  <p>
+                    <strong>Supervisor:</strong>{" "}
+                    {ticket.supervisor_name || "Not Assigned"}
+                  </p>
                 </div>
 
                 <div className="mt-6">
-                  <h3 className="text-lg font-bold mb-2">Evidence</h3>
+                  <h3 className="text-lg font-bold mb-4">Evidence Files</h3>
                   {evidenceLoading ? (
                     <p>Loading evidence files...</p>
                   ) : evidenceError ? (
@@ -246,57 +230,307 @@ return (
                   ) : evidenceFiles.length === 0 ? (
                     <p>No evidence files available.</p>
                   ) : (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                      {evidenceFiles.map((file, index) => {
+                    <div className="flex flex-wrap gap-4">
+                      {evidenceFiles.map((file) => {
                         const filePath = file.FilePath || file.filepath || "";
-                        const fileUrl = `http://localhost:5000/${filePath}`;
-                        const lowerPath = filePath.toLowerCase();
+                        const fileUrl = `http://localhost:5000/${filePath.replace(
+                          /\\/g,
+                          "/"
+                        )}`;
+                        const fileName = fileUrl.split("/").pop();
+                        const lowerName = fileName.toLowerCase();
+                        const isImage = /\.(jpg|jpeg|png|gif|bmp|webp)$/i.test(
+                          lowerName
+                        );
+                        const isVideo = /\.(mp4|webm|ogg)$/i.test(lowerName);
+                        const isAudio = /\.(mp3|wav|ogg)$/i.test(lowerName);
+                        const isPdf = /\.pdf$/i.test(lowerName);
+                        const isExcel = /\.(xls|xlsx)$/i.test(lowerName);
+                        const isWord = /\.(doc|docx)$/i.test(lowerName);
+                        const isPpt = /\.(ppt|pptx)$/i.test(lowerName);
+                        const isPreviewable =
+                          isImage || isVideo || isAudio || isPdf;
+                        const iconUrl = getIconUrl(fileName);
 
-                        if (/\.(jpg|jpeg|png|gif)$/i.test(lowerPath)) {
-                          return (
-                            <div key={index} className="rounded p-1 bg-white shadow-sm">
-                              <img src={fileUrl} alt={`Evidence ${index + 1}`} className="w-full h-20 object-cover rounded" />
-                              <a href={fileUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline block mt-1 text-center text-sm">View File</a>
+                        return (
+                          <div
+                            key={file.EvidenceID || file.id || fileName}
+                            className="w-25 h-25 border rounded-lg p-2 shadow-md bg-gray-100 flex flex-col items-center justify-between relative overflow-hidden"
+                          >
+                            <div
+                              className="w-full h-full flex items-center justify-center cursor-pointer"
+                              onClick={() => {
+                                if (!isPreviewable) return;
+                                setPreviewUrl({
+                                  url: fileUrl,
+                                  name: fileName,
+                                  type: isImage
+                                    ? "image"
+                                    : isVideo
+                                    ? "video"
+                                    : isAudio
+                                    ? "audio"
+                                    : isPdf
+                                    ? "pdf"
+                                    : "other",
+                                });
+                              }}
+                              title={
+                                isPreviewable
+                                  ? "Click to preview"
+                                  : "Download only"
+                              }
+                            >
+                              {isImage ? (
+                                <img
+                                  src={fileUrl}
+                                  alt={fileName}
+                                  className="w-full h-full object-cover rounded"
+                                />
+                              ) : isVideo ? (
+                                <video
+                                  muted
+                                  className="w-full h-full object-cover rounded"
+                                >
+                                  <source src={fileUrl} />
+                                </video>
+                              ) : isAudio ? (
+                                <div className="text-sm text-gray-700">
+                                  🎵 Audio
+                                </div>
+                              ) : iconUrl ? (
+                                <img
+                                  src={iconUrl}
+                                  alt={`${fileName} icon`}
+                                  className="w-10 h-10"
+                                />
+                              ) : (
+                                <div className="text-xs text-gray-600">
+                                  No preview
+                                </div>
+                              )}
                             </div>
-                          );
-                        } else if (/\.(pdf)$/i.test(lowerPath)) {
-                          return (
-                            <div key={index} className="rounded p-2 bg-white shadow-sm flex flex-col items-center justify-center text-center">
-                              <a href={fileUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline font-semibold">📄 PDF Document {index + 1}</a>
-                            </div>
-                          );
-                        } else if (/\.(mp4|webm|ogg)$/i.test(lowerPath)) {
-                          return (
-                            <div key={index} className="rounded p-1 bg-white shadow-sm">
-                              <video src={fileUrl} controls className="w-full h-32 rounded object-cover" />
-                              <a href={fileUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline block mt-1 text-center text-sm">View Video</a>
-                            </div>
-                          );
-                        } else {
-                          return (
-                            <div key={index} className="rounded p-2 bg-white shadow-sm flex items-center justify-center">
-                              <a href={fileUrl} target="_blank" rel="noopener noreferrer" className="text-gray-700 underline font-medium">📁 File {index + 1}</a>
-                            </div>
-                          );
-                        }
+
+                            <button
+                              onClick={() => handleFileDownload(fileName)}
+                              className="absolute bottom-1 right-1 text-xs bg-blue-600 text-white px-1 py-0.5 rounded hover:bg-blue-700"
+                            >
+                              Download
+                            </button>
+                          </div>
+                        );
                       })}
                     </div>
                   )}
                 </div>
               </div>
+            </div>
+          )}
 
-              <div className="bg-white border border-zinc-300 rounded-lg shadow-lg p-4">
-                <h2 className="font-bold text-xl mb-2">Chat</h2>
-                <ChatUI ticketID={ticket.id} />
+          {activeTab === "chat" && (
+            <div className="bg-white border border-zinc-300 rounded-lg shadow-lg p-4">
+              <h2 className="font-bold text-xl mb-2">Chat</h2>
+              <ChatUI ticketID={ticket.id} />
+            </div>
+          )}
+
+          <div className="hidden lg:grid grid-cols-2 gap-4">
+            <div className="bg-gray-100 border border-zinc-300 rounded-lg shadow-lg p-4">
+              <div className="space-y-3 text-lg text-justify">
+                <p>
+                  <strong>Ticket ID:</strong> {ticket.id}
+                </p>
+                <p>
+                  <strong>Status:</strong> {ticket.status}
+                </p>
+                <p>
+                  <strong>Description:</strong> {ticket.description}
+                </p>
+                <p>
+                  <strong>System Name:</strong> {ticket.system_name}
+                </p>
+                <p>
+                  <strong>Category:</strong> {ticket.category}
+                </p>
+                <p>
+                  <strong>Date & Time:</strong>{" "}
+                  {new Date(ticket.datetime).toLocaleString()}
+                </p>
+                <p>
+                  <strong>Supervisor:</strong>{" "}
+                  {ticket.supervisor_name || "Not Assigned"}
+                </p>
+              </div>
+
+              <div className="mt-6">
+                <h3 className="text-lg font-bold mb-4">Evidence Files</h3>
+                {evidenceLoading ? (
+                  <p>Loading evidence files...</p>
+                ) : evidenceError ? (
+                  <p className="text-red-600">{evidenceError}</p>
+                ) : evidenceFiles.length === 0 ? (
+                  <p>No evidence files available.</p>
+                ) : (
+                  <div className="flex flex-wrap gap-4">
+                    {evidenceFiles.map((file) => {
+                      const filePath = file.FilePath || file.filepath || "";
+                      const fileUrl = `http://localhost:5000/${filePath.replace(
+                        /\\/g,
+                        "/"
+                      )}`;
+                      const fileName = fileUrl.split("/").pop();
+                      const lowerName = fileName.toLowerCase();
+
+                      const isImage = /\.(jpg|jpeg|png|gif|bmp|webp)$/i.test(
+                        lowerName
+                      );
+                      const isVideo = /\.(mp4|webm|ogg)$/i.test(lowerName);
+                      const isAudio = /\.(mp3|wav|ogg)$/i.test(lowerName);
+                      const isPdf = /\.pdf$/i.test(lowerName);
+                      const isExcel = /\.(xls|xlsx)$/i.test(lowerName);
+                      const isWord = /\.(doc|docx)$/i.test(lowerName);
+                      const isPpt = /\.(ppt|pptx)$/i.test(lowerName);
+                      const isPreviewable =
+                        isImage || isVideo || isAudio || isPdf;
+
+                      const iconUrl = getIconUrl(fileName);
+
+                      return (
+                        <div
+                          key={file.EvidenceID || file.id || fileName}
+                          className="w-25 h-25 border rounded-lg p-2 shadow-md bg-gray-100 flex flex-col items-center justify-between relative overflow-hidden"
+                        >
+                          <div
+                            className="w-full h-full flex items-center justify-center cursor-pointer"
+                            onClick={() => {
+                              if (!isPreviewable) return;
+                              setPreviewUrl({
+                                url: fileUrl,
+                                name: fileName,
+                                type: isImage
+                                  ? "image"
+                                  : isVideo
+                                  ? "video"
+                                  : isAudio
+                                  ? "audio"
+                                  : isPdf
+                                  ? "pdf"
+                                  : "other",
+                              });
+                            }}
+                            title={
+                              isPreviewable
+                                ? "Click to preview"
+                                : "Download only"
+                            }
+                          >
+                            {isImage ? (
+                              <img
+                                src={fileUrl}
+                                alt={fileName}
+                                className="w-full h-full object-cover rounded"
+                              />
+                            ) : isVideo ? (
+                              <video
+                                muted
+                                className="w-full h-full object-cover rounded"
+                              >
+                                <source src={fileUrl} />
+                              </video>
+                            ) : isAudio ? (
+                              <div className="text-sm text-gray-700">
+                                🎵 Audio
+                              </div>
+                            ) : iconUrl ? (
+                              <img
+                                src={iconUrl}
+                                alt={`${fileName} icon`}
+                                className="w-10 h-10"
+                              />
+                            ) : (
+                              <div className="text-xs text-gray-600">
+                                No preview
+                              </div>
+                            )}
+                          </div>
+
+                          <button
+                            onClick={() => handleFileDownload(fileName)}
+                            className="absolute bottom-1 right-1 text-xs bg-blue-600 text-white px-1 py-0.5 rounded hover:bg-blue-700"
+                          >
+                            Download
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </div>
-          </>
-        )}
+
+            <div className="bg-white border border-zinc-300 rounded-lg shadow-lg p-4">
+              <h2 className="font-bold text-xl mb-2">Chat</h2>
+              <ChatUI ticketID={ticket.id} />
+            </div>
+          </div>
+
+          {previewUrl && (
+            <div className="fixed inset-0 z-50 flex bg-black/25 items-center justify-center p-4">
+              <div className="bg-gray-100 rounded-lg p-4 w-full max-w-2xl mx-auto relative">
+                <button
+                  onClick={() => setPreviewUrl(null)}
+                  className="absolute top-2 right-2 text-gray-600 hover:text-black"
+                >
+                  <IoClose size={24} />
+                </button>
+
+                <h4 className="text-lg font-semibold mb-4">
+                  {previewUrl.name}
+                </h4>
+
+                <div className="mb-4 max-h-[400px] overflow-auto flex justify-center items-center w-full">
+                  {previewUrl.type === "image" ? (
+                    <img
+                      src={previewUrl.url}
+                      alt={previewUrl.name}
+                      className="max-w-full max-h-96"
+                    />
+                  ) : previewUrl.type === "video" ? (
+                    <video controls className="max-w-full max-h-96">
+                      <source src={previewUrl.url} />
+                    </video>
+                  ) : previewUrl.type === "audio" ? (
+                    <audio controls className="w-full">
+                      <source src={previewUrl.url} />
+                    </audio>
+                  ) : previewUrl.type === "pdf" ? (
+                    <iframe
+                      src={previewUrl.url}
+                      className="w-full h-[500px] border rounded"
+                      title="PDF Preview"
+                    ></iframe>
+                  ) : (
+                    <div className="text-sm text-gray-600">
+                      Cannot preview this file type.
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex justify-end">
+                  <button
+                    onClick={() => handleFileDownload(previewUrl.name)}
+                    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                  >
+                    Download
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
-  </div>
-);
-
+  );
 };
 
 export default TicketDetails;

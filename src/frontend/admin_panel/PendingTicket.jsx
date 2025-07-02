@@ -218,9 +218,9 @@ const PendingTicket = () => {
       </main>
 
       {showTicketPopup && (
-        <div className="fixed inset-0 z-50 bg-black/65 flex justify-center items-center">
+        <div className="fixed inset-0 z-50 bg-black/55 flex justify-center items-center">
           <div className="rounded-lg w-[90%] max-w-4xl relative">
-            <div className="p-6 max-h-[90vh] overflow-y-auto">
+            <div className="bg-white rounded-xl shadow-lg w-[800px] max-h-[90vh] overflow-y-auto relative z-10">
               <TicketViewPage
                 ticketId={selectedTicketId}
                 popupMode={true}

@@ -11,6 +11,26 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
   import.meta.url
 ).toString();
 
+const iconBaseUrl = "https://cdn-icons-png.flaticon.com/512/";
+
+const getIconUrl = (fileName) => {
+  const extension = fileName.split(".").pop().toLowerCase();
+
+  const iconMap = {
+    pdf: "136/136522.png",
+    xls: "732/732220.png",
+    xlsx: "732/732220.png",
+    doc: "888/888883.png",
+    docx: "888/888883.png",
+    ppt: "7817/7817494.png",
+    pptx: "7817/7817494.png",
+    default: "833/833314.png",
+  };
+
+  const iconPath = iconMap[extension] || iconMap.default;
+  return `${iconBaseUrl}${iconPath}`;
+};
+
 const ChatUI = ({ ticketID: propTicketID }) => {
   const [ticketID, setTicketID] = useState(null);
   const [userID, setUserID] = useState(null);
@@ -76,7 +96,7 @@ const ChatUI = ({ ticketID: propTicketID }) => {
               type: msg.type || "text",
               role: msg.role || "",
               timestamp: msg.timestamp || new Date().toISOString(),
-              status: existingMsg?.status === "seen" ? "seen" : "✓ delivered",
+              status: existingMsg?.status === "seen" ? "seen" : "✓",
             };
           })
         );
@@ -125,7 +145,7 @@ const ChatUI = ({ ticketID: propTicketID }) => {
         type: message.type || "text",
         role: message.role || "",
         timestamp: message.timestamp || new Date().toISOString(),
-        status: message.status || "✓ delivered",
+        status: message.status || "✓",
       };
 
       addMessage(formattedMessage);
@@ -145,7 +165,7 @@ const ChatUI = ({ ticketID: propTicketID }) => {
         prev.map((msg) =>
           String(msg.ticketid) === String(seenData.TicketID) &&
           msg.role !== seenData.Role
-            ? { ...msg, status: "✓✓ seen" }
+            ? { ...msg, status: "✓✓" }
             : msg
         )
       );
@@ -176,34 +196,6 @@ const ChatUI = ({ ticketID: propTicketID }) => {
     return () =>
       document.removeEventListener("visibilitychange", handleVisibilityChange);
   }, [ticketID, role, messages]);
-
-  const generatePdfPreview = async (file) => {
-    if (!file || !canvasRef.current) return;
-    const reader = new FileReader();
-    reader.onload = async () => {
-      try {
-        const pdf = await pdfjsLib.getDocument({ data: reader.result }).promise;
-        const page = await pdf.getPage(1);
-        const viewport = page.getViewport({ scale: 1.5 });
-
-        const canvas = canvasRef.current;
-        const context = canvas.getContext("2d");
-        canvas.width = viewport.width;
-        canvas.height = viewport.height;
-
-        await page.render({ canvasContext: context, viewport }).promise;
-      } catch (err) {
-        console.error("PDF render error:", err);
-      }
-    };
-    reader.readAsArrayBuffer(file);
-  };
-
-  useEffect(() => {
-    if (selectedFile?.type === "application/pdf") {
-      generatePdfPreview(selectedFile);
-    }
-  }, [selectedFile]);
 
   const handleFileDownload = async (fileUrl) => {
     try {
@@ -274,6 +266,11 @@ const ChatUI = ({ ticketID: propTicketID }) => {
     );
   };
 
+  const getDateString = (date) => {
+    const d = new Date(date);
+    return d.toISOString().split("T")[0];
+  };
+
   return (
     <div className="flex flex-col h-150 border-none rounded-md bg-white">
       <div className="flex-1 overflow-y-auto space-y-2 p-2 mt-2">
@@ -281,44 +278,56 @@ const ChatUI = ({ ticketID: propTicketID }) => {
           <p className="text-center text-gray-500 mt-60">No messages yet</p>
         )}
         {messages.map((msg, idx) => {
+          const showDateLabel =
+            idx === 0 ||
+            getDateString(messages[idx - 1]?.timestamp) !==
+              getDateString(msg.timestamp);
+
           const isImage = msg.filePath?.match(
             /\.(jpeg|jpg|png|gif|webp|bmp|svg)$/i
           );
-          const isVideo = msg.filePath?.match(/\.(mp4|webm|ogg)$/i);
-          const isPDF = msg.filePath?.match(/\.pdf$/i);
-          const isExcel = msg.filePath?.match(/\.(xls|xlsx)$/i);
-          const isWord = msg.filePath?.match(/\.(doc|docx)$/i);
 
           return (
-            <div
-              key={msg.id || idx}
-              className={`flex ${
-                msg.sender === "user" ? "justify-end" : "justify-start"
-              }`}
-              style={{ marginBottom: 8 }}
-            >
+            <React.Fragment key={msg.id || idx}>
+              {showDateLabel && (
+                <div
+                  className="text-center text-gray-500 text-sm my-2"
+                  style={{ userSelect: "none" }}
+                >
+                  {new Date(msg.timestamp).toLocaleDateString(undefined, {
+                    year: "numeric",
+                    month: "long",
+                    day: "numeric",
+                  })}
+                </div>
+              )}
               <div
-                style={{
-                  maxWidth: "70%",
-                  padding: "10px 16px",
-                  borderRadius: 20,
-                  backgroundColor:
-                    msg.sender === "user" ? "#90cdf4" : "#e2e8f0",
-                  color: "#1a202c",
-                  whiteSpace: "pre-wrap",
-                  wordBreak: "break-word",
-                  borderTopRightRadius: msg.sender === "user" ? 0 : 20,
-                  borderTopLeftRadius: msg.sender === "user" ? 20 : 0,
-                  boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: msg.sender === "user" ? "" : "flex-start",
-                }}
+                className={`flex ${
+                  msg.sender === "user" ? "justify-end" : "justify-start"
+                }`}
+                style={{ marginBottom: 8 }}
               >
-                {msg.filePath ? (
-                  <>
-                    {isImage && (
-                      <>
+                <div
+                  style={{
+                    maxWidth: "70%",
+                    padding: "10px 16px",
+                    borderRadius: 20,
+                    backgroundColor:
+                      msg.sender === "user" ? "#90cdf4" : "#e2e8f0",
+                    color: "#1a202c",
+                    whiteSpace: "pre-wrap",
+                    wordBreak: "break-word",
+                    borderTopRightRadius: msg.sender === "user" ? 0 : 20,
+                    borderTopLeftRadius: msg.sender === "user" ? 20 : 0,
+                    boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: msg.sender === "user" ? "" : "flex-start",
+                  }}
+                >
+                  {msg.filePath ? (
+                    <>
+                      {isImage ? (
                         <img
                           src={msg.filePath}
                           alt="Sent"
@@ -341,212 +350,68 @@ const ChatUI = ({ ticketID: propTicketID }) => {
                             (e.currentTarget.style.transform = "scale(1)")
                           }
                         />
-                        <button
-                          onClick={() => handleFileDownload(msg.filePath)}
-                          style={{
-                            fontSize: 12,
-                            padding: "4px 8px",
-                            color: "#000",
-                            backgroundColor: "rgba(255,255,255,0.7)",
-                            borderRadius: 4,
-                            cursor: "pointer",
-                            alignSelf: "flex-start",
-                          }}
-                        >
-                          Download Image
-                        </button>
-                      </>
-                    )}
-                    {isVideo && (
-                      <>
-                        <video
-                          controls
-                          style={{
-                            maxWidth: "100%",
-                            maxHeight: 180,
-                            marginBottom: 8,
-                            borderRadius: 12,
-                          }}
-                        >
-                          <source src={msg.filePath} />
-                        </video>
-                        <button
-                          onClick={() => handleFileDownload(msg.filePath)}
-                          style={{
-                            fontSize: 12,
-                            padding: "4px 8px",
-                            color: "#000",
-                            backgroundColor: "rgba(255,255,255,0.7)",
-                            borderRadius: 4,
-                            cursor: "pointer",
-                            alignSelf: "flex-start",
-                          }}
-                        >
-                          Download Video
-                        </button>
-                      </>
-                    )}
-                    {isPDF && (
-                      <>
-                        <a
-                          href={msg.filePath}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          style={{ display: "block", marginBottom: 4 }}
-                        >
+                      ) : (
+                        <div className="flex flex-col items-start">
                           <img
-                            src="https://upload.wikimedia.org/wikipedia/commons/8/87/PDF_file_icon.svg"
-                            alt="PDF"
-                            style={{
-                              width: 60,
-                              height: 60,
-                              objectFit: "contain",
-                            }}
+                            src={getIconUrl(msg.fileName || msg.text)}
+                            alt="File Icon"
+                            className="h-16 w-16 object-contain"
                           />
-                        </a>
-                        <button
-                          onClick={() => handleFileDownload(msg.filePath)}
-                          style={{
-                            fontSize: 12,
-                            padding: "4px 8px",
-                            color: "#000",
-                            backgroundColor: "rgba(255,255,255,0.7)",
-                            borderRadius: 4,
-                            cursor: "pointer",
-                            alignSelf: "flex-start",
-                          }}
-                        >
-                          Download PDF
-                        </button>
-                      </>
-                    )}
-                    {isExcel && (
-                      <>
-                        <a
-                          href={msg.filePath}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          style={{ display: "block", marginBottom: 4 }}
-                        >
-                          <img
-                            src="https://cdn-icons-png.flaticon.com/512/732/732220.png"
-                            alt="Excel"
+                          <a
+                            href={msg.filePath}
+                            target="_blank"
+                            rel="noopener noreferrer"
                             style={{
-                              width: 60,
-                              height: 60,
-                              objectFit: "contain",
+                              fontSize: 14,
+                              textDecoration: "underline",
+                              color: "#1a202c",
                             }}
-                          />
-                        </a>
-                        <button
-                          onClick={() => handleFileDownload(msg.filePath)}
-                          style={{
-                            fontSize: 12,
-                            padding: "4px 8px",
-                            color: "#000",
-                            backgroundColor: "rgba(255,255,255,0.7)",
-                            borderRadius: 4,
-                            cursor: "pointer",
-                            alignSelf: "flex-start",
-                          }}
-                        >
-                          Download Excel
-                        </button>
-                      </>
-                    )}
-                    {isWord && (
-                      <>
-                        <a
-                          href={msg.filePath}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          style={{ display: "block", marginBottom: 4 }}
-                        >
-                          <img
-                            src="https://cdn-icons-png.flaticon.com/512/732/732221.png"
-                            alt="Word"
+                          >
+                            📎 {msg.fileName || msg.text}
+                          </a>
+                          <button
+                            onClick={() => handleFileDownload(msg.filePath)}
                             style={{
-                              width: 60,
-                              height: 60,
-                              objectFit: "contain",
+                              fontSize: 12,
+                              padding: "4px 8px",
+                              color: "#000",
+                              backgroundColor: "rgba(255,255,255,0.7)",
+                              borderRadius: 4,
+                              cursor: "pointer",
+                              marginTop: 4,
+                              display: "block",
+                              alignSelf: "flex-start",
                             }}
-                          />
-                        </a>
-                        <button
-                          onClick={() => handleFileDownload(msg.filePath)}
-                          style={{
-                            fontSize: 12,
-                            padding: "4px 8px",
-                            color: "#000",
-                            backgroundColor: "rgba(255,255,255,0.7)",
-                            borderRadius: 4,
-                            cursor: "pointer",
-                            alignSelf: "flex-start",
-                          }}
-                        >
-                          Download Word
-                        </button>
-                      </>
-                    )}
-                    {!isImage && !isVideo && !isPDF && !isExcel && !isWord && (
-                      <>
-                        <a
-                          href={msg.filePath}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          style={{
-                            fontSize: 14,
-                            textDecoration: "underline",
-                            color: "#1a202c",
-                          }}
-                        >
-                          📎 {msg.fileName || msg.text}
-                        </a>
-                        <button
-                          onClick={() => handleFileDownload(msg.filePath)}
-                          style={{
-                            fontSize: 12,
-                            padding: "4px 8px",
-                            color: "#000",
-                            backgroundColor: "rgba(255,255,255,0.7)",
-                            borderRadius: 4,
-                            cursor: "pointer",
-                            marginTop: 4,
-                            display: "block",
-                            alignSelf: "flex-start",
-                          }}
-                        >
-                          Download File
-                        </button>
-                      </>
-                    )}
-                  </>
-                ) : (
-                  <span>{linkifyText(msg.text)}</span>
-                )}
+                          >
+                            Download File
+                          </button>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <span>{linkifyText(msg.text)}</span>
+                  )}
 
-                <div
-                  style={{
-                    textAlign: "right",
-                    fontSize: 11,
-                    marginTop: 6,
-                    color: "#4a5568",
-                    userSelect: "none",
-                  }}
-                >
-                  {new Date(msg.timestamp).toLocaleString(undefined, {
-                    year: "numeric",
-                    month: "2-digit",
-                    day: "2-digit",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
-                  {msg.role && msg.role.toLowerCase() !== "supervisor"
-                    ? `  ${msg.status}`
-                    : null}
+                  <div
+                    style={{
+                      textAlign: "right",
+                      fontSize: 11,
+                      marginTop: 6,
+                      color: "#4a5568",
+                      userSelect: "none",
+                    }}
+                  >
+                    {new Date(msg.timestamp).toLocaleString(undefined, {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                    {msg.role && msg.role.toLowerCase() !== "supervisor"
+                      ? `  ${msg.status}`
+                      : null}
+                  </div>
                 </div>
               </div>
-            </div>
+            </React.Fragment>
           );
         })}
         <div ref={messagesEndRef} />
@@ -559,31 +424,9 @@ const ChatUI = ({ ticketID: propTicketID }) => {
               src={URL.createObjectURL(selectedFile)}
               alt="Preview"
               className="h-20 object-contain rounded cursor-pointer"
-              onClick={() => window.open(URL.createObjectURL(selectedFile), "_blank")}
-            />
-          ) : selectedFile.type.startsWith("video/") ? (
-            <video
-              className="h-20 object-contain rounded"
-              src={URL.createObjectURL(selectedFile)}
-              controls
-            />
-          ) : selectedFile.type === "application/pdf" ? (
-            <canvas ref={canvasRef} className="h-20 rounded border shadow" />
-          ) : selectedFile.type ===
-              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
-            selectedFile.type === "application/vnd.ms-excel" ? (
-            <img
-              src="https://cdn-icons-png.flaticon.com/512/732/732220.png"
-              alt="Excel file"
-              className="h-20 object-contain rounded"
-            />
-          ) : selectedFile.type ===
-              "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
-            selectedFile.type === "application/msword" ? (
-            <img
-              src="https://cdn-icons-png.flaticon.com/512/732/732221.png"
-              alt="Word file"
-              className="h-20 object-contain rounded"
+              onClick={() =>
+                window.open(URL.createObjectURL(selectedFile), "_blank")
+              }
             />
           ) : (
             <div className="flex flex-col items-start">

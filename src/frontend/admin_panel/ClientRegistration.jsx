@@ -117,7 +117,7 @@ const ClientRegistration = () => {
 
         {/* Modal */}
         {showModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55">
             <div className="bg-white p-6 rounded shadow-md w-full max-w-lg relative">
               <button
                 onClick={() => setShowModal(false)}

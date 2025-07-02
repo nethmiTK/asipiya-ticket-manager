@@ -25,6 +25,48 @@ export const SUPPORT = {
   avatar: "https://i.pravatar.cc/40?u=support",
 };
 
+const handleForceDownload = async (url, filename) => {
+  try {
+    if (url.startsWith('blob:')) {
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      return;
+    }
+
+    const response = await fetch(url, {
+      mode: 'cors',
+      headers: {
+        'Content-Type': 'application/octet-stream',
+      }
+    });
+
+    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+
+    const blob = await response.blob();
+    const blobUrl = window.URL.createObjectURL(blob);
+
+    const link = document.createElement('a');
+    link.href = blobUrl;
+    link.download = filename || 'download';
+    link.style.display = 'none';
+    document.body.appendChild(link);
+    link.click();
+
+    // Cleanup
+    setTimeout(() => {
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
+    }, 100);
+  } catch (error) {
+    console.error("Download failed:", error);
+    toast.error("Download failed. Please try again.");
+  }
+};
+
 export default function TicketManage() {
   const navigate = useNavigate();
   const { loggedInUser: user } = useAuth();
@@ -286,8 +328,20 @@ export default function TicketManage() {
   // Close preview menu when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
+      // Check if click is outside any open dropdown menu
       if (previewMenuIndex !== null) {
-        setPreviewMenuIndex(null);
+        const dropdowns = document.querySelectorAll('.dropdown-menu');
+        let isClickInside = false;
+
+        dropdowns.forEach(dropdown => {
+          if (dropdown.contains(event.target)) {
+            isClickInside = true;
+          }
+        });
+
+        if (!isClickInside) {
+          setPreviewMenuIndex(null);
+        }
       }
     };
 
@@ -887,8 +941,20 @@ export default function TicketManage() {
   // Close preview menu when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
+      // Check if click is outside any open dropdown menu
       if (previewMenuIndex !== null) {
-        setPreviewMenuIndex(null);
+        const dropdowns = document.querySelectorAll('.dropdown-menu');
+        let isClickInside = false;
+
+        dropdowns.forEach(dropdown => {
+          if (dropdown.contains(event.target)) {
+            isClickInside = true;
+          }
+        });
+
+        if (!isClickInside) {
+          setPreviewMenuIndex(null);
+        }
       }
     };
 
@@ -1239,7 +1305,7 @@ export default function TicketManage() {
 
                         {/* File Previews */}
                         {attachments.length > 0 && (
-                          <div className="mt-4 p-4 bg-white border border-gray-200 rounded-xl shadow-sm max-h-64 overflow-y-auto">
+                          <div className="mt-4 p-4 bg-white border border-gray-200 rounded-xl shadow-sm">
                             <div className="flex items-center justify-between mb-4">
                               <div className="flex items-center gap-2">
                                 <svg className="w-5 h-5 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
@@ -1760,124 +1826,117 @@ function CommentItem({
                 return (
                   <div className="space-y-4">
                     {/* Media Files */}
-                    {mediaFiles.length > 0 && (
-                      <div>
-                        <h4 className="text-xs font-medium text-gray-600 mb-2 uppercase tracking-wide">Media</h4>
-                        <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-2 relative overflow-visible">
-                          {mediaFiles.map((attachment, index) => {
-                            const isImage = attachment.fileType && attachment.fileType.startsWith('image/');
-                            const isVideo = attachment.fileType && attachment.fileType.startsWith('video/');
+                    <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-2 relative overflow-visible">
+                      {mediaFiles.map((attachment, index) => {
 
-                            return (
-                              <div
-                                key={index}
-                                className="w-32 h-32 relative group bg-white rounded-xl border border-gray-200 overflow-visible shadow-sm hover:shadow-lg transition-all duration-300"
-                              >
-                                {/* Media thumbnail */}
-                                <div className="w-full h-full flex items-center justify-center bg-gray-100 overflow-hidden">
-                                  {isImage ? (
-                                    <img
-                                      src={attachment.fullUrl}
-                                      alt={attachment.fileName}
-                                      className="w-full h-full object-cover"
-                                    />
-                                  ) : isVideo ? (
-                                    <div className="relative w-full h-full">
-                                      <video
-                                        className="w-full h-full object-cover"
-                                        src={attachment.fullUrl}
-                                        muted
-                                        playsInline
-                                      />
-                                      <div className="absolute inset-0 flex items-center justify-center">
-                                        <div className="w-10 h-10 bg-black bg-opacity-50 rounded-full flex items-center justify-center">
-                                          <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
-                                            <path d="M6.3 2.841A1.5 1.5 0 004 4.11v11.78a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
-                                          </svg>
-                                        </div>
-                                      </div>
+                        const isImage = isImageAttachment(attachment.fileType);
+                        const isVideo = isVideoAttachment(attachment.fileType);
+                        const mediaMenuId = `${comment.CommentID}-media-${index}`; // Moved inside map
+
+                        return (
+                          <div key={index} className="w-32 h-32 relative group bg-white rounded-xl border border-gray-200 overflow-visible shadow-sm hover:shadow-lg transition-all duration-300">
+                            {/* Media thumbnail */}
+                            <div className="w-full h-full flex items-center justify-center bg-gray-100 overflow-hidden">
+                              {isImage ? (
+                                <img src={attachment.fullUrl} alt={attachment.fileName} className="w-full h-full object-cover" />
+                              ) : isVideo ? (
+                                <div className="relative w-full h-full">
+                                  <video className="w-full h-full object-cover" src={attachment.fullUrl} muted playsInline />
+                                  <div className="absolute inset-0 flex items-center justify-center">
+                                    <div className="w-10 h-10 bg-black bg-opacity-50 rounded-full flex items-center justify-center">
+                                      <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                        <path d="M6.3 2.841A1.5 1.5 0 004 4.11v11.78a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
+                                      </svg>
                                     </div>
-                                  ) : null}
+                                  </div>
                                 </div>
+                              ) : null}
+                            </div>
 
+ 
                                 {/* File info footer */}
                                 <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-2">
                                   <div className="flex items-center justify-between">
                                     <p className="text-xs text-white font-medium truncate">{attachment.fileName}</p>
                                     <div className="flex gap-1 ml-2">
-                                      <span className="bg-black/50 text-white text-[10px] px-1 py-0.5 rounded">
+                                      <span className="bg-black/55 text-white text-[10px] px-1 py-0.5 rounded">
                                         {isImage ? 'IMAGE' : isVideo ? 'VIDEO' : 'FILE'}
                                       </span>
                                     </div>
-                                  </div>
+ 
                                 </div>
+                              </div>
+                            </div>
 
-                                {/* 3-dot Menu Button */}
-                                <div className="absolute top-2 right-2">
+                            {/* Menu Button */}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setPreviewMenuIndex(previewMenuIndex === mediaMenuId ? null : mediaMenuId);
+                              }}
+                              className="absolute top-2 right-2 flex items-center justify-center w-6 h-6 bg-white bg-opacity-80 text-gray-500 rounded-full hover:bg-opacity-100 hover:text-gray-700 transition-all duration-200 shadow-sm"
+                            >
+                              <FiMoreVertical className="w-4 h-4" />
+                            </button>
+
+                            {/* Dropdown Menu */}
+                            {previewMenuIndex === mediaMenuId && (
+                              <div
+                                className="dropdown-menu absolute z-50 top-10 right-0 w-44 bg-white border border-gray-200 rounded-lg shadow-xl"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <div className="py-1">
+                                  <a
+                                    href={attachment.fullUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setPreviewMenuIndex(null);
+                                    }}
+                                  >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                    </svg>
+                                    Open in New Tab
+                                  </a>
+
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      setPreviewMenuIndex(previewMenuIndex === index ? null : index);
+                                      handleForceDownload(attachment.fullUrl, attachment.fileName);
+                                      setPreviewMenuIndex(null);
                                     }}
-                                    className="flex items-center justify-center w-6 h-6 bg-white bg-opacity-80 text-gray-500 rounded-full hover:bg-opacity-100 hover:text-gray-700 transition-all duration-200 shadow-sm"
+                                    className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
                                   >
-                                    <FiMoreVertical className="w-4 h-4" />
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                    </svg>
+                                    Download File
+                                  </button>
+
+                                  <button
+                                    className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      navigator.clipboard.writeText(attachment.fullUrl);
+                                      setPreviewMenuIndex(null);
+                                      toast.success('File URL copied to clipboard!');
+                                    }}
+                                  >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                    </svg>
+                                    Copy Link
                                   </button>
                                 </div>
-
-                                {/* Dropdown Menu */}
-                                {previewMenuIndex === index && (
-                                  <div className="absolute z-50 top-10 right-0 w-44 bg-white border border-gray-200 rounded-lg shadow-xl">
-                                    <div className="py-1">
-                                      <button
-                                        onClick={() => {
-                                          window.open(attachment.fullUrl, '_blank');
-                                          setPreviewMenuIndex(null);
-                                        }}
-                                        className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                                      >
-                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                        </svg>
-                                        Open in New Tab
-                                      </button>
-
-                                      <a
-                                        href={attachment.fullUrl}
-                                        download={attachment.fileName}
-                                        onClick={() => setPreviewMenuIndex(null)}
-                                        className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                                      >
-                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                        </svg>
-                                        Download File
-                                      </a>
-
-                                      <button
-                                        onClick={() => {
-                                          navigator.clipboard.writeText(attachment.fullUrl);
-                                          setPreviewMenuIndex(null);
-                                          toast.success('File URL copied to clipboard!');
-                                        }}
-                                        className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                                      >
-                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                                        </svg>
-                                        Copy Link
-                                      </button>
-                                    </div>
-                                  </div>
-                                )}
                               </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-
+                            )}
+                          </div>
+                        );
+                      })}</div>
                     {/* Document Files */}
                     {documentFiles.length > 0 && (
                       <div>
@@ -1945,11 +2004,26 @@ function CommentItem({
                                 </div>
 
                                 {/* Dropdown Menu */}
-                                {previewMenuIndex === index && (
-                                  <div className="absolute z-50 top-10 right-0 w-44 bg-white border border-gray-200 rounded-lg shadow-xl">
+                                <div className="absolute top-2 right-2">
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      const uniqueId = `${comment.CommentID}-doc-${index}`;
+                                      setPreviewMenuIndex(previewMenuIndex === uniqueId ? null : uniqueId);
+                                    }}
+                                    className="flex items-center justify-center w-6 h-6 bg-white bg-opacity-80 text-gray-500 rounded-full hover:bg-opacity-100 hover:text-gray-700 transition-all duration-200 shadow-sm"
+                                    title="More options"
+                                  >
+                                    <FiMoreVertical className="w-4 h-4" />
+                                  </button>
+                                </div>
+
+                                {previewMenuIndex === `${comment.CommentID}-doc-${index}` && (
+                                  <div className="dropdown-menu absolute z-50 top-10 right-0 w-44 bg-white border border-gray-200 rounded-lg shadow-xl">
                                     <div className="py-1">
                                       <button
-                                        onClick={() => {
+                                        onClick={(e) => {
+                                          e.stopPropagation();
                                           window.open(attachment.fullUrl, '_blank');
                                           setPreviewMenuIndex(null);
                                         }}
@@ -1961,19 +2035,24 @@ function CommentItem({
                                         </svg>
                                         Open in New Tab
                                       </button>
-                                      <a
-                                        href={attachment.fullUrl}
-                                        download={attachment.fileName}
-                                        onClick={() => setPreviewMenuIndex(null)}
+
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleForceDownload(attachment.fullUrl, attachment.fileName);
+                                          setPreviewMenuIndex(null);
+                                        }}
                                         className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
                                       >
                                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                                         </svg>
                                         Download File
-                                      </a>
+                                      </button>
+
                                       <button
-                                        onClick={() => {
+                                        onClick={(e) => {
+                                          e.stopPropagation();
                                           navigator.clipboard.writeText(attachment.fullUrl);
                                           setPreviewMenuIndex(null);
                                           toast.success('File URL copied to clipboard!');
@@ -1981,7 +2060,7 @@ function CommentItem({
                                         className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
                                       >
                                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                                         </svg>
                                         Copy Link
                                       </button>

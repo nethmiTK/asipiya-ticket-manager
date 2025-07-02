@@ -150,7 +150,7 @@ const TicketTable = ({
 
       {selectedTicket && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => {
+          <div className="absolute inset-0 bg-black/55" onClick={() => {
             setSelectedTicket(null);
             setShowSecretModal(false);
           }}></div>
