@@ -1202,10 +1202,11 @@ app.get('/api/ticket_view/:id', (req, res) => {
 // PUT: Update supervisors for a ticket
 app.put("/update-supervisors/:id", async (req, res) => {
   const { id } = req.params;
-  const { supervisorIds } = req.body;
+  const { supervisorIds, currentUserId } = req.body; // Add currentUserId to get who is making the change
 
   console.log("Received ticket ID:", id);
   console.log("Received supervisor IDs:", supervisorIds);
+  console.log("Current User ID:", currentUserId);
 
   // Validate input
   if (!Array.isArray(supervisorIds) || supervisorIds.length === 0) {
@@ -1256,6 +1257,24 @@ app.put("/update-supervisors/:id", async (req, res) => {
     console.log("Added supervisors:", addedSupervisorIds);
     console.log("Removed supervisors:", removedSupervisorIds);
 
+    // Get current user information
+    let currentUserName = 'System';
+    let currentUserRole = 'System';
+    if (currentUserId) {
+      const getCurrentUserQuery = `SELECT FullName, Role FROM appuser WHERE UserID = ?`;
+      const currentUserResult = await new Promise((resolve, reject) => {
+        db.query(getCurrentUserQuery, [currentUserId], (err, results) => {
+          if (err) reject(err);
+          else resolve(results[0] || null);
+        });
+      });
+      
+      if (currentUserResult) {
+        currentUserName = currentUserResult.FullName;
+        currentUserRole = currentUserResult.Role;
+      }
+    }
+
     // Update the ticket table
     const supervisorIdString = validSupervisorIds.join(",");
     await new Promise((resolve, reject) => {
@@ -1289,25 +1308,26 @@ app.put("/update-supervisors/:id", async (req, res) => {
     // Create logs and notifications for changes
     if (addedSupervisorIds.length > 0) {
       const addedNames = addedSupervisorIds.map(id => supervisorNames[id] || `Supervisor ${id}`);
-      const logDescription = `Supervisors added: ${addedNames.join(', ')}`;
+      const logDescription = `${currentUserName} (${currentUserRole}) added supervisors: ${addedNames.join(', ')}`;
       
       const logResult = await createTicketLog(
         id,
         'SUPERVISOR_ADDED',
         logDescription,
-        null, // No specific user for this action from EditSupervisors
-        null,
-        addedSupervisorIds.join(','),
-        'Supervisors added via edit'
+        currentUserId, // Use the current user ID
+        null, // No old value to display in log message
+        null, // No new value to display in log message
+        `Added by ${currentUserName}`
       );
 
       // Notify ticket creator about added supervisors
       if (ticketCreatorId) {
         await createNotification(
           ticketCreatorId,
-          `New supervisors added to your ticket #${id}: ${addedNames.join(', ')}`,
+          `New supervisors added to your ticket #${id}: ${addedNames.join(', ')} by ${currentUserName}`,
           'SUPERVISOR_ADDED',
-          logResult.insertId
+          logResult.insertId,
+          id
         );
       }
 
@@ -1315,34 +1335,36 @@ app.put("/update-supervisors/:id", async (req, res) => {
       for (const supervisorId of addedSupervisorIds) {
         await createNotification(
           supervisorId,
-          `You have been assigned to ticket #${id}`,
+          `You have been assigned to ticket #${id} by ${currentUserName}`,
           'SUPERVISOR_ASSIGNED',
-          logResult.insertId
+          logResult.insertId,
+          id
         );
       }
     }
 
     if (removedSupervisorIds.length > 0) {
       const removedNames = removedSupervisorIds.map(id => supervisorNames[id] || `Supervisor ${id}`);
-      const logDescription = `Supervisors removed: ${removedNames.join(', ')}`;
+      const logDescription = `${currentUserName} (${currentUserRole}) removed supervisors: ${removedNames.join(', ')}`;
       
       const logResult = await createTicketLog(
         id,
         'SUPERVISOR_REMOVED',
         logDescription,
-        null,
-        removedSupervisorIds.join(','),
-        null,
-        'Supervisors removed via edit'
+        currentUserId, // Use the current user ID
+        null, // No old value to display in log message
+        null, // No new value to display in log message
+        `Removed by ${currentUserName}`
       );
 
       // Notify ticket creator about removed supervisors
       if (ticketCreatorId) {
         await createNotification(
           ticketCreatorId,
-          `Supervisors removed from your ticket #${id}: ${removedNames.join(', ')}`,
+          `Supervisors removed from your ticket #${id}: ${removedNames.join(', ')} by ${currentUserName}`,
           'SUPERVISOR_REMOVED',
-          logResult.insertId
+          logResult.insertId,
+          id
         );
       }
 
@@ -1350,9 +1372,10 @@ app.put("/update-supervisors/:id", async (req, res) => {
       for (const supervisorId of removedSupervisorIds) {
         await createNotification(
           supervisorId,
-          `You have been removed from ticket #${id}`,
+          `You have been removed from ticket #${id} by ${currentUserName}`,
           'SUPERVISOR_UNASSIGNED',
-          logResult.insertId
+          logResult.insertId,
+          id
         );
       }
     }
@@ -1394,36 +1417,24 @@ const createTicketLog = async (ticketId, type, description, userId, oldValue, ne
             VALUES (?, NOW(), ?, ?, ?, ?, ?, ?)
         `;
         
-        // Get user info for the log description - REVERTED CHANGE
-        const userQuery = 'SELECT FullName, Role FROM appuser WHERE UserID = ?';
-        db.query(userQuery, [userId], (userErr, userResults) => {
-            if (userErr) {
-                console.error("Error getting user info:", userErr);
-                reject(userErr);
+        // Removed prepending user info here, as the description from the caller should already be formatted.
+        const finalDescription = description; 
+            
+        db.query(logQuery, [
+            ticketId,
+            type,
+            finalDescription,
+            userId,
+            oldValue,
+            newValue,
+            note
+        ], (err, result) => {
+            if (err) {
+                console.error("Error creating ticket log:", err);
+                reject(err);
                 return;
             }
-
-            const userName = userResults[0]?.FullName || 'Unknown User';
-            const userRole = userResults[0]?.Role || 'Unknown Role';
-            
-            const finalDescription = `${userName} (${userRole}) ${description}`;
-            
-            db.query(logQuery, [
-                ticketId,
-                type,
-                finalDescription,
-                userId,
-                oldValue,
-                newValue,
-                note
-            ], (err, result) => {
-                if (err) {
-                    console.error("Error creating ticket log:", err);
-                    reject(err);
-                    return;
-                }
-                resolve(result);
-            });
+            resolve(result);
         });
     });
 };
@@ -3126,22 +3137,22 @@ app.put('/api/tickets/:id/assign', (req, res) => {
 
                 // Log supervisor change if it occurred
                 if (oldSupervisorId != supervisorString) {
-                    const oldNamesStr = oldSupervisorNames.length > 0 ? oldSupervisorNames.join(', ') : 'unassigned';
+                    const oldNamesStr = oldSupervisorNames.length > 0 ? oldSupervisorNames.join(', ') : 'No supervisors';
                     const newNamesStr = newSupervisorNames.join(', ');
                     
-                    const supervisorLogDescription = `Supervisor changed from ${oldNamesStr} to ${newNamesStr}`;
+                    const supervisorLogDescription = `Supervisors assigned: ${newNamesStr} (Previously: ${oldNamesStr})`;
                     const supervisorLogNote = `Assigned by ${assignerName}`;
                     const logResult = await createTicketLog(
                         ticketId,
                         'SUPERVISOR_CHANGE',
                         supervisorLogDescription,
                         assignerId,
-                        oldSupervisorId,
+                        oldSupervisorId || null,
                         supervisorString,
                         supervisorLogNote
                     );
                     logResults.push(logResult);
-                    changes.push(`supervisor(s) changed to ${newNamesStr}`);
+                    changes.push(`supervisor(s) assigned: ${newNamesStr}`);
 
                     // Notify old supervisors if they were unassigned
                     for (const oldId of oldSupervisorIds) {
@@ -3150,7 +3161,8 @@ app.put('/api/tickets/:id/assign', (req, res) => {
                                 oldId,
                                 `You have been unassigned from ticket #${ticketId}${assignerName ? ` by ${assignerName}` : ''}.`,
                                 'SUPERVISOR_UNASSIGNED',
-                                logResult.insertId
+                                logResult.insertId,
+                                ticketId
                             );
                         }
                     }
@@ -3197,7 +3209,8 @@ app.put('/api/tickets/:id/assign', (req, res) => {
                         ticketCreatorId,
                         `Your ticket #${ticketId} has been updated: ${changeMessage}${assignerName ? ` by ${assignerName}` : ''}.`,
                         'TICKET_UPDATED',
-                        logResults[0]?.insertId || null
+                        logResults[0]?.insertId || null,
+                        ticketId
                     );
                 }
 
@@ -3211,7 +3224,8 @@ app.put('/api/tickets/:id/assign', (req, res) => {
                                 supId,
                                 `You have been assigned to ticket #${ticketId}. Status: ${status}, Priority: ${priority}.${assignerName ? ` Assigned by ${assignerName}` : ''}`,
                                 'SUPERVISOR_ASSIGNED',
-                                logResults[0]?.insertId || null
+                                logResults[0]?.insertId || null,
+                                ticketId
                             );
                         } else if (changes.length > 0) {
                             // Changes to existing assignment
@@ -3220,7 +3234,8 @@ app.put('/api/tickets/:id/assign', (req, res) => {
                                 supId,
                                 `Ticket #${ticketId} assigned to you has been updated: ${changeMessage}${assignerName ? ` by ${assignerName}` : ''}.`,
                                 'TICKET_UPDATED',
-                                logResults[0]?.insertId || null
+                                logResults[0]?.insertId || null,
+                                ticketId
                             );
                         }
                     }

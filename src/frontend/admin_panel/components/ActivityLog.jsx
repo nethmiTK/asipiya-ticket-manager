@@ -110,6 +110,34 @@ const ActivityLog = ({ ticketId }) => {
             </svg>
           </div>
         );
+
+      case 'supervisor_change':
+      case 'supervisor_changed':
+        return (
+          <div className="p-2 bg-purple-100 rounded-full">
+            <svg className="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+            </svg>
+          </div>
+        );
+
+      case 'supervisor_added':
+        return (
+          <div className="p-2 bg-green-100 rounded-full">
+            <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+            </svg>
+          </div>
+        );
+
+      case 'supervisor_removed':
+        return (
+          <div className="p-2 bg-red-100 rounded-full">
+            <svg className="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7a4 4 0 11-8 0 4 4 0 018 0zM9 14a6 6 0 00-6 6v1h12v-1a6 6 0 00-6-6zM21 12h-6" />
+            </svg>
+          </div>
+        );
       default:
         return getDefaultIcon();
     }
@@ -202,9 +230,45 @@ const ActivityLog = ({ ticketId }) => {
       case 'assignment_changed':
         return (
           <div>
-            <span className="font-medium">{userName}</span> changed assignment from{' '}
-            <span className="px-2 py-1 bg-gray-100 rounded text-sm">{oldValue || 'Unassigned'}</span> to{' '}
-            <span className="px-2 py-1 bg-orange-100 text-orange-800 rounded text-sm">{newValue || 'Unassigned'}</span>
+            <span className="font-medium">{userName}</span> changed assignee from{' '}
+            <span className="px-2 py-1 bg-gray-100 rounded text-sm">{oldValue}</span> to{' '}
+            <span className="px-2 py-1 bg-orange-100 text-orange-800 rounded text-sm">{newValue}</span>
+          </div>
+        );
+
+      case 'supervisor_change':
+      case 'supervisor_changed':
+        return (
+          <div>
+            <span className="font-medium">{userName}</span> updated ticket supervisors
+            {(log.details?.description || log.Description) && (
+              <div className="mt-1 text-sm text-purple-600 font-medium">{log.details?.description || log.Description}</div>
+            )}
+            {oldValue && newValue && (
+              <div className="mt-1 text-xs text-gray-500">
+                <span className="text-red-600">Previous: {oldValue.split(',').join(', ')}</span> → <span className="text-green-600">Current: {newValue.split(',').join(', ')}</span>
+              </div>
+            )}
+          </div>
+        );
+
+      case 'supervisor_added':
+        return (
+          <div>
+            <span className="font-medium">{userName}</span> added supervisors:{' '}
+            <span className="px-2 py-1 bg-green-100 text-green-800 rounded text-sm">
+              {log.description.split(':')[1]?.trim() || 'N/A'}
+            </span>
+          </div>
+        );
+
+      case 'supervisor_removed':
+        return (
+          <div>
+            <span className="font-medium">{userName}</span> removed supervisors:{' '}
+            <span className="px-2 py-1 bg-red-100 text-red-800 rounded text-sm">
+              {log.description.split(':')[1]?.trim() || 'N/A'}
+            </span>
           </div>
         );
       default:
