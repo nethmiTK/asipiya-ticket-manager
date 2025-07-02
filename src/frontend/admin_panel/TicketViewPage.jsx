@@ -2,8 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { toast } from 'react-toastify';
-import { IoArrowBack, IoClose } from 'react-icons/io5';
+import { IoClose } from 'react-icons/io5';
 import { useAuth } from '../../App.jsx';
+import { IoArrowBackCircleSharp } from "react-icons/io5";
 
 const getFileIcon = (fileName) => {
   const extension = fileName.split('.').pop().toLowerCase();
@@ -137,16 +138,18 @@ const TicketViewPage = ({ ticketId, popupMode = false, onClose }) => {
 
   return (
     <div className="bg-white rounded-lg p-6 w-full max-w-2xl mx-auto relative">
+      
       <div className="flex justify-between items-center mb-6">
         <button
           onClick={() => (popupMode ? onClose() : navigate(-1))}
-          className="flex items-center text-gray-600 hover:text-gray-900 p-2 rounded-sm font-bold"
+          className="flex items-center text-gray-600 hover:text-blue-700 p-2 rounded-sm font-bold"
         >
-          <IoArrowBack className="mr-2" /> Back
+          <IoArrowBackCircleSharp className="w-7 h-7 mr-2" />
+          <span>Back</span>
         </button>
       </div>
 
-      <h2 className="text-2xl font-semibold text-center mb-8">Complain Details</h2>
+      <h2 className="text-2xl font-semibold text-center mb-8">Ticket Details</h2>
 
       <div className="space-y-6">
         {[['System Name', ticketData.SystemName],
@@ -200,11 +203,7 @@ const TicketViewPage = ({ ticketId, popupMode = false, onClose }) => {
                       }}
                       title={isPreviewable ? "Click to preview" : "Download only"}
                     >
-                      {isPreviewable ? (
-                        getFileIcon(fileName)
-                      ) : (
-                        getFileIcon(fileName)
-                      )}
+                      {getFileIcon(fileName)}
                     </div>
 
                     <button
@@ -236,6 +235,7 @@ const TicketViewPage = ({ ticketId, popupMode = false, onClose }) => {
         </button>
       </div>
 
+      {/* Reject Modal */}
       {showRejectModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/55">
           <div className="bg-gray-200 p-6 rounded-lg w-full max-w-md relative">
@@ -306,9 +306,16 @@ const TicketViewPage = ({ ticketId, popupMode = false, onClose }) => {
         </div>
       )}
 
+      {/* Preview Modal with Backdrop Click Close */}
       {previewUrl && (
-        <div className="fixed inset-0 z-50 flex bg-black/55 items-center justify-center p-4">
-          <div className="bg-gray-100 rounded-lg p-4 w-full max-w-2xl mx-auto relative">
+        <div
+          className="fixed inset-0 z-50 flex bg-black/55 items-center justify-center p-4"
+          onClick={() => setPreviewUrl(null)}
+        >
+          <div
+            className="bg-gray-100 rounded-lg p-4 w-full max-w-2xl mx-auto relative"
+            onClick={(e) => e.stopPropagation()}
+          >
             <button
               onClick={() => setPreviewUrl(null)}
               className="absolute top-2 right-2 text-gray-600 hover:text-black"
