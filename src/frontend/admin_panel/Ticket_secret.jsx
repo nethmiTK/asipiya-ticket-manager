@@ -8,35 +8,37 @@ const Ticket_secret = ({ ticket, onClose }) => {
   const getStatusColor = (status) => {
     switch (status?.toLowerCase()) {
       case "open":
-        return "text-blue-500";
+        return "bg-blue-100 text-blue-800 rounded-3xl px-3 py-1";
       case "in progress":
-        return "text-yellow-500";
+        return "bg-yellow-100 text-yellow-800 rounded-3xl px-3 py-1";
       case "closed":
-        return "text-green-500";
+        return "bg-green-100 text-green-800 rounded-3xl px-3 py-1";
       case "rejected":
-        return "text-red-500";
+        return "bg-red-100 text-red-800 rounded-3xl px-3 py-1";
       case "pending":
-        return "text-orange-500";
+        return "bg-orange-100 text-orange-800 rounded-3xl px-3 py-1";
       default:
-        return "text-gray-500";
+        return "bg-gray-100 text-gray-800 rounded-3xl px-3 py-1";
     }
   };
 
   const getPriorityColor = (priority) => {
     switch (priority?.toLowerCase()) {
       case "high":
-        return "text-red-500";
+        return "bg-red-100 text-red-800 rounded-3xl px-3 py-1";
       case "medium":
-        return "text-yellow-500";
+        return "bg-yellow-100 text-yellow-800 rounded-3xl px-3 py-1";
       case "low":
-        return "text-green-500";
+        return "bg-green-100 text-green-800 rounded-3xl px-3 py-1";
       default:
-        return "text-gray-500";
+        return "bg-gray-100 text-gray-800 rounded-3xl px-3 py-1";
     }
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-10 backdrop-blur-sm flex items-center justify-center z-50">
+ 
+    <div className="fixed inset-0 flex items-center justify-center z-50">
+ 
       <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl p-6 relative">
         <button
           onClick={onClose}

@@ -62,14 +62,14 @@ export default function EditMemberModal({ memberId, onClose, onUpdate }) {
 
   if (loading) {
     return (
-      <div className="fixed inset-0 bg-black/50 bg-opacity-50 flex justify-center items-center">
+      <div className="fixed inset-0 bg-black/55 flex justify-center items-center">
         <div className="bg-white p-6 rounded-xl shadow-lg text-lg">Loading...</div>
       </div>
     );
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/50 bg-opacity-50 flex justify-center items-center">
+    <div className="fixed inset-0 z-50 bg-black/55 flex justify-center items-center">
       <div className="bg-white w-full max-w-xl rounded-2xl p-8 relative shadow-2xl">
         <button
           onClick={onClose}

@@ -214,7 +214,7 @@ export default function TicketDetailsTab({
           )}
         </p>
         {showProblemModal && (
-          <div className="fixed inset-0 z-50 bg-black/40 bg-opacity-40 flex justify-center items-center">
+          <div className="fixed inset-0 z-50 bg-black/55 flex justify-center items-center">
             <div className="bg-white rounded-lg shadow-lg p-6 max-w-lg w-full max-h-[80vh]">
               <h2 className="text-lg font-semibold mb-4">
                 Full Problem Description

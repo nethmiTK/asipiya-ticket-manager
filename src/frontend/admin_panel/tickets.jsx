@@ -147,7 +147,7 @@ const Tickets = () => {
 
       <main
         className={`flex-1 min-h-screen bg-gray-100 transition-all duration-300 ${
-          isSidebarOpen ? "ml-80" : "ml-24"
+          isSidebarOpen ? "ml-72" : "ml-24"
         }`}
       >
         <div className="p-4 sm:p-6 lg:p-8">
