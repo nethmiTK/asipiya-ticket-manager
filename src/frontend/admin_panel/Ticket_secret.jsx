@@ -49,6 +49,7 @@ const Ticket_secret = ({ ticket, onClose }) => {
   const navigate = useNavigate();
   const [previewUrl, setPreviewUrl] = useState(null);
   const [evidenceList, setEvidenceList] = useState([]);
+  const [showDescModal, setShowDescModal] = useState(false);
 
   useEffect(() => {
     if (!ticket?.TicketID) return;
@@ -149,8 +150,24 @@ const Ticket_secret = ({ ticket, onClose }) => {
 
               <div>
                 <label className="block text-sm font-medium text-gray-600 mb-1">Description</label>
-                <div className="bg-gray-50 rounded-lg p-3 text-gray-800 whitespace-pre-wrap min-h-[100px]">
-                  {ticket.Description}
+                {/* Truncated description with read more */}
+                <div className="bg-gray-50 rounded-lg p-2 text-gray-800 text-justify relative">
+                  <p
+                    className="overflow-hidden"
+                    style={{
+                      display: '-webkit-box',
+                      WebkitLineClamp: 3,
+                      WebkitBoxOrient: 'vertical',
+                    }}
+                  >
+                    {ticket.Description}
+                  </p>
+                  <button
+                    className="text-blue-600 cursor-pointer text-xs mt-1"
+                    onClick={() => setShowDescModal(true)}
+                  >
+                    Read more
+                  </button>
                 </div>
               </div>
 
@@ -229,6 +246,27 @@ const Ticket_secret = ({ ticket, onClose }) => {
         {/* Modal */}
         
       </div>
+
+      {/* Full Description Modal */}
+        {showDescModal && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 bg-opacity-60 p-4"
+            onClick={() => setShowDescModal(false)}
+          >
+            <div
+              className="bg-white rounded-lg p-6 max-w-[80vh] max-h-[70vh] overflow-y-auto relative"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                className="absolute top-2 right-2 text-gray-600 hover:text-black"
+                onClick={() => setShowDescModal(false)}
+              >
+                <IoClose size={24} />
+              </button>
+              <p className="whitespace-pre-wrap text-gray-800">{ticket.Description}</p>
+            </div>
+          </div>
+        )}
 
       {/* 🔍 Preview Modal */}
       {previewUrl && (

@@ -19,6 +19,7 @@ const EditSupervisors = ({ ticketId, popupMode = false, onClose }) => {
   const [openDropdown, setOpenDropdown] = useState(false);
   const dropdownRef = useRef();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [showDescModal, setShowDescModal] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -122,29 +123,51 @@ const EditSupervisors = ({ ticketId, popupMode = false, onClose }) => {
             </h2>
 
             <div className="space-y-6">
-                {[
-                ["System Name", ticketData.SystemName],
-                ["User Email", ticketData.UserEmail],
-                ["Status", ticketData.Status],
-                ["Priority", ticketData.Priority],
-                ["Description", ticketData.Description],
-                ["Date & Time", new Date(ticketData.DateTime).toLocaleString()],
-                ].map(([label, value]) => (
-                <div key={label} className="flex">
-                    <label className="w-1/3 font-medium">{label}</label>
-                    <div
-                    className={`w-2/3 bg-gray-100 p-2 rounded ${
-                        label === "Status"
-                        ? getStatusColor(value)
-                        : label === "Priority"
-                        ? getPriorityColor(value)
-                        : ""
-                    }`}
-                    >
-                    {value}
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-600 mb-1">Ticket ID</label>
+                    <div className="bg-gray-50 rounded-lg p-2 text-gray-800">#{ticketData.TicketID}</div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-600 mb-1">User Name</label>
+                    <div className="bg-gray-50 rounded-lg p-2 text-gray-800">{ticketData.UserName}</div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-600 mb-1">Status</label>
+                    <div className="bg-gray-50 rounded-lg p-2 text-gray-800">{ticketData.Status}</div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-600 mb-1">Priority</label>
+                    <div className="bg-gray-50 rounded-lg p-2 text-gray-800">{ticketData.Priority}</div>
+                  </div>
+                  <div className="col-span-2">
+                    <label className="block text-sm font-medium text-gray-600 mb-1">Description</label>
+
+                    {/* Truncated description with read more */}
+                    <div className="bg-gray-50 rounded-lg p-2 text-gray-800 text-justify relative">
+                      <p
+                        className="overflow-hidden"
+                        style={{
+                          display: '-webkit-box',
+                          WebkitLineClamp: 3,
+                          WebkitBoxOrient: 'vertical',
+                        }}
+                      >
+                        {ticketData.Description}
+                      </p>
+                      <button
+                        className="text-blue-600 cursor-pointer text-xs mt-1"
+                        onClick={() => setShowDescModal(true)}
+                      >
+                        Read more
+                      </button>
                     </div>
+                  </div>
+                  <div className="col-span-2">
+                    <label className="block text-sm font-medium text-gray-600 mb-1">Created At</label>
+                    <div className="bg-gray-50 rounded-lg p-3 text-gray-800">{new Date(ticketData.DateTime).toLocaleString()}</div>
+                  </div>
                 </div>
-                ))}
 
                 {/* Supervisor dropdown */}
                 <div ref={dropdownRef} className="relative">
@@ -202,21 +225,41 @@ const EditSupervisors = ({ ticketId, popupMode = false, onClose }) => {
                         </label>
                         );
                     })}
-                    </div>
+                  </div>
                 )}
-                </div>
+              </div>
 
                 <div className="flex justify-end mt-6">
-                <button
-                    onClick={handleSave}
-                    className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded"
-                >
-                    Save Changes
-                </button>
+                  <button
+                      onClick={handleSave}
+                      className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded"
+                  >
+                      Save Changes
+                  </button>
                 </div>
-
+                
       </div>
 
+      {/* Full Description Modal */}
+      {showDescModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 bg-opacity-60 p-4"
+          onClick={() => setShowDescModal(false)}
+        >
+          <div
+            className="bg-white rounded-lg p-6 max-w-[80vh] max-h-[70vh] overflow-y-auto relative"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+                className="absolute top-2 right-2 text-gray-600 hover:text-black"
+              onClick={() => setShowDescModal(false)}
+            >
+              <IoClose size={24} />
+            </button>
+            <p className="whitespace-pre-wrap text-gray-800">{ticketData.Description}</p>
+          </div>
+        </div>
+      )}
       
       </div>
     </div>
