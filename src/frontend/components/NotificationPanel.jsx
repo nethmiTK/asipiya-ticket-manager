@@ -267,7 +267,14 @@ const NotificationPanel = ({ userId, role, onClose }) => {
             // Filter to only show unread notifications on the frontend
             // This prevents read notifications from reappearing after refresh
             const unreadNotifications = response.data.filter(notification => !notification.IsRead);
-            setNotifications(unreadNotifications);
+            
+            // Make sure justMarkedRead is false for fresh notifications
+            const cleanNotifications = unreadNotifications.map(notification => ({
+                ...notification,
+                justMarkedRead: false
+            }));
+            
+            setNotifications(cleanNotifications);
             setLoading(false);
         } catch (error) {
             console.error('Error fetching notifications:', error);
@@ -287,19 +294,34 @@ const NotificationPanel = ({ userId, role, onClose }) => {
 
     const markAsRead = async (notificationId) => {
         try {
-            // First update the UI immediately by filtering out the read notification
-            setNotifications(notifications.filter(notification => 
-                notification.NotificationID !== notificationId
+            // First mark the notification as read in the UI to show the read indicator
+            setNotifications(notifications.map(notification => 
+                notification.NotificationID === notificationId
+                    ? { ...notification, IsRead: true, justMarkedRead: true }
+                    : notification
             ));
             
             // Then make the API call to mark as read in the backend
             await axios.put(`http://localhost:5000/api/notifications/read`, {
                 notificationIds: [notificationId]
             });
+            
+            // After a short delay, remove the notification from the UI
+            setTimeout(() => {
+                setNotifications(prevNotifications => 
+                    prevNotifications.filter(notification => 
+                        notification.NotificationID !== notificationId
+                    )
+                );
+            }, 1500); // 1.5 second delay to show the read indicator
         } catch (error) {
             console.error('Error marking notification as read:', error);
-            // If API call fails, we could optionally restore the notification
-            // But for better UX, we'll keep it removed from the UI
+            // If API call fails, revert the read status
+            setNotifications(notifications.map(notification => 
+                notification.NotificationID === notificationId
+                    ? { ...notification, IsRead: false, justMarkedRead: false }
+                    : notification
+            ));
         }
     };
 
@@ -355,15 +377,28 @@ const NotificationPanel = ({ userId, role, onClose }) => {
 
     const markAllAsRead = async () => {
         try {
-            // First update the UI immediately by clearing all notifications
-            setNotifications([]);
+            // First mark all notifications as read with the read indicator
+            setNotifications(notifications.map(notification => ({
+                ...notification,
+                IsRead: true,
+                justMarkedRead: true
+            })));
             
             // Then make the API call to mark all as read in the backend
             await axios.put(`http://localhost:5000/api/notifications/read-all/${userId}`);
+            
+            // After a short delay, remove all notifications from the UI
+            setTimeout(() => {
+                setNotifications([]);
+            }, 2000); // 2 second delay to show the read indicators
         } catch (error) {
             console.error('Error marking all notifications as read:', error);
-            // If API call fails, we could optionally restore the notifications
-            // But for better UX, we'll keep them removed from the UI
+            // If API call fails, revert the read status
+            setNotifications(notifications.map(notification => ({
+                ...notification,
+                IsRead: false,
+                justMarkedRead: false
+            })));
         }
     };
 
@@ -470,12 +505,18 @@ const NotificationPanel = ({ userId, role, onClose }) => {
                                 <Link
                                     key={notification.NotificationID}
                                     to={notificationLink}
-                                    className={`flex items-start p-5 transition-all duration-300 group relative notification-enter bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-400 ${isClickable ? 'cursor-pointer hover:bg-gradient-to-r hover:from-gray-50 hover:to-blue-50' : 'cursor-default hover:bg-gray-50'}`}
+                                    className={`flex items-start p-5 transition-all duration-300 group relative notification-enter ${
+                                        notification.justMarkedRead 
+                                            ? 'bg-gradient-to-r from-green-50 to-green-100 border-l-4 border-green-400' 
+                                            : 'bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-400'
+                                    } ${isClickable ? 'cursor-pointer hover:bg-gradient-to-r hover:from-gray-50 hover:to-blue-50' : 'cursor-default hover:bg-gray-50'}`}
                                     onClick={(e) => {
                                         if (!isClickable) {
                                             e.preventDefault();
                                         }
-                                        markAsRead(notification.NotificationID);
+                                        if (!notification.justMarkedRead) {
+                                            markAsRead(notification.NotificationID);
+                                        }
                                     }}
                                     style={{
                                         animationDelay: `${index * 0.1}s`,
@@ -505,7 +546,15 @@ const NotificationPanel = ({ userId, role, onClose }) => {
                                                 {formatDistanceToNow(new Date(notification.CreatedAt), { addSuffix: true })}
                                             </span>
                                             <div className="flex items-center space-x-2">
-                                                {!isClickable && (
+                                                {notification.justMarkedRead && (
+                                                    <div className="flex items-center space-x-1 bg-green-100 px-2 py-1 rounded-full">
+                                                        <svg className="w-3 h-3 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                                                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                                        </svg>
+                                                        <span className="text-xs text-green-600 font-medium">Read</span>
+                                                    </div>
+                                                )}
+                                                {!isClickable && !notification.justMarkedRead && (
                                                     <span className="text-xs text-gray-400 bg-gray-200 px-2 py-1 rounded-full">
                                                         Info
                                                     </span>

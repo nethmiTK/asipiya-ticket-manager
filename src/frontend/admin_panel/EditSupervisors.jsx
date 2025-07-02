@@ -4,11 +4,13 @@ import axios from "axios";
 import { toast } from "react-toastify";
 import { IoArrowBack, IoClose } from "react-icons/io5";
 import AdminSideBar from '../../user_components/SideBar/AdminSideBar';
+import { useAuth } from '../../App.jsx';
 
 const EditSupervisors = ({ ticketId, popupMode = false, onClose }) => {
   const { id: routeId } = useParams();
   const navigate = useNavigate();
   const id = popupMode ? ticketId : routeId;
+  const { loggedInUser: user } = useAuth(); // Add useAuth hook to get current user
 
   const [ticketData, setTicketData] = useState(null);
   const [supervisors, setSupervisors] = useState([]);
@@ -93,6 +95,7 @@ const EditSupervisors = ({ ticketId, popupMode = false, onClose }) => {
     try {
       await axios.put(`http://localhost:5000/update-supervisors/${id}`, {
         supervisorIds: selectedSupervisors.map((id) => parseInt(id)),
+        currentUserId: user?.UserID, // Add current user ID to the request
       });
       toast.success("Supervisors updated successfully");
       navigate(-1);
