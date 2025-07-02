@@ -67,6 +67,20 @@ const handleForceDownload = async (url, filename) => {
   }
 };
 
+  const canPreviewInBrowser = (fileType) => {
+  return (
+    fileType.startsWith('image/') || 
+    fileType === 'application/pdf' ||
+    fileType.startsWith('video/') ||
+    fileType.startsWith('audio/') ||
+    fileType === 'text/plain' ||
+    fileType === 'text/html' ||
+    fileType === 'text/css' ||
+    fileType === 'text/javascript' ||
+    fileType === 'application/json'
+  );
+};
+
 export default function TicketManage() {
   const navigate = useNavigate();
   const { loggedInUser: user } = useAuth();
@@ -2021,7 +2035,20 @@ function CommentItem({
                                       <button
                                         onClick={(e) => {
                                           e.stopPropagation();
-                                          window.open(attachment.fullUrl, '_blank');
+                                          if (canPreviewInBrowser(attachment.fileType)) {
+                                            window.open(attachment.fullUrl, '_blank');
+                                          } else {
+                                            toast.info(
+                                              <div>
+                                                <p className="font-medium">This file type cannot be previewed in browser</p>
+                                                <p className="text-sm">Please download the file to view it</p>
+                                              </div>,
+                                              {
+                                                autoClose: 5000,
+                                                closeButton: true,
+                                              }
+                                            );
+                                          }
                                           setPreviewMenuIndex(null);
                                         }}
                                         className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
@@ -2032,7 +2059,6 @@ function CommentItem({
                                         </svg>
                                         Open in New Tab
                                       </button>
-
                                       <button
                                         onClick={(e) => {
                                           e.stopPropagation();
