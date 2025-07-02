@@ -2,9 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { toast } from 'react-toastify';
-import { IoClose } from 'react-icons/io5';
+import { IoClose, IoArrowBackCircleSharp } from "react-icons/io5";
 import { useAuth } from '../../App.jsx';
-import { IoArrowBackCircleSharp } from "react-icons/io5";
 
 const getFileIcon = (fileName) => {
   const extension = fileName.split('.').pop().toLowerCase();
@@ -57,6 +56,7 @@ const TicketViewPage = ({ ticketId, popupMode = false, onClose }) => {
   const [ticketData, setTicketData] = useState(null);
   const [evidenceList, setEvidenceList] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showDescModal, setShowDescModal] = useState(false);
 
   const [previewUrl, setPreviewUrl] = useState(null);
   const [showRejectModal, setShowRejectModal] = useState(false);
@@ -138,7 +138,6 @@ const TicketViewPage = ({ ticketId, popupMode = false, onClose }) => {
 
   return (
     <div className="bg-white rounded-lg p-6 w-full max-w-2xl mx-auto relative">
-      
       <div className="flex justify-between items-center mb-6">
         <button
           onClick={() => (popupMode ? onClose() : navigate(-1))}
@@ -151,21 +150,55 @@ const TicketViewPage = ({ ticketId, popupMode = false, onClose }) => {
 
       <h2 className="text-2xl font-semibold text-center mb-8">Ticket Details</h2>
 
-      <div className="space-y-6">
-        {[['System Name', ticketData.SystemName],
-          ['User Email', ticketData.UserEmail],
-          ['Category', ticketData.CategoryName],
-          ['Description', ticketData.Description],
-          ['Date & Time', new Date(ticketData.DateTime).toLocaleString()]
-        ].map(([label, value]) => (
-          <div key={label} className="flex">
-            <label className="w-1/3 font-medium">{label}</label>
-            <div className="w-2/3 bg-gray-100 p-2 rounded">{value}</div>
+      <div className="space-x-15 space-y-2">
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label className="block text-sm font-medium text-gray-600 mb-1">Ticket ID</label>
+            <div className="bg-gray-50 rounded-lg p-2 text-gray-800">#{ticketData.TicketID}</div>
           </div>
-        ))}
+          <div>
+            <label className="block text-sm font-medium text-gray-600 mb-1">User Name</label>
+            <div className="bg-gray-50 rounded-lg p-2 text-gray-800">{ticketData.UserName}</div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-600 mb-1">Status</label>
+            <div className="bg-gray-50 rounded-lg p-2 text-gray-800">{ticketData.Status}</div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-600 mb-1">Priority</label>
+            <div className="bg-gray-50 rounded-lg p-2 text-gray-800">{ticketData.Priority}</div>
+          </div>
+          <div className="col-span-2">
+            <label className="block text-sm font-medium text-gray-600 mb-1">Description</label>
+
+            {/* Truncated description with read more */}
+            <div className="bg-gray-50 rounded-lg p-2 text-gray-800 text-justify relative">
+              <p
+                className="overflow-hidden"
+                style={{
+                  display: '-webkit-box',
+                  WebkitLineClamp: 3,
+                  WebkitBoxOrient: 'vertical',
+                }}
+              >
+                {ticketData.Description}
+              </p>
+              <button
+                className="text-blue-600 cursor-pointer text-xs mt-1"
+                onClick={() => setShowDescModal(true)}
+              >
+                Read more
+              </button>
+            </div>
+          </div>
+          <div className="col-span-2">
+            <label className="block text-sm font-medium text-gray-600 mb-1">Created At</label>
+            <div className="bg-gray-50 rounded-lg p-3 text-gray-800">{new Date(ticketData.DateTime).toLocaleString()}</div>
+          </div>
+        </div>
 
         {evidenceList.length > 0 && (
-          <div className="mt-8">
+          <div className="mt-2">
             <h3 className="text-lg font-semibold mb-4">Evidence Files</h3>
             <div className="flex flex-wrap gap-4">
               {evidenceList.map((evi) => {
@@ -235,7 +268,27 @@ const TicketViewPage = ({ ticketId, popupMode = false, onClose }) => {
         </button>
       </div>
 
-      {/* Reject Modal */}
+      {/* Full Description Modal */}
+      {showDescModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 bg-opacity-60 p-4"
+          onClick={() => setShowDescModal(false)}
+        >
+          <div
+            className="bg-white rounded-lg p-6 max-w-[80vh] max-h-[70vh] overflow-y-auto relative"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              className="absolute top-2 right-2 text-gray-600 hover:text-black"
+              onClick={() => setShowDescModal(false)}
+            >
+              <IoClose size={24} />
+            </button>
+            <p className="whitespace-pre-wrap text-gray-800">{ticketData.Description}</p>
+          </div>
+        </div>
+      )}
+
       {showRejectModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/55">
           <div className="bg-gray-200 p-6 rounded-lg w-full max-w-md relative">
@@ -306,7 +359,6 @@ const TicketViewPage = ({ ticketId, popupMode = false, onClose }) => {
         </div>
       )}
 
-      {/* Preview Modal with Backdrop Click Close */}
       {previewUrl && (
         <div
           className="fixed inset-0 z-50 flex bg-black/55 items-center justify-center p-4"
