@@ -1950,12 +1950,12 @@ function CommentItem({
                                 className="w-32 h-32 relative group bg-white rounded-xl border border-gray-200 overflow-visible shadow-sm hover:shadow-lg transition-all duration-300"
                               >
                                 {/* Media thumbnail */}
-                                <div className="w-full h-full flex items-center justify-center bg-gray-100 overflow-hidden">
+                                <div className="flex flex-col items-center justify-center h-full p-2 text-center">
                                   {isImage ? (
                                     <img
                                       src={attachment.fullUrl}
                                       alt={attachment.fileName}
-                                      className="w-full h-full object-cover"
+                                       className="w-full h-full object-cover rounded-md"
                                     />
                                   ) : isVideo ? (
                                     <div className="relative w-full h-full">
@@ -1977,7 +1977,7 @@ function CommentItem({
                                 </div>
 
                                 {/* File info footer */}
-                                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-2">
+                                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-2 rounded-b-xl">
                                   <div className="flex items-center justify-between">
                                     <p className="text-xs text-white font-medium truncate">{attachment.fileName}</p>
                                     <div className="flex gap-1 ml-2">
