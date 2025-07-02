@@ -9,6 +9,7 @@ import { CiLogout } from "react-icons/ci";
 import { GrSystem } from "react-icons/gr";
 import { IoNotificationsOutline } from "react-icons/io5";
 import AdminSideBar from "../../user_components/SideBar/AdminSideBar";
+import AdminNavBar from "../../user_components/NavBar/AdminNavBar.jsx";
 import axios from "axios";
 import { Pie, Bar } from "react-chartjs-2";
 import {
@@ -559,63 +560,35 @@ const DashboardLayout = () => {
     <div className="flex">
       <AdminSideBar open={isSidebarOpen} setOpen={setIsSidebarOpen} />
 
-      <main className={`flex-1 min-h-screen bg-gray-100 transition-all duration-300 ${isSidebarOpen ? "ml-72" : "ml-20"}`}>
+      <AdminNavBar
+        pageTitle="Dashboard"
+        user={user}
+        sidebarOpen={isSidebarOpen}
+        onProfileClick={handleProfileClick}
+        onNotificationClick={() => setShowNotifications(!showNotifications)}
+        unreadNotifications={unreadNotifications}
+        showNotifications={showNotifications}
+        notificationRef={notificationRef}
+      >
+        <NotificationPanel
+          userId={user?.UserID}
+          role={user?.Role}
+          onClose={() => setShowNotifications(false)}
+          onNotificationUpdate={handleNotificationPanelUpdate}
+        />
+      </AdminNavBar>
+      {showNotifications && (
+        <div ref={notificationRef} className="absolute right-4 top-32 z-50">
+          <NotificationPanel
+            userId={user?.UserID}
+            role={user?.Role}
+            onClose={() => setShowNotifications(false)}
+            onNotificationUpdate={handleNotificationPanelUpdate}
+          />
+        </div>
+      )}
+      <main className={`flex-1 min-h-screen mt-12 bg-gray-100 transition-all duration-300 ${isSidebarOpen ? "ml-72" : "ml-16"}`}>
         <div className="p-4 sm:p-6 lg:p-8">
-          <header className="flex flex-col md:flex-row justify-between items-center bg-white p-6 rounded-lg shadow-sm mb-8">
-            <h1 className="text-2xl font-bold mb-4 md:mb-0">Dashboard</h1>
-            
-            <div className="flex items-center gap-4">
-              <div 
-                className="flex items-center gap-3 cursor-pointer hover:bg-gray-50 p-2 rounded-lg transition-colors"
-                onClick={handleProfileClick}
-              >
-                <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-200 flex-shrink-0">
-                  {user?.ProfileImagePath ? (
-                    <img 
-                      src={`http://localhost:5000/uploads/${user.ProfileImagePath}`}
-                      alt="Profile"
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center bg-blue-500 text-white">
-                      {user?.FullName?.charAt(0)}
-                    </div>
-                  )}
-                </div>
-                <div className="text-right hidden sm:block">
-                  <p className="font-semibold text-gray-800">{user?.FullName}</p>
-                  <p className="text-sm text-gray-500">{user?.Role}</p>
-                </div>
-
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setShowNotifications(!showNotifications);
-                  }}
-                  className="relative p-2 hover:bg-gray-100 rounded-full transition-colors ml-2"
-                >
-                  <IoNotificationsOutline className="text-2xl text-gray-600" />
-                  {unreadNotifications > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                      {unreadNotifications}
-                    </span>
-                  )}
-                </button>
-              </div>
-            </div>
-          </header>
-
-          {showNotifications && (
-            <div ref={notificationRef} className="absolute right-4 top-32 z-50">
-              <NotificationPanel
-                userId={user?.UserID}
-                role={user?.Role}
-                onClose={() => setShowNotifications(false)}
-                onNotificationUpdate={handleNotificationPanelUpdate}
-              />
-            </div>
-          )}
-
           <Dashboard />
         </div>
       </main>
