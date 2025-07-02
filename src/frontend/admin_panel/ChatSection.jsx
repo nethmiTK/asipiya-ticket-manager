@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import axios from "axios";
 import { io } from "socket.io-client";
 import { IoMdAttach } from "react-icons/io";
 import { MdSend } from "react-icons/md";
-import { FaFilter, FaTimes } from "react-icons/fa"; // Added FaTimes for closing filters
+import { FaFilter, FaTimes, FaChevronUp, FaChevronDown } from "react-icons/fa";
 
+// Helper function to render messages with links (unchanged)
 function renderMessageWithLinks(text) {
   if (typeof text !== "string") return text;
 
@@ -13,7 +14,6 @@ function renderMessageWithLinks(text) {
 
   return text.split(urlRegex).map((part, i) => {
     if (part && typeof part === "string" && part.match(urlRegex)) {
-      // Ensure a protocol exists
       const href =
         part.startsWith("http://") || part.startsWith("https://")
           ? part
@@ -35,13 +35,49 @@ function renderMessageWithLinks(text) {
   });
 }
 
+// Helper function to highlight text (unchanged)
+function highlightText(text, keyword) {
+  if (!keyword || typeof text !== 'string') return renderMessageWithLinks(text);
+
+  const parts = [];
+  let lastIndex = 0;
+  const lowercasedText = text.toLowerCase();
+  const lowercasedKeyword = keyword.toLowerCase();
+
+  let match;
+  const regex = new RegExp(lowercasedKeyword, 'gi');
+
+  while ((match = regex.exec(lowercasedText)) !== null) {
+    const startIndex = match.index;
+    const endIndex = startIndex + keyword.length;
+
+    if (startIndex > lastIndex) {
+      parts.push(renderMessageWithLinks(text.substring(lastIndex, startIndex)));
+    }
+
+    parts.push(
+      <mark key={startIndex} className="bg-yellow-300 rounded px-0.5">
+        {text.substring(startIndex, endIndex)}
+      </mark>
+    );
+    lastIndex = endIndex;
+  }
+
+  if (lastIndex < text.length) {
+    parts.push(renderMessageWithLinks(text.substring(lastIndex)));
+  }
+
+  return parts;
+}
+
+
 export default function SupervisorChatSection({
-  user, // This should be the current supervisor/agent's info (loggedInUser)
-  supportUser, // This is the client/user's info (selectedTicket.user)
+  user,
+  supportUser,
   ticketId,
   ticket,
   role,
-  onNewMessageStatusChange, // Renamed prop as discussed earlier
+  onNewMessageStatusChange,
 }) {
   const [chatMessages, setChatMessages] = useState([]);
   const [chatInput, setChatInput] = useState("");
@@ -49,11 +85,17 @@ export default function SupervisorChatSection({
   const [stickyDate, setStickyDate] = useState("");
   const [hasNewUnseenMessage, setHasNewUnseenMessage] = useState(false);
 
-  // NEW FILTER STATES FOR INLINE FILTERING
-  const [showFilters, setShowFilters] = useState(false); // To toggle visibility of filter section
-  const [filterSender, setFilterSender] = useState("all"); // 'all', 'user', 'agent'
-  const [filterType, setFilterType] = useState("all"); // 'all', 'text', 'file'
+  // Filter states
+  const [showFilters, setShowFilters] = useState(false);
+  const [filterSender, setFilterSender] = useState("all");
+  const [filterType, setFilterType] = useState("all");
   const [filterKeyword, setFilterKeyword] = useState("");
+
+  // Highlight and Navigation states
+  const [highlightedMessageIndex, setHighlightedMessageIndex] = useState(-1);
+  // Store refs for *all* messages that potentially could be highlighted
+  // This will be reset and rebuilt whenever chatMessages changes.
+  const allMessageRefs = useRef({});
 
   const chatEndRef = useRef(null);
   const socketRef = useRef(null);
@@ -74,7 +116,6 @@ export default function SupervisorChatSection({
         Role: role,
       });
       setHasNewUnseenMessage(false);
-      // Inform the parent component that new messages have been seen
       if (onNewMessageStatusChange) {
         onNewMessageStatusChange(false);
       }
@@ -103,6 +144,7 @@ export default function SupervisorChatSection({
     }
   };
 
+  // This function now operates on the full list of messages (`chatMessages`)
   const groupMessagesByDate = (messages) => {
     const grouped = {};
     messages.forEach((msg) => {
@@ -125,11 +167,21 @@ export default function SupervisorChatSection({
     return grouped;
   };
 
-  const scrollToBottom = () => {
+  const scrollToBottom = useCallback(() => {
     if (chatEndRef.current) {
       chatEndRef.current.scrollIntoView({ behavior: "smooth" });
     }
-  };
+  }, []);
+
+  // Scroll to a specific highlighted message using its ref from allMessageRefs
+  const scrollToHighlighted = useCallback((messageId) => {
+    if (allMessageRefs.current[messageId]) {
+      allMessageRefs.current[messageId].scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    }
+  }, []);
 
   useEffect(() => {
     if (!ticketId) return;
@@ -148,7 +200,6 @@ export default function SupervisorChatSection({
 
         if (sender === "user" && document.visibilityState === "hidden") {
           setHasNewUnseenMessage(true);
-          // Notify parent about new message when tab is hidden
           if (onNewMessageStatusChange) {
             onNewMessageStatusChange(true);
           }
@@ -295,8 +346,9 @@ export default function SupervisorChatSection({
     }
   };
 
+  // filteredMessages now determines which messages *should be highlighted and navigable*
   const filteredMessages = useMemo(() => {
-    let messagesToFilter = chatMessages;
+    let messagesToFilter = chatMessages; // Start with all messages for the purpose of filtering
 
     if (filterSender !== "all") {
       messagesToFilter = messagesToFilter.filter(
@@ -314,28 +366,64 @@ export default function SupervisorChatSection({
       const lowercasedKeyword = filterKeyword.toLowerCase();
       messagesToFilter = messagesToFilter.filter(
         (msg) =>
-          (msg.content &&
-            msg.content.toLowerCase().includes(lowercasedKeyword)) ||
+          (msg.content && msg.content.toLowerCase().includes(lowercasedKeyword)) ||
           (msg.file && msg.file.name.toLowerCase().includes(lowercasedKeyword))
       );
     }
-
     return messagesToFilter;
   }, [chatMessages, filterSender, filterType, filterKeyword]);
 
-  const groupedMessages = groupMessagesByDate(filteredMessages);
+  // IMPORTANT: groupMessagesByDate now uses chatMessages (ALL messages)
+  const groupedMessages = useMemo(() => groupMessagesByDate(chatMessages), [chatMessages]);
   const sortedDates = Object.keys(groupedMessages).sort(
     (a, b) => new Date(a) - new Date(b)
   );
 
+  // Scroll to bottom when new messages arrive (only if no keyword filter is active)
   useEffect(() => {
-    scrollToBottom();
-  }, [chatMessages, filteredMessages]);
+    if (filterKeyword.trim() === "") {
+      scrollToBottom();
+    }
+  }, [chatMessages, scrollToBottom, filterKeyword]);
 
+  // Scroll to the currently highlighted message when highlightedMessageIndex changes
+  useEffect(() => {
+    if (highlightedMessageIndex !== -1 && filteredMessages[highlightedMessageIndex]) {
+      scrollToHighlighted(filteredMessages[highlightedMessageIndex].id);
+    }
+  }, [highlightedMessageIndex, filteredMessages, scrollToHighlighted]);
+
+
+  // Reset highlighted index when filters change, re-evaluate starting position
+  useEffect(() => {
+    if (filterKeyword.trim() === "") {
+        setHighlightedMessageIndex(-1); // No keyword, no highlight navigation
+    } else if (filteredMessages.length > 0) {
+        setHighlightedMessageIndex(0); // If keyword, start at the first result
+    } else {
+        setHighlightedMessageIndex(-1); // Keyword but no results
+    }
+    // Clear refs when filters change to rebuild them correctly
+    allMessageRefs.current = {};
+  }, [filterKeyword, filteredMessages.length, filterSender, filterType]); // Add all filter dependencies
+
+  // Sticky date header observer logic (unchanged from last time, but relies on all messages)
   useEffect(() => {
     const messagesContainer = messagesContainerRef.current;
     if (!messagesContainer) return;
 
+    // Clear previous observers to prevent issues with changing DOM structure due to filtering
+    const oldObservers = messagesContainer.dataset.observers;
+    if (oldObservers) {
+        JSON.parse(oldObservers).forEach(id => {
+            const obs = window.__chat_date_observers__?.[id];
+            if(obs) obs.disconnect();
+            delete window.__chat_date_observers__?.[id];
+        });
+    }
+
+    const observerId = `obs-${Date.now()}`;
+    if (!window.__chat_date_observers__) window.__chat_date_observers__ = {};
     const observer = new IntersectionObserver(
       (entries) => {
         let currentStickyDate = "";
@@ -354,6 +442,9 @@ export default function SupervisorChatSection({
         threshold: 0,
       }
     );
+    window.__chat_date_observers__[observerId] = observer;
+    messagesContainer.dataset.observers = JSON.stringify([observerId]);
+
 
     sortedDates.forEach((date) => {
       const dateElement = messagesContainer.querySelector(
@@ -366,8 +457,31 @@ export default function SupervisorChatSection({
 
     return () => {
       observer.disconnect();
+      delete window.__chat_date_observers__?.[observerId];
     };
-  }, [groupedMessages, sortedDates, filteredMessages]);
+  }, [groupedMessages, sortedDates]); // Dependency on groupedMessages and sortedDates to re-run when messages change
+
+
+  const handleNextHighlight = () => {
+    setHighlightedMessageIndex(prevIndex => {
+      const nextIndex = prevIndex + 1;
+      if (nextIndex < filteredMessages.length) {
+        return nextIndex;
+      }
+      return 0; // Wrap around to the first
+    });
+  };
+
+  const handlePrevHighlight = () => {
+    setHighlightedMessageIndex(prevIndex => {
+      const prevIndexVal = prevIndex - 1;
+      if (prevIndexVal >= 0) {
+        return prevIndexVal;
+      }
+      return filteredMessages.length - 1; // Wrap around to the last
+    });
+  };
+
 
   return (
     <div className="flex flex-col h-full w-6xl mx-auto border-gray-400 rounded-lg shadow-lg border">
@@ -375,21 +489,48 @@ export default function SupervisorChatSection({
         <h2 className="text-lg font-bold text-gray-700">
           Chat for Ticket #{ticket?.id || ticketId}
         </h2>
-        {/* Toggle filter visibility */}
-        <button
-          onClick={() => setShowFilters(!showFilters)}
-          className="p-2 rounded-full bg-gray-200 text-gray-700 hover:bg-gray-300 transition-colors duration-200"
-          title={showFilters ? "Hide Filters" : "Show Filters"}
-        >
-          {showFilters ? (
-            <FaTimes className="size-5" />
-          ) : (
-            <FaFilter className="size-5" />
+        <div className="flex items-center space-x-2">
+          {/* Navigation for highlighted results - only show if keyword filter is active and there are results */}
+          {filterKeyword.trim() !== "" && filteredMessages.length > 0 && (
+            <div className="flex items-center text-gray-700 bg-gray-100 rounded-full px-3 py-1 text-sm shadow-sm">
+              <span className="mr-2">
+                {highlightedMessageIndex + 1} of {filteredMessages.length}
+              </span>
+              <button
+                onClick={handlePrevHighlight}
+                className="p-1 rounded-full hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={filteredMessages.length <= 1}
+                title="Previous result"
+              >
+                <FaChevronUp className="size-4" />
+              </button>
+              <button
+                onClick={handleNextHighlight}
+                className="p-1 rounded-full hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={filteredMessages.length <= 1}
+                title="Next result"
+              >
+                <FaChevronDown className="size-4" />
+              </button>
+            </div>
           )}
-        </button>
+
+          {/* Toggle filter visibility */}
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className="p-2 rounded-full bg-gray-200 text-gray-700 hover:bg-gray-300 transition-colors duration-200"
+            title={showFilters ? "Hide Filters" : "Show Filters"}
+          >
+            {showFilters ? (
+              <FaTimes className="size-5" />
+            ) : (
+              <FaFilter className="size-5" />
+            )}
+          </button>
+        </div>
       </header>
 
-      {/* NEW: Inline Filter Section - Conditionally rendered based on showFilters */}
+      {/* Inline Filter Section */}
       {showFilters && (
         <div className="p-4 bg-gray-50 border-b border-gray-200 grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
@@ -435,7 +576,6 @@ export default function SupervisorChatSection({
             />
           </div>
 
-          {/* Optional: Add a "Reset Filters" button if desired */}
           {(filterSender !== "all" ||
             filterType !== "all" ||
             filterKeyword !== "") && (
@@ -464,14 +604,21 @@ export default function SupervisorChatSection({
         }}
         ref={messagesContainerRef}
       >
-        {filteredMessages.length === 0 && (
+        {/* Display message if ALL chatMessages are empty (i.e., no chat history) */}
+        {chatMessages.length === 0 && (
           <p className="text-center text-gray-600 mt-50">
-            {chatMessages.length === 0
-              ? "No chat messages yet. Start the conversation!"
-              : "No messages match your filter criteria."}
+            No chat messages yet. Start the conversation!
           </p>
         )}
+        {/* Display message if filter is active but NO results are found */}
+        {filterKeyword.trim() !== "" && filteredMessages.length === 0 && chatMessages.length > 0 && (
+            <p className="text-center text-gray-600 mt-50">
+                No messages match your search.
+            </p>
+        )}
 
+
+        {/* Loop through sortedDates derived from ALL chatMessages */}
         {sortedDates.map((dateKey) => (
           <div key={dateKey}>
             <div
@@ -486,11 +633,28 @@ export default function SupervisorChatSection({
             {groupedMessages[dateKey].messages.map((msg) => {
               const isClient = msg.sender === "user";
 
+              // Check if this message is part of the filtered results
+              const isFiltered = filteredMessages.some(fm => fm.id === msg.id);
+
+              // Check if this message is the currently highlighted message
+              const isHighlighted = isFiltered &&
+                                    highlightedMessageIndex !== -1 &&
+                                    filteredMessages[highlightedMessageIndex]?.id === msg.id;
+
               return (
                 <div
                   key={String(msg.id)}
+                  ref={el => {
+                    // Assign ref to ALL messages, so we can scroll to any of them
+                    // This creates a mapping from message.id to its DOM element
+                    allMessageRefs.current[msg.id] = el;
+                  }}
                   className={`flex mb-2 ${
                     !isClient ? "justify-end" : "justify-start"
+                  } ${
+                    isHighlighted // Apply border only if it's the currently highlighted message
+                      ? 'border-2 border-blue-500 p-1 rounded-lg transition-all duration-300'
+                      : ''
                   }`}
                 >
                   {isClient && (
@@ -548,7 +712,8 @@ export default function SupervisorChatSection({
                           />
                         )}
                         <p className="text-sm font-medium text-gray-800 text-center break-words mb-1">
-                          {msg.file.name}
+                          {/* Highlight file name */}
+                          {highlightText(msg.file.name, filterKeyword)}
                         </p>
                         <a
                           href={msg.file.url}
@@ -559,11 +724,11 @@ export default function SupervisorChatSection({
                         >
                           <svg
                             xmlns="http://www.w3.org/2000/svg"
-                            className="h-3 w-3 mr-1" // Make sure h-3 w-3 give you the desired size
+                            className="h-3 w-3 mr-1"
                             fill="none"
                             viewBox="0 0 24 24"
                             stroke="currentColor"
-                            strokeWidth="1.5" // Often 1.5 is used for Heroicons outlined style
+                            strokeWidth="1.5"
                           >
                             <path
                               strokeLinecap="round"
@@ -575,7 +740,8 @@ export default function SupervisorChatSection({
                         </a>
                       </div>
                     ) : (
-                      renderMessageWithLinks(msg.content)
+                      // Highlight message content
+                      highlightText(msg.content, filterKeyword)
                     )}
 
                     <div
