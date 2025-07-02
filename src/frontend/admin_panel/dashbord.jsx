@@ -543,6 +543,14 @@ const DashboardLayout = () => {
     }
   };
 
+  // New function to handle updates from NotificationPanel
+  const handleNotificationPanelUpdate = () => {
+      // Optimistically decrease the unread count displayed on the bell icon
+      setUnreadNotifications(prevCount => Math.max(0, prevCount - 1));
+      // Then, re-fetch the actual count from the backend to ensure consistency
+      fetchUnreadNotifications();
+  };
+
   const handleProfileClick = () => {
     navigate('/admin-profile');
   };
@@ -603,6 +611,7 @@ const DashboardLayout = () => {
                 userId={user?.UserID}
                 role={user?.Role}
                 onClose={() => setShowNotifications(false)}
+                onNotificationUpdate={handleNotificationPanelUpdate}
               />
             </div>
           )}
