@@ -67,9 +67,9 @@ const handleForceDownload = async (url, filename) => {
   }
 };
 
-  const canPreviewInBrowser = (fileType) => {
+const canPreviewInBrowser = (fileType) => {
   return (
-    fileType.startsWith('image/') || 
+    fileType.startsWith('image/') ||
     fileType === 'application/pdf' ||
     fileType.startsWith('video/') ||
     fileType.startsWith('audio/') ||
@@ -114,6 +114,8 @@ export default function TicketManage() {
   const [showAllComments, setShowAllComments] = useState(false);
   const [expandedReplies, setExpandedReplies] = useState({});
   const [previewMenuIndex, setPreviewMenuIndex] = useState(null);
+
+  const [previewAttachment, setPreviewAttachment] = useState(null);
 
   // Utility function to set cursor position reliably
   const setCursorPosition = (textarea, position) => {
@@ -978,6 +980,26 @@ export default function TicketManage() {
     };
   }, [previewMenuIndex]);
 
+  const [textContent, setTextContent] = useState('');
+
+  useEffect(() => {
+    if (previewAttachment && previewAttachment.fileType === 'text/plain') {
+      const fetchTextContent = async () => {
+        try {
+          const response = await fetch(previewAttachment.fullUrl);
+          const text = await response.text();
+          setTextContent(text);
+        } catch (error) {
+          console.error('Error loading text file:', error);
+          setTextContent('Error loading file content');
+        }
+      };
+      fetchTextContent();
+    } else {
+      setTextContent('');
+    }
+  }, [previewAttachment]);
+
   return (
     <div className="flex">
       <AdminSideBar open={isSidebarOpen} setOpen={setIsSidebarOpen} />
@@ -1626,6 +1648,7 @@ export default function TicketManage() {
                                   expandedReplies={expandedReplies}
                                   previewMenuIndex={previewMenuIndex}
                                   setPreviewMenuIndex={setPreviewMenuIndex}
+                                  setPreviewAttachment={setPreviewAttachment}
                                 />
                               ))}
                           </ul>
@@ -1663,6 +1686,71 @@ export default function TicketManage() {
           </div>
         </div>
       </div>
+      {/* Preview Modal */}
+      {previewAttachment && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-75 backdrop-blur-sm">
+          <div className="relative bg-white rounded-xl max-w-4xl w-full max-h-[90vh] overflow-auto">
+            <button
+              onClick={() => setPreviewAttachment(null)}
+              className="absolute top-4 right-4 z-50 p-2 bg-white rounded-full shadow-lg hover:bg-gray-100"
+            >
+              <svg className="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+
+            <div className="p-4">
+              {previewAttachment.fileType.startsWith('image/') && (
+                <img
+                  src={previewAttachment.fullUrl}
+                  alt={previewAttachment.fileName}
+                  className="w-full h-auto max-h-[80vh] object-contain"
+                />
+              )}
+
+              {previewAttachment.fileType.startsWith('video/') && (
+                <video
+                  controls
+                  autoPlay
+                  className="w-full h-auto max-h-[80vh]"
+                  src={previewAttachment.fullUrl}
+                />
+              )}
+
+              {previewAttachment.fileType.startsWith('audio/') && (
+                <div className="p-8">
+                  <audio
+                    controls
+                    autoPlay
+                    className="w-full"
+                    src={previewAttachment.fullUrl}
+                  />
+                  <p className="mt-4 text-center text-lg font-medium">
+                    {previewAttachment.fileName}
+                  </p>
+                </div>
+              )}
+
+              {previewAttachment.fileType === 'application/pdf' && (
+                <iframe
+                  src={previewAttachment.fullUrl}
+                  className="w-full h-[80vh]"
+                  title={previewAttachment.fileName}
+                />
+              )}
+
+              {previewAttachment.fileType === 'text/plain' && (
+                <div className="h-[80vh] overflow-auto bg-gray-50 p-4">
+                  <pre className="whitespace-pre-wrap font-mono text-sm">
+                    {/* We'll load the text content here */}
+                    {textContent || 'Loading text file...'}
+                  </pre>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1695,7 +1783,8 @@ function CommentItem({
   toggleExpandedReplies,
   expandedReplies,
   previewMenuIndex,
-  setPreviewMenuIndex
+  setPreviewMenuIndex,
+  setPreviewAttachment
 }) {
   const nestedReplies = allComments
     .filter((c) => c.ReplyToCommentID === comment.CommentID)
@@ -1897,22 +1986,20 @@ function CommentItem({
                                 onClick={(e) => e.stopPropagation()}
                               >
                                 <div className="py-1">
-                                  <a
-                                    href={attachment.fullUrl}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                                  <button
                                     onClick={(e) => {
                                       e.stopPropagation();
+                                      setPreviewAttachment(attachment);
                                       setPreviewMenuIndex(null);
                                     }}
+                                    className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
                                   >
                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                                     </svg>
-                                    Open in New Tab
-                                  </a>
+                                    Preview 
+                                  </button>
 
                                   <button
                                     onClick={(e) => {
@@ -2036,7 +2123,7 @@ function CommentItem({
                                         onClick={(e) => {
                                           e.stopPropagation();
                                           if (canPreviewInBrowser(attachment.fileType)) {
-                                            window.open(attachment.fullUrl, '_blank');
+                                            setPreviewAttachment(attachment);
                                           } else {
                                             toast.info(
                                               <div>
@@ -2057,7 +2144,7 @@ function CommentItem({
                                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                                         </svg>
-                                        Open in New Tab
+                                        Preview 
                                       </button>
                                       <button
                                         onClick={(e) => {
@@ -2163,6 +2250,7 @@ function CommentItem({
                   expandedReplies={expandedReplies}
                   previewMenuIndex={previewMenuIndex}
                   setPreviewMenuIndex={setPreviewMenuIndex}
+                  setPreviewAttachment={setPreviewAttachment}
                 />
               ))}
             </ul>
