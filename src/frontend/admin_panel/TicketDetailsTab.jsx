@@ -17,55 +17,24 @@ export default function TicketDetailsTab({
 }) {
   const handleUpdateTicket = async () => {
     try {
-      // Ensure 'tickets' is available in scope, likely passed as a prop or fetched
-      // For now, assuming 'tickets' would be part of the component's state or props if needed here.
-      // If 'tickets' is not a prop, you might need to fetch it or remove this specific logging logic
-      // if it relies on comparing with an "originalTicket" that isn't readily available.
-      // For this example, I'll comment out the 'originalTicket' finding if 'tickets' isn't explicitly passed.
-
-      // const originalTicket = tickets.find(t => t.id === selectedTicket.id);
-      // const oldResolution = originalTicket?.resolution || "";
-      const oldResolution = selectedTicket?.resolution || ""; // Simpler, assumes selectedTicket already has the current state before update
+      const oldResolution = selectedTicket?.resolution || "";
       const newResolution = selectedTicket.resolution || "";
       const res = await fetch(
-        `http://localhost:5000/tickets/${selectedTicket.id}`,
+        `http://localhost:5000/api/tickets/${selectedTicket.id}/resolution`, // Corrected endpoint for resolution update
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             resolution: newResolution,
+            userId: user.UserID, // Pass userId for backend logging/notification
+            oldResolution: oldResolution // Pass old resolution for backend logging
           }),
         }
       );
       if (!res.ok) throw new Error("Failed to update ticket");
 
-      // Log the resolution update to ticket log if resolution was added/changed
-      // This logging is now handled by the backend /api/tickets/:ticketId/resolution endpoint.
-      // if (newResolution && newResolution !== oldResolution) {
-      //   try {
-      //     await axios.post('http://localhost:5000/api/ticket-logs', {
-      //       ticketId: selectedTicket.id,
-      //       type: 'RESOLUTION_UPDATE',
-      //       description: `Resolution summary updated: ${newResolution.substring(0, 100)}${newResolution.length > 100 ? '...' : ''}`,
-      //       userId: user.UserID,
-      //       oldValue: oldResolution,
-      //       newValue: newResolution
-      //     });
-
-      //     // Send notifications to all admins and assigned supervisors
-      //     try {
-      //       await axios.post('http://localhost:5000/api/notifications/resolution-update', {
-      //         ticketId: selectedTicket.id,
-      //         updatedByUserId: user.UserID,
-      //         resolutionText: newResolution.substring(0, 100) + (newResolution.length > 100 ? '...' : '')
-      //       });
-      //     } catch (notificationError) {
-      //       console.error("Failed to send resolution update notifications:", notificationError);
-      //     }
-      //   } catch (logError) {
-      //     console.error("Failed to log resolution update:", logError);
-      //   }
-      // }
+      // Logging and notification for resolution update are now handled by the backend /api/tickets/:ticketId/resolution endpoint.
+      // The commented out code below is removed as it's no longer needed on the frontend.
 
       toast.success("Ticket updated successfully!");
       // If you want to close the modal or perform other actions after save
@@ -107,19 +76,6 @@ export default function TicketDetailsTab({
         }
       );
       if (!res.ok) throw new Error("Failed to update status");
-
-      // Send notifications to all admins and assigned supervisors
-      // This notification is now handled by the backend /api/tickets/:ticketId/status endpoint.
-      // try {
-      //   await axios.post('http://localhost:5000/api/notifications/status-update', {
-      //     ticketId: selectedTicket.id,
-      //     updatedByUserId: user.UserID,
-      //     oldStatus: oldStatus,
-      //     newStatus: newStatus
-      //   });
-      // } catch (notificationError) {
-      //   console.error("Failed to send status update notifications:", notificationError);
-      // }
 
       toast.success("Status updated successfully!");
       // Check if setTickets prop is provided before attempting to use it
