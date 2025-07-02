@@ -1308,16 +1308,16 @@ app.put("/update-supervisors/:id", async (req, res) => {
     // Create logs and notifications for changes
     if (addedSupervisorIds.length > 0) {
       const addedNames = addedSupervisorIds.map(id => supervisorNames[id] || `Supervisor ${id}`);
-      const logDescription = `${currentUserName} (${currentUserRole}) added supervisors: ${addedNames.join(', ')}`;
+      const logDescription = `added supervisors: ${addedNames.join(', ')}`;
       
       const logResult = await createTicketLog(
         id,
         'SUPERVISOR_ADDED',
         logDescription,
-        currentUserId, // Use the current user ID
+        currentUserId,
         null, // No old value to display in log message
         null, // No new value to display in log message
-        `Added by ${currentUserName}`
+        null // Let createTicketLog handle the note
       );
 
       // Notify ticket creator about added supervisors
@@ -1345,16 +1345,16 @@ app.put("/update-supervisors/:id", async (req, res) => {
 
     if (removedSupervisorIds.length > 0) {
       const removedNames = removedSupervisorIds.map(id => supervisorNames[id] || `Supervisor ${id}`);
-      const logDescription = `${currentUserName} (${currentUserRole}) removed supervisors: ${removedNames.join(', ')}`;
+      const logDescription = `removed supervisors: ${removedNames.join(', ')}`;
       
       const logResult = await createTicketLog(
         id,
         'SUPERVISOR_REMOVED',
         logDescription,
-        currentUserId, // Use the current user ID
+        currentUserId,
         null, // No old value to display in log message
         null, // No new value to display in log message
-        `Removed by ${currentUserName}`
+        null // Let createTicketLog handle the note
       );
 
       // Notify ticket creator about removed supervisors
@@ -1411,14 +1411,27 @@ app.get('/api/supervisors', (req, res) => {
 
 // Helper function to create a ticket log
 const createTicketLog = async (ticketId, type, description, userId, oldValue, newValue, note = null) => {
-    return new Promise((resolve, reject) => {
+    return new Promise(async (resolve, reject) => {
+        let userName = 'System';
+        if (userId) {
+            try {
+                const [userResult] = await db.promise().query('SELECT FullName FROM appuser WHERE UserID = ?', [userId]);
+                if (userResult.length > 0) {
+                    userName = userResult[0].FullName;
+                }
+            } catch (userErr) {
+                console.error("Error fetching user name for ticket log:", userErr);
+                // Continue even if user name fetch fails
+            }
+        }
+
         const logQuery = `
             INSERT INTO ticketlog (TicketID, DateTime, Type, Description, UserID, OldValue, NewValue, Note)
             VALUES (?, NOW(), ?, ?, ?, ?, ?, ?)
         `;
         
-        // Removed prepending user info here, as the description from the caller should already be formatted.
-        const finalDescription = description; 
+        const finalDescription = `${userName} ${description}`;
+        const finalNote = note ? `${note} by ${userName}` : `Updated by ${userName}`;
             
         db.query(logQuery, [
             ticketId,
@@ -1427,7 +1440,7 @@ const createTicketLog = async (ticketId, type, description, userId, oldValue, ne
             userId,
             oldValue,
             newValue,
-            note
+            finalNote
         ], (err, result) => {
             if (err) {
                 console.error("Error creating ticket log:", err);
@@ -1471,11 +1484,11 @@ app.put('/api/tickets/:ticketId/status', async (req, res) => {
         const logResult = await createTicketLog(
           ticketId,
           logType,
-          desc,
+          `changed status from ${oldStatus} to ${status}`,
           userId,
           oldStatus,
           status,
-          logNote
+          null // The note is now handled by createTicketLog's userName prepending
         );
 
         // 4. Send notifications
@@ -1487,7 +1500,7 @@ app.put('/api/tickets/:ticketId/status', async (req, res) => {
             else resolve(res);
           });
         });
-        const updaterName = updaterNameResult && updaterNameResult.length > 0 ? updaterNameResult[0].FullName : null;
+        const updaterName = updaterNameResult && updaterNameResult.length > 0 ? updaterNameResult[0].FullName : 'Unknown User';
 
         // Notify ticket creator
         if (ticketCreatorId) {
@@ -1500,7 +1513,7 @@ app.put('/api/tickets/:ticketId/status', async (req, res) => {
         }
 
         // Notify supervisor (if assigned and not the one who made the change)
-        if (supervisorId && supervisorId !== userId) {
+        if (supervisorId && supervisorId != userId) { // Use != for comparison
           await createNotification(
             supervisorId,
             `Ticket #${ticketId} status has been changed from ${oldStatus} to ${status}${updaterName ? ` by ${updaterName}` : ''}`,
@@ -1571,13 +1584,12 @@ app.put('/api/tickets/:ticketId/priority', async (req, res) => {
             VALUES (?, NOW(), ?, ?, ?, ?, ?, ?)
         `;
 
-        const description = `Priority changed from ${oldPriority} to ${priority}`;
-        const note = `Updated by ${updatedByName}`;
+        const description = `changed priority from ${oldPriority} to ${priority}`;
 
         const [logResult] = await new Promise((resolve, reject) => {
             db.query(
                 logQuery,
-                [ticketId, 'PRIORITY_CHANGE', description, userId, oldPriority, priority, note],
+                [ticketId, 'PRIORITY_CHANGE', description, userId, oldPriority, priority, null],
                 (err, result) => {
                     if (err) reject(err);
                     else resolve(result);
@@ -1680,15 +1692,15 @@ app.post('/api/tickets/:ticketId/comments', commentAttachmentUpload.array('file'
     try {
       // Add to ticketlog
       const logSql = `
-        INSERT INTO ticketlog (TicketID, DateTime, Type, Description, UserID)
+        INSERT INTO ticketlog (TicketID, DateTime, Type, Description, UserID) 
         VALUES (?, NOW(), 'COMMENT', ?, ?)
       `;
       // Fetch user's name for the log description
       const [userResult] = await db.promise().query('SELECT FullName FROM appuser WHERE UserID = ?', [userId]);
       const userName = userResult.length > 0 ? userResult[0].FullName : 'Unknown User';
       
-      const logDescription = `Comment added by ${userName}: "${comment.substring(0, 100)}..."`; // Use original comment for log description
-      await db.promise().query(logSql, [ticketId, logDescription, userId]); // Use await for logging
+      const logDescription = `added a comment: "${comment.substring(0, 100)}..."`; // Use original comment for log description
+      await createTicketLog(ticketId, 'COMMENT', logDescription, userId, null, null, null); // Use createTicketLog
 
       // Notify mentioned users
       if (processedMentions.length > 0) {
@@ -1697,7 +1709,7 @@ app.post('/api/tickets/:ticketId/comments', commentAttachmentUpload.array('file'
           if (mentionedUserId !== parseInt(userId)) { // Ensure userId is compared as a number
             await createNotification(
               mentionedUserId,
-              `You were mentioned in a comment on ticket #${ticketId}`,
+              `You were mentioned in a comment on ticket #${ticketId} by ${userName}`,
               'MENTION',
               newCommentId // Link notification to the new comment
             );
@@ -2816,7 +2828,7 @@ app.put('/api/ticket_status/:id', async (req, res) => {
         });
 
         // Create ticket log
-        const logDescription = `Ticket ${status.toLowerCase()}: ${reason}`;
+        const logDescription = `${status.toLowerCase()} ticket: ${reason}`;
         const logType = status === 'Rejected' ? 'TICKET_REJECTED' : 'STATUS_CHANGE';
         
         const logResult = await createTicketLog(
@@ -2826,7 +2838,7 @@ app.put('/api/ticket_status/:id', async (req, res) => {
             userId,
             oldStatus,
             status,
-            reason
+            reason // Keep reason in note for specific rejection detail
         );
 
         // Send notification to the ticket creator
@@ -3141,8 +3153,7 @@ app.put('/api/tickets/:id/assign', (req, res) => {
                     const oldNamesStr = oldSupervisorNames.length > 0 ? oldSupervisorNames.join(', ') : 'No supervisors';
                     const newNamesStr = newSupervisorNames.join(', ');
                     
-                    const supervisorLogDescription = `Supervisors assigned: ${newNamesStr} (Previously: ${oldNamesStr})`;
-                    const supervisorLogNote = `Assigned by ${assignerName}`;
+                    const supervisorLogDescription = `assigned supervisors: ${newNamesStr} (Previously: ${oldNamesStr})`;
                     const logResult = await createTicketLog(
                         ticketId,
                         'SUPERVISOR_CHANGE',
@@ -3150,7 +3161,7 @@ app.put('/api/tickets/:id/assign', (req, res) => {
                         assignerId,
                         oldSupervisorId || null,
                         supervisorString,
-                        supervisorLogNote
+                        null // Let createTicketLog handle the note
                     );
                     logResults.push(logResult);
                     changes.push(`supervisor(s) assigned: ${newNamesStr}`);
@@ -3171,8 +3182,7 @@ app.put('/api/tickets/:id/assign', (req, res) => {
 
                 // Log status change if it occurred
                 if ((oldStatus || '').trim().toLowerCase() !== (status || '').trim().toLowerCase()) {
-                    const statusLogDescription = `Status changed from ${oldStatus} to ${status}`;
-                    const statusLogNote = `Updated by ${assignerName}`;
+                    const statusLogDescription = `changed status from ${oldStatus} to ${status}`;
                     const logResult = await createTicketLog(
                         ticketId,
                         'STATUS_CHANGE',
@@ -3180,7 +3190,7 @@ app.put('/api/tickets/:id/assign', (req, res) => {
                         assignerId,
                         oldStatus,
                         status,
-                        statusLogNote
+                        null // Let createTicketLog handle the note
                     );
                     logResults.push(logResult);
                     changes.push(`status changed to ${status}`);
@@ -3188,8 +3198,7 @@ app.put('/api/tickets/:id/assign', (req, res) => {
 
                 // Log priority change if it occurred
                 if ((oldPriority || '').trim().toLowerCase() !== (priority || '').trim().toLowerCase()) {
-                    const priorityLogDescription = `Priority changed from ${oldPriority} to ${priority}`;
-                    const priorityLogNote = `Updated by ${assignerName}`;
+                    const priorityLogDescription = `changed priority from ${oldPriority} to ${priority}`;
                     const logResult = await createTicketLog(
                         ticketId,
                         'PRIORITY_CHANGE',
@@ -3197,7 +3206,7 @@ app.put('/api/tickets/:id/assign', (req, res) => {
                         assignerId,
                         oldPriority,
                         priority,
-                        priorityLogNote
+                        null // Let createTicketLog handle the note
                     );
                     logResults.push(logResult);
                     changes.push(`priority changed to ${priority}`);
@@ -3542,7 +3551,7 @@ app.post('/api/tickets/:ticketId/attachments', attachmentUpload.single('file'), 
             VALUES (?, NOW(), ?, ?, ?, ?, ?)
         `;
 
-        const description = `File "${fileName}" uploaded by ${uploaderName}`;
+        const description = `uploaded file "${fileName}"`;
         const fileDetails = JSON.stringify({
             name: fileName,
             size: fileSize,
@@ -3550,16 +3559,15 @@ app.post('/api/tickets/:ticketId/attachments', attachmentUpload.single('file'), 
             path: filePath
         });
 
-        const [logResult] = await new Promise((resolve, reject) => {
-            db.query(
-                logQuery,
-                [ticketId, 'ATTACHMENT', description, userId, `File size: ${Math.round(fileSize/1024)}KB`, fileDetails],
-                (err, result) => {
-                    if (err) reject(err);
-                    else resolve(result);
-                }
-            );
-        });
+        const [logResult] = await createTicketLog(
+            ticketId,
+            'ATTACHMENT',
+            description,
+            userId,
+            null,
+            fileDetails,
+            `File size: ${Math.round(fileSize/1024)}KB`
+        );
 
         // Update LastRespondedTime
         await new Promise((resolve, reject) => {
@@ -3741,14 +3749,23 @@ app.put('/api/tickets/:ticketId/due-date', async (req, res) => {
     if (err || results.length === 0) return res.status(500).json({ message: 'Error' });
     const oldDueDate = results[0].DueDate;
 
-    db.query('UPDATE ticket SET DueDate = ? WHERE TicketID = ?', [dueDate, ticketId], (err2) => {
+    db.query('UPDATE ticket SET DueDate = ? WHERE TicketID = ?', [dueDate, ticketId], async (err2) => {
       if (err2) return res.status(500).json({ message: 'Error updating due date' });
 
-      const desc = `Due date changed from ${oldDueDate} to ${dueDate}`;
-      db.query(
-        'INSERT INTO ticketlog (TicketID, DateTime, Type, Description, UserID, OldValue, NewValue) VALUES (?, NOW(), ?, ?, ?, ?, ?)',
-        [ticketId, 'DUE_DATE_CHANGE', desc, userId, oldDueDate, dueDate],
-        () => {}
+      let desc;
+      if (!oldDueDate) {
+        desc = `changed due date to ${dueDate}`;
+      } else {
+        desc = `changed due date from ${oldDueDate} to ${dueDate}`;
+      }
+      await createTicketLog(
+        ticketId,
+        'DUE_DATE_CHANGE',
+        desc,
+        userId,
+        oldDueDate,
+        dueDate,
+        null
       );
       res.json({ message: 'Due date updated and logged' });
     });
@@ -3764,14 +3781,23 @@ app.put('/api/tickets/:ticketId/resolution', async (req, res) => {
     if (err || results.length === 0) return res.status(500).json({ message: 'Error' });
     const oldResolution = results[0].Resolution;
 
-    db.query('UPDATE ticket SET Resolution = ? WHERE TicketID = ?', [resolution, ticketId], (err2) => {
+    db.query('UPDATE ticket SET Resolution = ? WHERE TicketID = ?', [resolution, ticketId], async (err2) => {
       if (err2) return res.status(500).json({ message: 'Error updating resolution' });
 
-      const desc = `Resolution changed from "${oldResolution || ''}" to "${resolution || ''}"`;
-      db.query(
-        'INSERT INTO ticketlog (TicketID, DateTime, Type, Description, UserID, OldValue, NewValue) VALUES (?, NOW(), ?, ?, ?, ?, ?)',
-        [ticketId, 'RESOLUTION_CHANGE', desc, userId, oldResolution, resolution],
-        () => {}
+      let desc;
+      if (!oldResolution) {
+        desc = `changed resolution to "${resolution || ''}"`;
+      } else {
+        desc = `changed resolution from "${oldResolution || ''}" to "${resolution || ''}"`;
+      }
+      await createTicketLog(
+        ticketId,
+        'RESOLUTION_CHANGE',
+        desc,
+        userId,
+        oldResolution,
+        resolution,
+        null
       );
       res.json({ message: 'Resolution updated and logged' });
     });

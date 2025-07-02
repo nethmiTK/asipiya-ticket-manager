@@ -1,4 +1,5 @@
 import express from 'express';
+import util from 'util';
 const router = express.Router();
 
 // Get all logs for a specific ticket
@@ -18,7 +19,6 @@ router.get('/:ticketId', async (req, res) => {
             t.SupervisorID,
             t.DueDate,
             t.LastRespondedTime,
-            au_supervisor.FullName as SupervisorName,
             au_creator.FullName as CreatedByName,
             s.SystemName,
             tc.CategoryName,
@@ -30,7 +30,6 @@ router.get('/:ticketId', async (req, res) => {
         FROM ticketlog tl
         JOIN ticket t ON t.TicketID = tl.TicketID
         LEFT JOIN appuser au ON au.UserID = tl.UserID
-        LEFT JOIN appuser au_supervisor ON au_supervisor.UserID = t.SupervisorID
         LEFT JOIN appuser au_creator ON au_creator.UserID = t.UserId
         LEFT JOIN asipiyasystem s ON s.AsipiyaSystemID = t.AsipiyaSystemID
         LEFT JOIN ticketcategory tc ON tc.TicketCategoryID = t.TicketCategoryID
@@ -39,44 +38,68 @@ router.get('/:ticketId', async (req, res) => {
     `;
 
     try {
-        req.db.query(query, [ticketId], (err, results) => {
-            if (err) {
-                console.error('Error fetching ticket logs:', err);
-                return res.status(500).json({ error: 'Failed to fetch ticket logs' });
-            }
+        // Promisify the query function for this specific request
+        const queryAsync = util.promisify(req.db.query).bind(req.db);
 
-            // Process the results to format them nicely
-            const formattedResults = results.map(log => ({
-                ...log,
-                formattedDateTime: new Date(log.DateTime).toLocaleString(),
-                actionType: log.Type,
-                actor: log.UserName,
-                details: {
-                    oldValue: log.OldValue,
-                    newValue: log.NewValue,
-                    description: log.Description,
-                    note: log.Note,
-                    additionalInfo: log.AdditionalInfo
-                },
-                ticketInfo: {
-                    currentStatus: log.CurrentStatus,
-                    currentPriority: log.CurrentPriority,
-                    description: log.TicketDescription,
-                    createdAt: log.TicketCreatedAt,
-                    resolution: log.TicketResolution,
-                    dueDate: log.DueDate,
-                    lastRespondedTime: log.LastRespondedTime,
-                    system: log.SystemName,
-                    category: log.CategoryName
-                },
-                people: {
-                    supervisor: log.SupervisorName,
-                    creator: log.CreatedByName
+        const results = await queryAsync(query, [ticketId]);
+
+        if (results.length === 0) {
+            return res.json([]);
+        }
+
+        const supervisorIdsString = results[0].SupervisorID;
+        let supervisorNames = 'Not Assigned';
+
+        console.log("Backend: SupervisorIDs string from ticket:", supervisorIdsString);
+
+        if (supervisorIdsString) {
+            const supervisorIds = supervisorIdsString.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id));
+            if (supervisorIds.length > 0) {
+                const placeholders = supervisorIds.map(() => '?').join(',');
+                const nameQuery = `SELECT FullName FROM appuser WHERE UserID IN (${placeholders})`;
+                
+                try {
+                    const nameResults = await queryAsync(nameQuery, supervisorIds);
+                    supervisorNames = nameResults.map(row => row.FullName).join(', ');
+                    console.log("Backend: Fetched supervisor names:", supervisorNames);
+                } catch (nameErr) {
+                    console.error("Error fetching supervisor names:", nameErr);
+                    supervisorNames = 'Error fetching supervisor names';
                 }
-            }));
+            }
+        }
 
-            res.json(formattedResults);
-        });
+        // Process the results to format them nicely
+        const formattedResults = results.map(log => ({
+            ...log,
+            formattedDateTime: new Date(log.DateTime).toLocaleString(),
+            actionType: log.Type,
+            actor: log.UserName,
+            details: {
+                oldValue: log.OldValue,
+                newValue: log.NewValue,
+                description: log.Description,
+                note: log.Note,
+                additionalInfo: log.AdditionalInfo
+            },
+            ticketInfo: {
+                currentStatus: log.CurrentStatus,
+                currentPriority: log.CurrentPriority,
+                description: log.TicketDescription,
+                createdAt: log.TicketCreatedAt,
+                resolution: log.TicketResolution,
+                dueDate: log.DueDate,
+                lastRespondedTime: log.LastRespondedTime,
+                system: log.SystemName,
+                category: log.CategoryName
+            },
+            people: {
+                supervisor: supervisorNames, // Use the fetched multiple supervisor names
+                creator: log.CreatedByName
+            }
+        }));
+
+        res.json(formattedResults);
     } catch (error) {
         console.error('Error:', error);
         res.status(500).json({ error: 'Internal server error' });
