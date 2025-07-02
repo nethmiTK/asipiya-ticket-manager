@@ -1795,7 +1795,8 @@ app.get("/userTicket/:ticketId", (req, res) => {
       a.SystemName AS system_name,
       c.CategoryName AS category,
       t.DateTime AS datetime,
-      t.SupervisorID AS supervisor_id
+      t.SupervisorID AS supervisor_id,
+      t.LastRespondedTime
     FROM ticket t
     JOIN asipiyasystem a ON t.AsipiyaSystemID = a.AsipiyaSystemID
     JOIN ticketcategory c ON t.TicketCategoryID = c.TicketCategoryID

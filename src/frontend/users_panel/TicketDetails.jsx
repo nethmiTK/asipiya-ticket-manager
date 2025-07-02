@@ -135,6 +135,9 @@ const TicketDetails = () => {
   if (ticketError) return <p className="text-red-600">{ticketError}</p>;
   if (!ticket) return <p>No ticket found.</p>;
 
+  // Calculate fixed height for details/chat container: total viewport height minus navbar & padding (navbar ~60px, padding ~48px)
+  const fixedHeight = "calc(100vh - 60px - 48px)"; // adjust as needed
+
   return (
     <div className="flex">
       <SideBar open={isSidebarOpen} setOpen={setIsSidebarOpen} />
@@ -193,33 +196,40 @@ const TicketDetails = () => {
           </div>
 
           {activeTab === "details" && (
-            <div className="lg:hidden">
-              <div className="bg-gray-100 border border-zinc-300 rounded-lg shadow-lg p-4 mb-4">
-                <div className="space-y-3 text-lg text-justify">
-                  <p>
-                    <strong>Ticket ID:</strong> {ticket.id}
-                  </p>
-                  <p>
-                    <strong>Status:</strong> {ticket.status}
-                  </p>
-                  <p>
-                    <strong>Description:</strong> {ticket.description}
-                  </p>
-                  <p>
-                    <strong>System Name:</strong> {ticket.system_name}
-                  </p>
-                  <p>
-                    <strong>Category:</strong> {ticket.category}
-                  </p>
-                  <p>
-                    <strong>Date & Time:</strong>{" "}
-                    {new Date(ticket.datetime).toLocaleString()}
-                  </p>
-                  <p>
-                    <strong>Supervisor:</strong>{" "}
-                    {ticket.supervisor_name || "Not Assigned"}
-                  </p>
-                </div>
+            <div
+              className="lg:hidden bg-gray-100 border border-zinc-300 rounded-lg shadow-lg p-4 mb-4 overflow-auto"
+              style={{ height: fixedHeight }}
+            >
+              <div className="space-y-3 text-lg text-justify">
+                <p>
+                  <strong>Ticket ID:</strong> {ticket.id}
+                </p>
+                <p>
+                  <strong>Status:</strong> {ticket.status}
+                </p>
+                <p>
+                  <strong>Description:</strong> {ticket.description}
+                </p>
+                <p>
+                  <strong>System Name:</strong> {ticket.system_name}
+                </p>
+                <p>
+                  <strong>Category:</strong> {ticket.category}
+                </p>
+                <p>
+                  <strong>Date & Time:</strong>{" "}
+                  {new Date(ticket.datetime).toLocaleString()}
+                </p>
+                <p>
+                  <strong>Supervisor:</strong>{" "}
+                  {ticket.supervisor_name || "Not Assigned"}
+                </p>
+                <p>
+                  <strong>Last Responded Time:</strong>{" "}
+                  {ticket.LastRespondedTime
+                    ? new Date(ticket.LastRespondedTime).toLocaleString()
+                    : "No responses yet"}
+                </p>
 
                 <div className="mt-6">
                   <h3 className="text-lg font-bold mb-4">Evidence Files</h3>
@@ -245,9 +255,6 @@ const TicketDetails = () => {
                         const isVideo = /\.(mp4|webm|ogg)$/i.test(lowerName);
                         const isAudio = /\.(mp3|wav|ogg)$/i.test(lowerName);
                         const isPdf = /\.pdf$/i.test(lowerName);
-                        const isExcel = /\.(xls|xlsx)$/i.test(lowerName);
-                        const isWord = /\.(doc|docx)$/i.test(lowerName);
-                        const isPpt = /\.(ppt|pptx)$/i.test(lowerName);
                         const isPreviewable =
                           isImage || isVideo || isAudio || isPdf;
                         const iconUrl = getIconUrl(fileName);
@@ -328,14 +335,20 @@ const TicketDetails = () => {
           )}
 
           {activeTab === "chat" && (
-            <div className="bg-white border border-zinc-300 rounded-lg shadow-lg p-4">
+            <div
+              className="lg:hidden bg-white border border-zinc-300 rounded-lg shadow-lg p-4 overflow-auto"
+              style={{ height: fixedHeight }}
+            >
               <h2 className="font-bold text-xl mb-2">Chat</h2>
               <ChatUI ticketID={ticket.id} />
             </div>
           )}
 
-          <div className="hidden lg:grid grid-cols-2 gap-4">
-            <div className="bg-gray-100 border border-zinc-300 rounded-lg shadow-lg p-4">
+          {/* Desktop layout */}
+          <div className="hidden lg:grid grid-cols-2 gap-4" style={{ height: fixedHeight }}>
+            <div
+              className="bg-gray-100 border h-180 border-zinc-300 rounded-lg shadow-lg p-4 overflow-auto"
+            >
               <div className="space-y-3 text-lg text-justify">
                 <p>
                   <strong>Ticket ID:</strong> {ticket.id}
@@ -359,6 +372,12 @@ const TicketDetails = () => {
                 <p>
                   <strong>Supervisor:</strong>{" "}
                   {ticket.supervisor_name || "Not Assigned"}
+                </p>
+                <p>
+                  <strong>Last Responded Time:</strong>{" "}
+                  {ticket.LastRespondedTime
+                    ? new Date(ticket.LastRespondedTime).toLocaleString()
+                    : "No responses yet"}
                 </p>
               </div>
 
@@ -387,9 +406,6 @@ const TicketDetails = () => {
                       const isVideo = /\.(mp4|webm|ogg)$/i.test(lowerName);
                       const isAudio = /\.(mp3|wav|ogg)$/i.test(lowerName);
                       const isPdf = /\.pdf$/i.test(lowerName);
-                      const isExcel = /\.(xls|xlsx)$/i.test(lowerName);
-                      const isWord = /\.(doc|docx)$/i.test(lowerName);
-                      const isPpt = /\.(ppt|pptx)$/i.test(lowerName);
                       const isPreviewable =
                         isImage || isVideo || isAudio || isPdf;
 
@@ -468,7 +484,9 @@ const TicketDetails = () => {
               </div>
             </div>
 
-            <div className="bg-white border border-zinc-300 rounded-lg shadow-lg p-4">
+            <div
+              className="bg-white border h-180 border-zinc-300 rounded-lg shadow-lg p-4 overflow-auto"
+            >
               <h2 className="font-bold text-xl mb-2">Chat</h2>
               <ChatUI ticketID={ticket.id} />
             </div>
