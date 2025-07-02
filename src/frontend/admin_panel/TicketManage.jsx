@@ -67,6 +67,20 @@ const handleForceDownload = async (url, filename) => {
   }
 };
 
+const canPreviewInBrowser = (fileType) => {
+  return (
+    fileType.startsWith('image/') ||
+    fileType === 'application/pdf' ||
+    fileType.startsWith('video/') ||
+    fileType.startsWith('audio/') ||
+    fileType === 'text/plain' ||
+    fileType === 'text/html' ||
+    fileType === 'text/css' ||
+    fileType === 'text/javascript' ||
+    fileType === 'application/json'
+  );
+};
+
 export default function TicketManage() {
   const navigate = useNavigate();
   const { loggedInUser: user } = useAuth();
@@ -100,6 +114,8 @@ export default function TicketManage() {
   const [showAllComments, setShowAllComments] = useState(false);
   const [expandedReplies, setExpandedReplies] = useState({});
   const [previewMenuIndex, setPreviewMenuIndex] = useState(null);
+
+  const [previewAttachment, setPreviewAttachment] = useState(null);
 
   // Utility function to set cursor position reliably
   const setCursorPosition = (textarea, position) => {
@@ -328,19 +344,26 @@ export default function TicketManage() {
   // Close preview menu when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
-      // Check if click is outside any open dropdown menu
       if (previewMenuIndex !== null) {
         const dropdowns = document.querySelectorAll('.dropdown-menu');
-        let isClickInside = false;
+        let isClickInsideDropdown = false;
 
         dropdowns.forEach(dropdown => {
           if (dropdown.contains(event.target)) {
-            isClickInside = true;
+            isClickInsideDropdown = true;
           }
         });
 
-        if (!isClickInside) {
+        if (!isClickInsideDropdown) {
           setPreviewMenuIndex(null);
+        }
+      }
+
+      // Handle preview modal click outside
+      if (previewAttachment) {
+        const modalContent = document.querySelector('.preview-modal-content');
+        if (modalContent && !modalContent.contains(event.target)) {
+          setPreviewAttachment(null);
         }
       }
     };
@@ -349,7 +372,7 @@ export default function TicketManage() {
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [previewMenuIndex]);
+  }, [previewMenuIndex, previewAttachment]);
 
   const handleCardClick = (ticket) => {
     setSelectedTicket(ticket);
@@ -938,31 +961,51 @@ export default function TicketManage() {
   // Filter supervisors to only those assigned to tickets
   const availableSupervisors = supervisors.filter(s => tickets.some(t => t.assignedBy === s.UserID));
 
-  // Close preview menu when clicking outside
+  // // Close preview menu when clicking outside
+  // useEffect(() => {
+  //   const handleClickOutside = (event) => {
+  //     // Check if click is outside any open dropdown menu
+  //     if (previewMenuIndex !== null) {
+  //       const dropdowns = document.querySelectorAll('.dropdown-menu');
+  //       let isClickInside = false;
+
+  //       dropdowns.forEach(dropdown => {
+  //         if (dropdown.contains(event.target)) {
+  //           isClickInside = true;
+  //         }
+  //       });
+
+  //       if (!isClickInside) {
+  //         setPreviewMenuIndex(null);
+  //       }
+  //     }
+  //   };
+
+  //   document.addEventListener('mousedown', handleClickOutside);
+  //   return () => {
+  //     document.removeEventListener('mousedown', handleClickOutside);
+  //   };
+  // }, [previewMenuIndex]);
+
+  const [textContent, setTextContent] = useState('');
+
   useEffect(() => {
-    const handleClickOutside = (event) => {
-      // Check if click is outside any open dropdown menu
-      if (previewMenuIndex !== null) {
-        const dropdowns = document.querySelectorAll('.dropdown-menu');
-        let isClickInside = false;
-
-        dropdowns.forEach(dropdown => {
-          if (dropdown.contains(event.target)) {
-            isClickInside = true;
-          }
-        });
-
-        if (!isClickInside) {
-          setPreviewMenuIndex(null);
+    if (previewAttachment && previewAttachment.fileType === 'text/plain') {
+      const fetchTextContent = async () => {
+        try {
+          const response = await fetch(previewAttachment.fullUrl);
+          const text = await response.text();
+          setTextContent(text);
+        } catch (error) {
+          console.error('Error loading text file:', error);
+          setTextContent('Error loading file content');
         }
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [previewMenuIndex]);
+      };
+      fetchTextContent();
+    } else {
+      setTextContent('');
+    }
+  }, [previewAttachment]);
 
   return (
     <div className="flex">
@@ -1612,6 +1655,7 @@ export default function TicketManage() {
                                   expandedReplies={expandedReplies}
                                   previewMenuIndex={previewMenuIndex}
                                   setPreviewMenuIndex={setPreviewMenuIndex}
+                                  setPreviewAttachment={setPreviewAttachment}
                                 />
                               ))}
                           </ul>
@@ -1649,6 +1693,71 @@ export default function TicketManage() {
           </div>
         </div>
       </div>
+      {/* Preview Modal */}
+      {previewAttachment && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30">
+          <div className="preview-modal-content relative bg-white rounded-xl max-w-4xl w-full max-h-[90vh] overflow-auto">
+            <button
+              onClick={() => setPreviewAttachment(null)}
+              className="absolute top-4 right-4 z-50 p-2 bg-white rounded-full shadow-lg hover:bg-gray-100"
+            >
+              <svg className="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+
+            <div className="p-4">
+              {previewAttachment.fileType.startsWith('image/') && (
+                <img
+                  src={previewAttachment.fullUrl}
+                  alt={previewAttachment.fileName}
+                  className="w-full h-auto max-h-[80vh] object-contain"
+                />
+              )}
+
+              {previewAttachment.fileType.startsWith('video/') && (
+                <video
+                  controls
+                  autoPlay
+                  className="w-full h-auto max-h-[80vh]"
+                  src={previewAttachment.fullUrl}
+                />
+              )}
+
+              {previewAttachment.fileType.startsWith('audio/') && (
+                <div className="p-8">
+                  <audio
+                    controls
+                    autoPlay
+                    className="w-full"
+                    src={previewAttachment.fullUrl}
+                  />
+                  <p className="mt-4 text-center text-lg font-medium">
+                    {previewAttachment.fileName}
+                  </p>
+                </div>
+              )}
+
+              {previewAttachment.fileType === 'application/pdf' && (
+                <iframe
+                  src={previewAttachment.fullUrl}
+                  className="w-full h-[80vh]"
+                  title={previewAttachment.fileName}
+                />
+              )}
+
+              {previewAttachment.fileType === 'text/plain' && (
+                <div className="h-[80vh] overflow-auto bg-gray-50 p-4">
+                  <pre className="whitespace-pre-wrap font-mono text-sm">
+                    {/* We'll load the text content here */}
+                    {textContent || 'Loading text file...'}
+                  </pre>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1681,7 +1790,8 @@ function CommentItem({
   toggleExpandedReplies,
   expandedReplies,
   previewMenuIndex,
-  setPreviewMenuIndex
+  setPreviewMenuIndex,
+  setPreviewAttachment
 }) {
   const nestedReplies = allComments
     .filter((c) => c.ReplyToCommentID === comment.CommentID)
@@ -1822,118 +1932,130 @@ function CommentItem({
                 const documentFiles = comment.attachments.filter(att =>
                   !att.fileType || (!att.fileType.startsWith('image/') && !att.fileType.startsWith('video/'))
                 );
-
                 return (
                   <div className="space-y-4">
-                    {/* Media Files */}
-                    <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-2 relative overflow-visible">
-                      {mediaFiles.map((attachment, index) => {
+                    {/* Media Files Section */}
+                    {mediaFiles.length > 0 && (
+                      <div>
+                        <h4 className="text-xs font-medium text-gray-600 mb-2 uppercase tracking-wide">Media</h4>
+                        <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-2 relative overflow-visible">
+                          {mediaFiles.map((attachment, index) => {
+                            const isImage = isImageAttachment(attachment.fileType);
+                            const isVideo = isVideoAttachment(attachment.fileType);
+                            const mediaMenuId = `${comment.CommentID}-media-${index}`;
 
-                        const isImage = isImageAttachment(attachment.fileType);
-                        const isVideo = isVideoAttachment(attachment.fileType);
-                        const mediaMenuId = `${comment.CommentID}-media-${index}`; // Moved inside map
+                            return (
+                              <div
+                                key={index}
+                                className="w-32 h-32 relative group bg-white rounded-xl border border-gray-200 overflow-visible shadow-sm hover:shadow-lg transition-all duration-300"
+                              >
+                                {/* Media thumbnail */}
+                                <div className="flex flex-col items-center justify-center h-full p-2 text-center">
+                                  {isImage ? (
+                                    <img
+                                      src={attachment.fullUrl}
+                                      alt={attachment.fileName}
+                                       className="w-full h-full object-cover rounded-md"
+                                    />
+                                  ) : isVideo ? (
+                                    <div className="relative w-full h-full">
+                                      <video
+                                        className="w-full h-full object-cover"
+                                        src={attachment.fullUrl}
+                                        muted
+                                        playsInline
+                                      />
+                                      <div className="absolute inset-0 flex items-center justify-center">
+                                        <div className="w-10 h-10 bg-black bg-opacity-50 rounded-full flex items-center justify-center">
+                                          <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                            <path d="M6.3 2.841A1.5 1.5 0 004 4.11v11.78a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
+                                          </svg>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ) : null}
+                                </div>
 
-                        return (
-                          <div key={index} className="w-32 h-32 relative group bg-white rounded-xl border border-gray-200 overflow-visible shadow-sm hover:shadow-lg transition-all duration-300">
-                            {/* Media thumbnail */}
-                            <div className="w-full h-full flex items-center justify-center bg-gray-100 overflow-hidden">
-                              {isImage ? (
-                                <img src={attachment.fullUrl} alt={attachment.fileName} className="w-full h-full object-cover" />
-                              ) : isVideo ? (
-                                <div className="relative w-full h-full">
-                                  <video className="w-full h-full object-cover" src={attachment.fullUrl} muted playsInline />
-                                  <div className="absolute inset-0 flex items-center justify-center">
-                                    <div className="w-10 h-10 bg-black bg-opacity-50 rounded-full flex items-center justify-center">
-                                      <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
-                                        <path d="M6.3 2.841A1.5 1.5 0 004 4.11v11.78a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
-                                      </svg>
+                                {/* File info footer */}
+                                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-2 rounded-b-xl">
+                                  <div className="flex items-center justify-between">
+                                    <p className="text-xs text-white font-medium truncate">{attachment.fileName}</p>
+                                    <div className="flex gap-1 ml-2">
+                                      <span className="bg-black/55 text-white text-[10px] px-1 py-0.5 rounded">
+                                        {isImage ? 'IMAGE' : isVideo ? 'VIDEO' : 'FILE'}
+                                      </span>
                                     </div>
                                   </div>
                                 </div>
-                              ) : null}
-                            </div>
 
-                            {/* File info footer */}
-                            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-2">
-                              <div className="flex items-center justify-between">
-                                <p className="text-xs text-white font-medium truncate">{attachment.fileName}</p>
-                                <div className="flex gap-1 ml-2">
-                                  <span className="bg-black/55 text-white text-[10px] px-1 py-0.5 rounded">
-                                    {isImage ? 'IMAGE' : isVideo ? 'VIDEO' : 'FILE'}
-                                  </span>
-                                </div>
+                                {/* Menu Button */}
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setPreviewMenuIndex(previewMenuIndex === mediaMenuId ? null : mediaMenuId);
+                                  }}
+                                  className="absolute top-2 right-2 flex items-center justify-center w-6 h-6 bg-white bg-opacity-80 text-gray-500 rounded-full hover:bg-opacity-100 hover:text-gray-700 transition-all duration-200 shadow-sm cursor-pointer"
+                                >
+                                  <FiMoreVertical className="w-4 h-4" />
+                                </button>
+
+                                {/* Dropdown Menu */}
+                                {previewMenuIndex === mediaMenuId && (
+                                  <div
+                                    className="dropdown-menu absolute z-50 top-10 right-0 w-44 bg-white border border-gray-200 rounded-lg shadow-xl"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    <div className="py-1">
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setPreviewAttachment(attachment);
+                                          setPreviewMenuIndex(null);
+                                        }}
+                                        className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer"
+                                      >
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                        </svg>
+                                        Open
+                                      </button>
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleForceDownload(attachment.fullUrl, attachment.fileName);
+                                          setPreviewMenuIndex(null);
+                                        }}
+                                        className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer"
+                                      >
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                        </svg>
+                                        Download File
+                                      </button>
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          navigator.clipboard.writeText(attachment.fullUrl);
+                                          setPreviewMenuIndex(null);
+                                          toast.success('File URL copied to clipboard!');
+                                        }}
+                                        className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer"
+                                      >
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                        </svg>
+                                        Copy Link
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
                               </div>
-                            </div>
-
-                            {/* Menu Button */}
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setPreviewMenuIndex(previewMenuIndex === mediaMenuId ? null : mediaMenuId);
-                              }}
-                              className="absolute top-2 right-2 flex items-center justify-center w-6 h-6 bg-white bg-opacity-80 text-gray-500 rounded-full hover:bg-opacity-100 hover:text-gray-700 transition-all duration-200 shadow-sm"
-                            >
-                              <FiMoreVertical className="w-4 h-4" />
-                            </button>
-
-                            {/* Dropdown Menu */}
-                            {previewMenuIndex === mediaMenuId && (
-                              <div
-                                className="dropdown-menu absolute z-50 top-10 right-0 w-44 bg-white border border-gray-200 rounded-lg shadow-xl"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                <div className="py-1">
-                                  <a
-                                    href={attachment.fullUrl}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setPreviewMenuIndex(null);
-                                    }}
-                                  >
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                    </svg>
-                                    Open in New Tab
-                                  </a>
-
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleForceDownload(attachment.fullUrl, attachment.fileName);
-                                      setPreviewMenuIndex(null);
-                                    }}
-                                    className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                                  >
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                    </svg>
-                                    Download File
-                                  </button>
-
-                                  <button
-                                    className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      navigator.clipboard.writeText(attachment.fullUrl);
-                                      setPreviewMenuIndex(null);
-                                      toast.success('File URL copied to clipboard!');
-                                    }}
-                                  >
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                                    </svg>
-                                    Copy Link
-                                  </button>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}</div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
                     {/* Document Files */}
                     {documentFiles.length > 0 && (
                       <div>
@@ -1993,7 +2115,7 @@ function CommentItem({
                                       e.stopPropagation();
                                       setPreviewMenuIndex(previewMenuIndex === index ? null : index);
                                     }}
-                                    className="flex items-center justify-center w-6 h-6 bg-white bg-opacity-80 text-gray-500 rounded-full hover:bg-opacity-100 hover:text-gray-700 transition-all duration-200 shadow-sm"
+                                    className="flex items-center justify-center w-6 h-6 bg-white bg-opacity-80 text-gray-500 rounded-full hover:bg-opacity-100 hover:text-gray-700 transition-all duration-200 shadow-sm cursor-pointer"
                                     title="More options"
                                   >
                                     <FiMoreVertical className="w-4 h-4" />
@@ -2008,7 +2130,7 @@ function CommentItem({
                                       const uniqueId = `${comment.CommentID}-doc-${index}`;
                                       setPreviewMenuIndex(previewMenuIndex === uniqueId ? null : uniqueId);
                                     }}
-                                    className="flex items-center justify-center w-6 h-6 bg-white bg-opacity-80 text-gray-500 rounded-full hover:bg-opacity-100 hover:text-gray-700 transition-all duration-200 shadow-sm"
+                                    className="flex items-center justify-center w-6 h-6 bg-white bg-opacity-80 text-gray-500 rounded-full hover:bg-opacity-100 hover:text-gray-700 transition-all duration-200 shadow-sm cursor-pointer"
                                     title="More options"
                                   >
                                     <FiMoreVertical className="w-4 h-4" />
@@ -2021,25 +2143,37 @@ function CommentItem({
                                       <button
                                         onClick={(e) => {
                                           e.stopPropagation();
-                                          window.open(attachment.fullUrl, '_blank');
+                                          if (canPreviewInBrowser(attachment.fileType)) {
+                                            setPreviewAttachment(attachment);
+                                          } else {
+                                            toast.info(
+                                              <div>
+                                                <p className="font-medium">This file type cannot be previewed in browser</p>
+                                                <p className="text-sm">Please download the file to view it</p>
+                                              </div>,
+                                              {
+                                                autoClose: 5000,
+                                                closeButton: true,
+                                              }
+                                            );
+                                          }
                                           setPreviewMenuIndex(null);
                                         }}
-                                        className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                                        className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer"
                                       >
                                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                                         </svg>
-                                        Open in New Tab
+                                        Open
                                       </button>
-
                                       <button
                                         onClick={(e) => {
                                           e.stopPropagation();
                                           handleForceDownload(attachment.fullUrl, attachment.fileName);
                                           setPreviewMenuIndex(null);
                                         }}
-                                        className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                                        className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer"
                                       >
                                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -2054,7 +2188,7 @@ function CommentItem({
                                           setPreviewMenuIndex(null);
                                           toast.success('File URL copied to clipboard!');
                                         }}
-                                        className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                                        className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer"
                                       >
                                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
@@ -2137,6 +2271,7 @@ function CommentItem({
                   expandedReplies={expandedReplies}
                   previewMenuIndex={previewMenuIndex}
                   setPreviewMenuIndex={setPreviewMenuIndex}
+                  setPreviewAttachment={setPreviewAttachment}
                 />
               ))}
             </ul>
