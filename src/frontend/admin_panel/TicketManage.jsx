@@ -1853,14 +1853,17 @@ function CommentItem({
                               ) : null}
                             </div>
 
-                            {/* File info footer */}
-                            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-2">
-                              <div className="flex items-center justify-between">
-                                <p className="text-xs text-white font-medium truncate">{attachment.fileName}</p>
-                                <div className="flex gap-1 ml-2">
-                                  <span className="bg-black/50 text-white text-[10px] px-1 py-0.5 rounded">
-                                    {isImage ? 'IMAGE' : isVideo ? 'VIDEO' : 'FILE'}
-                                  </span>
+ 
+                                {/* File info footer */}
+                                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-2">
+                                  <div className="flex items-center justify-between">
+                                    <p className="text-xs text-white font-medium truncate">{attachment.fileName}</p>
+                                    <div className="flex gap-1 ml-2">
+                                      <span className="bg-black/55 text-white text-[10px] px-1 py-0.5 rounded">
+                                        {isImage ? 'IMAGE' : isVideo ? 'VIDEO' : 'FILE'}
+                                      </span>
+                                    </div>
+ 
                                 </div>
                               </div>
                             </div>
