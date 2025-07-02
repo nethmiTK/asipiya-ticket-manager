@@ -40,31 +40,32 @@ export default function TicketDetailsTab({
       if (!res.ok) throw new Error("Failed to update ticket");
 
       // Log the resolution update to ticket log if resolution was added/changed
-      if (newResolution && newResolution !== oldResolution) {
-        try {
-          await axios.post('http://localhost:5000/api/ticket-logs', {
-            ticketId: selectedTicket.id,
-            type: 'RESOLUTION_UPDATE',
-            description: `Resolution summary updated: ${newResolution.substring(0, 100)}${newResolution.length > 100 ? '...' : ''}`,
-            userId: user.UserID,
-            oldValue: oldResolution,
-            newValue: newResolution
-          });
+      // This logging is now handled by the backend /api/tickets/:ticketId/resolution endpoint.
+      // if (newResolution && newResolution !== oldResolution) {
+      //   try {
+      //     await axios.post('http://localhost:5000/api/ticket-logs', {
+      //       ticketId: selectedTicket.id,
+      //       type: 'RESOLUTION_UPDATE',
+      //       description: `Resolution summary updated: ${newResolution.substring(0, 100)}${newResolution.length > 100 ? '...' : ''}`,
+      //       userId: user.UserID,
+      //       oldValue: oldResolution,
+      //       newValue: newResolution
+      //     });
 
-          // Send notifications to all admins and assigned supervisors
-          try {
-            await axios.post('http://localhost:5000/api/notifications/resolution-update', {
-              ticketId: selectedTicket.id,
-              updatedByUserId: user.UserID,
-              resolutionText: newResolution.substring(0, 100) + (newResolution.length > 100 ? '...' : '')
-            });
-          } catch (notificationError) {
-            console.error("Failed to send resolution update notifications:", notificationError);
-          }
-        } catch (logError) {
-          console.error("Failed to log resolution update:", logError);
-        }
-      }
+      //     // Send notifications to all admins and assigned supervisors
+      //     try {
+      //       await axios.post('http://localhost:5000/api/notifications/resolution-update', {
+      //         ticketId: selectedTicket.id,
+      //         updatedByUserId: user.UserID,
+      //         resolutionText: newResolution.substring(0, 100) + (newResolution.length > 100 ? '...' : '')
+      //       });
+      //     } catch (notificationError) {
+      //       console.error("Failed to send resolution update notifications:", notificationError);
+      //     }
+      //   } catch (logError) {
+      //     console.error("Failed to log resolution update:", logError);
+      //   }
+      // }
 
       toast.success("Ticket updated successfully!");
       // If you want to close the modal or perform other actions after save
@@ -108,16 +109,17 @@ export default function TicketDetailsTab({
       if (!res.ok) throw new Error("Failed to update status");
 
       // Send notifications to all admins and assigned supervisors
-      try {
-        await axios.post('http://localhost:5000/api/notifications/status-update', {
-          ticketId: selectedTicket.id,
-          updatedByUserId: user.UserID,
-          oldStatus: oldStatus,
-          newStatus: newStatus
-        });
-      } catch (notificationError) {
-        console.error("Failed to send status update notifications:", notificationError);
-      }
+      // This notification is now handled by the backend /api/tickets/:ticketId/status endpoint.
+      // try {
+      //   await axios.post('http://localhost:5000/api/notifications/status-update', {
+      //     ticketId: selectedTicket.id,
+      //     updatedByUserId: user.UserID,
+      //     oldStatus: oldStatus,
+      //     newStatus: newStatus
+      //   });
+      // } catch (notificationError) {
+      //   console.error("Failed to send status update notifications:", notificationError);
+      // }
 
       toast.success("Status updated successfully!");
       // Check if setTickets prop is provided before attempting to use it
@@ -154,16 +156,17 @@ export default function TicketDetailsTab({
       if (!res.ok) throw new Error("Failed to update due date");
 
       // Send notifications to all admins and assigned supervisors
-      try {
-        await axios.post('http://localhost:5000/api/notifications/due-date-update', {
-          ticketId: selectedTicket.id,
-          updatedByUserId: user.UserID,
-          oldDueDate: oldDueDate,
-          newDueDate: newDueDate
-        });
-      } catch (notificationError) {
-        console.error("Failed to send due date update notifications:", notificationError);
-      }
+      // This notification is now handled by the backend /api/tickets/:ticketId/due-date endpoint.
+      // try {
+      //   await axios.post('http://localhost:5000/api/notifications/due-date-update', {
+      //     ticketId: selectedTicket.id,
+      //     updatedByUserId: user.UserID,
+      //     oldDueDate: oldDueDate,
+      //     newDueDate: newDueDate
+      //   });
+      // } catch (notificationError) {
+      //   console.error("Failed to send due date update notifications:", notificationError);
+      // }
 
       // Check if setTickets prop is provided before attempting to use it
       if (setTickets) {

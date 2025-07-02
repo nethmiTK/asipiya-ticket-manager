@@ -132,7 +132,7 @@ const TicketLogView = ({ ticketId }) => {
                     </div>
                     <div>
                         <p className="text-sm text-gray-600">Assigned To</p>
-                        <p className="font-medium">{ticketDetails.SupervisorName || 'Not Assigned'}</p>
+                        <p className="font-medium">{ticketDetails.people.supervisor || 'Not Assigned'}</p>
                     </div>
                     <div>
                         <p className="text-sm text-gray-600">System</p>

@@ -90,32 +90,26 @@ const NotificationPanel = ({ userId, role, onClose }) => {
 
     const formatNotificationMessage = (notification) => {
         if (notification.Type === 'STATUS_UPDATE') {
-            // Extract old and new status from the message
-            const match = notification.Message.match(/status has been updated from (.*) to (.*)/);
-            if (match) {
-                const [, oldStatus, newStatus] = match;
-                return (
-                    <span>
-                        <span className="font-medium text-blue-600">Status Update</span><br />
-                        Ticket #{notification.TicketID}: <br />
-                        <span className={`font-medium ${getStatusColor(oldStatus)}`}>{oldStatus}</span>
-                        <span className="mx-2">→</span>
-                        <span className={`font-medium ${getStatusColor(newStatus)}`}>{newStatus}</span>
-                    </span>
-                );
-            }
+            return (
+                <span>
+                    <span className="font-medium text-blue-600">Status Update</span><br />
+                    {notification.Message}
+                </span>
+            );
         } else if (notification.Type === 'RESOLUTION_UPDATE') {
-            const match = notification.Message.match(/Resolution summary updated: (.*)/);
-            if (match) {
-                const [, resolutionText] = match;
-                return (
-                    <span>
-                        <span className="font-medium text-green-600">Resolution Update</span><br />
-                        Ticket #{notification.TicketID} has been resolved: <br />
-                        <span className="italic text-gray-600">"{resolutionText}"</span>
-                    </span>
-                );
-            }
+            return (
+                <span>
+                    <span className="font-medium text-green-600">Resolution Update</span><br />
+                    {notification.Message}
+                </span>
+            );
+        } else if (notification.Type === 'DUE_DATE_UPDATE') {
+            return (
+                <span>
+                    <span className="font-medium text-orange-600">Due Date Updated</span><br />
+                    {notification.Message}
+                </span>
+            );
         } else if (notification.Type === 'TICKET_REJECTED') {
             // Handle ticket rejection notifications with special styling
             return (
@@ -185,14 +179,6 @@ const NotificationPanel = ({ userId, role, onClose }) => {
             return (
                 <span>
                     <span className="text-indigo-600 font-medium">You were mentioned</span><br />
-                    {notification.Message}
-                </span>
-            );
-        } else if (notification.Type === 'DUE_DATE_UPDATE') {
-            // Handle due date update notifications
-            return (
-                <span>
-                    <span className="text-orange-600 font-medium">Due Date Updated</span><br />
                     {notification.Message}
                 </span>
             );
@@ -306,14 +292,14 @@ const NotificationPanel = ({ userId, role, onClose }) => {
                 notificationIds: [notificationId]
             });
             
-            // After a short delay, remove the notification from the UI
-            setTimeout(() => {
-                setNotifications(prevNotifications => 
-                    prevNotifications.filter(notification => 
-                        notification.NotificationID !== notificationId
-                    )
-                );
-            }, 1500); // 1.5 second delay to show the read indicator
+            // Remove the setTimeout block - notifications will only disappear on page refresh
+            // setTimeout(() => {
+            //     setNotifications(prevNotifications => 
+            //         prevNotifications.filter(notification => 
+            //             notification.NotificationID !== notificationId
+            //         )
+            //     );
+            // }, 1500); // 1.5 second delay to show the read indicator
         } catch (error) {
             console.error('Error marking notification as read:', error);
             // If API call fails, revert the read status
@@ -387,10 +373,10 @@ const NotificationPanel = ({ userId, role, onClose }) => {
             // Then make the API call to mark all as read in the backend
             await axios.put(`http://localhost:5000/api/notifications/read-all/${userId}`);
             
-            // After a short delay, remove all notifications from the UI
-            setTimeout(() => {
-                setNotifications([]);
-            }, 2000); // 2 second delay to show the read indicators
+            // Remove the setTimeout block - notifications will only disappear on page refresh
+            // setTimeout(() => {
+            //     setNotifications([]);
+            // }, 2000); // 2 second delay to show the read indicators
         } catch (error) {
             console.error('Error marking all notifications as read:', error);
             // If API call fails, revert the read status
@@ -458,14 +444,14 @@ const NotificationPanel = ({ userId, role, onClose }) => {
                 <div className="flex items-center space-x-2">
                     <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
                     <h2 className="text-xl font-bold text-gray-800">Notifications</h2>
-                    {notifications.length > 0 && (
+                    {notifications.filter(n => !n.IsRead).length > 0 && (
                         <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full font-medium">
-                            {notifications.length}
+                            {notifications.filter(n => !n.IsRead).length}
                         </span>
                     )}
                 </div>
                 <div className="flex items-center space-x-2">
-                    {notifications.length > 0 && (
+                    {notifications.filter(n => !n.IsRead).length > 0 && (
                         <button 
                             onClick={markAllAsRead}
                             className="text-blue-600 hover:text-blue-800 text-sm font-medium px-3 py-1.5 rounded-lg hover:bg-blue-100 transition-all duration-200"
@@ -546,17 +532,9 @@ const NotificationPanel = ({ userId, role, onClose }) => {
                                                 {formatDistanceToNow(new Date(notification.CreatedAt), { addSuffix: true })}
                                             </span>
                                             <div className="flex items-center space-x-2">
-                                                {notification.justMarkedRead && (
-                                                    <div className="flex items-center space-x-1 bg-green-100 px-2 py-1 rounded-full">
-                                                        <svg className="w-3 h-3 text-green-600" fill="currentColor" viewBox="0 0 20 20">
-                                                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                                        </svg>
-                                                        <span className="text-xs text-green-600 font-medium">Read</span>
-                                                    </div>
-                                                )}
-                                                {!isClickable && !notification.justMarkedRead && (
+                                                {!notification.IsRead && !notification.justMarkedRead && (
                                                     <span className="text-xs text-gray-400 bg-gray-200 px-2 py-1 rounded-full">
-                                                        Info
+                                                        New
                                                     </span>
                                                 )}
                                             </div>
