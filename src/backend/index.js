@@ -1200,7 +1200,7 @@ app.get('/api/ticket_view/:id', (req, res) => {
 });
 
 // PUT: Update supervisors for a ticket
-app.put("/update-supervisors/:id", (req, res) => {
+app.put("/update-supervisors/:id", async (req, res) => {
   const { id } = req.params;
   const { supervisorIds } = req.body;
 
@@ -1221,19 +1221,149 @@ app.put("/update-supervisors/:id", (req, res) => {
     return res.status(400).json({ error: "No valid supervisor IDs provided." });
   }
 
-  const supervisorIdString = validSupervisorIds.join(",");
+  try {
+    // Get current ticket data and old supervisors
+    const getTicketQuery = `
+      SELECT SupervisorID, UserId as ticketCreatorId 
+      FROM ticket 
+      WHERE TicketID = ?
+    `;
+    
+    const currentTicketData = await new Promise((resolve, reject) => {
+      db.query(getTicketQuery, [id], (err, results) => {
+        if (err) reject(err);
+        else resolve(results[0]);
+      });
+    });
 
-  // Update the ticket table
-  const sql = "UPDATE ticket SET SupervisorID = ? WHERE TicketID = ?";
-  db.query(sql, [supervisorIdString, id], (err, result) => {
-    if (err) {
-      console.error("Error updating supervisors:", err);
-      return res.status(500).json({ error: "Failed to update supervisors." });
+    if (!currentTicketData) {
+      return res.status(404).json({ error: "Ticket not found." });
     }
 
-    console.log("Supervisors updated:", result);
+    const oldSupervisorIds = currentTicketData.SupervisorID 
+      ? currentTicketData.SupervisorID.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id))
+      : [];
+    
+    const newSupervisorIds = validSupervisorIds;
+    const ticketCreatorId = currentTicketData.ticketCreatorId;
+
+    // Find added and removed supervisors
+    const addedSupervisorIds = newSupervisorIds.filter(id => !oldSupervisorIds.includes(id));
+    const removedSupervisorIds = oldSupervisorIds.filter(id => !newSupervisorIds.includes(id));
+
+    console.log("Old supervisors:", oldSupervisorIds);
+    console.log("New supervisors:", newSupervisorIds);
+    console.log("Added supervisors:", addedSupervisorIds);
+    console.log("Removed supervisors:", removedSupervisorIds);
+
+    // Update the ticket table
+    const supervisorIdString = validSupervisorIds.join(",");
+    await new Promise((resolve, reject) => {
+      db.query("UPDATE ticket SET SupervisorID = ? WHERE TicketID = ?", [supervisorIdString, id], (err, result) => {
+        if (err) reject(err);
+        else resolve(result);
+      });
+    });
+
+    // Get supervisor names for notifications
+    const getSupervisorNamesQuery = `
+      SELECT UserID, FullName 
+      FROM appuser 
+      WHERE UserID IN (${[...addedSupervisorIds, ...removedSupervisorIds].map(() => '?').join(',')})
+    `;
+    
+    let supervisorNames = {};
+    if (addedSupervisorIds.length > 0 || removedSupervisorIds.length > 0) {
+      const nameResults = await new Promise((resolve, reject) => {
+        db.query(getSupervisorNamesQuery, [...addedSupervisorIds, ...removedSupervisorIds], (err, results) => {
+          if (err) reject(err);
+          else resolve(results);
+        });
+      });
+      
+      nameResults.forEach(supervisor => {
+        supervisorNames[supervisor.UserID] = supervisor.FullName;
+      });
+    }
+
+    // Create logs and notifications for changes
+    if (addedSupervisorIds.length > 0) {
+      const addedNames = addedSupervisorIds.map(id => supervisorNames[id] || `Supervisor ${id}`);
+      const logDescription = `Supervisors added: ${addedNames.join(', ')}`;
+      
+      const logResult = await createTicketLog(
+        id,
+        'SUPERVISOR_ADDED',
+        logDescription,
+        null, // No specific user for this action from EditSupervisors
+        null,
+        addedSupervisorIds.join(','),
+        'Supervisors added via edit'
+      );
+
+      // Notify ticket creator about added supervisors
+      if (ticketCreatorId) {
+        await createNotification(
+          ticketCreatorId,
+          `New supervisors added to your ticket #${id}: ${addedNames.join(', ')}`,
+          'SUPERVISOR_ADDED',
+          logResult.insertId
+        );
+      }
+
+      // Notify newly added supervisors
+      for (const supervisorId of addedSupervisorIds) {
+        await createNotification(
+          supervisorId,
+          `You have been assigned to ticket #${id}`,
+          'SUPERVISOR_ASSIGNED',
+          logResult.insertId
+        );
+      }
+    }
+
+    if (removedSupervisorIds.length > 0) {
+      const removedNames = removedSupervisorIds.map(id => supervisorNames[id] || `Supervisor ${id}`);
+      const logDescription = `Supervisors removed: ${removedNames.join(', ')}`;
+      
+      const logResult = await createTicketLog(
+        id,
+        'SUPERVISOR_REMOVED',
+        logDescription,
+        null,
+        removedSupervisorIds.join(','),
+        null,
+        'Supervisors removed via edit'
+      );
+
+      // Notify ticket creator about removed supervisors
+      if (ticketCreatorId) {
+        await createNotification(
+          ticketCreatorId,
+          `Supervisors removed from your ticket #${id}: ${removedNames.join(', ')}`,
+          'SUPERVISOR_REMOVED',
+          logResult.insertId
+        );
+      }
+
+      // Notify removed supervisors
+      for (const supervisorId of removedSupervisorIds) {
+        await createNotification(
+          supervisorId,
+          `You have been removed from ticket #${id}`,
+          'SUPERVISOR_UNASSIGNED',
+          logResult.insertId
+        );
+      }
+    }
+
+    console.log("Supervisors updated successfully");
     res.json({ message: "Supervisors updated successfully" });
-  });
+
+  } catch (error) {
+    console.error("Error updating supervisors:", error);
+    res.status(500).json({ error: "Failed to update supervisors." });
+  }
 });
 
 
@@ -2041,6 +2171,206 @@ app.put('/api/notifications/read-all/:userId', (req, res) => {
     });
 });
 
+// API endpoint to send status update notifications to admins and supervisors
+app.post('/api/notifications/status-update', async (req, res) => {
+    try {
+        const { ticketId, updatedByUserId, oldStatus, newStatus } = req.body;
+
+        // Get ticket information
+        const ticketQuery = 'SELECT * FROM ticket WHERE TicketID = ?';
+        const ticketResult = await new Promise((resolve, reject) => {
+            db.query(ticketQuery, [ticketId], (err, result) => {
+                if (err) reject(err);
+                else resolve(result);
+            });
+        });
+
+        if (ticketResult.length === 0) {
+            return res.status(404).json({ error: 'Ticket not found' });
+        }
+
+        const ticket = ticketResult[0];
+
+        // Get updater name
+        const updaterQuery = 'SELECT FullName FROM appuser WHERE UserID = ?';
+        const updaterResult = await new Promise((resolve, reject) => {
+            db.query(updaterQuery, [updatedByUserId], (err, result) => {
+                if (err) reject(err);
+                else resolve(result);
+            });
+        });
+
+        const updaterName = updaterResult.length > 0 ? updaterResult[0].FullName : 'Admin';
+
+        // Get all admins
+        const admins = await getUsersByRoles(['Admin']);
+
+        // Get assigned supervisors for this ticket
+        const supervisorQuery = `
+            SELECT DISTINCT appuser.UserID 
+            FROM ticket_supervisors 
+            JOIN appuser ON ticket_supervisors.SupervisorUserID = appuser.UserID 
+            WHERE ticket_supervisors.TicketID = ?
+        `;
+        const supervisors = await new Promise((resolve, reject) => {
+            db.query(supervisorQuery, [ticketId], (err, result) => {
+                if (err) reject(err);
+                else resolve(result);
+            });
+        });
+
+        // Combine admins and supervisors, excluding the updater
+        const allRecipients = [...admins, ...supervisors].filter(user => user.UserID != updatedByUserId);
+
+        // Create notifications for all recipients
+        const message = `Ticket #${ticketId} status has been updated from ${oldStatus} to ${newStatus} by ${updaterName}`;
+        const notifications = allRecipients.map(user =>
+            createNotification(user.UserID, message, 'STATUS_UPDATE', null, ticketId)
+        );
+
+        await Promise.all(notifications);
+
+        res.json({ message: 'Status update notifications sent successfully' });
+    } catch (error) {
+        console.error('Error sending status update notifications:', error);
+        res.status(500).json({ error: 'Failed to send status update notifications' });
+    }
+});
+
+// API endpoint to send resolution update notifications to admins and supervisors
+app.post('/api/notifications/resolution-update', async (req, res) => {
+    try {
+        const { ticketId, updatedByUserId, resolutionText } = req.body;
+
+        // Get ticket information
+        const ticketQuery = 'SELECT * FROM ticket WHERE TicketID = ?';
+        const ticketResult = await new Promise((resolve, reject) => {
+            db.query(ticketQuery, [ticketId], (err, result) => {
+                if (err) reject(err);
+                else resolve(result);
+            });
+        });
+
+        if (ticketResult.length === 0) {
+            return res.status(404).json({ error: 'Ticket not found' });
+        }
+
+        const ticket = ticketResult[0];
+
+        // Get updater name
+        const updaterQuery = 'SELECT FullName FROM appuser WHERE UserID = ?';
+        const updaterResult = await new Promise((resolve, reject) => {
+            db.query(updaterQuery, [updatedByUserId], (err, result) => {
+                if (err) reject(err);
+                else resolve(result);
+            });
+        });
+
+        const updaterName = updaterResult.length > 0 ? updaterResult[0].FullName : 'Admin';
+
+        // Get all admins
+        const admins = await getUsersByRoles(['Admin']);
+
+        // Get assigned supervisors for this ticket
+        const supervisorQuery = `
+            SELECT DISTINCT appuser.UserID 
+            FROM ticket_supervisors 
+            JOIN appuser ON ticket_supervisors.SupervisorUserID = appuser.UserID 
+            WHERE ticket_supervisors.TicketID = ?
+        `;
+        const supervisors = await new Promise((resolve, reject) => {
+            db.query(supervisorQuery, [ticketId], (err, result) => {
+                if (err) reject(err);
+                else resolve(result);
+            });
+        });
+
+        // Combine admins and supervisors, excluding the updater
+        const allRecipients = [...admins, ...supervisors].filter(user => user.UserID != updatedByUserId);
+
+        // Create notifications for all recipients
+        const message = `Ticket #${ticketId} resolution updated by ${updaterName}: ${resolutionText}`;
+        const notifications = allRecipients.map(user =>
+            createNotification(user.UserID, message, 'RESOLUTION_UPDATE', null, ticketId)
+        );
+
+        await Promise.all(notifications);
+
+        res.json({ message: 'Resolution update notifications sent successfully' });
+    } catch (error) {
+        console.error('Error sending resolution update notifications:', error);
+        res.status(500).json({ error: 'Failed to send resolution update notifications' });
+    }
+});
+
+// API endpoint to send due date update notifications to admins and supervisors
+app.post('/api/notifications/due-date-update', async (req, res) => {
+    try {
+        const { ticketId, updatedByUserId, oldDueDate, newDueDate } = req.body;
+
+        // Get ticket information
+        const ticketQuery = 'SELECT * FROM ticket WHERE TicketID = ?';
+        const ticketResult = await new Promise((resolve, reject) => {
+            db.query(ticketQuery, [ticketId], (err, result) => {
+                if (err) reject(err);
+                else resolve(result);
+            });
+        });
+
+        if (ticketResult.length === 0) {
+            return res.status(404).json({ error: 'Ticket not found' });
+        }
+
+        const ticket = ticketResult[0];
+
+        // Get updater name
+        const updaterQuery = 'SELECT FullName FROM appuser WHERE UserID = ?';
+        const updaterResult = await new Promise((resolve, reject) => {
+            db.query(updaterQuery, [updatedByUserId], (err, result) => {
+                if (err) reject(err);
+                else resolve(result);
+            });
+        });
+
+        const updaterName = updaterResult.length > 0 ? updaterResult[0].FullName : 'Admin';
+
+        // Get all admins
+        const admins = await getUsersByRoles(['Admin']);
+
+        // Get assigned supervisors for this ticket
+        const supervisorQuery = `
+            SELECT DISTINCT appuser.UserID 
+            FROM ticket_supervisors 
+            JOIN appuser ON ticket_supervisors.SupervisorUserID = appuser.UserID 
+            WHERE ticket_supervisors.TicketID = ?
+        `;
+        const supervisors = await new Promise((resolve, reject) => {
+            db.query(supervisorQuery, [ticketId], (err, result) => {
+                if (err) reject(err);
+                else resolve(result);
+            });
+        });
+
+        // Combine admins and supervisors, excluding the updater
+        const allRecipients = [...admins, ...supervisors].filter(user => user.UserID != updatedByUserId);
+
+        // Create notifications for all recipients
+        const oldDateStr = oldDueDate ? new Date(oldDueDate).toLocaleDateString() : 'None';
+        const newDateStr = newDueDate ? new Date(newDueDate).toLocaleDateString() : 'None';
+        const message = `Ticket #${ticketId} due date updated by ${updaterName} from ${oldDateStr} to ${newDateStr}`;
+        const notifications = allRecipients.map(user =>
+            createNotification(user.UserID, message, 'DUE_DATE_UPDATE', null, ticketId)
+        );
+
+        await Promise.all(notifications);
+
+        res.json({ message: 'Due date update notifications sent successfully' });
+    } catch (error) {
+        console.error('Error sending due date update notifications:', error);
+        res.status(500).json({ error: 'Failed to send due date update notifications' });
+    }
+});
+
 /*------------------------------COUNT TICKETS----------------------------------------------------*/
 
 // API endpoint to fetch ticket counts for a SPECIFIC USER
@@ -2553,13 +2883,57 @@ app.get("/download_evidence/:filename", (req, res) => {
 /* ------------------------------NOTIFY ROLE BASED----------------------------------------------------------------*/
 
 // Helper function to create a notification
-const createNotification = async (userId, message, type, ticketLogId = null) => {
+const createNotification = async (userId, message, type, ticketLogId = null, ticketId = null) => {
     return new Promise((resolve, reject) => {
-        const query = `
-      INSERT INTO notifications (UserID, Message, Type, TicketLogID)
-      VALUES (?, ?, ?, ?)
-    `;
-        db.query(query, [userId, message, type, ticketLogId], (err, result) => {
+        let query, params;
+        
+        if (ticketLogId) {
+            // If we have a ticketLogId, use the existing structure
+            query = `
+                INSERT INTO notifications (UserID, Message, Type, TicketLogID)
+                VALUES (?, ?, ?, ?)
+            `;
+            params = [userId, message, type, ticketLogId];
+        } else if (ticketId) {
+            // If we only have a ticketId, we need to create a simple log entry first or handle it differently
+            // For these notification types, we'll create a temporary log entry
+            const createTempLogQuery = `
+                INSERT INTO ticketlog (TicketID, Type, Description, UserID, CreatedAt)
+                VALUES (?, ?, ?, ?, NOW())
+            `;
+            
+            db.query(createTempLogQuery, [ticketId, type, message, userId || 1], (logErr, logResult) => {
+                if (logErr) {
+                    console.error('Error creating temporary log:', logErr);
+                    reject(logErr);
+                    return;
+                }
+                
+                // Now create the notification with the new log ID
+                const notificationQuery = `
+                    INSERT INTO notifications (UserID, Message, Type, TicketLogID)
+                    VALUES (?, ?, ?, ?)
+                `;
+                db.query(notificationQuery, [userId, message, type, logResult.insertId], (err, result) => {
+                    if (err) {
+                        console.error('Error creating notification:', err);
+                        reject(err);
+                    } else {
+                        resolve(result);
+                    }
+                });
+            });
+            return;
+        } else {
+            // Original structure for notifications without tickets
+            query = `
+                INSERT INTO notifications (UserID, Message, Type, TicketLogID)
+                VALUES (?, ?, ?, ?)
+            `;
+            params = [userId, message, type, null];
+        }
+        
+        db.query(query, params, (err, result) => {
             if (err) {
                 console.error('Error creating notification:', err);
                 reject(err);
@@ -3006,6 +3380,18 @@ app.post('/api/clients', async (req, res) => {
     // 3. Fetch inserted client
     const insertedClientID = insertResult.insertId;
     const clientRows = await query('SELECT * FROM client WHERE ClientID = ?', [insertedClientID]);
+
+    // 4. Send notification to all admins about new client registration
+    try {
+      await sendNotificationsByRoles(
+        ['admin', 'manager'],
+        `New client registered: ${CompanyName} (Contact: ${ContactPersonEmail})`,
+        'NEW_CLIENT_REGISTRATION'
+      );
+    } catch (notificationError) {
+      console.error('Error sending client registration notifications:', notificationError);
+      // Don't fail the registration if notification fails
+    }
 
     res.status(200).json({
       message: 'Client registered successfully',
