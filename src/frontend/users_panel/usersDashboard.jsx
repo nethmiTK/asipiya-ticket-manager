@@ -69,6 +69,14 @@ const usersDashboard = () => {
         }
     };
 
+    // New function to handle updates from NotificationPanel
+    const handleNotificationPanelUpdate = () => {
+        // Optimistically decrease the unread count displayed on the bell icon
+        setUnreadNotifications(prevCount => Math.max(0, prevCount - 1));
+        // Then, re-fetch the actual count from the backend to ensure consistency
+        fetchUnreadNotifications();
+    };
+
     useEffect(() => {
         if (loggedInUser?.UserID) {
             const interval = setInterval(fetchUnreadNotifications, 30000); // Check every 30 seconds
@@ -185,6 +193,7 @@ const usersDashboard = () => {
                                 userId={loggedInUser?.UserID}
                                 role={loggedInUser?.Role}
                                 onClose={() => setShowNotifications(false)}
+                                onNotificationUpdate={handleNotificationPanelUpdate}
                             />
                         </div>
                     )}
