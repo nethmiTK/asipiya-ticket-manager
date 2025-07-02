@@ -164,7 +164,7 @@ const SystemRegistration = () => {
 
         {/* Add / Edit Modal */}
         {showModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55">
             <div className="bg-white p-6 rounded shadow-md w-full max-w-lg relative">
               <button
                 onClick={() => setShowModal(false)}
@@ -248,7 +248,7 @@ const SystemRegistration = () => {
 
         {/* Confirm Delete Modal */}
         {confirmDeleteId !== null && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55">
             <div className="bg-white p-6 rounded shadow-md w-full max-w-sm text-center">
               <h4 className="text-lg font-semibold mb-4">Are you sure you want to delete this system?</h4>
               <div className="flex justify-center gap-4">
