@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import axios from "axios";
 import { io } from "socket.io-client";
 import { IoMdAttach } from "react-icons/io";
 import { MdSend } from "react-icons/md";
+import { FaFilter, FaTimes } from "react-icons/fa"; // Added FaTimes for closing filters
 
 function renderMessageWithLinks(text) {
   if (typeof text !== "string") return text;
@@ -11,29 +12,16 @@ function renderMessageWithLinks(text) {
     /((https?:\/\/)?(www\.)?[\w\-]+\.[\w]{2,}([\/\w\-\.?=&%]*)?)/gi;
 
   return text.split(urlRegex).map((part, i) => {
-    if (
-      part &&
-      typeof part === "string" &&
-      part.match(urlRegex) &&
-      !part.startsWith("http://") &&
-      !part.startsWith("https://")
-    ) {
+    if (part && typeof part === "string" && part.match(urlRegex)) {
+      // Ensure a protocol exists
+      const href =
+        part.startsWith("http://") || part.startsWith("https://")
+          ? part
+          : `https://${part}`;
       return (
         <a
           key={i}
-          href={`https://${part}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-blue-600 underline"
-        >
-          {part}
-        </a>
-      );
-    } else if (typeof part === "string" && part.startsWith("http")) {
-      return (
-        <a
-          key={i}
-          href={part}
+          href={href}
           target="_blank"
           rel="noopener noreferrer"
           className="text-blue-600 underline"
@@ -48,21 +36,29 @@ function renderMessageWithLinks(text) {
 }
 
 export default function SupervisorChatSection({
-  user,
-  supportUser,
+  user, // This should be the current supervisor/agent's info (loggedInUser)
+  supportUser, // This is the client/user's info (selectedTicket.user)
   ticketId,
   ticket,
   role,
+  onNewMessageStatusChange, // Renamed prop as discussed earlier
 }) {
   const [chatMessages, setChatMessages] = useState([]);
   const [chatInput, setChatInput] = useState("");
   const [sendingFile, setSendingFile] = useState(null);
-  const [stickyDate, setStickyDate] = useState(""); // New state for sticky date
+  const [stickyDate, setStickyDate] = useState("");
+  const [hasNewUnseenMessage, setHasNewUnseenMessage] = useState(false);
+
+  // NEW FILTER STATES FOR INLINE FILTERING
+  const [showFilters, setShowFilters] = useState(false); // To toggle visibility of filter section
+  const [filterSender, setFilterSender] = useState("all"); // 'all', 'user', 'agent'
+  const [filterType, setFilterType] = useState("all"); // 'all', 'text', 'file'
+  const [filterKeyword, setFilterKeyword] = useState("");
+
   const chatEndRef = useRef(null);
   const socketRef = useRef(null);
-  const messagesContainerRef = useRef(null); // Ref for the scrollable messages container
+  const messagesContainerRef = useRef(null);
 
-  // Helper: Deduplicate messages by id
   const deduplicateMessages = (messages) => {
     return messages.filter(
       (msg, index, self) =>
@@ -70,7 +66,6 @@ export default function SupervisorChatSection({
     );
   };
 
-  // Mark messages as seen on server
   const markMessagesAsSeen = async () => {
     if (!ticketId || !role) return;
     try {
@@ -78,12 +73,16 @@ export default function SupervisorChatSection({
         TicketID: ticketId,
         Role: role,
       });
+      setHasNewUnseenMessage(false);
+      // Inform the parent component that new messages have been seen
+      if (onNewMessageStatusChange) {
+        onNewMessageStatusChange(false);
+      }
     } catch (error) {
       console.error("Failed to mark messages as seen:", error);
     }
   };
 
-  // Helper: Format date for display (Today, Yesterday, or actual date)
   const formatDateForDisplay = (dateString) => {
     const today = new Date();
     const yesterday = new Date(today);
@@ -104,7 +103,6 @@ export default function SupervisorChatSection({
     }
   };
 
-  // Helper: Group messages by date with dynamic formatting
   const groupMessagesByDate = (messages) => {
     const grouped = {};
     messages.forEach((msg) => {
@@ -112,9 +110,9 @@ export default function SupervisorChatSection({
         year: "numeric",
         month: "long",
         day: "numeric",
-      }); // This will be the key for grouping
-      
-      const displayDate = formatDateForDisplay(msg.timestamp); // This will be the string shown to the user
+      });
+
+      const displayDate = formatDateForDisplay(msg.timestamp);
 
       if (!grouped[messageDate]) {
         grouped[messageDate] = {
@@ -127,14 +125,12 @@ export default function SupervisorChatSection({
     return grouped;
   };
 
-  // Scroll to bottom function
   const scrollToBottom = () => {
     if (chatEndRef.current) {
       chatEndRef.current.scrollIntoView({ behavior: "smooth" });
     }
   };
 
-  // Initialize socket, join room, listen to events
   useEffect(() => {
     if (!ticketId) return;
 
@@ -145,11 +141,25 @@ export default function SupervisorChatSection({
       if (String(message.ticketid) !== String(ticketId)) return;
       const sender =
         (message.role || "").toLowerCase() === "user" ? "user" : "agent";
+
       setChatMessages((prevMsgs) => {
         if (prevMsgs.find((m) => String(m.id) === String(message.id)))
           return prevMsgs;
+
+        if (sender === "user" && document.visibilityState === "hidden") {
+          setHasNewUnseenMessage(true);
+          // Notify parent about new message when tab is hidden
+          if (onNewMessageStatusChange) {
+            onNewMessageStatusChange(true);
+          }
+        }
+
         return deduplicateMessages([...prevMsgs, { ...message, sender }]);
       });
+
+      if (document.visibilityState === "visible") {
+        markMessagesAsSeen();
+      }
     });
 
     socketRef.current.on("messagesSeen", (seenData) => {
@@ -173,9 +183,8 @@ export default function SupervisorChatSection({
         socketRef.current = null;
       }
     };
-  }, [ticketId]);
+  }, [ticketId, role, onNewMessageStatusChange]);
 
-  // Fetch messages on ticket change, mark them as seen immediately
   useEffect(() => {
     if (!ticketId) return;
 
@@ -194,7 +203,6 @@ export default function SupervisorChatSection({
       .catch(console.error);
   }, [ticketId, role]);
 
-  // Mark messages as seen when tab/window regains focus
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") {
@@ -206,7 +214,6 @@ export default function SupervisorChatSection({
       document.removeEventListener("visibilitychange", handleVisibilityChange);
   }, [ticketId, role]);
 
-  // Handle send message (text or file)
   const handleSendMessage = async () => {
     if (!chatInput.trim() && !sendingFile) return;
 
@@ -216,9 +223,9 @@ export default function SupervisorChatSection({
     const newMsg = {
       id: optimisticId,
       ticketid: ticketId,
-      userid: supportUser || null,
+      userid: role === "Supervisor" ? user?.id : supportUser?.id,
       role: role || "Supervisor",
-      sender: "agent",
+      sender: role === "Supervisor" ? "agent" : "user",
       content: chatInput || sendingFile?.name,
       timestamp: new Date().toISOString(),
       type: sendingFile ? "file" : "text",
@@ -232,8 +239,14 @@ export default function SupervisorChatSection({
       const formData = new FormData();
       formData.append("TicketID", ticketId);
       formData.append("Type", sendingFile ? "file" : "text");
-      formData.append("Note", chatInput || sendingFile.name);
-      formData.append("UserID", supportUser || "");
+      formData.append(
+        "Note",
+        chatInput || (sendingFile ? sendingFile.name : "")
+      );
+      formData.append(
+        "UserID",
+        role === "Supervisor" ? user?.id : supportUser?.id
+      );
       formData.append("Role", role || "Supervisor");
       if (sendingFile) formData.append("file", sendingFile);
 
@@ -282,17 +295,43 @@ export default function SupervisorChatSection({
     }
   };
 
-  const groupedMessages = groupMessagesByDate(chatMessages);
+  const filteredMessages = useMemo(() => {
+    let messagesToFilter = chatMessages;
+
+    if (filterSender !== "all") {
+      messagesToFilter = messagesToFilter.filter(
+        (msg) => msg.sender === filterSender
+      );
+    }
+
+    if (filterType !== "all") {
+      messagesToFilter = messagesToFilter.filter((msg) =>
+        filterType === "file" ? msg.type === "file" : msg.type === "text"
+      );
+    }
+
+    if (filterKeyword.trim() !== "") {
+      const lowercasedKeyword = filterKeyword.toLowerCase();
+      messagesToFilter = messagesToFilter.filter(
+        (msg) =>
+          (msg.content &&
+            msg.content.toLowerCase().includes(lowercasedKeyword)) ||
+          (msg.file && msg.file.name.toLowerCase().includes(lowercasedKeyword))
+      );
+    }
+
+    return messagesToFilter;
+  }, [chatMessages, filterSender, filterType, filterKeyword]);
+
+  const groupedMessages = groupMessagesByDate(filteredMessages);
   const sortedDates = Object.keys(groupedMessages).sort(
     (a, b) => new Date(a) - new Date(b)
   );
 
-  // Scroll to bottom when messages change
   useEffect(() => {
     scrollToBottom();
-  }, [chatMessages]);
+  }, [chatMessages, filteredMessages]);
 
-  // --- Sticky Date Header Logic ---
   useEffect(() => {
     const messagesContainer = messagesContainerRef.current;
     if (!messagesContainer) return;
@@ -300,26 +339,26 @@ export default function SupervisorChatSection({
     const observer = new IntersectionObserver(
       (entries) => {
         let currentStickyDate = "";
-        // Iterate in reverse to find the topmost visible date
         for (let i = entries.length - 1; i >= 0; i--) {
           const entry = entries[i];
           if (entry.isIntersecting && entry.target.dataset.date) {
             currentStickyDate = entry.target.dataset.date;
-            break; // Found the topmost intersecting date, so we can stop
+            break;
           }
         }
         setStickyDate(currentStickyDate);
       },
       {
         root: messagesContainer,
-        rootMargin: "-1px 0px 0px 0px", // Trigger when the date separator hits the very top
-        threshold: 0, // Trigger as soon as any part of the element is visible
+        rootMargin: "-1px 0px 0px 0px",
+        threshold: 0,
       }
     );
 
-    // Observe each date separator
     sortedDates.forEach((date) => {
-      const dateElement = messagesContainer.querySelector(`[data-date-key="${date}"]`);
+      const dateElement = messagesContainer.querySelector(
+        `[data-date-key="${date}"]`
+      );
       if (dateElement) {
         observer.observe(dateElement);
       }
@@ -328,48 +367,117 @@ export default function SupervisorChatSection({
     return () => {
       observer.disconnect();
     };
-  }, [groupedMessages, sortedDates]); // Re-run when grouped messages or sorted dates change
+  }, [groupedMessages, sortedDates, filteredMessages]);
 
   return (
     <div className="flex flex-col h-full w-6xl mx-auto border-gray-400 rounded-lg shadow-lg border">
-      {/* Header - WhatsApp style */}
-      <header className="p-4 rounded-t-lg border-b bg-gray-400 text-white shadow-md">
+      <header className="p-4 rounded-t-lg border-b bg-gray-400 text-white shadow-md flex justify-between items-center">
         <h2 className="text-lg font-bold text-gray-700">
           Chat for Ticket #{ticket?.id || ticketId}
         </h2>
-        {/* You could add participant names here, e.g., "Chat with {user?.name}" */}
+        {/* Toggle filter visibility */}
+        <button
+          onClick={() => setShowFilters(!showFilters)}
+          className="p-2 rounded-full bg-gray-200 text-gray-700 hover:bg-gray-300 transition-colors duration-200"
+          title={showFilters ? "Hide Filters" : "Show Filters"}
+        >
+          {showFilters ? (
+            <FaTimes className="size-5" />
+          ) : (
+            <FaFilter className="size-5" />
+          )}
+        </button>
       </header>
 
-      {/* Sticky Date Header */}
-      {stickyDate && (
-        <div className="sticky top-0 z-10 text-center py-2 bg-green-200 text-gray-700 text-sm font-medium shadow-sm border-b">
-          {stickyDate}
+      {/* NEW: Inline Filter Section - Conditionally rendered based on showFilters */}
+      {showFilters && (
+        <div className="p-4 bg-gray-50 border-b border-gray-200 grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700">
+              Sender:
+            </label>
+            <select
+              value={filterSender}
+              onChange={(e) => setFilterSender(e.target.value)}
+              className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
+            >
+              <option value="all">All</option>
+              <option value="user">Client</option>
+              <option value="agent">Agent (You)</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700">
+              Message Type:
+            </label>
+            <select
+              value={filterType}
+              onChange={(e) => setFilterType(e.target.value)}
+              className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
+            >
+              <option value="all">All</option>
+              <option value="text">Text</option>
+              <option value="file">File</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700">
+              Keyword:
+            </label>
+            <input
+              type="text"
+              value={filterKeyword}
+              onChange={(e) => setFilterKeyword(e.target.value)}
+              placeholder="Search keywords..."
+              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+            />
+          </div>
+
+          {/* Optional: Add a "Reset Filters" button if desired */}
+          {(filterSender !== "all" ||
+            filterType !== "all" ||
+            filterKeyword !== "") && (
+            <div className="col-span-full text-right mt-2">
+              <button
+                onClick={() => {
+                  setFilterSender("all");
+                  setFilterType("all");
+                  setFilterKeyword("");
+                }}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300"
+              >
+                Reset Filters
+              </button>
+            </div>
+          )}
         </div>
       )}
 
-      {/* Chat Messages Area - WhatsApp style */}
       <div
-        className="flex-1 overflow-y-auto p-4 relative" // Added relative for sticky child positioning
+        className="flex-1 overflow-y-auto p-4 relative"
         style={{
           backgroundImage:
             "url('https://www.transparenttextures.com/patterns/clean-textile.png')",
           backgroundColor: "#0000",
         }}
-        ref={messagesContainerRef} // Assign ref to the scrollable container
+        ref={messagesContainerRef}
       >
-        {chatMessages.length === 0 && (
+        {filteredMessages.length === 0 && (
           <p className="text-center text-gray-600 mt-50">
-            No chat messages yet. Start the conversation!
+            {chatMessages.length === 0
+              ? "No chat messages yet. Start the conversation!"
+              : "No messages match your filter criteria."}
           </p>
         )}
 
         {sortedDates.map((dateKey) => (
           <div key={dateKey}>
-            {/* Date Separator */}
             <div
               className="text-center my-4"
-              data-date-key={dateKey} // Use data attribute for Intersection Observer
-              data-date={groupedMessages[dateKey].displayDate} // Store the display string here
+              data-date-key={dateKey}
+              data-date={groupedMessages[dateKey].displayDate}
             >
               <span className="inline-block bg-green-200 text-gray-700 px-3 py-1 rounded-full text-sm font-medium shadow-sm">
                 {groupedMessages[dateKey].displayDate}
@@ -385,7 +493,6 @@ export default function SupervisorChatSection({
                     !isClient ? "justify-end" : "justify-start"
                   }`}
                 >
-                  {/* Client Avatar (if applicable and desired) */}
                   {isClient && (
                     <img
                       src={
@@ -397,7 +504,6 @@ export default function SupervisorChatSection({
                     />
                   )}
 
-                  {/* Message Bubble */}
                   <div
                     className={`relative max-w-[75%] px-3 py-2 rounded-lg shadow-md break-words whitespace-pre-wrap text-sm ${
                       !isClient
@@ -410,8 +516,7 @@ export default function SupervisorChatSection({
                         : { borderBottomLeftRadius: "0.25rem" }
                     }
                   >
-                    {/* Message Content */}
-                    {msg.file ? (
+                    {msg.type === "file" && msg.file ? (
                       <div className="flex flex-col items-center p-2">
                         {msg.file.name
                           .toLowerCase()
@@ -454,16 +559,16 @@ export default function SupervisorChatSection({
                         >
                           <svg
                             xmlns="http://www.w3.org/2000/svg"
-                            className="h-3 w-3 mr-1"
+                            className="h-3 w-3 mr-1" // Make sure h-3 w-3 give you the desired size
                             fill="none"
                             viewBox="0 0 24 24"
                             stroke="currentColor"
-                            strokeWidth="2"
+                            strokeWidth="1.5" // Often 1.5 is used for Heroicons outlined style
                           >
                             <path
                               strokeLinecap="round"
                               strokeLinejoin="round"
-                              d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                              d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75v-2.25M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"
                             />
                           </svg>
                           Download
@@ -473,7 +578,6 @@ export default function SupervisorChatSection({
                       renderMessageWithLinks(msg.content)
                     )}
 
-                    {/* Timestamp and Status */}
                     <div
                       className={`text-[10px] mt-1 ${
                         !isClient ? "text-right" : "text-left"
@@ -482,7 +586,7 @@ export default function SupervisorChatSection({
                       {new Date(msg.timestamp).toLocaleTimeString("en-US", {
                         hour: "2-digit",
                         minute: "2-digit",
-                        hour12: true, // Use AM/PM format
+                        hour12: true,
                       })}
                       {!isClient && (
                         <span className="ml-1">
@@ -491,13 +595,12 @@ export default function SupervisorChatSection({
                             : msg.status === "failed"
                             ? "❌"
                             : msg.status === "seen"
-                            ? "✓✓" // Double tick for seen
+                            ? "✓✓"
                             : "✓"}
                         </span>
                       )}
                     </div>
 
-                    {/* WhatsApp-like "tail" for the bubble */}
                     {!isClient ? (
                       <div
                         className="absolute -right-2 bottom-0 w-3 h-3 bg-[#D9FDD3] transform rotate-45 origin-bottom-left rounded-sm"
@@ -511,7 +614,6 @@ export default function SupervisorChatSection({
                     )}
                   </div>
 
-                  {/* Agent/Supervisor Avatar */}
                   {!isClient && (
                     <img
                       src={user?.avatar || "https://i.pravatar.cc/40?u=support"}
@@ -528,7 +630,6 @@ export default function SupervisorChatSection({
         {sendingFile && (
           <div className="flex justify-end mb-2">
             {" "}
-            {/* Align to right like sent messages */}
             <div className="relative bg-blue-50 border border-blue-200 rounded-lg p-2 shadow-md max-w-xs w-full flex flex-col items-center">
               {sendingFile.type && sendingFile.type.startsWith("image/") ? (
                 <img
@@ -544,7 +645,7 @@ export default function SupervisorChatSection({
                 />
               ) : (
                 <img
-                  src={getFileIcon(sendingFile.type || '', sendingFile.name || '')} // Pass default empty strings
+                  src="https://upload.wikimedia.org/wikipedia/commons/8/87/PDF_file_icon.svg"
                   alt="File Icon"
                   className="w-16 h-16 object-contain mb-1"
                 />
@@ -557,7 +658,7 @@ export default function SupervisorChatSection({
               </span>
               <button
                 onClick={() => {
-                  URL.revokeObjectURL(URL.createObjectURL(sendingFile)); // Clean up URL
+                  URL.revokeObjectURL(URL.createObjectURL(sendingFile));
                   setSendingFile(null);
                 }}
                 className="absolute top-1 right-2 text-red-600 hover:text-red-800 text-lg font-bold"
@@ -569,13 +670,10 @@ export default function SupervisorChatSection({
           </div>
         )}
 
-        {/* --- Key change: Ensure chatEndRef is the last element within the scrollable container --- */}
         <div ref={chatEndRef} />
       </div>
 
-      {/* Input Area - WhatsApp style */}
       <div className="flex items-center space-x-2 p-3 bg-gray-100 border-t border-gray-200 rounded-b-lg">
-        {/* Attach Button */}
         <label
           htmlFor="file-upload"
           className="cursor-pointer p-2 rounded-full hover:bg-gray-200 transition-colors duration-200"
@@ -590,7 +688,6 @@ export default function SupervisorChatSection({
           onChange={(e) => setSendingFile(e.target.files[0])}
         />
 
-        {/* Text Input */}
         <input
           type="text"
           value={chatInput}
@@ -605,7 +702,6 @@ export default function SupervisorChatSection({
           }}
         />
 
-        {/* Send Button */}
         <button
           onClick={handleSendMessage}
           disabled={!chatInput.trim() && !sendingFile}
