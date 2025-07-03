@@ -1762,10 +1762,11 @@ export default function TicketManage() {
                       <ChatSection
                         user={selectedTicket.user}
                         supportUser={selectedTicket.assignedBy}
+                        currentUser={user} // Pass the logged-in admin/supervisor
                         initialMessages={initialMessages}
                         ticket={selectedTicket}
                         ticketId={selectedTicket.id}
-                        role={"Supervisor"} // Adjust role based on actual loggedInUser.Role
+                        role={user?.Role || "Supervisor"} // Use actual user role
                       />
                     </div>
                   ) : null}

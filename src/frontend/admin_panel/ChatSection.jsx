@@ -74,6 +74,7 @@ function highlightText(text, keyword) {
 export default function SupervisorChatSection({
   user,
   supportUser,
+  currentUser, // The logged-in admin/supervisor
   ticketId,
   ticket,
   role,
@@ -274,9 +275,9 @@ export default function SupervisorChatSection({
     const newMsg = {
       id: optimisticId,
       ticketid: ticketId,
-      userid: role === "Supervisor" ? user?.id : supportUser?.id,
+      userid: role === "Supervisor" || role === "Admin" ? currentUser?.UserID : supportUser?.UserID,
       role: role || "Supervisor",
-      sender: role === "Supervisor" ? "agent" : "user",
+      sender: role === "Supervisor" || role === "Admin" ? "agent" : "user",
       content: chatInput || sendingFile?.name,
       timestamp: new Date().toISOString(),
       type: sendingFile ? "file" : "text",
@@ -294,10 +295,9 @@ export default function SupervisorChatSection({
         "Note",
         chatInput || (sendingFile ? sendingFile.name : "")
       );
-      formData.append(
-        "UserID",
-        role === "Supervisor" ? user?.id : supportUser?.id
-      );
+      const userIdToSend = role === "Supervisor" || role === "Admin" ? currentUser?.UserID : supportUser?.UserID;
+      console.log("Sending message with UserID:", userIdToSend, "Role:", role, "CurrentUser:", currentUser);
+      formData.append("UserID", userIdToSend);
       formData.append("Role", role || "Supervisor");
       if (sendingFile) formData.append("file", sendingFile);
 
@@ -660,10 +660,11 @@ export default function SupervisorChatSection({
                   {isClient && (
                     <img
                       src={
-                        supportUser?.avatar ||
-                        "https://i.pravatar.cc/40?u=user1"
+                        user?.ProfileImagePath
+                          ? `http://localhost:5000/uploads/profile_images/${user.ProfileImagePath}`
+                          : `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.FullName || 'User')}&background=random&color=fff`
                       }
-                      alt="avatar"
+                      alt={user?.FullName || 'User'}
                       className="w-8 h-8 rounded-full mr-2 self-end shadow-md"
                     />
                   )}
@@ -782,8 +783,11 @@ export default function SupervisorChatSection({
 
                   {!isClient && (
                     <img
-                      src={user?.avatar || "https://i.pravatar.cc/40?u=support"}
-                      alt="avatar"
+                      src={currentUser?.ProfileImagePath 
+                        ? `http://localhost:5000/uploads/profile_images/${currentUser.ProfileImagePath}`
+                        : `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser?.FullName || 'Admin')}&background=random&color=fff`
+                      }
+                      alt={currentUser?.FullName || 'Admin'}
                       className="w-8 h-8 rounded-full ml-2 self-end shadow-md"
                     />
                   )}
