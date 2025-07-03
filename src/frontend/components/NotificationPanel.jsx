@@ -208,24 +208,19 @@ const NotificationPanel = ({ userId, role, onClose, onNotificationUpdate }) => {
                 cleanMessage = cleanMessage.replace(ticketMatch[0], '').trim();
             }
             
-            // Determine sender display name based on sender's role
+            // Determine sender display name based on role
             let displaySender = senderName;
             
-            // Always show role-based display for admin/supervisor messages
-            if (senderRole === 'Admin') {
-                displaySender = 'Admin';
-            } else if (senderRole === 'Supervisor') {
-                displaySender = 'Supervisor';
-            } else if (senderRole === 'User' || senderRole === 'Client') {
-                // Keep the actual user/client name for user-to-admin messages
-                displaySender = senderName;
-            } else if (senderName && senderName !== 'Someone' && senderName !== 'Unknown') {
-                // If no role info but we have a name, check if it looks like an admin name
-                // This is a fallback - if the name is very long, it's likely an admin's full name
-                if (senderName.includes(' ') && senderName.length > 15) {
+            // If this is coming from admin panel, show role instead of full name
+            if (role === 'User' || role === 'Client') {
+                // For users/clients receiving messages, show role-based display
+                if (senderRole === 'Admin') {
                     displaySender = 'Admin';
-                } else {
-                    displaySender = senderName;
+                } else if (senderRole === 'Supervisor') {
+                    displaySender = 'Supervisor';
+                } else if (senderName && senderName !== 'Someone') {
+                    // If no role info but we have a name, assume it's admin
+                    displaySender = 'Admin';
                 }
             }
             
