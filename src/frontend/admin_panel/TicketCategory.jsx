@@ -1,9 +1,13 @@
-import React, { useState, useEffect } from 'react';
-import axiosClient from '../axiosClient'; // Changed from axios to axiosClient
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import axiosClient from '../axiosClient';
 import { toast } from 'react-toastify';
 import { FaEdit, FaTrash } from 'react-icons/fa';
 import { X } from 'lucide-react';
 import AdminSideBar from '../../user_components/SideBar/AdminSideBar';
+import AdminNavBar from '../../user_components/NavBar/AdminNavBar';
+import NotificationPanel from '../components/NotificationPanel';
+import { useAuth } from '../../App';
+import { useNavigate } from 'react-router-dom';
 
 const TicketCategory = () => {
   const [form, setForm] = useState({ CategoryName: '', Description: '', Status: '1' });
@@ -14,13 +18,55 @@ const TicketCategory = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
 
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+
+  // Auth and notification
+  const { loggedInUser: user } = useAuth();
+  const navigate = useNavigate();
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
+  const notificationRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (notificationRef.current && !notificationRef.current.contains(event.target)) {
+        setShowNotifications(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const fetchUnreadNotifications = useCallback(async () => {
+    if (!user?.UserID) return;
+    try {
+      const res = await axiosClient.get(`/api/notifications/count/${user.UserID}`);
+      setUnreadNotifications(res.data.count);
+    } catch (error) {
+      console.error("Error fetching unread notifications", error);
+    }
+  }, [user?.UserID]);
+
+  useEffect(() => {
+    if (user?.UserID) {
+      fetchUnreadNotifications();
+      const interval = setInterval(fetchUnreadNotifications, 30000);
+      return () => clearInterval(interval);
+    }
+  }, [user, fetchUnreadNotifications]);
+
+  const handleNotificationPanelUpdate = () => {
+    fetchUnreadNotifications();
+  };
+
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
   const fetchCategories = async () => {
     try {
-      // Use axiosClient and remove base URL
       const res = await axiosClient.get('/ticket_category');
       setCategories(res.data);
     } catch (error) {
@@ -36,22 +82,19 @@ const TicketCategory = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
-
     try {
       if (editingId) {
-        // Use axiosClient and remove base URL
         await axiosClient.put(`/api/ticket_category_update/${editingId}`, form);
         toast.success('Category updated successfully.');
       } else {
-        // Use axiosClient and remove base URL
         await axiosClient.post('/api/ticket_category', { ...form, Status: '1' });
         toast.success('Category added successfully.');
       }
-
       setForm({ CategoryName: '', Description: '', Status: '1' });
       setEditingId(null);
       setIsModalOpen(false);
-      await fetchCategories(); // Re-fetch categories to update the list
+      await fetchCategories();
+      setCurrentPage(1); // Reset to first page on update/add
     } catch (error) {
       setError('Submit Error: ' + (error.response?.data?.message || error.message));
       toast.error(error.response?.data?.message || 'Failed to submit category data.');
@@ -74,10 +117,10 @@ const TicketCategory = () => {
 
   const confirmDelete = async () => {
     try {
-      // Use axiosClient and remove base URL
       const res = await axiosClient.delete(`/api/ticket_category_delete/${confirmDeleteId}`);
       toast.success(res.data.message || 'Category deleted successfully.');
-      await fetchCategories(); // Re-fetch categories after successful deletion
+      await fetchCategories();
+      setCurrentPage(1); // Reset to first page on delete
     } catch (error) {
       if (error.response?.status === 403) {
         toast.error("This category is already in use and cannot be deleted.");
@@ -90,11 +133,49 @@ const TicketCategory = () => {
     }
   };
 
+  // Pagination calculations
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentCategories = categories.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(categories.length / itemsPerPage);
+
+  const paginate = (page) => {
+    if (page < 1 || page > totalPages) return;
+    setCurrentPage(page);
+  };
+
+  const handleItemsPerPageChange = (e) => {
+    setItemsPerPage(Number(e.target.value));
+    setCurrentPage(1);
+  };
+
   return (
     <div className="flex">
       <AdminSideBar open={isSidebarOpen} setOpen={setIsSidebarOpen} />
+      <AdminNavBar
+        pageTitle="Ticket Category Management"
+        user={user}
+        sidebarOpen={isSidebarOpen}
+        onProfileClick={() => navigate('/admin-profile')}
+        onNotificationClick={() => setShowNotifications(!showNotifications)}
+        unreadNotifications={unreadNotifications}
+        showNotifications={showNotifications}
+        notificationRef={notificationRef}
+      />
+
       <div className={`flex-1 min-h-screen bg-gray-100 p-8 transition-all duration-300 ${isSidebarOpen ? "ml-72" : "ml-20"}`}>
-        <div className="bg-white rounded-lg shadow p-6">
+        {showNotifications && (
+          <div ref={notificationRef} className="absolute right-4 top-16 z-50">
+            <NotificationPanel
+              userId={user?.UserID}
+              role={user?.Role}
+              onClose={() => setShowNotifications(false)}
+              onNotificationUpdate={handleNotificationPanelUpdate}
+            />
+          </div>
+        )}
+
+        <div className="bg-white rounded-lg shadow p-6 mt-10">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-2xl font-bold">Ticket Category Management</h2>
             <button
@@ -116,20 +197,20 @@ const TicketCategory = () => {
           <table className="table-fixed w-full">
             <thead className="bg-gray-200">
               <tr>
-                <th className="w-20 p-2 text-left">Category ID</th>
-                <th className="w-44 p-2 text-left">Category Name</th>
-                <th className="w-[500px] p-2 text-left">Description</th>
-                <th className="w-24 p-2 text-left">Status</th>
-                <th className="w-24 p-2 text-left">Actions</th>
+                <th className="w-20 p-2 text-left text-xs md:text-sm">Category ID</th>
+                <th className="w-44 p-2 text-left text-xs md:text-sm">Category Name</th>
+                <th className="w-[500px] p-2 text-left text-xs md:text-sm">Description</th>
+                <th className="w-24 p-2 text-left text-xs md:text-sm">Status</th>
+                <th className="w-24 p-2 text-left text-xs md:text-sm">Actions</th>
               </tr>
             </thead>
             <tbody className='bg-white divide-y divide-gray-200'>
-              {categories.map((category) => (
+              {currentCategories.map((category) => (
                 <tr key={category.TicketCategoryID}>
-                  <td className="p-2">{category.TicketCategoryID}</td>
-                  <td className="p-2">{category.CategoryName}</td>
-                  <td className="p-2">{category.Description}</td>
-                  <td className="p-2">
+                  <td className="p-2 text-xs md:text-sm">{category.TicketCategoryID}</td>
+                  <td className="p-2 text-xs md:text-sm">{category.CategoryName}</td>
+                  <td className="p-2 text-xs md:text-sm">{category.Description}</td>
+                  <td className="p-2 text-xs md:text-sm">
                     <span className={`px-2 py-1 text-sm font-semibold rounded 
                       ${parseInt(category.Status) === 1 
                         ? 'bg-green-100 text-green-700' 
@@ -137,7 +218,7 @@ const TicketCategory = () => {
                       {parseInt(category.Status) === 1 ? 'Active' : 'Inactive'}
                     </span>
                   </td>
-                  <td className="p-2">
+                  <td className="p-2 text-xs md:text-sm">
                     <button onClick={() => handleEdit(category)} className="text-blue-600 hover:text-blue-800 mr-4"><FaEdit /></button>
                     <button onClick={() => handleDelete(category.TicketCategoryID)} className="text-red-600 hover:text-red-800"><FaTrash /></button>
                   </td>
@@ -146,6 +227,27 @@ const TicketCategory = () => {
             </tbody>
           </table>
         </div>
+
+          {categories.length > 0 && (
+            <div className="flex justify-end items-center mt-4 p-4">
+              <div className="flex items-center space-x-4">
+                <span className="text-sm text-gray-700">Entries per page:</span>
+                <select value={itemsPerPage} onChange={handleItemsPerPageChange} className="border p-2 rounded text-sm">
+                  {[5, 10, 20, 50].map(num => (
+                    <option key={num} value={num}>{num}</option>
+                  ))}
+                </select>
+                <span className="text-sm text-gray-700">
+                  {`${indexOfFirstItem + 1}-${Math.min(indexOfLastItem, categories.length)} of ${categories.length}`}
+                </span>
+                <button onClick={() => paginate(1)} disabled={currentPage === 1} className="btn-page">&lt;&lt;</button>
+                <button onClick={() => paginate(currentPage - 1)} disabled={currentPage === 1} className="btn-page">&lt;</button>
+                <span className="text-sm">{currentPage}</span>
+                <button onClick={() => paginate(currentPage + 1)} disabled={currentPage === totalPages} className="btn-page">&gt;</button>
+                <button onClick={() => paginate(totalPages)} disabled={currentPage === totalPages} className="btn-page">&gt;&gt;</button>
+              </div>
+            </div>
+          )}
 
         {/* Modal */}
         {isModalOpen && (
@@ -177,7 +279,6 @@ const TicketCategory = () => {
                   />
                 </div>
 
-                {/* Show status only when editing */}
                 {editingId && (
                   <div className="mb-4">
                     <label className="block text-sm font-medium mb-1">Status</label>
