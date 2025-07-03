@@ -415,10 +415,9 @@ const OpenTickets = () => {
             />
           )}
 
-          <h1 className="text-2xl font-bold mb-6">Create Your Tickets</h1>
+          <h1 className="text-2xl font-bold mb-6 text-gray-800">Create Your Ticket</h1>
           <div className="flex flex-col items-center justify-start">
             <div className="w-full max-w-[750px] bg-slate-100 text-black p-8 rounded-2xl shadow-lg">
-              <h1 className="text-2xl md:text-3xl font-bold text-center mb-4">Create Ticket</h1>
 
               <Formik
                 initialValues={{
