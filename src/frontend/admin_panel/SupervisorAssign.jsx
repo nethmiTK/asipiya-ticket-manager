@@ -1,7 +1,9 @@
-import React, { useEffect, useRef, useState } from 'react';
-import axiosClient from '../axiosClient'; // Changed from axios to axiosClient
+import React, { useEffect, useRef, useState, useCallback } from 'react';
+import axiosClient from '../axiosClient';
 import { useParams, useNavigate } from 'react-router-dom';
 import AdminSideBar from '../../user_components/SideBar/AdminSideBar';
+import AdminNavBar from '../../user_components/NavBar/AdminNavBar';
+import NotificationPanel from '../components/NotificationPanel';
 import { toast } from 'react-toastify';
 import { IoArrowBack } from 'react-icons/io5';
 import { useAuth } from '../../App.jsx';
@@ -10,6 +12,7 @@ const SupervisorAssignPage = ({ ticketId }) => {
   const params = useParams();
   const navigate = useNavigate();
   const { loggedInUser: user } = useAuth();
+
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [ticketData, setTicketData] = useState(null);
   const [supervisors, setSupervisors] = useState([]);
@@ -19,20 +22,20 @@ const SupervisorAssignPage = ({ ticketId }) => {
   const [openDropdown, setOpenDropdown] = useState(false);
   const dropdownRef = useRef(null);
 
+  // Notification State
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
+  const notificationRef = useRef(null);
+
   const id = ticketId || params.id;
+  
 
   useEffect(() => {
-    // Use axiosClient and remove base URL
     axiosClient.get(`/api/ticket_view/${id}`)
       .then(res => {
         setTicketData(res.data);
-
-        const validStatuses = ['Open', 'In Progress', 'Resolved'];
-        const validPriorities = ['Low', 'Medium', 'High'];
-
-        setStatus(validStatuses.includes(res.data.Status) ? res.data.Status : 'Open');
-        setPriority(validPriorities.includes(res.data.Priority) ? res.data.Priority : 'Low');
-
+        setStatus(['Open', 'In Progress', 'Resolved'].includes(res.data.Status) ? res.data.Status : 'Open');
+        setPriority(['Low', 'Medium', 'High'].includes(res.data.Priority) ? res.data.Priority : 'Low');
         const supervisorStr = res.data.SupervisorID || '';
         const ids = supervisorStr.split(',').map(id => id.trim()).filter(Boolean);
         setSelectedSupervisors(ids);
@@ -42,22 +45,15 @@ const SupervisorAssignPage = ({ ticketId }) => {
         toast.error('Failed to load ticket data.');
       });
 
-    // Use axiosClient and remove base URL
     axiosClient.get('/api/supervisors')
-      .then(res => {
-        if (Array.isArray(res.data)) {
-          setSupervisors(res.data);
-        } else {
-          console.error("Expected array but got:", res.data);
-          toast.error('Failed to load supervisor data.');
-        }
-      })
+      .then(res => setSupervisors(Array.isArray(res.data) ? res.data : []))
       .catch(err => {
         console.error('Error fetching supervisors:', err);
         toast.error('Failed to load supervisor data.');
       });
   }, [id]);
 
+  // Close dropdown on outside click
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
@@ -68,13 +64,29 @@ const SupervisorAssignPage = ({ ticketId }) => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // Fetch unread notifications
+  const fetchUnreadNotifications = useCallback(async () => {
+    if (!user?.UserID) return;
+    try {
+      const res = await axiosClient.get(`/api/notifications/count/${user.UserID}`);
+      setUnreadNotifications(res.data.count);
+    } catch (error) {
+      console.error("Error fetching unread notifications", error);
+    }
+  }, [user?.UserID]);
+
+  useEffect(() => {
+    fetchUnreadNotifications();
+    const interval = setInterval(fetchUnreadNotifications, 30000);
+    return () => clearInterval(interval);
+  }, [fetchUnreadNotifications]);
+
   const handleAssign = () => {
     if (!selectedSupervisors.length) {
       toast.error("Please select at least one supervisor.");
       return;
     }
 
-    // Use axiosClient and remove base URL
     axiosClient.put(`/api/tickets/${id}/assign`, {
       supervisorId: selectedSupervisors.join(','),
       status,
@@ -82,12 +94,8 @@ const SupervisorAssignPage = ({ ticketId }) => {
       assignerId: user.UserID
     })
       .then(response => {
-        if (response.data.status === 'success') {
-          toast.success('Supervisors assigned successfully!');
-          if (!ticketId) navigate(-1);
-        } else {
-          throw new Error(response.data.message || 'Failed to assign supervisors');
-        }
+        toast.success('Supervisors assigned successfully!');
+        if (!ticketId) navigate(-1);
       })
       .catch(err => {
         console.error('Error assigning supervisors:', err);
@@ -142,11 +150,8 @@ const SupervisorAssignPage = ({ ticketId }) => {
           </select>
         </div>
 
-        {/* Supervisor dropdown with checkbox */}
         <div ref={dropdownRef} className="relative">
           <label className="block font-medium mb-2">Supervisor Name(s)</label>
-
-          {/* Toggle box */}
           <div
             onClick={() => setOpenDropdown(!openDropdown)}
             className="w-full px-4 py-2 border border-gray-300 rounded cursor-pointer bg-white"
@@ -159,10 +164,9 @@ const SupervisorAssignPage = ({ ticketId }) => {
               : 'Select supervisors'}
           </div>
 
-          {/* Dropdown content */}
           {openDropdown && (
-            <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded shadow max-h-35 overflow-y-auto">
-              {supervisors.map((sUser) => { // Renamed 'user' to 'sUser' to avoid conflict with 'user' from useAuth
+            <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded shadow max-h-40 overflow-y-auto">
+              {supervisors.map((sUser) => {
                 const userIdStr = String(sUser.UserID);
                 return (
                   <label key={sUser.UserID} className="flex items-center px-4 py-2 hover:bg-gray-100">
@@ -172,13 +176,11 @@ const SupervisorAssignPage = ({ ticketId }) => {
                       checked={selectedSupervisors.includes(userIdStr)}
                       onChange={(e) => {
                         const value = e.target.value;
-                        if (e.target.checked) {
-                          setSelectedSupervisors([...selectedSupervisors, value]);
-                        } else {
-                          setSelectedSupervisors(
-                            selectedSupervisors.filter((id) => id !== value)
-                          );
-                        }
+                        setSelectedSupervisors(prev =>
+                          e.target.checked
+                            ? [...new Set([...prev, value])]
+                            : prev.filter((id) => id !== value)
+                        );
                       }}
                       className="form-checkbox h-4 w-4 text-blue-600 mr-2"
                     />
@@ -221,18 +223,41 @@ const SupervisorAssignPage = ({ ticketId }) => {
   );
 
   return ticketId ? content : (
-    <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
-      <AdminSideBar open={isSidebarOpen} setOpen={setIsSidebarOpen} />
-      <div className="bg-white p-8 rounded-xl shadow-lg max-w-xl w-full relative">
-        <button
-          onClick={() => navigate(-1)}
-          title="Back"
-          className="flex items-center gap-1 text-gray-600 hover:text-gray-900"
-        >
-          <IoArrowBack size={20} />
-          Back
-        </button>
-        {content}
+    <div className="min-h-screen bg-gray-100">
+      <AdminNavBar
+        user={user}
+        pageTitle="Assign Supervisor"
+        sidebarOpen={isSidebarOpen}
+        onProfileClick={() => navigate('/admin-profile')}
+        onNotificationClick={() => setShowNotifications(!showNotifications)}
+        unreadNotifications={unreadNotifications}
+        showNotifications={showNotifications}
+        notificationRef={notificationRef}
+      />
+      <div className="flex pt-16">
+        <AdminSideBar open={isSidebarOpen} setOpen={setIsSidebarOpen} />
+        <main className={`flex-grow p-6 transition-all duration-300 ${isSidebarOpen ? 'ml-72' : 'ml-20'}`}>
+          {showNotifications && (
+            <div ref={notificationRef} className="absolute right-4 top-16 z-50">
+              <NotificationPanel
+                userId={user?.UserID}
+                role={user?.Role}
+                onClose={() => setShowNotifications(false)}
+              />
+            </div>
+          )}
+          <div className="bg-white p-8 rounded-xl shadow-lg max-w-xl mx-auto">
+            <button
+              onClick={() => navigate(-1)}
+              title="Back"
+              className="flex items-center gap-1 text-gray-600 hover:text-gray-900 mb-4"
+            >
+              <IoArrowBack size={20} />
+              Back
+            </button>
+            {content}
+          </div>
+        </main>
       </div>
     </div>
   );
