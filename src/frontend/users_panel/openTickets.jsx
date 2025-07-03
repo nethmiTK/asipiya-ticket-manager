@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useDropzone } from "react-dropzone";
 import { Formik, Form, Field } from "formik";
-import axios from "axios";
+import axiosClient from "../axiosClient"; // Changed to axiosClient
 import SideBar from "../../user_components/SideBar/SideBar";
 import NavBar from "../../user_components/NavBar/NavBar";
 import NotificationPanel from "../components/NotificationPanel";
@@ -10,355 +10,358 @@ import { useNavigate } from "react-router-dom";
 
 // Helper function to enhance files with preview URLs
 const enhanceFilesWithPreview = (acceptedFiles) =>
-  acceptedFiles.map((file) =>
-    Object.assign(file, {
-      preview: URL.createObjectURL(file),
-    })
-  );
+    acceptedFiles.map((file) =>
+        Object.assign(file, {
+            preview: URL.createObjectURL(file),
+        })
+    );
 
 // Helper function to get file icon based on file type using image URLs
 const getFileIcon = (fileName) => {
-  const extension = fileName.split('.').pop().toLowerCase();
-  const iconBaseUrl = "https://cdn-icons-png.flaticon.com/512/"; // Base URL for Flaticon 512x512 icons
+    const extension = fileName.split('.').pop().toLowerCase();
+    const iconBaseUrl = "https://cdn-icons-png.flaticon.com/512/"; // Base URL for Flaticon 512x512 icons
 
-  switch (extension) {
-    case 'pdf': return <img src={`${iconBaseUrl}136/136522.png`} alt="PDF icon" className="w-5 h-5" />;
-    case 'doc':
-    case 'docx': return <img src={`${iconBaseUrl}888/888883.png`} alt="Word icon" className="w-5 h-5" />;
-    case 'xls':
-    case 'xlsx': return <img src={`${iconBaseUrl}732/732220.png`} alt="Excel icon" className="w-5 h-5" />;
-    case 'ppt':
-    case 'pptx': return <img src={`${iconBaseUrl}7817/7817494.png`} alt="PowerPoint icon" className="w-5 h-5" />;
-    case 'txt': return <img src={`${iconBaseUrl}8243/8243060.png`} alt="Text icon" className="w-5 h-5" />;
-    case 'zip':
-    case 'rar':
-    case '7z': return <img src={`${iconBaseUrl}337/337960.png`} alt="Archive icon" className="w-5 h-5" />;
-    case 'mp3':
-    case 'wav':
-    case 'flac': return <img src={`${iconBaseUrl}651/651717.png`} alt="Audio icon" className="w-5 h-5" />;
-    case 'mp4':
-    case 'avi':
-    case 'mov':
-    case 'mkv': return <img src={`${iconBaseUrl}10278/10278992.png`} alt="Video icon" className="w-5 h-5" />;
-    case 'jpg':
-    case 'jpeg':
-    case 'png':
-    case 'gif':
-    case 'bmp': return <img src={`${iconBaseUrl}1829/1829586.png`} alt="Image icon" className="w-5 h-5" />;
-    default: return <img src={`${iconBaseUrl}64/64522.png`} alt="File icon" className="w-5 h-5" />; 
-  }
+    switch (extension) {
+        case 'pdf': return <img src={`${iconBaseUrl}136/136522.png`} alt="PDF icon" className="w-5 h-5" />;
+        case 'doc':
+        case 'docx': return <img src={`${iconBaseUrl}888/888883.png`} alt="Word icon" className="w-5 h-5" />;
+        case 'xls':
+        case 'xlsx': return <img src={`${iconBaseUrl}732/732220.png`} alt="Excel icon" className="w-5 h-5" />;
+        case 'ppt':
+        case 'pptx': return <img src={`${iconBaseUrl}7817/7817494.png`} alt="PowerPoint icon" className="w-5 h-5" />;
+        case 'txt': return <img src={`${iconBaseUrl}8243/8243060.png`} alt="Text icon" className="w-5 h-5" />;
+        case 'zip':
+        case 'rar':
+        case '7z': return <img src={`${iconBaseUrl}337/337960.png`} alt="Archive icon" className="w-5 h-5" />;
+        case 'mp3':
+        case 'wav':
+        case 'flac': return <img src={`${iconBaseUrl}651/651717.png`} alt="Audio icon" className="w-5 h-5" />;
+        case 'mp4':
+        case 'avi':
+        case 'mov':
+        case 'mkv': return <img src={`${iconBaseUrl}10278/10278992.png`} alt="Video icon" className="w-5 h-5" />;
+        case 'jpg':
+        case 'jpeg':
+        case 'png':
+        case 'gif':
+        case 'bmp': return <img src={`${iconBaseUrl}1829/1829586.png`} alt="Image icon" className="w-5 h-5" />;
+        default: return <img src={`${iconBaseUrl}64/64522.png`} alt="File icon" className="w-5 h-5" />;
+    }
 };
 
 // Helper function to check if file can be previewed in browser
 const canPreviewFile = (file) => {
-  // Only return true for file types that browsers natively support for direct preview.
-  return file.type.startsWith('image/') ||
-         file.type.startsWith('video/') ||
-         file.type.startsWith('audio/') ||
-         file.type === 'application/pdf';
+    // Only return true for file types that browsers natively support for direct preview.
+    return file.type.startsWith('image/') ||
+        file.type.startsWith('video/') ||
+        file.type.startsWith('audio/') ||
+        file.type === 'application/pdf';
 };
 const PreviewModal = ({ previewFile, onClose }) => {
-  const previewRef = useRef(null);
-  const [loading, setLoading] = useState(true);
+    const previewRef = useRef(null);
+    const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (!previewFile) return;
+    useEffect(() => {
+        if (!previewFile) return;
 
-    const renderOfficeDocument = async () => {
-      try {
-        setLoading(true);
+        const renderOfficeDocument = async () => {
+            try {
+                setLoading(true);
 
-        if (previewFile.type.includes('wordprocessingml.document') ||
-          previewFile.type === 'application/msword') {
-          // Word document preview
-          const { renderAsync } = await import('docx-preview');
-          const arrayBuffer = await previewFile.arrayBuffer();
-          await renderAsync(arrayBuffer, previewRef.current);
+                if (previewFile.type.includes('wordprocessingml.document') ||
+                    previewFile.type === 'application/msword') {
+                    // Word document preview
+                    const { renderAsync } = await import('docx-preview');
+                    const arrayBuffer = await previewFile.arrayBuffer();
+                    await renderAsync(arrayBuffer, previewRef.current);
+                }
+                else if (previewFile.type.includes('spreadsheetml.sheet') ||
+                    previewFile.type === 'application/vnd.ms-excel') {
+                    // Excel preview
+                    const XLSX = await import('xlsx');
+                    const arrayBuffer = await previewFile.arrayBuffer();
+                    const workbook = XLSX.read(arrayBuffer);
+                    const firstSheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[firstSheetName];
+                    const html = XLSX.utils.sheet_to_html(worksheet);
+                    previewRef.current.innerHTML = html;
+                }
+                else if (previewFile.type.includes('presentationml.presentation') ||
+                    previewFile.type === 'application/vnd.ms-powerpoint') {
+                    // PowerPoint preview
+                    previewRef.current.innerHTML = '<p class="text-yellow-500 text-center py-4">PowerPoint preview is not supported at the moment. Please download the file instead.</p>'; // Add a fallback message
+                }
+            } catch (error) {
+                console.error('Error rendering document:', error);
+                previewRef.current.innerHTML = '<p class="text-red-500">Error previewing document. Please download instead.</p>';
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        if (previewFile.type.includes('officedocument') ||
+            previewFile.type === 'application/msword' ||
+            previewFile.type === 'application/vnd.ms-excel' ||
+            previewFile.type === 'application/vnd.ms-powerpoint') {
+            renderOfficeDocument();
         }
-        else if (previewFile.type.includes('spreadsheetml.sheet') ||
-          previewFile.type === 'application/vnd.ms-excel') {
-          // Excel preview
-          const XLSX = await import('xlsx');
-          const arrayBuffer = await previewFile.arrayBuffer();
-          const workbook = XLSX.read(arrayBuffer);
-          const firstSheetName = workbook.SheetNames[0];
-          const worksheet = workbook.Sheets[firstSheetName];
-          const html = XLSX.utils.sheet_to_html(worksheet);
-          previewRef.current.innerHTML = html;
-        }
-        else if (previewFile.type.includes('presentationml.presentation') ||
-          previewFile.type === 'application/vnd.ms-powerpoint') {
-          // PowerPoint preview
-          previewRef.current.innerHTML = '<p class="text-yellow-500 text-center py-4">PowerPoint preview is not supported at the moment. Please download the file instead.</p>'; // Add a fallback message
-        }
-      } catch (error) {
-        console.error('Error rendering document:', error);
-        previewRef.current.innerHTML = '<p class="text-red-500">Error previewing document. Please download instead.</p>';
-      } finally {
-        setLoading(false);
-      }
-    };
 
-    if (previewFile.type.includes('officedocument') ||
-      previewFile.type === 'application/msword' ||
-      previewFile.type === 'application/vnd.ms-excel' ||
-      previewFile.type === 'application/vnd.ms-powerpoint') {
-      renderOfficeDocument();
-    }
+        return () => {
+        };
+    }, [previewFile]);
 
-    return () => {
-    };
-  }, [previewFile]);
+    if (!previewFile) return null;
 
-  if (!previewFile) return null;
+    const isImage = previewFile.type.startsWith('image/');
+    const isVideo = previewFile.type.startsWith('video/');
+    const isPdf = previewFile.type === 'application/pdf';
+    const isAudio = previewFile.type.startsWith('audio/');
+    const isOfficeDoc = previewFile.type.includes('officedocument') ||
+        previewFile.type === 'application/msword' ||
+        previewFile.type === 'application/vnd.ms-excel';
 
-  const isImage = previewFile.type.startsWith('image/');
-  const isVideo = previewFile.type.startsWith('video/');
-  const isPdf = previewFile.type === 'application/pdf';
-  const isAudio = previewFile.type.startsWith('audio/');
-  const isOfficeDoc = previewFile.type.includes('officedocument') ||
-    previewFile.type === 'application/msword' ||
-    previewFile.type === 'application/vnd.ms-excel';
+    const iconBaseUrl = "https://cdn-icons-png.flaticon.com/512/";
 
-  const iconBaseUrl = "https://cdn-icons-png.flaticon.com/512/";
-
-  return (
-    <div
-      className="fixed inset-0 backdrop-blur-sm bg-black/55 flex items-center justify-center z-50 p-4"
-      onClick={onClose}
-    >
-      <div
-        className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] flex flex-col"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex justify-between items-center border-b p-4">
-          <h3 className="text-lg font-medium flex items-center">
-            {isImage && <img src={`${iconBaseUrl}1829/1829586.png`} alt="Image icon" className="mr-2 w-5 h-5" />}
-            {isVideo && <img src={`${iconBaseUrl}10278/10278992.png`} alt="Video icon" className="mr-2 w-5 h-5" />}
-            {isPdf && <img src={`${iconBaseUrl}136/136522.png`} alt="PDF icon" className="mr-2 w-5 h-5" />}
-            {isAudio && <img src={`${iconBaseUrl}651/651717.png`} alt="Audio icon" className="mr-2 w-5 h-5" />}
-            {isOfficeDoc && <img src={`${iconBaseUrl}888/888883.png`} alt="Office document icon" className="mr-2 w-5 h-5" />}
-            {previewFile.name}
-          </h3>
-          <button
+    return (
+        <div
+            className="fixed inset-0 backdrop-blur-sm bg-black/55 flex items-center justify-center z-50 p-4"
             onClick={onClose}
-            className="text-gray-500 hover:text-gray-700 p-1 rounded-full hover:bg-gray-100"
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-        <div className="flex-1 overflow-auto p-4">
-          {loading && isOfficeDoc && (
-            <div className="flex items-center justify-center h-full">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-              <span className="ml-2">Loading document...</span>
-            </div>
-          )}
-
-          {isImage && (
-            <img
-              src={previewFile.preview}
-              alt={previewFile.name}
-              className="max-w-full max-h-[70vh] mx-auto object-contain"
-            />
-          )}
-          {isVideo && (
-            <video
-              src={previewFile.preview}
-              controls
-              className="max-w-full max-h-[70vh] mx-auto"
-            />
-          )}
-          {isPdf && (
-            <iframe
-              src={previewFile.preview}
-              className="w-full h-[70vh] border-0"
-              title={previewFile.name}
-            />
-          )}
-          {isAudio && (
-            <audio
-              src={previewFile.preview}
-              controls
-              className="w-full max-w-md mx-auto mt-8"
-            />
-          )}
-          {isOfficeDoc && (
+        >
             <div
-              ref={previewRef}
-              className="w-full h-[70vh] overflow-auto border p-4"
-            ></div>
-          )}
+                className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] flex flex-col"
+                onClick={(e) => e.stopPropagation()}
+            >
+                <div className="flex justify-between items-center border-b p-4">
+                    <h3 className="text-lg font-medium flex items-center">
+                        {isImage && <img src={`${iconBaseUrl}1829/1829586.png`} alt="Image icon" className="mr-2 w-5 h-5" />}
+                        {isVideo && <img src={`${iconBaseUrl}10278/10278992.png`} alt="Video icon" className="mr-2 w-5 h-5" />}
+                        {isPdf && <img src={`${iconBaseUrl}136/136522.png`} alt="PDF icon" className="mr-2 w-5 h-5" />}
+                        {isAudio && <img src={`${iconBaseUrl}651/651717.png`} alt="Audio icon" className="mr-2 w-5 h-5" />}
+                        {isOfficeDoc && <img src={`${iconBaseUrl}888/888883.png`} alt="Office document icon" className="mr-2 w-5 h-5" />}
+                        {previewFile.name}
+                    </h3>
+                    <button
+                        onClick={onClose}
+                        className="text-gray-500 hover:text-gray-700 p-1 rounded-full hover:bg-gray-100"
+                    >
+                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+                <div className="flex-1 overflow-auto p-4">
+                    {loading && isOfficeDoc && (
+                        <div className="flex items-center justify-center h-full">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                            <span className="ml-2">Loading document...</span>
+                        </div>
+                    )}
+
+                    {isImage && (
+                        <img
+                            src={previewFile.preview}
+                            alt={previewFile.name}
+                            className="max-w-full max-h-[70vh] mx-auto object-contain"
+                        />
+                    )}
+                    {isVideo && (
+                        <video
+                            src={previewFile.preview}
+                            controls
+                            className="max-w-full max-h-[70vh] mx-auto"
+                        />
+                    )}
+                    {isPdf && (
+                        <iframe
+                            src={previewFile.preview}
+                            className="w-full h-[70vh] border-0"
+                            title={previewFile.name}
+                        />
+                    )}
+                    {isAudio && (
+                        <audio
+                            src={previewFile.preview}
+                            controls
+                            className="w-full max-w-md mx-auto mt-8"
+                        />
+                    )}
+                    {isOfficeDoc && (
+                        <div
+                            ref={previewRef}
+                            className="w-full h-[70vh] overflow-auto border p-4"
+                        ></div>
+                    )}
+                </div>
+            </div>
         </div>
-      </div>
-    </div>
-  );
+    );
 };
 
 const OpenTickets = () => {
-  const navigate = useNavigate();
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [files, setFiles] = useState([]);
-  const [systemNames, setSystemNames] = useState([]);
-  const [categoryName, setCategoryName] = useState([]);
-  const [showNotifications, setShowNotifications] = useState(false);
-  const [unreadNotifications, setUnreadNotifications] = useState(0);
-  const notificationRef = useRef(null);
+    const navigate = useNavigate();
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    const [files, setFiles] = useState([]);
+    const [systemNames, setSystemNames] = useState([]);
+    const [categoryName, setCategoryName] = useState([]);
+    const [showNotifications, setShowNotifications] = useState(false);
+    const [unreadNotifications, setUnreadNotifications] = useState(0);
+    const notificationRef = useRef(null);
 
-  // Loading state
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
+    // Loading state
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [uploadProgress, setUploadProgress] = useState(0);
 
-  // Custom dropdown states
-  const [isSystemDropdownOpen, setIsSystemDropdownOpen] = useState(false);
-  const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
-  const [selectedSystem, setSelectedSystem] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("");
+    // Custom dropdown states
+    const [isSystemDropdownOpen, setIsSystemDropdownOpen] = useState(false);
+    const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
+    const [selectedSystem, setSelectedSystem] = useState("");
+    const [selectedCategory, setSelectedCategory] = useState("");
 
-  // File dropdown states
-  const [fileDropdownStates, setFileDropdownStates] = useState({});
+    // File dropdown states
+    const [fileDropdownStates, setFileDropdownStates] = useState({});
 
-  // Refs for dropdown click outside detection
-  const [dropdownPosition, setDropdownPosition] = useState({ x: 0, y: 0 });
-  const systemDropdownRef = useRef(null);
-  const categoryDropdownRef = useRef(null);
+    // Refs for dropdown click outside detection
+    const [dropdownPosition, setDropdownPosition] = useState({ x: 0, y: 0 });
+    const systemDropdownRef = useRef(null);
+    const categoryDropdownRef = useRef(null);
 
-  const [previewFile, setPreviewFile] = useState(null);
-  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+    const [previewFile, setPreviewFile] = useState(null);
+    const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
-  // Click outside handler
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (notificationRef.current && !notificationRef.current.contains(event.target)) {
-        setShowNotifications(false);
-      }
-      if (systemDropdownRef.current && !systemDropdownRef.current.contains(event.target)) {
-        setIsSystemDropdownOpen(false);
-      }
-      if (categoryDropdownRef.current && !categoryDropdownRef.current.contains(event.target)) {
-        setIsCategoryDropdownOpen(false);
-      }
-      if (!event.target.closest('.file-dropdown')) {
+    // Click outside handler
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (notificationRef.current && !notificationRef.current.contains(event.target)) {
+                setShowNotifications(false);
+            }
+            if (systemDropdownRef.current && !systemDropdownRef.current.contains(event.target)) {
+                setIsSystemDropdownOpen(false);
+            }
+            if (categoryDropdownRef.current && !categoryDropdownRef.current.contains(event.target)) {
+                setIsCategoryDropdownOpen(false);
+            }
+            if (!event.target.closest('.file-dropdown')) {
+                setFileDropdownStates({});
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    useEffect(() => {
+        const fetchUnreadNotifications = async () => {
+            const storedUser = localStorage.getItem("user");
+            const userId = storedUser ? JSON.parse(storedUser).UserID : null;
+
+            if (!userId) return;
+
+            try {
+                // Use axiosClient and remove base URL
+                const response = await axiosClient.get(`/api/notifications/count/${userId}`);
+                setUnreadNotifications(response.data.count);
+            } catch (error) {
+                console.error('Error fetching unread notifications:', error);
+            }
+        };
+
+        fetchUnreadNotifications();
+        const interval = setInterval(fetchUnreadNotifications, 30000);
+        return () => clearInterval(interval);
+    }, []);
+
+    // File handling
+    const { getRootProps, getInputProps } = useDropzone({
+        onDrop: (acceptedFiles) => {
+            const newFiles = acceptedFiles.filter(
+                newFile => !files.some(existingFile =>
+                    existingFile.name === newFile.name && existingFile.size === newFile.size
+                )
+            );
+            setFiles(prev => [...prev, ...enhanceFilesWithPreview(newFiles)]);
+        },
+        multiple: true,
+        accept: undefined,
+    });
+
+    const handleRemoveFile = (index) => {
+        setFiles(prev => prev.filter((_, i) => i !== index));
+        setFileDropdownStates(prev => {
+            const newState = { ...prev };
+            delete newState[index];
+            return newState;
+        });
+    };
+
+    const handleFileDropdownToggle = (index, event) => {
+        event.stopPropagation();
+        event.preventDefault();
+
+        const rect = event.currentTarget.getBoundingClientRect();
+        setDropdownPosition({
+            x: rect.left,
+            y: rect.bottom + window.scrollY
+        });
+
+        setFileDropdownStates(prev => ({
+            [index]: !prev[index]
+        }));
+    };
+
+    const handleFileOpen = async (file) => {
+        if (canPreviewFile(file)) {
+            setPreviewFile(file);
+            setIsPreviewOpen(true);
+        } else {
+            toast.info('This file type cannot be previewed. Please download it instead.');
+        }
         setFileDropdownStates({});
-      }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  useEffect(() => {
-    const fetchUnreadNotifications = async () => {
-      const storedUser = localStorage.getItem("user");
-      const userId = storedUser ? JSON.parse(storedUser).UserID : null;
-
-      if (!userId) return;
-
-      try {
-        const response = await axios.get(`http://localhost:5000/api/notifications/count/${userId}`);
-        setUnreadNotifications(response.data.count);
-      } catch (error) {
-        console.error('Error fetching unread notifications:', error);
-      }
+    const handleFileDownload = (file) => {
+        const link = document.createElement('a');
+        link.href = file.preview;
+        link.download = file.name;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        setFileDropdownStates({});
     };
 
-    fetchUnreadNotifications();
-    const interval = setInterval(fetchUnreadNotifications, 30000);
-    return () => clearInterval(interval);
-  }, []);
+    const fetchSystems = async () => {
+        try {
+            // Use axiosClient and remove base URL
+            const res = await axiosClient.get("/system_registration");
+            const activeSystems = res.data.filter(system => system.Status === 1);
+            setSystemNames(activeSystems);
+        } catch (error) {
+            console.error("Error fetching systems:", error);
+        }
+    };
 
-  // File handling
-  const { getRootProps, getInputProps } = useDropzone({
-    onDrop: (acceptedFiles) => {
-      const newFiles = acceptedFiles.filter(
-        newFile => !files.some(existingFile =>
-          existingFile.name === newFile.name && existingFile.size === newFile.size
-        )
-      );
-      setFiles(prev => [...prev, ...enhanceFilesWithPreview(newFiles)]);
-    },
-    multiple: true,
-    accept: undefined,
-  });
+    useEffect(() => {
+        fetchSystems();
+    }, []);
 
-  const handleRemoveFile = (index) => {
-    setFiles(prev => prev.filter((_, i) => i !== index));
-    setFileDropdownStates(prev => {
-      const newState = { ...prev };
-      delete newState[index];
-      return newState;
-    });
-  };
+    const fetchCategory = async () => {
+        try {
+            // Use axiosClient and remove base URL
+            const res = await axiosClient.get("/ticket_category");
+            const activeCategories = res.data.filter(cat => cat.Status === 1);
+            setCategoryName(activeCategories);
+        } catch (error) {
+            console.error("Error fetching categories:", error);
+        }
+    };
 
-  const handleFileDropdownToggle = (index, event) => {
-    event.stopPropagation();
-    event.preventDefault();
+    useEffect(() => {
+        fetchCategory();
+    }, []);
 
-    const rect = event.currentTarget.getBoundingClientRect();
-    setDropdownPosition({
-      x: rect.left,
-      y: rect.bottom + window.scrollY
-    });
-
-    setFileDropdownStates(prev => ({
-      [index]: !prev[index]
-    }));
-  };
-
-  const handleFileOpen = async (file) => {
-    if (canPreviewFile(file)) {
-      setPreviewFile(file);
-      setIsPreviewOpen(true);
-    } else {
-      toast.info('This file type cannot be previewed. Please download it instead.');
-    }
-    setFileDropdownStates({});
-  };
-
-  const handleFileDownload = (file) => {
-    const link = document.createElement('a');
-    link.href = file.preview;
-    link.download = file.name;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    setFileDropdownStates({});
-  };
-
-  const fetchSystems = async () => {
-    try {
-      const res = await axios.get("http://localhost:5000/system_registration");
-      const activeSystems = res.data.filter(system => system.Status === 1);
-      setSystemNames(activeSystems);
-    } catch (error) {
-      console.error("Error fetching systems:", error);
-    }
-  };
-
-  useEffect(() => {
-    fetchSystems();
-  }, []);
-
-  const fetchCategory = async () => {
-    try {
-      const res = await axios.get("http://localhost:5000/ticket_category");
-      const activeCategories = res.data.filter(cat => cat.Status === 1);
-      setCategoryName(activeCategories);
-    } catch (error) {
-      console.error("Error fetching categories:", error);
-    }
-  };
-
-  useEffect(() => {
-    fetchCategory();
-  }, []);
-
-  // Clean up object URLs
-  useEffect(() => {
-    return () => files.forEach(file => URL.revokeObjectURL(file.preview));
-  }, [files]);
+    // Clean up object URLs
+    useEffect(() => {
+        return () => files.forEach(file => URL.revokeObjectURL(file.preview));
+    }, [files]);
 
   return (
     <div className="flex">
@@ -463,8 +466,8 @@ const OpenTickets = () => {
                       userId: user.UserID,
                     };
 
-                    const ticketRes = await axios.post(
-                      "http://localhost:5000/api/tickets",
+                    const ticketRes = await axiosClient.post(
+                      "/api/tickets",
                       ticketPayload
                     );
 
@@ -482,8 +485,8 @@ const OpenTickets = () => {
 
                       // Progress: 70% - Uploading files
                       setUploadProgress(70);
-                      await axios.post(
-                        "http://localhost:5000/api/upload_evidence",
+                      await axiosClient.post(
+                        "/api/upload_evidence",
                         formData,
                         {
                           headers: {

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import axios from 'axios';
+import axiosClient from '../axiosClient'; // Import the axiosClient
 import { toast } from 'react-toastify';
 import { useAuth } from '../../App.jsx';
 import { AiOutlineUser } from 'react-icons/ai';
@@ -7,8 +7,8 @@ import { MdClose } from 'react-icons/md';
 import { FaArrowLeft } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 import SideBar from "../../user_components/SideBar/SideBar";
-import NavBar from "../../user_components/NavBar/NavBar";     
-import NotificationPanel from "../components/NotificationPanel"; 
+import NavBar from "../../user_components/NavBar/NavBar";
+import NotificationPanel from "../components/NotificationPanel";
 
 const UserProfile = () => {
     const { loggedInUser: user, setLoggedInUser } = useAuth();
@@ -39,14 +39,13 @@ const UserProfile = () => {
     const [imagePreview, setImagePreview] = useState(null);
 
     const fileInputRef = useRef(null);
-    // const [isSidebarOpen, setIsSidebarOpen] = useState(true); 
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
     const [showNotifications, setShowNotifications] = useState(false);
     const [unreadNotifications, setUnreadNotifications] = useState(0);
-    const notificationRef = useRef(null); 
+    const notificationRef = useRef(null);
 
-    // Effect for handling clicks outside the notification panel 
+    // Effect for handling clicks outside the notification panel
     useEffect(() => {
         const handleClickOutside = (event) => {
             if (notificationRef.current && !notificationRef.current.contains(event.target)) {
@@ -60,12 +59,13 @@ const UserProfile = () => {
         };
     }, []);
 
-    // Effect for fetching unread notifications 
+    // Effect for fetching unread notifications
     useEffect(() => {
         const fetchUnreadNotifications = async () => {
-            if (!user || !user.UserID) return; 
+            if (!user || !user.UserID) return;
             try {
-                const response = await axios.get(`http://localhost:5000/api/notifications/count/${user.UserID}`);
+                // Use axiosClient and remove base URL
+                const response = await axiosClient.get(`/api/notifications/count/${user.UserID}`);
                 setUnreadNotifications(response.data.count);
             } catch (error) {
                 console.error('Error fetching unread notifications:', error);
@@ -75,7 +75,7 @@ const UserProfile = () => {
         if (user?.UserID) {
             fetchUnreadNotifications();
             const interval = setInterval(fetchUnreadNotifications, 30000); // Check every 30 seconds
-            return () => clearInterval(interval); 
+            return () => clearInterval(interval);
         }
     }, [user]);
 
@@ -85,7 +85,8 @@ const UserProfile = () => {
             if (user && user.UserID) {
                 try {
                     setLoading(true);
-                    const response = await axios.get(`http://localhost:5000/api/user/profile/${user.UserID}`);
+                    // Use axiosClient and remove base URL
+                    const response = await axiosClient.get(`/api/user/profile/${user.UserID}`);
                     const fetchedData = response.data;
 
                     setProfileData(fetchedData);
@@ -101,7 +102,7 @@ const UserProfile = () => {
 
                     // Set image preview if an image path exists from the backend
                     if (fetchedData.ProfileImagePath) {
-                        setImagePreview(`http://localhost:5000/uploads/${fetchedData.ProfileImagePath}`); // Construct full URL
+                        setImagePreview(`${axiosClient.defaults.baseURL}/uploads/${fetchedData.ProfileImagePath}`); // Use axiosClient's baseURL
                     } else {
                         setImagePreview(null); // No image, clear preview
                     }
@@ -185,7 +186,7 @@ const UserProfile = () => {
         } else {
             setSelectedFile(null);
             // Revert to current profile image if user cancels file selection
-            setImagePreview(profileData.ProfileImagePath ? `http://localhost:5000/uploads/${profileData.ProfileImagePath}` : null);
+            setImagePreview(profileData.ProfileImagePath ? `${axiosClient.defaults.baseURL}/uploads/${profileData.ProfileImagePath}` : null);
         }
     };
 
@@ -206,7 +207,8 @@ const UserProfile = () => {
         formDataPayload.append('profileImage', selectedFile); // 'profileImage' must match Multer's field name in backend
 
         try {
-            const response = await axios.post(`http://localhost:5000/api/user/profile/upload/${user.UserID}`, formDataPayload, {
+            // Use axiosClient and remove base URL
+            const response = await axiosClient.post(`/api/user/profile/upload/${user.UserID}`, formDataPayload, {
                 headers: {
                     'Content-Type': 'multipart/form-data',
                 },
@@ -260,7 +262,7 @@ const UserProfile = () => {
         if (selectedFile) {
             setSelectedFile(null);
             setImagePreview(null); // Clear local preview
-            setProfileData(prevData => ({ ...prevData, ProfileImagePath: null })); 
+            setProfileData(prevData => ({ ...prevData, ProfileImagePath: null }));
             toast.info("Selected image cleared locally.");
             return;
         }
@@ -268,7 +270,8 @@ const UserProfile = () => {
         // If there's an image from the server, send delete request
         setLoading(true);
         try {
-            const response = await axios.delete(`http://localhost:5000/api/user/profile/image/${user.UserID}`);
+            // Use axiosClient and remove base URL
+            const response = await axiosClient.delete(`/api/user/profile/image/${user.UserID}`);
             toast.success(response.data.message || "Profile image removed successfully!");
 
             // Clear image states and profileData
@@ -351,7 +354,8 @@ const UserProfile = () => {
                 updatePayload.NewPassword = formData.NewPassword;
             }
 
-            const response = await axios.put(`http://localhost:5000/api/user/profile/${user.UserID}`, updatePayload);
+            // Use axiosClient and remove base URL
+            const response = await axiosClient.put(`/api/user/profile/${user.UserID}`, updatePayload);
             toast.success(response.data.message || 'Profile updated successfully!');
 
 
@@ -415,14 +419,13 @@ const UserProfile = () => {
     // --- Component Render ---
     return (
         <div className="flex">
-            <title>User Profile</title> 
+            <title>User Profile</title>
             <SideBar open={isSidebarOpen} setOpen={setIsSidebarOpen} />
 
-            
-            {/* <div className={`flex-1 ${isSidebarOpen ? 'ml-72' : 'ml-20'} flex flex-col h-screen overflow-y-auto transition-all duration-300`}> */}
-             <div className={`flex-1 flex flex-col h-screen overflow-y-auto transition-all duration-300
-                ml-0 
-                lg:ml-20 ${isSidebarOpen ? 'lg:ml-72' : ''} 
+
+            <div className={`flex-1 flex flex-col h-screen overflow-y-auto transition-all duration-300
+                ml-0
+                lg:ml-20 ${isSidebarOpen ? 'lg:ml-72' : ''}
             `}>
                 <NavBar
                     isSidebarOpen={isSidebarOpen}
@@ -433,7 +436,7 @@ const UserProfile = () => {
                     setOpen={setIsSidebarOpen}
                 />
 
-                <div className="p-6 mt-[60px] flex-1"> 
+                <div className="p-6 mt-[60px] flex-1">
                     {showNotifications && (
                         <div ref={notificationRef} className="absolute right-4 top-[70px] z-50">
                             <NotificationPanel
@@ -448,7 +451,7 @@ const UserProfile = () => {
                         <button
                             onClick={() => navigate(-1)} // Navigate back to the previous page
                             className="flex items-center text-blue-600 hover:text-blue-800 font-semibold text-lg transition duration-200 focus:outline-none"
-                            aria-label="Go back" 
+                            aria-label="Go back"
                         >
                             <FaArrowLeft className="mr-2" /> Back
                         </button>

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import SideBar from "../../user_components/SideBar/SideBar";
 import NavBar from "../../user_components/NavBar/NavBar";
 import { useAuth } from '../../App';
-import axios from 'axios';
+import axiosClient from '../axiosClient'; // Changed from axios to axiosClient
 import { LuTicketCheck, LuTicketX, LuTicket, LuStar } from "react-icons/lu";
 import { FaHistory } from "react-icons/fa";
 import { toast } from 'react-toastify';
@@ -34,7 +34,6 @@ const usersDashboard = () => {
     const [unreadNotifications, setUnreadNotifications] = useState(0);
     const notificationRef = useRef(null);
 
-    // const [isSidebarOpen, setIsSidebarOpen] = useState(true); 
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
     useEffect(() => {
@@ -62,7 +61,8 @@ const usersDashboard = () => {
     const fetchUnreadNotifications = async () => {
         if (!loggedInUser || !loggedInUser.UserID) return; // Ensure user is logged in
         try {
-            const response = await axios.get(`http://localhost:5000/api/notifications/count/${loggedInUser.UserID}`);
+            // Use axiosClient and remove base URL
+            const response = await axiosClient.get(`/api/notifications/count/${loggedInUser.UserID}`);
             setUnreadNotifications(response.data.count);
         } catch (error) {
             console.error('Error fetching unread notifications:', error);
@@ -91,7 +91,8 @@ const usersDashboard = () => {
         }
 
         try {
-            const response = await axios.get(`http://localhost:5000/api/user/tickets/counts/${loggedInUser.UserID}`);
+            // Use axiosClient and remove base URL
+            const response = await axiosClient.get(`/api/user/tickets/counts/${loggedInUser.UserID}`);
             setTicketCounts(response.data);
         } catch (err) {
             console.error("Error fetching user ticket counts:", err);
@@ -109,7 +110,8 @@ const usersDashboard = () => {
         }
 
         try {
-            const response = await axios.get(`http://localhost:5000/api/user/tickets/recent/${loggedInUser.UserID}`);
+            // Use axiosClient and remove base URL
+            const response = await axiosClient.get(`/api/user/tickets/recent/${loggedInUser.UserID}`);
             setRecentTickets(response.data);
         } catch (err) {
             console.error("Error fetching user recent tickets:", err);
@@ -170,10 +172,9 @@ const usersDashboard = () => {
             <title>User Dashboard</title>
             <SideBar open={isSidebarOpen} setOpen={setIsSidebarOpen} />
 
-            {/* <div className={`flex-1 ${isSidebarOpen ? 'ml-72' : 'ml-20'} flex flex-col h-screen overflow-y-auto transition-all duration-300`}> */}
             <div className={`flex-1 flex flex-col h-screen overflow-y-auto transition-all duration-300
-                ml-0 
-                lg:ml-20 ${isSidebarOpen ? 'lg:ml-72' : ''} 
+                ml-0
+                lg:ml-20 ${isSidebarOpen ? 'lg:ml-72' : ''}
             `}>
 
                 <NavBar
@@ -246,7 +247,7 @@ const usersDashboard = () => {
                                     {item.icon}
                                     <p className="mt-1 text-sm font-bold text-gray-700">{item.count}</p>
                                     <span className={`
-                absolute -bottom-8 left-1/2 transform -translate-x-1/2 
+                absolute -bottom-8 left-1/2 transform -translate-x-1/2
                 bg-gray-800 text-white text-xs rounded py-1 px-2 whitespace-nowrap
                 transition-opacity duration-200
                 ${activeTooltip === item.id ? 'opacity-100' : 'opacity-0'}

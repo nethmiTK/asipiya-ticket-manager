@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useParams, useLocation } from "react-router-dom";
-import axios from "axios";
+import axiosClient from "../axiosClient"; // Changed from axios to axiosClient
 import ChatUI from "../../user_components/ChatUI/ChatUI";
 import SideBar from "../../user_components/SideBar/SideBar";
 import NavBar from "../../user_components/NavBar/NavBar";
@@ -58,8 +58,8 @@ const TicketDetails = () => {
 
     setTicketLoading(true);
     setTicketError(null);
-    axios
-      .get(`http://localhost:5000/userTicket/${ticketId}`)
+    axiosClient // Changed from axios
+      .get(`/userTicket/${ticketId}`)
       .then((res) => setTicket(res.data))
       .catch(() => setTicketError("Error fetching ticket details"))
       .finally(() => setTicketLoading(false));
@@ -70,8 +70,8 @@ const TicketDetails = () => {
 
     setEvidenceLoading(true);
     setEvidenceError(null);
-    axios
-      .get(`http://localhost:5000/api/evidence/${ticketId}`)
+    axiosClient // Changed from axios
+      .get(`/api/evidence/${ticketId}`)
       .then((res) => setEvidenceFiles(res.data))
       .catch(() => setEvidenceError("Error fetching evidence files"))
       .finally(() => setEvidenceLoading(false));
@@ -96,8 +96,8 @@ const TicketDetails = () => {
       if (!currentUserId) return;
 
       try {
-        const response = await axios.get(
-          `http://localhost:5000/api/notifications/count/${currentUserId}`
+        const response = await axiosClient.get( // Changed from axios
+          `/api/notifications/count/${currentUserId}`
         );
         setUnreadNotifications(response.data.count);
       } catch (error) {
@@ -112,6 +112,10 @@ const TicketDetails = () => {
 
   const handleFileDownload = async (fileName) => {
     try {
+      // For file downloads, if your backend's /download_evidence endpoint is also proxied
+      // through axiosClient's base URL, you can use axiosClient here too.
+      // Otherwise, keep it as fetch or adjust axiosClient's configuration.
+      // Assuming it's still a direct path for simplicity if axiosClient isn't configured for blobs.
       const response = await fetch(
         `http://localhost:5000/download_evidence/${fileName}`
       );
@@ -154,7 +158,7 @@ const TicketDetails = () => {
 
       <div
         className={`flex-1 flex flex-col h-screen overflow-y-auto transition-all duration-300
-          ml-0 
+          ml-0
           lg:ml-20 ${isSidebarOpen ? "lg:ml-72" : ""}`}
       >
         <NavBar
