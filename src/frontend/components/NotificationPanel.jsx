@@ -162,10 +162,18 @@ const NotificationPanel = ({ userId, role, onClose, onNotificationUpdate }) => {
             );
         } else if (notification.Type === 'NEW_CHAT_MESSAGE') {
             // Handle new chat message notifications
+            const senderName = notification.SourceUserFullName || 'Someone';
+            
+            // Clean up the message - remove "Unknown:" prefix if it exists
+            let cleanMessage = notification.Message;
+            if (cleanMessage.startsWith('Unknown:')) {
+                cleanMessage = cleanMessage.replace('Unknown:', '').trim();
+            }
+            
             return (
                 <span>
-                    <span className="text-blue-600 font-medium">💬 New Message</span><br />
-                    {notification.Message}
+                    <span className="text-blue-600 font-medium">💬 New Message from {senderName}</span><br />
+                    {cleanMessage}
                 </span>
             );
         } else if (notification.Type === 'NEW_CLIENT_REGISTRATION') {
@@ -199,8 +207,23 @@ const NotificationPanel = ({ userId, role, onClose, onNotificationUpdate }) => {
     const getNotificationProfilePic = (notification) => {
         const systemNotificationTypes = ['NEW_SYSTEM_ADDED', 'NEW_CATEGORY_ADDED', 'NEW_USER_REGISTRATION', 'NEW_CLIENT_REGISTRATION'];
         const supervisorNotificationTypes = ['SUPERVISOR_ASSIGNED', 'SUPERVISOR_UNASSIGNED', 'TICKET_UPDATED', 'SUPERVISOR_ADDED', 'SUPERVISOR_REMOVED', 'STATUS_UPDATE', 'RESOLUTION_UPDATE', 'DUE_DATE_UPDATE'];
-        const chatNotificationTypes = ['NEW_CHAT_MESSAGE'];
         
+        // Priority 1: Check if notification has source user information (for personalized notifications)
+        if (notification.SourceUserProfileImagePath) {
+            // Use the source user's profile picture
+            return {
+                imgSrc: `http://localhost:5000/uploads/profile_images/${notification.SourceUserProfileImagePath}`,
+                altText: notification.SourceUserFullName || 'User',
+            };
+        } else if (notification.SourceUserFullName) {
+             // Fallback to UI-avatars if path is missing but name exists
+            return {
+                imgSrc: `https://ui-avatars.com/api/?name=${encodeURIComponent(notification.SourceUserFullName)}&background=random&color=fff`,
+                altText: notification.SourceUserFullName,
+            };
+        }
+        
+        // Priority 2: System notifications (use icons)
         if (systemNotificationTypes.includes(notification.Type)) {
             // Use a specific icon or image for system notifications
             switch (notification.Type) {
@@ -215,15 +238,15 @@ const NotificationPanel = ({ userId, role, onClose, onNotificationUpdate }) => {
                 default:
                     return { icon: <FaLaptopCode className="w-6 h-6 text-gray-600" />, bgColor: 'bg-gradient-to-br from-gray-100 to-gray-200' };
             }
-        } else if (chatNotificationTypes.includes(notification.Type)) {
-            // Use specific icons for chat-related notifications
-            switch (notification.Type) {
-                case 'NEW_CHAT_MESSAGE':
-                    return { icon: <FaComments className="w-6 h-6 text-blue-600" />, bgColor: 'bg-gradient-to-br from-blue-100 to-blue-200' };
-                default:
-                    return { icon: <FaComments className="w-6 h-6 text-blue-600" />, bgColor: 'bg-gradient-to-br from-blue-100 to-blue-200' };
-            }
-        } else if (supervisorNotificationTypes.includes(notification.Type)) {
+        }
+        
+        // Priority 3: Chat notifications (use icon only if no user info)
+        if (notification.Type === 'NEW_CHAT_MESSAGE') {
+            return { icon: <FaComments className="w-6 h-6 text-blue-600" />, bgColor: 'bg-gradient-to-br from-blue-100 to-blue-200' };
+        }
+        
+        // Priority 4: Supervisor-related notifications (use icons)
+        if (supervisorNotificationTypes.includes(notification.Type)) {
             // Use specific icons for supervisor-related notifications
             switch (notification.Type) {
                 case 'SUPERVISOR_ASSIGNED':
@@ -245,23 +268,10 @@ const NotificationPanel = ({ userId, role, onClose, onNotificationUpdate }) => {
                 default:
                     return { icon: <FaUserCheck className="w-6 h-6 text-gray-600" />, bgColor: 'bg-gradient-to-br from-gray-100 to-gray-200' };
             }
-        } else if (notification.SourceUserProfileImagePath) {
-            // Use the source user's profile picture
-            return {
-                imgSrc: `http://localhost:5000/uploads/profile_images/${notification.SourceUserProfileImagePath}`,
-                altText: notification.SourceUserFullName || 'User',
-            };
-        } else if (notification.SourceUserFullName) {
-             // Fallback to UI-avatars if path is missing but name exists
-            return {
-                imgSrc: `https://ui-avatars.com/api/?name=${encodeURIComponent(notification.SourceUserFullName)}&background=random&color=fff`,
-                altText: notification.SourceUserFullName,
-            };
         }
-         else {
-            // Default icon if no specific user or system type is matched
-            return { icon: <FaUserPlus className="w-6 h-6 text-gray-600" />, bgColor: 'bg-gradient-to-br from-gray-100 to-gray-200' };
-        }
+        
+        // Default fallback
+        return { icon: <FaUserPlus className="w-6 h-6 text-gray-600" />, bgColor: 'bg-gradient-to-br from-gray-100 to-gray-200' };
     };
 
     const fetchNotifications = async () => {
@@ -305,6 +315,8 @@ const NotificationPanel = ({ userId, role, onClose, onNotificationUpdate }) => {
                         IsRead: false,
                         CreatedAt: newNotification.createdAt,
                         TicketID: newNotification.ticketId,
+                        SourceUserFullName: newNotification.sourceUserFullName || null,
+                        SourceUserProfileImagePath: newNotification.sourceUserProfileImagePath || null,
                         justReceived: true // Flag to highlight new notifications
                     };
                     return [newNotificationWithDetails, ...prevNotifications];
