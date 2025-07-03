@@ -111,7 +111,7 @@ const AdminSideBar = ({ open: propOpen, setOpen: propSetOpen }) => {
   if (!authContext) {
     return (
       <div className="bg-gray-900 h-screen p-5 pt-30 fixed top-0 left-0 z-50">
-        <p className="text-white">Loading...</p>
+        {/* <p className="text-white">Loading...</p> */}
       </div>
     );
   }

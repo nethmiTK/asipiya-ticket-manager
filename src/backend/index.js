@@ -698,7 +698,7 @@ const createChatNotification = async (ticketId, senderUserId, senderRole, messag
       // Admin/Supervisor sending to User
       const ticketQuery = `
         SELECT t.UserId as UserID, au.FullName as UserName, 
-               sender.FullName as SenderName, sender.Role as SenderRole
+               sender.FullName as SenderName
         FROM ticket t 
         LEFT JOIN appuser au ON t.UserId = au.UserID
         LEFT JOIN appuser sender ON sender.UserID = ?
@@ -719,7 +719,6 @@ const createChatNotification = async (ticketId, senderUserId, senderRole, messag
         const ticket = ticketResults[0];
         const recipientUserId = ticket.UserID;
         const senderName = ticket.SenderName || 'Unknown';
-        const senderRole = ticket.SenderRole || 'Unknown';
 
         // Don't send notification to the same user who sent the message
         if (recipientUserId === senderUserId) {
@@ -759,9 +758,6 @@ const createChatNotification = async (ticketId, senderUserId, senderRole, messag
               message: notificationMessage,
               type: 'NEW_CHAT_MESSAGE',
               ticketId: ticketId,
-              sourceUserFullName: senderName,
-              sourceUserRole: senderRole,
-              sourceUserProfileImagePath: null, // We don't have this here, but the frontend will handle it
               createdAt: new Date().toISOString()
             });
           }
@@ -771,7 +767,7 @@ const createChatNotification = async (ticketId, senderUserId, senderRole, messag
     } else if (senderRole === 'User' || senderRole === 'Client') {
       // User/Client sending to Admin/Supervisors
       const supervisorQuery = `
-        SELECT t.SupervisorID, sender.FullName as SenderName, sender.Role as SenderRole
+        SELECT t.SupervisorID, sender.FullName as SenderName
         FROM ticket t
         LEFT JOIN appuser sender ON sender.UserID = ?
         WHERE t.TicketID = ?
@@ -789,7 +785,6 @@ const createChatNotification = async (ticketId, senderUserId, senderRole, messag
         }
 
         const senderName = supervisorResults[0].SenderName || 'User';
-        const senderRole = supervisorResults[0].SenderRole || 'User';
         const supervisorIDsString = supervisorResults[0].SupervisorID;
 
         // Parse supervisor IDs from comma-separated string
@@ -857,9 +852,6 @@ const createChatNotification = async (ticketId, senderUserId, senderRole, messag
                   message: notificationMessage,
                   type: 'NEW_CHAT_MESSAGE',
                   ticketId: ticketId,
-                  sourceUserFullName: senderName,
-                  sourceUserRole: senderRole,
-                  sourceUserProfileImagePath: null, // We don't have this here, but the frontend will handle it
                   createdAt: new Date().toISOString()
                 });
               }
@@ -2321,37 +2313,9 @@ app.get('/api/notifications/:userId', (req, res) => {
                 WHEN n.Type = 'NEW_CHAT_MESSAGE' THEN n.TicketLogID
                 ELSE tl.TicketID 
             END AS TicketID,
-            CASE 
-                WHEN n.Type = 'NEW_CHAT_MESSAGE' THEN 
-                    (SELECT tc.UserID FROM ticketchat tc 
-                     WHERE tc.TicketID = n.TicketLogID 
-                     ORDER BY tc.CreatedAt DESC LIMIT 1)
-                ELSE tl.UserID 
-            END AS SourceUserID,
-            CASE 
-                WHEN n.Type = 'NEW_CHAT_MESSAGE' THEN 
-                    (SELECT au_chat.FullName FROM ticketchat tc 
-                     JOIN appuser au_chat ON tc.UserID = au_chat.UserID
-                     WHERE tc.TicketID = n.TicketLogID 
-                     ORDER BY tc.CreatedAt DESC LIMIT 1)
-                ELSE au.FullName 
-            END AS SourceUserFullName,
-            CASE 
-                WHEN n.Type = 'NEW_CHAT_MESSAGE' THEN 
-                    (SELECT au_chat.ProfileImagePath FROM ticketchat tc 
-                     JOIN appuser au_chat ON tc.UserID = au_chat.UserID
-                     WHERE tc.TicketID = n.TicketLogID 
-                     ORDER BY tc.CreatedAt DESC LIMIT 1)
-                ELSE au.ProfileImagePath 
-            END AS SourceUserProfileImagePath,
-            CASE 
-                WHEN n.Type = 'NEW_CHAT_MESSAGE' THEN 
-                    (SELECT au_chat.Role FROM ticketchat tc 
-                     JOIN appuser au_chat ON tc.UserID = au_chat.UserID
-                     WHERE tc.TicketID = n.TicketLogID 
-                     ORDER BY tc.CreatedAt DESC LIMIT 1)
-                ELSE au.Role 
-            END AS SourceUserRole
+            tl.UserID AS SourceUserID,
+            au.FullName AS SourceUserFullName,
+            au.ProfileImagePath AS SourceUserProfileImagePath
         FROM
             notifications n
         LEFT JOIN
