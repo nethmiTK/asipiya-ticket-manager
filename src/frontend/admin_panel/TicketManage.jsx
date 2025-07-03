@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback} from "react";
 import { FaBell } from "react-icons/fa6";
 import { MessageCircle } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -12,6 +12,8 @@ import TicketDetailsTab from "./TicketDetailsTab";
 import axios from "axios";
 import { FaFilePdf, FaFileWord, FaFileArchive, FaFileAlt, FaFileImage } from 'react-icons/fa';
 import { FiMoreVertical } from 'react-icons/fi';
+import AdminNavBar from "../../user_components/NavBar/AdminNavBar";
+import NotificationPanel from "../components/NotificationPanel";
 
 export const USER = {
   id: "user1",
@@ -116,6 +118,11 @@ export default function TicketManage() {
   const [previewMenuIndex, setPreviewMenuIndex] = useState(null);
 
   const [previewAttachment, setPreviewAttachment] = useState(null);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
+  const notificationRef = useRef(null);
+  const [isLoading, setIsLoading] = useState(true); // New loading state
+  const [error, setError] = useState(null); // New error state
 
   // Utility function to set cursor position reliably
   const setCursorPosition = (textarea, position) => {
@@ -1007,18 +1014,89 @@ export default function TicketManage() {
     }
   }, [previewAttachment]);
 
+  // --- Notification Handling ---
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (notificationRef.current && !notificationRef.current.contains(event.target)) {
+        setShowNotifications(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  const fetchUnreadNotifications = useCallback(async () => {
+    if (!user?.UserID) return;
+    try {
+      const response = await axios.get(`http://localhost:5000/api/notifications/count/${user.UserID}`);
+      setUnreadNotifications(response.data.count);
+    } catch (error) {
+      console.error('Error fetching unread notifications:', error);
+      // Optionally set an error state here for notifications
+    }
+  }, [user?.UserID]);
+
+  useEffect(() => {
+    if (user?.UserID) {
+      fetchUnreadNotifications();
+      const interval = setInterval(fetchUnreadNotifications, 30000); // Poll every 30 seconds
+      return () => clearInterval(interval);
+    }
+  }, [user, fetchUnreadNotifications]);
+
+  // Function to handle updates from NotificationPanel (e.g., notification marked as read)
+  const handleNotificationPanelUpdate = () => {
+    fetchUnreadNotifications(); // Re-fetch the actual count to ensure consistency
+  };
+
+  // --- User Management Logic ---
+  const fetchSupervisors = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const res = await axios.get("http://localhost:5000/supervisor");
+      setUsers(res.data);
+    } catch (err) {
+      setError("Failed to load members. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  }, []); // Empty dependency array means this function is created once
+
+  useEffect(() => {
+    fetchSupervisors();
+  }, [fetchSupervisors]); // Re-run when fetchSupervisors callback changes (which it won't due to useCallback)
+
+  const handleProfileClick = () => {
+    navigate('/admin-profile');
+  };
+
   return (
     <div className="flex">
       <AdminSideBar open={isSidebarOpen} setOpen={setIsSidebarOpen} />
+      <AdminNavBar
+        pageTitle="Ticket Manage" 
+        user={user}
+        sidebarOpen={isSidebarOpen}
+        onProfileClick={handleProfileClick}
+        onNotificationClick={() => setShowNotifications(!showNotifications)}
+        unreadNotifications={unreadNotifications}
+        showNotifications={showNotifications}
+        notificationRef={notificationRef}
+      />
       <div
         className={`flex-1 min-h-screen bg-gray-100 p-8 transition-all duration-300 ${isSidebarOpen ? "ml-72" : "ml-20"
           }`}
       >
+        <div><h1 className="text-2xl font-bold mb-8"></h1></div>
         <div className="min-h-screen bg-gray-50">
           {/* Top Navigation */}
           <nav className="bg-white shadow-md px-6 py-4 flex flex-col sm:flex-row sm:justify-between gap-4 sm:gap-0 rounded-lg items-center">
             <h1 className="text-xl sm:text-2xl font-bold text-gray-700">
-              Ticket Management
+              My Tickets
             </h1>
 
             <div className="flex gap-4 items-center">
@@ -1049,17 +1127,21 @@ export default function TicketManage() {
                   </option>
                 ))}
               </select>
-
-              <div className="relative cursor-pointer">
-                <FaBell className="text-2xl text-gray-700" />
-                {/* Uncomment if you want notification badge */}
-                {/* <span className="absolute -top-1 -right-1 bg-red-600 text-white text-xs rounded-full px-2">3</span> */}
-              </div>
             </div>
           </nav>
 
           {/* Ticket Sections */}
           <div className="max-w-7xl mx-auto px-4 py-6 space-y-10 ">
+            {showNotifications && (
+            <div ref={notificationRef} className="absolute right-4 top-14 z-50">
+              <NotificationPanel
+                userId={user?.UserID}
+                role={user?.Role}
+                onClose={() => setShowNotifications(false)}
+                onNotificationUpdate={handleNotificationPanelUpdate}
+              />
+            </div>
+          )}
             {!selectedTicket ? (
               <>
                 <Section
