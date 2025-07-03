@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { IoClose } from 'react-icons/io5';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import axiosClient from '../axiosClient'; // Changed from axios to axiosClient
 import { IoArrowBackCircleSharp } from "react-icons/io5";
 
 const getFileIcon = (fileName) => {
@@ -53,14 +53,15 @@ const Ticket_secret = ({ ticket, onClose }) => {
 
   useEffect(() => {
     if (!ticket?.TicketID) return;
-    axios.get(`http://localhost:5000/evidence/${ticket.TicketID}`)
+    // Use axiosClient and remove base URL
+    axiosClient.get(`/evidence/${ticket.TicketID}`)
       .then(res => setEvidenceList(res.data))
       .catch(err => console.error("Evidence fetch failed", err));
   }, [ticket?.TicketID]);
 
   const getStatusColor = (status) => {
     switch (status?.toLowerCase()) {
-       case "open":
+      case "open":
         return "bg-blue-100 text-blue-800 rounded-3xl px-3 py-1";
       case "in progress":
         return "bg-yellow-100 text-yellow-800 rounded-3xl px-3 py-1";
@@ -89,10 +90,12 @@ const Ticket_secret = ({ ticket, onClose }) => {
   };
 
   const handleDownload = (fileName) => {
-    const url = `http://localhost:5000/download_evidence/${fileName}`;
+    // Construct the URL using the base URL from axiosClient
+    // The server needs to handle the /download_evidence endpoint
+    const url = axiosClient.defaults.baseURL + `/download_evidence/${fileName}`;
     const a = document.createElement('a');
     a.href = url;
-    a.download = fileName;
+    a.download = fileName; // Suggests the file name for download
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -110,15 +113,15 @@ const Ticket_secret = ({ ticket, onClose }) => {
             className="bg-white rounded-xl shadow-lg w-[800px] max-h-[90vh] overflow-y-auto relative z-10 p-10"
             onClick={(e) => e.stopPropagation()}
           >
-          <div className="flex justify-between items-center mb-6">
-            <button
-              onClick={onClose}
-              className="flex items-center text-gray-600 hover:text-blue-700 p-2 rounded-sm font-bold"
-            >
-              <IoArrowBackCircleSharp className="w-7 h-7 mr-2" />
-              <span>Back</span>
-            </button>
-          </div>
+            <div className="flex justify-between items-center mb-6">
+              <button
+                onClick={onClose}
+                className="flex items-center text-gray-600 hover:text-blue-700 p-2 rounded-sm font-bold"
+              >
+                <IoArrowBackCircleSharp className="w-7 h-7 mr-2" />
+                <span>Back</span>
+              </button>
+            </div>
 
             <h2 className="text-2xl font-bold text-center mb-8 text-gray-800">
               Ticket Details
@@ -185,7 +188,8 @@ const Ticket_secret = ({ ticket, onClose }) => {
                     {evidenceList.map((evi) => {
                       const filePath = evi.FilePath.replace(/\\/g, '/');
                       const fileName = filePath.split('/').pop();
-                      const fileUrl = `http://localhost:5000/${filePath.startsWith("uploads/") ? filePath : "uploads/" + filePath}`;
+                      // Use axiosClient's base URL for file URLs
+                      const fileUrl = `${axiosClient.defaults.baseURL}/${filePath.startsWith("uploads/") ? filePath : "uploads/" + filePath}`;
                       const isImage = /\.(jpg|jpeg|png|gif|bmp|webp)$/i.test(fileName);
                       const isVideo = /\.(mp4|webm|ogg)$/i.test(fileName);
                       const isAudio = /\.(mp3|wav|ogg)$/i.test(fileName);
@@ -244,29 +248,29 @@ const Ticket_secret = ({ ticket, onClose }) => {
           </div>
         </div>
         {/* Modal */}
-        
+
       </div>
 
       {/* Full Description Modal */}
-        {showDescModal && (
+      {showDescModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 bg-opacity-60 p-4"
+          onClick={() => setShowDescModal(false)}
+        >
           <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 bg-opacity-60 p-4"
-            onClick={() => setShowDescModal(false)}
+            className="bg-white rounded-lg p-6 max-w-[80vh] max-h-[70vh] overflow-y-auto relative"
+            onClick={(e) => e.stopPropagation()}
           >
-            <div
-              className="bg-white rounded-lg p-6 max-w-[80vh] max-h-[70vh] overflow-y-auto relative"
-              onClick={(e) => e.stopPropagation()}
+            <button
+              className="absolute top-2 right-2 text-gray-600 hover:text-black"
+              onClick={() => setShowDescModal(false)}
             >
-              <button
-                className="absolute top-2 right-2 text-gray-600 hover:text-black"
-                onClick={() => setShowDescModal(false)}
-              >
-                <IoClose size={24} />
-              </button>
-              <p className="whitespace-pre-wrap text-gray-800">{ticket.Description}</p>
-            </div>
+              <IoClose size={24} />
+            </button>
+            <p className="whitespace-pre-wrap text-gray-800">{ticket.Description}</p>
           </div>
-        )}
+        </div>
+      )}
 
       {/* 🔍 Preview Modal */}
       {previewUrl && (

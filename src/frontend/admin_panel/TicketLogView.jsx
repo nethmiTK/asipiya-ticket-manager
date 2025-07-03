@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import axiosClient from '../axiosClient'; // Changed from axios to axiosClient
 import { format } from 'date-fns';
 import { FaHistory, FaExclamationTriangle, FaCheckCircle, FaComments, FaPaperclip } from 'react-icons/fa';
 
@@ -11,7 +11,8 @@ const TicketLogView = ({ ticketId }) => {
     useEffect(() => {
         const fetchTicketLogs = async () => {
             try {
-                const response = await axios.get(`http://localhost:5000/api/ticket-logs/${ticketId}`);
+                // Use axiosClient and remove base URL
+                const response = await axiosClient.get(`/api/ticket-logs/${ticketId}`);
                 setTicketLogs(response.data);
                 setLoading(false);
             } catch (err) {
@@ -204,4 +205,4 @@ const TicketLogView = ({ ticketId }) => {
     );
 };
 
-export default TicketLogView; 
+export default TicketLogView;

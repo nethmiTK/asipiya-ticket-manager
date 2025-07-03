@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import axios from 'axios';
+import axiosClient from '../axiosClient'; // Changed from axios to axiosClient
 import AdminSideBar from '../../user_components/SideBar/AdminSideBar';
 
 const UserDetails = () => {
@@ -13,12 +13,14 @@ const UserDetails = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const userResponse = await axios.get(`http://localhost:5000/api/users/${userId}`);
+        // Use axiosClient and remove base URL
+        const userResponse = await axiosClient.get(`/api/users/${userId}`);
         setUserData(userResponse.data);
 
-        const ticketsResponse = await axios.get(`http://localhost:5000/api/tickets/user/${userId}`);
+        // Use axiosClient and remove base URL
+        const ticketsResponse = await axiosClient.get(`/api/tickets/user/${userId}`);
         setTickets(ticketsResponse.data);
-        
+
         setLoading(false);
       } catch (error) {
         console.error('Error fetching data:', error);
@@ -49,7 +51,7 @@ const UserDetails = () => {
   return (
     <div className="flex">
       <AdminSideBar open={isSidebarOpen} setOpen={setIsSidebarOpen} />
-      
+
       <main className={`flex-1 min-h-screen bg-gray-100 transition-all duration-300 ${
         isSidebarOpen ? "ml-72" : "ml-20"
       }`}>
@@ -59,8 +61,8 @@ const UserDetails = () => {
             <div className="flex items-center gap-6">
               <div className="w-32 h-32 rounded-full overflow-hidden bg-gray-200">
                 {userData.ProfileImagePath ? (
-                  <img 
-                    src={`http://localhost:5000/uploads/${userData.ProfileImagePath}`}
+                  <img
+                    src={`http://localhost:5000/uploads/${userData.ProfileImagePath}`} // Keep this as it's for static file serving
                     alt={userData.FullName}
                     className="w-full h-full object-cover"
                   />
@@ -70,7 +72,7 @@ const UserDetails = () => {
                   </div>
                 )}
               </div>
-              
+
               <div>
                 <h1 className="text-3xl font-bold text-gray-800 mb-2">{userData.FullName}</h1>
                 <p className="text-gray-600 mb-1">
@@ -150,17 +152,17 @@ const UserDetails = () => {
                         {ticket.Description}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
-                          ${ticket.Status === 'Resolved' ? 'bg-green-100 text-green-800' : 
-                            ticket.Status === 'Pending' ? 'bg-yellow-100 text-yellow-800' : 
+                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full
+                          ${ticket.Status === 'Resolved' ? 'bg-green-100 text-green-800' :
+                            ticket.Status === 'Pending' ? 'bg-yellow-100 text-yellow-800' :
                             'bg-gray-100 text-gray-800'}`}>
                           {ticket.Status}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
-                          ${ticket.Priority === 'High' ? 'bg-red-100 text-red-800' : 
-                            ticket.Priority === 'Medium' ? 'bg-yellow-100 text-yellow-800' : 
+                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full
+                          ${ticket.Priority === 'High' ? 'bg-red-100 text-red-800' :
+                            ticket.Priority === 'Medium' ? 'bg-yellow-100 text-yellow-800' :
                             'bg-green-100 text-green-800'}`}>
                           {ticket.Priority}
                         </span>

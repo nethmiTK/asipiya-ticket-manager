@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import axiosClient from '../axiosClient'; // Changed from axios to axiosClient
 import { toast } from 'react-toastify';
 import { FaEdit, FaTrash } from 'react-icons/fa';
 import { X } from 'lucide-react';
@@ -20,10 +20,12 @@ const TicketCategory = () => {
 
   const fetchCategories = async () => {
     try {
-      const res = await axios.get('http://localhost:5000/ticket_category');
+      // Use axiosClient and remove base URL
+      const res = await axiosClient.get('/ticket_category');
       setCategories(res.data);
     } catch (error) {
       setError('Error fetching categories: ' + error.message);
+      toast.error('Failed to fetch categories.');
     }
   };
 
@@ -37,19 +39,22 @@ const TicketCategory = () => {
 
     try {
       if (editingId) {
-        await axios.put(`http://localhost:5000/api/ticket_category_update/${editingId}`, form);
+        // Use axiosClient and remove base URL
+        await axiosClient.put(`/api/ticket_category_update/${editingId}`, form);
         toast.success('Category updated successfully.');
       } else {
-        await axios.post('http://localhost:5000/api/ticket_category', { ...form, Status: '1' });
+        // Use axiosClient and remove base URL
+        await axiosClient.post('/api/ticket_category', { ...form, Status: '1' });
         toast.success('Category added successfully.');
       }
 
       setForm({ CategoryName: '', Description: '', Status: '1' });
       setEditingId(null);
       setIsModalOpen(false);
-      await fetchCategories();
+      await fetchCategories(); // Re-fetch categories to update the list
     } catch (error) {
       setError('Submit Error: ' + (error.response?.data?.message || error.message));
+      toast.error(error.response?.data?.message || 'Failed to submit category data.');
     }
   };
 
@@ -69,14 +74,16 @@ const TicketCategory = () => {
 
   const confirmDelete = async () => {
     try {
-      const res = await axios.delete(`http://localhost:5000/api/ticket_category_delete/${confirmDeleteId}`);
+      // Use axiosClient and remove base URL
+      const res = await axiosClient.delete(`/api/ticket_category_delete/${confirmDeleteId}`);
       toast.success(res.data.message || 'Category deleted successfully.');
-      await fetchCategories();
+      await fetchCategories(); // Re-fetch categories after successful deletion
     } catch (error) {
       if (error.response?.status === 403) {
         toast.error("This category is already in use and cannot be deleted.");
       } else {
         setError("Delete Error: " + (error.response?.data?.message || error.message));
+        toast.error("Failed to delete category: " + (error.response?.data?.message || error.message));
       }
     } finally {
       setConfirmDeleteId(null);
