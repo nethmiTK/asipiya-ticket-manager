@@ -1,8 +1,13 @@
-import React, { useState, useEffect } from 'react';
-import axiosClient from '../axiosClient'; // Assuming this is the correct relative path
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import axios from 'axios';
 import AdminSideBar from '../../user_components/SideBar/AdminSideBar';
+import AdminNavBar from '../../user_components/NavBar/AdminNavBar';
+import NotificationPanel from '../components/NotificationPanel';
 import { toast } from 'react-toastify';
-import { X, AlignLeft, FileText } from 'lucide-react';
+import { X, FileText } from 'lucide-react';
+import { useAuth } from '../../App'; 
+import { useNavigate } from 'react-router-dom'; // <-- Add this
+
 
 const ClientRegistration = () => {
   const [form, setForm] = useState({
@@ -15,21 +20,71 @@ const ClientRegistration = () => {
   const [error, setError] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+
+  // Notifications
+  const { loggedInUser: user } = useAuth();
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
+  const notificationRef = useRef(null);
+  const navigate = useNavigate();
+
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (notificationRef.current && !notificationRef.current.contains(event.target)) {
+        setShowNotifications(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const fetchUnreadNotifications = useCallback(async () => {
+    if (!user?.UserID) return;
+    try {
+      const res = await axios.get(`http://localhost:5000/api/notifications/count/${user.UserID}`);
+      setUnreadNotifications(res.data.count);
+    } catch (error) {
+      console.error("Error fetching unread notifications", error);
+    }
+  }, [user?.UserID]);
+
+  useEffect(() => {
+    if (user?.UserID) {
+      fetchUnreadNotifications();
+      const interval = setInterval(fetchUnreadNotifications, 30000);
+      return () => clearInterval(interval);
+    }
+  }, [user, fetchUnreadNotifications]);
+
+  const handleNotificationPanelUpdate = () => {
+    fetchUnreadNotifications();
+  };
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentClients = clients.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(clients.length / itemsPerPage);
+
+  const paginate = (pageNumber) => setCurrentPage(pageNumber);
+  const handleItemsPerPageChange = (e) => {
+    setItemsPerPage(Number(e.target.value));
+    setCurrentPage(1);
+  };
+
   const fetchClients = async () => {
     try {
-      // Use axiosClient instead of axios, and remove the base URL
-      const res = await axiosClient.get('/api/clients');
+      const res = await axios.get('http://localhost:5000/api/clients');
       setClients(res.data);
-
       localStorage.setItem('clients', JSON.stringify(res.data));
     } catch (err) {
       setError('Failed to fetch clients: ' + err.message);
-      toast.error('Failed to fetch clients.');
     }
   };
 
@@ -45,32 +100,43 @@ const ClientRegistration = () => {
     e.preventDefault();
     setError(null);
     try {
-      // Use axiosClient instead of axios, and remove the base URL
-      const res = await axiosClient.post('/api/clients', form);
-      const createdClient = res.data.client;
-
-      localStorage.setItem("client", JSON.stringify(createdClient));
-      const client = JSON.parse(localStorage.getItem("client"));
-      console.log("ClientID:", client?.ClientID);
-
+      const res = await axios.post('http://localhost:5000/api/clients', form);
       toast.success('Client registered successfully!');
       setForm({ CompanyName: '', ContactNo: '', ContactPersonEmail: '', MobileNo: '' });
       setShowModal(false);
-      fetchClients(); // Re-fetch clients to update the table
+      fetchClients();
     } catch (err) {
-      const errorMessage = err.response?.data?.message || err.message;
-      setError('Submit error: ' + errorMessage);
-      toast.error('Error registering client: ' + errorMessage);
+      setError('Submit error: ' + (err.response?.data?.message || err.message));
     }
   };
 
   return (
     <div className="flex">
       <AdminSideBar open={isSidebarOpen} setOpen={setIsSidebarOpen} />
+      <AdminNavBar
+        pageTitle="Clent Registration"
+        user={user}
+        sidebarOpen={isSidebarOpen}
+        onProfileClick={() => navigate('/admin-profile')}
+        onNotificationClick={() => setShowNotifications(!showNotifications)}
+        unreadNotifications={unreadNotifications}
+        showNotifications={showNotifications}
+        notificationRef={notificationRef}
+      />
       <div className={`flex-1 min-h-screen bg-gray-100 p-8 transition-all duration-300 ${isSidebarOpen ? "ml-72" : "ml-20"}`}>
+        {showNotifications && (
+          <div ref={notificationRef} className="absolute right-4 top-16 z-50">
+            <NotificationPanel
+              userId={user?.UserID}
+              role={user?.Role}
+              onClose={() => setShowNotifications(false)}
+              onNotificationUpdate={handleNotificationPanelUpdate}
+            />
+          </div>
+        )}
+
         <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-2xl font-bold">Client Registration</h2>
+          <div className="flex justify-between items-center mb-4 ml-343">
             <button
               onClick={() => {
                 setForm({ CompanyName: '', ContactNo: '', ContactPersonEmail: '', MobileNo: '' });
@@ -99,7 +165,7 @@ const ClientRegistration = () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {clients.map((client) => (
+              {currentClients.map((client) => (
                 <tr key={client.ClientID}>
                   <td className="p-2">{client.ClientID}</td>
                   <td className="p-2">{client.CompanyName}</td>
@@ -108,7 +174,7 @@ const ClientRegistration = () => {
                   <td className="p-2">{client.MobileNo}</td>
                 </tr>
               ))}
-              {clients.length === 0 && (
+              {currentClients.length === 0 && (
                 <tr>
                   <td colSpan="5" className="text-center text-gray-500 py-4">No clients registered</td>
                 </tr>
@@ -116,6 +182,31 @@ const ClientRegistration = () => {
             </tbody>
           </table>
         </div>
+
+        {clients.length > 0 && (
+          <div className="flex justify-end items-center mt-4 p-4">
+            <div className="flex items-center space-x-4">
+              <span className="text-gray-700 text-sm">Entries per page:</span>
+              <select
+                value={itemsPerPage}
+                onChange={handleItemsPerPageChange}
+                className="p-2 border border-gray-300 rounded-md text-sm"
+              >
+                {[5, 10, 20, 50].map((num) => (
+                  <option key={num} value={num}>{num}</option>
+                ))}
+              </select>
+              <span className="text-gray-700 text-sm">
+                {`${indexOfFirstItem + 1}-${Math.min(indexOfLastItem, clients.length)} of ${clients.length}`}
+              </span>
+              <button onClick={() => paginate(1)} disabled={currentPage === 1} className="btn-page">&lt;&lt;</button>
+              <button onClick={() => paginate(currentPage - 1)} disabled={currentPage === 1} className="btn-page">&lt;</button>
+              <span className="text-sm">{currentPage}</span>
+              <button onClick={() => paginate(currentPage + 1)} disabled={currentPage === totalPages} className="btn-page">&gt;</button>
+              <button onClick={() => paginate(totalPages)} disabled={currentPage === totalPages} className="btn-page">&gt;&gt;</button>
+            </div>
+          </div>
+        )}
 
         {/* Modal */}
         {showModal && (

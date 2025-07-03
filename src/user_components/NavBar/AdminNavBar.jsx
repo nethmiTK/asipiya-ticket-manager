@@ -23,7 +23,7 @@ const AdminNavBar = ({
           width: `calc(100% - ${leftOffset})`,
         }}
       >
-        <h1 className="text-lg font-semibold text-white">{pageTitle}</h1>
+        <h1 className="text-lg font-semibold ml-4 text-white">{pageTitle}</h1>
 
         <div className="flex items-center gap-6 relative">
           <div

@@ -1,9 +1,14 @@
 import React, { useEffect, useState } from "react";
 import axiosClient from "../axiosClient"; // Changed from axios to axiosClient
+ 
 import AdminSideBar from "../../user_components/SideBar/AdminSideBar";
 import TicketViewPage from "../admin_panel/TicketViewPage";
 import { FaEdit } from 'react-icons/fa';
 import Select from "react-select";
+import AdminNavBar from "../../user_components/NavBar/AdminNavBar";
+import NotificationPanel from "../components/NotificationPanel";
+import { useAuth } from "../../App";
+import { useNavigate } from "react-router-dom";
 
 const PendingTicket = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -12,15 +17,21 @@ const PendingTicket = () => {
   const [loading, setLoading] = useState(true);
   const [showTicketPopup, setShowTicketPopup] = useState(false);
   const [selectedTicketId, setSelectedTicketId] = useState(null);
-
   const [systemOptions, setSystemOptions] = useState([]);
   const [companyOptions, setCompanyOptions] = useState([]);
   const [selectedSystem, setSelectedSystem] = useState(null);
   const [selectedCompany, setSelectedCompany] = useState(null);
 
-  // Pagination state
+  // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
+
+  // Navbar & Notification state
+  const { loggedInUser: user } = useAuth();
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
+  const notificationRef = useRef(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const fetchTickets = async () => {
@@ -33,7 +44,6 @@ const PendingTicket = () => {
         setTickets(pendingTickets);
         setFilteredTickets(pendingTickets);
 
-        // Create unique dropdown options
         const systems = [...new Set(pendingTickets.map(t => t.SystemName).filter(Boolean))];
         const companies = [...new Set(pendingTickets.map(t => t.CompanyName).filter(Boolean))];
         setSystemOptions(systems.map(s => ({ value: s, label: s })));
@@ -60,8 +70,37 @@ const PendingTicket = () => {
       temp = temp.filter(ticket => ticket.CompanyName === selectedCompany.value);
     }
     setFilteredTickets(temp);
-    setCurrentPage(1); // Reset to first page on filter change
+    setCurrentPage(1);
   }, [selectedSystem, selectedCompany, tickets]);
+
+  // Notification logic
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (notificationRef.current && !notificationRef.current.contains(event.target)) {
+        setShowNotifications(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const fetchUnreadNotifications = useCallback(async () => {
+    if (!user?.UserID) return;
+    try {
+      const res = await axios.get(`http://localhost:5000/api/notifications/count/${user.UserID}`);
+      setUnreadNotifications(res.data.count);
+    } catch (error) {
+      console.error("Error fetching notification count:", error);
+    }
+  }, [user?.UserID]);
+
+  useEffect(() => {
+    if (user?.UserID) {
+      fetchUnreadNotifications();
+      const interval = setInterval(fetchUnreadNotifications, 30000);
+      return () => clearInterval(interval);
+    }
+  }, [user, fetchUnreadNotifications]);
 
   const getStatusColor = (status) => {
     switch (status.toLowerCase()) {
@@ -78,7 +117,6 @@ const PendingTicket = () => {
     setShowTicketPopup(true);
   };
 
-  // Pagination logic
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
   const currentItems = filteredTickets.slice(indexOfFirstItem, indexOfLastItem);
@@ -102,10 +140,33 @@ const PendingTicket = () => {
     <div className="flex">
       <AdminSideBar open={isSidebarOpen} setOpen={setIsSidebarOpen} />
 
-      <main className={`flex-1 min-h-screen bg-gray-100 p-6 transition-all duration-300 ${isSidebarOpen ? "ml-72" : "ml-27"}`}>
-        <header className="mb-6">
-          <h1 className="text-2xl font-bold mb-4">Pending Tickets</h1>
+      {/* Admin NavBar */}
+      <AdminNavBar
+        pageTitle="Pending Tickets"
+        user={user}
+        sidebarOpen={isSidebarOpen}
+        onProfileClick={() => navigate('/admin-profile')}
+        onNotificationClick={() => setShowNotifications(!showNotifications)}
+        unreadNotifications={unreadNotifications}
+        showNotifications={showNotifications}
+        notificationRef={notificationRef}
+      />
 
+      {/* Main Content */}
+      <main className={`flex-1 min-h-screen bg-gray-100 pt-16 px-6 transition-all duration-300 ${isSidebarOpen ? "ml-72" : "ml-24"}`}>
+        {/* Notification Panel */}
+        {showNotifications && (
+          <div ref={notificationRef} className="absolute right-6 top-14 z-50">
+            <NotificationPanel
+              userId={user?.UserID}
+              role={user?.Role}
+              onClose={() => setShowNotifications(false)}
+              onNotificationUpdate={fetchUnreadNotifications}
+            />
+          </div>
+        )}
+
+        <header className="mb-6">
           <div className="flex gap-4 mb-4">
             <div className="w-64">
               <Select
@@ -128,6 +189,7 @@ const PendingTicket = () => {
           </div>
         </header>
 
+        {/* Ticket Table */}
         <div className="bg-white rounded-lg shadow overflow-hidden">
           <table className="min-w-full">
             <thead className="bg-gray-200">
@@ -143,7 +205,7 @@ const PendingTicket = () => {
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {currentItems.map((ticket) => (
-                <tr key={ticket.TicketID} className="hover:bg-gray-50 cursor-pointer transition-colors">
+                <tr key={ticket.TicketID} className="hover:bg-gray-50 transition-colors">
                   <td className="px-6 py-4 text-sm font-medium text-gray-900">{ticket.TicketID}</td>
                   <td className="px-6 py-4 text-sm text-gray-700">{ticket.SystemName || "N/A"}</td>
                   <td className="px-6 py-4 text-sm text-gray-700">{ticket.CompanyName || "N/A"}</td>
@@ -165,61 +227,34 @@ const PendingTicket = () => {
           </table>
         </div>
 
+        {/* Pagination */}
         {filteredTickets.length > 0 && (
-          <div className="flex flex-col sm:flex-row justify-end items-center mt-4 p-4">
+          <div className="flex justify-end items-center mt-4 p-4">
             <div className="flex items-center space-x-4">
-              <div className="flex items-center">
-                <span className="text-gray-700 text-sm mr-2">Entries per page:</span>
-                <select
-                  value={itemsPerPage}
-                  onChange={handleItemsPerPageChange}
-                  className="p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                >
-                  <option value={5}>5</option>
-                  <option value={10}>10</option>
-                  <option value={20}>20</option>
-                  <option value={50}>50</option>
-                </select>
-              </div>
+              <span className="text-gray-700 text-sm">Entries per page:</span>
+              <select
+                value={itemsPerPage}
+                onChange={handleItemsPerPageChange}
+                className="p-2 border border-gray-300 rounded-md text-sm"
+              >
+                {[5, 10, 20, 50].map((num) => (
+                  <option key={num} value={num}>{num}</option>
+                ))}
+              </select>
               <span className="text-gray-700 text-sm">
                 {`${indexOfFirstItem + 1}-${Math.min(indexOfLastItem, filteredTickets.length)} of ${filteredTickets.length}`}
               </span>
-              <div className="flex items-center space-x-2">
-                <button
-                  onClick={() => paginate(1)}
-                  disabled={currentPage === 1}
-                  className="px-3 py-1 rounded-md bg-gray-200 text-gray-700 hover:bg-gray-300 disabled:opacity-50 text-sm"
-                >
-                  &lt;&lt;
-                </button>
-                <button
-                  onClick={() => paginate(currentPage - 1)}
-                  disabled={currentPage === 1}
-                  className="px-3 py-1 rounded-md bg-gray-200 text-gray-700 hover:bg-gray-300 disabled:opacity-50 text-sm"
-                >
-                  &lt;
-                </button>
-                <span className="text-gray-700 text-sm font-medium">{currentPage}</span>
-                <button
-                  onClick={() => paginate(currentPage + 1)}
-                  disabled={currentPage === totalPages}
-                  className="px-3 py-1 rounded-md bg-gray-200 text-gray-700 hover:bg-gray-300 disabled:opacity-50 text-sm"
-                >
-                  &gt;
-                </button>
-                <button
-                  onClick={() => paginate(totalPages)}
-                  disabled={currentPage === totalPages}
-                  className="px-3 py-1 rounded-md bg-gray-200 text-gray-700 hover:bg-gray-300 disabled:opacity-50 text-sm"
-                >
-                  &gt;&gt;
-                </button>
-              </div>
+              <button onClick={() => paginate(1)} disabled={currentPage === 1} className="btn-page">&lt;&lt;</button>
+              <button onClick={() => paginate(currentPage - 1)} disabled={currentPage === 1} className="btn-page">&lt;</button>
+              <span className="text-sm">{currentPage}</span>
+              <button onClick={() => paginate(currentPage + 1)} disabled={currentPage === totalPages} className="btn-page">&gt;</button>
+              <button onClick={() => paginate(totalPages)} disabled={currentPage === totalPages} className="btn-page">&gt;&gt;</button>
             </div>
           </div>
         )}
       </main>
 
+      {/* Ticket View Popup */}
       {showTicketPopup && (
         <div className="fixed inset-0 z-50 bg-black/55 flex justify-center items-center">
           <div className="rounded-lg w-[90%] max-w-4xl relative">
