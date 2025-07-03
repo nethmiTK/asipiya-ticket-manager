@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
-import axios from "axios";
+import axiosClient from "../axiosClient"; // Updated import path for axiosClient
 import SideBar from "../../user_components/SideBar/SideBar";
 import NavBar from "../../user_components/NavBar/NavBar";
 import ChatUI from "../../user_components/ChatUI/ChatUI";
@@ -38,7 +38,6 @@ const TicketView = () => {
   const [selectedTicket, setSelectedTicket] = useState(null);
   const [activeTab, setActiveTab] = useState("details");
   const modalRef = useRef(null);
-  // const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
@@ -48,12 +47,6 @@ const TicketView = () => {
 
   const [searchQuery, setSearchQuery] = useState("");
   const navigate = useNavigate();
-
-  // const filteredTickets = tickets.filter(ticket =>
-  //   Object.values(ticket).some(value =>
-  //     String(value).toLowerCase().includes(searchQuery.toLowerCase())
-  //   )
-  // );
 
   // States for custom dropdown visibility
   const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
@@ -91,10 +84,6 @@ const TicketView = () => {
   // only filters by ID and Description
   const filteredTickets = tickets.filter(
     (ticket) =>
-      // String(ticket.id).toLowerCase().includes(searchQuery.toLowerCase()) ||
-      // String(ticket.status).toLowerCase().includes(searchQuery.toLowerCase()) ||
-      // String(ticket.category).toLowerCase().includes(searchQuery.toLowerCase()) ||
-      // String(ticket.system_name).toLowerCase().(searchQuery.toLowerCase())
       String(ticket.id).toLowerCase().includes(searchQuery.toLowerCase()) ||
       String(ticket.description)
         .toLowerCase()
@@ -147,7 +136,8 @@ const TicketView = () => {
       if (!userId) return;
 
       try {
-        const res = await axios.get("http://localhost:5000/userTickets", {
+        // Use axiosClient and remove base URL from path
+        const res = await axiosClient.get("/userTickets", {
           params: { userId },
         });
         setTickets(res.data);
@@ -251,8 +241,9 @@ const TicketView = () => {
       if (!userId) return;
 
       try {
-        const response = await axios.get(
-          `http://localhost:5000/api/notifications/count/${userId}`
+        // Use axiosClient and remove base URL from path
+        const response = await axiosClient.get(
+          `/api/notifications/count/${userId}`
         );
         setUnreadNotifications(response.data.count);
       } catch (error) {
@@ -269,15 +260,10 @@ const TicketView = () => {
     <div className="flex">
       <title>My All Tickets</title>
       <SideBar open={isSidebarOpen} setOpen={setIsSidebarOpen} />
-      {/* <div
-        className={`flex-1 ${
-          isSidebarOpen ? "ml-72" : "ml-20"
-        } flex flex-col h-screen overflow-y-auto transition-all duration-300`}
-      > */}
       <div
         className={`flex-1 flex flex-col h-screen overflow-y-auto transition-all duration-300
-          ml-0 
-          lg:ml-20 ${isSidebarOpen ? 'lg:ml-72' : ''} 
+          ml-0
+          lg:ml-20 ${isSidebarOpen ? 'lg:ml-72' : ''}
         `}
       >
         <NavBar
@@ -509,7 +495,7 @@ const TicketView = () => {
                     </div>
 
                     <p className="text-gray-700 mb-3 text-sm leading-relaxed">
-                      {truncateDescription(ticket.description, 20)} 
+                      {truncateDescription(ticket.description, 20)}
                     </p>
                     <div className="grid grid-cols-2 gap-3 text-sm text-gray-600 mb-3">
                       <div>
@@ -609,7 +595,7 @@ const TicketView = () => {
         </div>
         {/* Pagination Controls at the bottom */}
         {finalFilteredTickets.length > 0 && ( // Changed from filteredTickets.length
-                              <div className="flex flex-col sm:flex-row justify-end items-end sm:items-center mt-4 p-4 bg-white rounded-lg shadow flex-wrap gap-4">
+          <div className="flex flex-col sm:flex-row justify-end items-end sm:items-center mt-4 p-4 bg-white rounded-lg shadow flex-wrap gap-4">
             <div className="flex items-center flex-wrap gap-2 sm:space-x-4">
               <div className="flex items-center">
                 <span className="text-gray-700 text-sm mr-2">
