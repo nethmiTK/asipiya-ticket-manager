@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import axiosClient from '../axiosClient'; // Assuming this is the correct relative path
 import AdminSideBar from '../../user_components/SideBar/AdminSideBar';
 import { toast } from 'react-toastify';
 import { X, AlignLeft, FileText } from 'lucide-react';
@@ -22,15 +22,16 @@ const ClientRegistration = () => {
 
   const fetchClients = async () => {
     try {
-      const res = await axios.get('http://localhost:5000/api/clients');
+      // Use axiosClient instead of axios, and remove the base URL
+      const res = await axiosClient.get('/api/clients');
       setClients(res.data);
 
       localStorage.setItem('clients', JSON.stringify(res.data));
     } catch (err) {
       setError('Failed to fetch clients: ' + err.message);
+      toast.error('Failed to fetch clients.');
     }
   };
-
 
   useEffect(() => {
     const storedClients = localStorage.getItem('clients');
@@ -40,27 +41,28 @@ const ClientRegistration = () => {
     fetchClients();
   }, []);
 
-
   const handleSubmit = async (e) => {
-  e.preventDefault();
-  setError(null);
-  try {
-    const res = await axios.post('http://localhost:5000/api/clients', form);
-    const createdClient = res.data.client;
+    e.preventDefault();
+    setError(null);
+    try {
+      // Use axiosClient instead of axios, and remove the base URL
+      const res = await axiosClient.post('/api/clients', form);
+      const createdClient = res.data.client;
 
-    localStorage.setItem("client", JSON.stringify(createdClient));
-    const client = JSON.parse(localStorage.getItem("client"));
-    console.log("ClientID:", client?.ClientID);
+      localStorage.setItem("client", JSON.stringify(createdClient));
+      const client = JSON.parse(localStorage.getItem("client"));
+      console.log("ClientID:", client?.ClientID);
 
-    toast.success('Client registered successfully!');
-    setForm({ CompanyName: '', ContactNo: '', ContactPersonEmail: '', MobileNo: '' });
-    setShowModal(false);
-    fetchClients();
-  } catch (err) {
-    setError('Submit error: ' + (err.response?.data?.message || err.message));
-  }
-};
-
+      toast.success('Client registered successfully!');
+      setForm({ CompanyName: '', ContactNo: '', ContactPersonEmail: '', MobileNo: '' });
+      setShowModal(false);
+      fetchClients(); // Re-fetch clients to update the table
+    } catch (err) {
+      const errorMessage = err.response?.data?.message || err.message;
+      setError('Submit error: ' + errorMessage);
+      toast.error('Error registering client: ' + errorMessage);
+    }
+  };
 
   return (
     <div className="flex">
