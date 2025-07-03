@@ -102,7 +102,7 @@ const PendingTicket = () => {
     <div className="flex">
       <AdminSideBar open={isSidebarOpen} setOpen={setIsSidebarOpen} />
 
-      <main className={`flex-1 min-h-screen bg-gray-100 p-6 transition-all duration-300 ${isSidebarOpen ? "ml-72" : "ml-27"}`}>
+      <main className={`flex-1 min-h-screen bg-gray-100 p-6 transition-all duration-300 ${isSidebarOpen ? "ml-72" : "ml-20"}`}>
         <header className="mb-6">
           <h1 className="text-2xl font-bold mb-4">Pending Tickets</h1>
 
