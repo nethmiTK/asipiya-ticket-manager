@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import axiosClient from '../axiosClient'; // Changed from axios to axiosClient
+import axiosClient from '../axiosClient';
 import AdminSideBar from '../../user_components/SideBar/AdminSideBar';
 import AdminNavBar from '../../user_components/NavBar/AdminNavBar';
 import NotificationPanel from '../components/NotificationPanel';
 import { toast } from 'react-toastify';
 import { X, FileText } from 'lucide-react';
 import { useAuth } from '../../App';
-import { useNavigate } from 'react-router-dom'; // <-- Add this
+import { useNavigate } from 'react-router-dom';
+import { Tooltip } from 'react-tooltip';
 
 
 const ClientRegistration = () => {
@@ -44,7 +45,6 @@ const ClientRegistration = () => {
     const fetchUnreadNotifications = useCallback(async () => {
         if (!user?.UserID) return;
         try {
-            // Use axiosClient and remove base URL
             const res = await axiosClient.get(`/api/notifications/count/${user.UserID}`);
             setUnreadNotifications(res.data.count);
         } catch (error) {
@@ -81,7 +81,6 @@ const ClientRegistration = () => {
 
     const fetchClients = async () => {
         try {
-            // Use axiosClient and remove base URL
             const res = await axiosClient.get('/api/clients');
             setClients(res.data);
             localStorage.setItem('clients', JSON.stringify(res.data));
@@ -102,7 +101,6 @@ const ClientRegistration = () => {
         e.preventDefault();
         setError(null);
         try {
-            // Use axiosClient and remove base URL
             const res = await axiosClient.post('/api/clients', form);
             toast.success('Client registered successfully!');
             setForm({ CompanyName: '', ContactNo: '', ContactPersonEmail: '', MobileNo: '' });
@@ -117,7 +115,7 @@ const ClientRegistration = () => {
         <div className="flex">
             <AdminSideBar open={isSidebarOpen} setOpen={setIsSidebarOpen} />
             <AdminNavBar
-                pageTitle="Client Registration" 
+                pageTitle="Client Registration"
                 user={user}
                 sidebarOpen={isSidebarOpen}
                 onProfileClick={() => navigate('/admin-profile')}
@@ -126,7 +124,8 @@ const ClientRegistration = () => {
                 showNotifications={showNotifications}
                 notificationRef={notificationRef}
             />
-            <div className={`flex-1 min-h-screen bg-gray-100 p-8 transition-all duration-300 ${isSidebarOpen ? "ml-72" : "ml-20"}`}>
+            {/* Main content area - adjusted padding for smaller screens */}
+            <div className={`flex-1 min-h-screen bg-gray-100 p-4 md:p-8 transition-all duration-300 ${isSidebarOpen ? "ml-72" : "ml-20"}`}>
                 {showNotifications && (
                     <div ref={notificationRef} className="absolute right-4 top-16 z-50">
                         <NotificationPanel
@@ -137,83 +136,88 @@ const ClientRegistration = () => {
                         />
                     </div>
                 )}
-
-                <div className="bg-white rounded-lg shadow p-6">
-                    <div className="flex justify-between items-center mb-4 ml-343"> {/* Consider removing ml-343 if it's not a valid class or intended for something specific */}
+                <div><h1 className="text-xl md:text-2xl font-bold mb-4 md:mb-8"></h1></div> {/* Adjusted font size and margin */}
+                <div className="bg-white rounded-lg shadow p-4 md:p-6"> {/* Adjusted padding */}
+                    <div className="flex justify-end items-center mb-4"> {/* Removed ml-343 as it's not a standard Tailwind class and might cause issues */}
                         <button
+                            data-tooltip-id="tooltip"
+                            data-tooltip-content="Register New User"
                             onClick={() => {
                                 setForm({ CompanyName: '', ContactNo: '', ContactPersonEmail: '', MobileNo: '' });
                                 setShowModal(true);
                             }}
-                            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+                            className="bg-blue-600 text-white px-3 py-1 md:px-4 md:py-2 rounded hover:bg-blue-700 text-sm md:text-base" // Adjusted padding and font size
                         >
-                            + Register New
+                            +
                         </button>
                     </div>
 
                     {error && (
-                        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+                        <div className="bg-red-100 border border-red-400 text-red-700 px-3 py-2 md:px-4 md:py-3 rounded mb-4 text-sm"> {/* Adjusted padding and font size */}
                             {error}
                         </div>
                     )}
 
-                    <table className="table-fixed w-full">
-                        <thead className="bg-gray-200">
-                            <tr>
-                                <th className="p-2 text-left">Client ID</th>
-                                <th className="p-2 text-left">Company Name</th>
-                                <th className="p-2 text-left">Contact No</th>
-                                <th className="p-2 text-left">Contact Person Email</th>
-                                <th className="p-2 text-left">Mobile No</th>
-                            </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                            {currentClients.map((client) => (
-                                <tr key={client.ClientID}>
-                                    <td className="p-2">{client.ClientID}</td>
-                                    <td className="p-2">{client.CompanyName}</td>
-                                    <td className="p-2">{client.ContactNo}</td>
-                                    <td className="p-2">{client.ContactPersonEmail}</td>
-                                    <td className="p-2">{client.MobileNo}</td>
-                                </tr>
-                            ))}
-                            {currentClients.length === 0 && (
+                    {/* Table Responsiveness: Added overflow-x-auto */}
+                    <div className="overflow-x-auto">
+                        <table className="min-w-full divide-y divide-gray-200"> {/* Changed table-fixed to min-w-full to allow columns to shrink, added divide-y */}
+                            <thead className="bg-gray-200">
                                 <tr>
-                                    <td colSpan="5" className="text-center text-gray-500 py-4">No clients registered</td>
+                                    <th className="p-2 text-left text-xs md:text-sm">Client ID</th> {/* Adjusted font size */}
+                                    <th className="p-2 text-left text-xs md:text-sm">Company Name</th>
+                                    <th className="p-2 text-left text-xs md:text-sm">Contact No</th>
+                                    <th className="p-2 text-left text-xs md:text-sm">Contact Person Email</th>
+                                    <th className="p-2 text-left text-xs md:text-sm">Mobile No</th>
                                 </tr>
-                            )}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody className="bg-white divide-y divide-gray-200">
+                                {currentClients.map((client) => (
+                                    <tr key={client.ClientID}>
+                                        <td className="p-2 text-xs md:text-sm">{client.ClientID}</td> {/* Adjusted font size */}
+                                        <td className="p-2 text-xs md:text-sm">{client.CompanyName}</td>
+                                        <td className="p-2 text-xs md:text-sm">{client.ContactNo}</td>
+                                        <td className="p-2 text-xs md:text-sm">{client.ContactPersonEmail}</td>
+                                        <td className="p-2 text-xs md:text-sm">{client.MobileNo}</td>
+                                    </tr>
+                                ))}
+                                {currentClients.length === 0 && (
+                                    <tr>
+                                        <td colSpan="5" className="text-center text-gray-500 py-4 text-sm">No clients registered</td> {/* Adjusted font size */}
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
 
                 {clients.length > 0 && (
-                    <div className="flex justify-end items-center mt-4 p-4">
-                        <div className="flex items-center space-x-4">
-                            <span className="text-gray-700 text-sm">Entries per page:</span>
+                    <div className="flex flex-col md:flex-row justify-end items-center mt-4 p-4 space-y-2 md:space-y-0 md:space-x-4"> {/* Added flex-col on mobile, flex-row on md+, and spacing */}
+                        <div className="flex items-center space-x-2 md:space-x-4 text-sm"> {/* Adjusted spacing and font size */}
+                            <span className="text-gray-700">Entries per page:</span>
                             <select
                                 value={itemsPerPage}
                                 onChange={handleItemsPerPageChange}
-                                className="p-2 border border-gray-300 rounded-md text-sm"
+                                className="p-1 md:p-2 border border-gray-300 rounded-md text-sm" // Adjusted padding
                             >
                                 {[5, 10, 20, 50].map((num) => (
                                     <option key={num} value={num}>{num}</option>
                                 ))}
                             </select>
-                            <span className="text-gray-700 text-sm">
+                            <span className="text-gray-700">
                                 {`${indexOfFirstItem + 1}-${Math.min(indexOfLastItem, clients.length)} of ${clients.length}`}
                             </span>
-                            <button onClick={() => paginate(1)} disabled={currentPage === 1} className="btn-page">&lt;&lt;</button>
-                            <button onClick={() => paginate(currentPage - 1)} disabled={currentPage === 1} className="btn-page">&lt;</button>
+                            <button onClick={() => paginate(1)} disabled={currentPage === 1} className="btn-page text-sm md:text-base p-1 md:p-2">&lt;&lt;</button> {/* Adjusted padding and font size */}
+                            <button onClick={() => paginate(currentPage - 1)} disabled={currentPage === 1} className="btn-page text-sm md:text-base p-1 md:p-2">&lt;</button>
                             <span className="text-sm">{currentPage}</span>
-                            <button onClick={() => paginate(currentPage + 1)} disabled={currentPage === totalPages} className="btn-page">&gt;</button>
-                            <button onClick={() => paginate(totalPages)} disabled={currentPage === totalPages} className="btn-page">&gt;&gt;</button>
+                            <button onClick={() => paginate(currentPage + 1)} disabled={currentPage === totalPages} className="btn-page text-sm md:text-base p-1 md:p-2">&gt;</button>
+                            <button onClick={() => paginate(totalPages)} disabled={currentPage === totalPages} className="btn-page text-sm md:text-base p-1 md:p-2">&gt;&gt;</button>
                         </div>
                     </div>
                 )}
 
                 {/* Modal */}
                 {showModal && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55">
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4"> {/* Added padding for small screens */}
                         <div className="bg-white p-6 rounded shadow-md w-full max-w-lg relative">
                             <button
                                 onClick={() => setShowModal(false)}
@@ -221,7 +225,7 @@ const ClientRegistration = () => {
                             >
                                 <X />
                             </button>
-                            <h3 className="text-xl font-semibold mb-4">Register Client</h3>
+                            <h3 className="text-lg md:text-xl font-semibold mb-4">Register Client</h3> {/* Adjusted font size */}
                             <form onSubmit={handleSubmit}>
                                 <div className="mb-4">
                                     <label className="block text-sm font-medium mb-1">Company Name</label>
@@ -234,7 +238,7 @@ const ClientRegistration = () => {
                                             name="CompanyName"
                                             value={form.CompanyName}
                                             onChange={handleChange}
-                                            className="border rounded px-4 py-2 w-full pl-10"
+                                            className="border rounded px-4 py-2 w-full pl-10 text-sm md:text-base" // Adjusted font size
                                             required
                                         />
                                     </div>
@@ -247,7 +251,7 @@ const ClientRegistration = () => {
                                         name="ContactNo"
                                         value={form.ContactNo}
                                         onChange={handleChange}
-                                        className="border rounded px-4 py-2 w-full"
+                                        className="border rounded px-4 py-2 w-full text-sm md:text-base" // Adjusted font size
                                     />
                                 </div>
 
@@ -258,7 +262,7 @@ const ClientRegistration = () => {
                                         name="ContactPersonEmail"
                                         value={form.ContactPersonEmail}
                                         onChange={handleChange}
-                                        className="border rounded px-4 py-2 w-full"
+                                        className="border rounded px-4 py-2 w-full text-sm md:text-base" // Adjusted font size
                                     />
                                 </div>
 
@@ -269,18 +273,18 @@ const ClientRegistration = () => {
                                         name="MobileNo"
                                         value={form.MobileNo}
                                         onChange={handleChange}
-                                        className="border rounded px-4 py-2 w-full"
+                                        className="border rounded px-4 py-2 w-full text-sm md:text-base" // Adjusted font size
                                     />
                                 </div>
 
                                 <div className="flex justify-end">
-                                    <button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded">
+                                    <button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded text-sm md:text-base"> {/* Adjusted font size */}
                                         Register
                                     </button>
                                     <button
                                         type="button"
                                         onClick={() => setShowModal(false)}
-                                        className="ml-2 bg-gray-400 hover:bg-gray-500 text-white px-4 py-2 rounded"
+                                        className="ml-2 bg-gray-400 hover:bg-gray-500 text-white px-4 py-2 rounded text-sm md:text-base" 
                                     >
                                         Cancel
                                     </button>
@@ -290,6 +294,7 @@ const ClientRegistration = () => {
                     </div>
                 )}
             </div>
+            <Tooltip id="tooltip" place="top" />
         </div>
     );
 };
