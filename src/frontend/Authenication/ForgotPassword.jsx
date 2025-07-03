@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import axios from 'axios';
+import axiosClient from '../axiosClient'; // Changed from axios to axiosClient
 import { useNavigate, Link } from 'react-router-dom';
 import { toast } from 'react-toastify';
 
@@ -16,8 +16,8 @@ const ForgotPassword = () => {
         e.preventDefault();
         setLoading(true); // Start loading
         try {
-            // Send the email to the backend to initiate password reset
-            const response = await axios.post('http://localhost:5000/forgot-password', { email });
+            // Send the email to the backend to initiate password reset using axiosClient
+            const response = await axiosClient.post('/forgot-password', { email });
             toast.success(response.data.message || 'Password reset link sent to your email!');
             navigate('/login'); // Redirect to login page after sending link
         } catch (error) {

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import { FaTicketAlt, FaExclamationCircle, FaCalendarDay, FaTasks, FaHome, FaEye, FaClock } from "react-icons/fa";
 import { Link, useNavigate } from "react-router-dom";
 import { BsChevronLeft } from "react-icons/bs";
@@ -10,7 +10,7 @@ import { GrSystem } from "react-icons/gr";
 import { IoNotificationsOutline } from "react-icons/io5";
 import AdminSideBar from "../../user_components/SideBar/AdminSideBar";
 import AdminNavBar from "../../user_components/NavBar/AdminNavBar.jsx";
-import axios from "axios";
+import axiosClient from "../axiosClient"; // Changed from axios to axiosClient
 import { Pie, Bar } from "react-chartjs-2";
 import {
   Chart as ChartJS,
@@ -72,7 +72,7 @@ const Sidebar = ({ open, setOpen }) => {
         }`}
         onClick={() => setOpen(!open)}
       />
- 
+
     </div>
   );
 };
@@ -83,7 +83,8 @@ const TicketByStatusChart = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await axios.get("http://localhost:5000/api/tickets/status-distribution");
+        // Use axiosClient and remove base URL
+        const response = await axiosClient.get("/api/tickets/status-distribution");
         const data = response.data;
 
         const chartData = {
@@ -120,7 +121,7 @@ const TicketByStatusChart = () => {
       <div className="flex-1 relative">
         <div className="absolute inset-0 flex items-center justify-center">
           <div className="w-full h-full max-w-[300px] max-h-[300px] mx-auto">
-            <Pie data={chartData} options={{ 
+            <Pie data={chartData} options={{
               maintainAspectRatio: true,
               responsive: true,
               plugins: {
@@ -164,8 +165,9 @@ const TicketBySystemChart = () => {
       try {
         setLoading(true);
         setError(null);
-        const response = await axios.get("http://localhost:5000/api/tickets/system-distribution");
-        
+        // Use axiosClient and remove base URL
+        const response = await axiosClient.get("/api/tickets/system-distribution");
+
         if (!response.data || response.data.length === 0) {
           setError("No system data available");
           setLoading(false);
@@ -290,6 +292,7 @@ const Dashboard = () => {
     highPriority: 0,
     closed: 0,
     pending: 0,
+    resolved: 0, // Ensure resolved is initialized
   });
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [recentActivities, setRecentActivities] = useState([]);
@@ -299,7 +302,8 @@ const Dashboard = () => {
   useEffect(() => {
     const fetchCounts = async () => {
       try {
-        const response = await axios.get("http://localhost:5000/api/tickets/counts");
+        // Use axiosClient and remove base URL
+        const response = await axiosClient.get("/api/tickets/counts");
         setCounts(response.data);
       } catch (error) {
         console.error("Error fetching ticket counts:", error);
@@ -312,9 +316,10 @@ const Dashboard = () => {
   useEffect(() => {
     const fetchRecentData = async () => {
       try {
+        // Use axiosClient and remove base URL for both calls
         const [logRes, usersRes] = await Promise.all([
-          axios.get("http://localhost:5000/api/tickets/recent-activities"),
-          axios.get("http://localhost:5000/api/users/recent")
+          axiosClient.get("/api/tickets/recent-activities"),
+          axiosClient.get("/api/users/recent")
         ]);
         setRecentActivities(logRes.data);
         setRecentUsers(usersRes.data);
@@ -334,9 +339,9 @@ const Dashboard = () => {
     navigate(path);
   };
 
-  const handleProfileClick = () => {
+  const handleProfileClick = useCallback(() => { // Wrap with useCallback for optimization
     navigate('/admin-profile');
-  };
+  }, [navigate]);
 
   const toggleNotifications = () => {
     setIsNotificationOpen(!isNotificationOpen);
@@ -419,8 +424,8 @@ const Dashboard = () => {
                       <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">#{log.TicketID}</td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
                         {log.DateTime ? (
-                          typeof log.DateTime === 'string' && log.DateTime.includes('-') ? 
-                            log.DateTime : 
+                          typeof log.DateTime === 'string' && log.DateTime.includes('-') ?
+                            log.DateTime :
                             format(new Date(log.DateTime), 'yyyy-MM-dd HH:mm:ss')
                         ) : 'N/A'}
                       </td>
@@ -461,8 +466,8 @@ const Dashboard = () => {
           <h2 className="text-xl font-semibold mb-6">Recently Users</h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6">
             {recentUsers.map((user) => (
-              <div 
-                key={user.UserID} 
+              <div
+                key={user.UserID}
                 className="flex flex-col items-center cursor-pointer hover:opacity-80 transition-opacity"
                 onClick={() => handleUserClick(user.UserID)}
               >
@@ -471,7 +476,7 @@ const Dashboard = () => {
                     user.hasPendingTicket ? 'ring-2 ring-green-500' : ''
                   }`}>
                     {user.ProfileImagePath ? (
-                      <img 
+                      <img
                         src={`http://localhost:5000/uploads/${user.ProfileImagePath}`}
                         alt={user.FullName}
                         className="w-full h-full object-cover"
@@ -527,34 +532,36 @@ const DashboardLayout = () => {
     };
   }, []);
 
+  const fetchUnreadNotifications = useCallback(async () => {
+    if (!user?.UserID) return;
+    try {
+      // Use axiosClient and remove base URL
+      const response = await axiosClient.get(`/api/notifications/count/${user.UserID}`);
+      setUnreadNotifications(response.data.count);
+    } catch (error) {
+      console.error('Error fetching unread notifications:', error);
+    }
+  }, [user?.UserID]); // Added user.UserID to dependencies
+
   useEffect(() => {
     if (user?.UserID) {
       fetchUnreadNotifications();
       const interval = setInterval(fetchUnreadNotifications, 30000);
       return () => clearInterval(interval);
     }
-  }, [user]);
-
-  const fetchUnreadNotifications = async () => {
-    try {
-      const response = await axios.get(`http://localhost:5000/api/notifications/count/${user.UserID}`);
-      setUnreadNotifications(response.data.count);
-    } catch (error) {
-      console.error('Error fetching unread notifications:', error);
-    }
-  };
+  }, [user, fetchUnreadNotifications]);
 
   // New function to handle updates from NotificationPanel
-  const handleNotificationPanelUpdate = () => {
+  const handleNotificationPanelUpdate = useCallback(() => {
       // Optimistically decrease the unread count displayed on the bell icon
       setUnreadNotifications(prevCount => Math.max(0, prevCount - 1));
       // Then, re-fetch the actual count from the backend to ensure consistency
       fetchUnreadNotifications();
-  };
+  }, [fetchUnreadNotifications]); // Added fetchUnreadNotifications to dependencies
 
-  const handleProfileClick = () => {
+  const handleProfileClick = useCallback(() => {
     navigate('/admin-profile');
-  };
+  }, [navigate]);
 
   return (
     <div className="flex">
@@ -571,7 +578,7 @@ const DashboardLayout = () => {
         notificationRef={notificationRef}
       >
       </AdminNavBar>
-      
+
       <main className={`flex-1 min-h-screen mt-12 bg-gray-100 transition-all duration-300 ${isSidebarOpen ? "ml-72" : "ml-16"}`}>
         <div className="p-4 sm:p-6 lg:p-8">
           {showNotifications && (
