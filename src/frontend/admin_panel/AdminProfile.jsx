@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import axios from 'axios';
+import axiosClient from '../axiosClient'; // Assuming this is the correct relative path from admin_panel to frontend
 import { toast } from 'react-toastify';
 import { useAuth } from '../../App.jsx';
 import { AiOutlineUser, AiOutlineCamera } from 'react-icons/ai';
@@ -7,23 +7,22 @@ import { IoClose } from 'react-icons/io5';
 import AdminSideBar from "../../user_components/SideBar/AdminSideBar";
 import NotificationPanel from '../components/NotificationPanel.jsx';
 import AdminNavBar from '../../user_components/NavBar/AdminNavBar.jsx';
-import { useNavigate } from 'react-router-dom'; // Import useNavigate
+import { useNavigate } from 'react-router-dom';
 
 const AdminProfile = () => {
     const { loggedInUser: user, setLoggedInUser } = useAuth();
-    const navigate = useNavigate(); // Initialize useNavigate
+    const navigate = useNavigate();
 
-    const [profileImage, setProfileImage] = useState(null); // This state isn't strictly needed if you upload immediately
+    const [profileImage, setProfileImage] = useState(null);
     const [previewUrl, setPreviewUrl] = useState(null);
-    const [isOpen, setIsOpen] = useState(false); // Controls AdminSideBar open/close
-    
-    // Notification states for AdminNavBar and NotificationPanel
+    const [isOpen, setIsOpen] = useState(false);
+
     const [showNotifications, setShowNotifications] = useState(false);
     const [unreadNotifications, setUnreadNotifications] = useState(0);
     const notificationRef = useRef(null);
 
-    const [loading, setLoading] = useState(true); // Initial loading for profile data
-    const [errors, setErrors] = useState({}); // Form validation errors
+    const [loading, setLoading] = useState(true);
+    const [errors, setErrors] = useState({});
 
     const [profileData, setProfileData] = useState({
         FullName: '',
@@ -48,7 +47,8 @@ const AdminProfile = () => {
             if (user && user.UserID) {
                 try {
                     setLoading(true);
-                    const response = await axios.get(`http://localhost:5000/api/user/profile/${user.UserID}`);
+                    // Path now includes '/api' because BASE_URL is 'http://localhost:5000'
+                    const response = await axiosClient.get(`/api/user/profile/${user.UserID}`);
                     const fetchedData = response.data;
                     setProfileData(fetchedData);
                     setFormData({
@@ -60,9 +60,10 @@ const AdminProfile = () => {
                         ConfirmNewPassword: ''
                     });
                     if (fetchedData.ProfileImagePath) {
+                        // This URL is for serving static files, so it needs the full base URL
                         setPreviewUrl(`http://localhost:5000/uploads/${fetchedData.ProfileImagePath}`);
                     } else {
-                        setPreviewUrl(null); // Ensure previewUrl is reset if no image path
+                        setPreviewUrl(null);
                     }
                     setLoading(false);
                 } catch (error) {
@@ -76,7 +77,7 @@ const AdminProfile = () => {
             }
         };
         fetchUserProfile();
-    }, [user, setLoggedInUser]); // Add setLoggedInUser to dependencies if it's a stable function or its updates trigger re-renders elsewhere
+    }, [user, setLoggedInUser]);
 
     // --- Profile Image Handling ---
     const handleImageChange = async (e) => {
@@ -91,12 +92,13 @@ const AdminProfile = () => {
                 return;
             }
 
-            const imageFormData = new FormData(); // Use a distinct name to avoid confusion with form data for text inputs
+            const imageFormData = new FormData();
             imageFormData.append('profileImage', file);
 
             try {
-                const response = await axios.post(
-                    `http://localhost:5000/api/user/profile/upload/${user.UserID}`,
+                // Path now includes '/api'
+                const response = await axiosClient.post(
+                    `/api/user/profile/upload/${user.UserID}`,
                     imageFormData,
                     {
                         headers: {
@@ -107,7 +109,6 @@ const AdminProfile = () => {
 
                 if (response.data.imagePath) {
                     setPreviewUrl(`http://localhost:5000/uploads/${response.data.imagePath}`);
-                    // Update the loggedInUser context and localStorage
                     if (setLoggedInUser) {
                         const updatedUser = { ...user, ProfileImagePath: response.data.imagePath };
                         setLoggedInUser(updatedUser);
@@ -122,14 +123,14 @@ const AdminProfile = () => {
         }
     };
 
-    const handleImageRemove = async () => { // Renamed from handleImageClick for clarity
-        if (!previewUrl) return; // Only try to remove if there's an image to remove
+    const handleImageRemove = async () => {
+        if (!previewUrl) return;
 
         try {
-            await axios.delete(`http://localhost:5000/api/user/profile/image/${user.UserID}`);
+            // Path now includes '/api'
+            await axiosClient.delete(`/api/user/profile/image/${user.UserID}`);
             setPreviewUrl(null);
-            setProfileImage(null); // Reset profileImage state as well
-            // Update the loggedInUser context and localStorage
+            setProfileImage(null);
             if (setLoggedInUser) {
                 const updatedUser = { ...user, ProfileImagePath: null };
                 setLoggedInUser(updatedUser);
@@ -146,7 +147,7 @@ const AdminProfile = () => {
     const handleChange = (e) => {
         const { name, value } = e.target;
         setFormData({ ...formData, [name]: value });
-        setErrors(prevErrors => ({ ...prevErrors, [name]: '' })); // Clear error when typing
+        setErrors(prevErrors => ({ ...prevErrors, [name]: '' }));
     };
 
     // --- Form Validation ---
@@ -177,7 +178,6 @@ const AdminProfile = () => {
         const newErrors = {};
         const { CurrentPassword, NewPassword, ConfirmNewPassword } = formData;
 
-        // Only validate password fields if at least one password field is filled
         if (CurrentPassword || NewPassword || ConfirmNewPassword) {
             if (!CurrentPassword) {
                 newErrors.CurrentPassword = 'Current password is required to change password.';
@@ -217,10 +217,10 @@ const AdminProfile = () => {
         const { FullName, Email, Phone } = formData;
         try {
             const updatePayload = { FullName, Email, Phone };
-            const response = await axios.put(`http://localhost:5000/api/user/profile/${user.UserID}`, updatePayload);
+            // Path now includes '/api'
+            const response = await axiosClient.put(`/api/user/profile/${user.UserID}`, updatePayload);
             toast.success(response.data.message || 'Personal information updated successfully!');
 
-            // Update user context and local storage
             if (setLoggedInUser) {
                 const updatedUser = { ...user, FullName, Email, Phone };
                 setLoggedInUser(updatedUser);
@@ -242,12 +242,13 @@ const AdminProfile = () => {
         }
 
         const { CurrentPassword, NewPassword } = formData;
+        const updatePayload = { CurrentPassword, NewPassword };
+
         try {
-            const updatePayload = { CurrentPassword, NewPassword }; // Only send password fields
-            const response = await axios.put(`http://localhost:5000/api/user/profile/${user.UserID}`, updatePayload);
+            // Path now includes '/api'
+            const response = await axiosClient.put(`/api/user/profile/${user.UserID}`, updatePayload);
             toast.success(response.data.message || 'Security information updated successfully!');
 
-            // Clear password fields after successful update
             setFormData(prevData => ({
                 ...prevData,
                 CurrentPassword: '',
@@ -277,7 +278,8 @@ const AdminProfile = () => {
     const fetchUnreadNotifications = useCallback(async () => {
         if (!user?.UserID) return;
         try {
-            const response = await axios.get(`http://localhost:5000/api/notifications/count/${user.UserID}`);
+            // Path now includes '/api'
+            const response = await axiosClient.get(`/api/notifications/count/${user.UserID}`);
             setUnreadNotifications(response.data.count);
         } catch (error) {
             console.error('Error fetching unread notifications:', error);
@@ -287,20 +289,20 @@ const AdminProfile = () => {
     useEffect(() => {
         if (user?.UserID) {
             fetchUnreadNotifications();
-            const interval = setInterval(fetchUnreadNotifications, 30000); // Poll every 30 seconds
+            const interval = setInterval(fetchUnreadNotifications, 30000);
             return () => clearInterval(interval);
         }
     }, [user, fetchUnreadNotifications]);
 
     const handleNotificationPanelUpdate = useCallback(() => {
-        fetchUnreadNotifications(); // Re-fetch the actual count to ensure consistency
+        fetchUnreadNotifications();
     }, [fetchUnreadNotifications]);
 
     // --- Profile Click Handler for AdminNavBar (if navigating to own profile) ---
     const handleProfileClick = useCallback(() => {
-      navigate('/admin-profile'); // Assuming /admin-profile is the route to this component
+        navigate('/admin-profile');
     }, [navigate]);
-    
+
 
     if (loading) {
         return (
@@ -324,7 +326,7 @@ const AdminProfile = () => {
             <AdminNavBar
                 pageTitle="My Profile"
                 user={user}
-                sidebarOpen={isOpen} 
+                sidebarOpen={isOpen}
                 onProfileClick={handleProfileClick}
                 onNotificationClick={() => setShowNotifications(!showNotifications)}
                 unreadNotifications={unreadNotifications}
@@ -333,7 +335,6 @@ const AdminProfile = () => {
             />
 
             <div className={`flex-1 overflow-y-auto p-6 md:p-12 transition-all duration-300 ${isOpen ? "ml-72" : "ml-20"}`}>
-                {/* Conditional rendering for NotificationPanel */}
                 {showNotifications && (
                     <div ref={notificationRef} className="absolute right-4 top-14 z-50">
                         <NotificationPanel
@@ -357,7 +358,7 @@ const AdminProfile = () => {
                                             className="w-full h-full object-cover"
                                         />
                                         <button
-                                            onClick={handleImageRemove} // Corrected function name
+                                            onClick={handleImageRemove}
                                             className="absolute top-0 right-0 bg-red-500 rounded-full p-1 text-white hover:bg-red-600 transition-colors"
                                             aria-label="Remove profile image"
                                         >
