@@ -1,5 +1,6 @@
-import React, { useEffect, useState, useRef, useCallback } from "react";
-import axios from "axios";
+import React, { useEffect, useState } from "react";
+import axiosClient from "../axiosClient"; // Changed from axios to axiosClient
+ 
 import AdminSideBar from "../../user_components/SideBar/AdminSideBar";
 import TicketViewPage from "../admin_panel/TicketViewPage";
 import { FaEdit } from 'react-icons/fa';
@@ -35,7 +36,8 @@ const PendingTicket = () => {
   useEffect(() => {
     const fetchTickets = async () => {
       try {
-        const response = await axios.get("http://localhost:5000/api/pending_ticket");
+        // Use axiosClient and remove the base URL
+        const response = await axiosClient.get("/api/pending_ticket");
         const pendingTickets = response.data.filter(
           (ticket) => ticket.Status?.toLowerCase() === "pending"
         );
@@ -51,6 +53,8 @@ const PendingTicket = () => {
       } catch (error) {
         console.error("Error fetching tickets:", error);
         setLoading(false);
+        // Optionally, add a toast notification for the user
+        toast.error("Failed to load pending tickets.");
       }
     };
 

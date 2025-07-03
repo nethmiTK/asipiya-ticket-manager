@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from "react-toastify";
+import axiosClient from '../../axiosClient'; // Changed from fetch to axiosClient
 
 const ActivityLog = ({ ticketId }) => {
   const [activityLogs, setActivityLogs] = useState([]);
@@ -11,10 +12,9 @@ const ActivityLog = ({ ticketId }) => {
     const fetchActivityLogs = async () => {
       try {
         setLoading(true);
-        const response = await fetch(`http://localhost:5000/api/ticket-logs/${ticketId}`);
-        if (!response.ok) throw new Error('Failed to fetch activity logs');
-        const data = await response.json();
-        setActivityLogs(data);
+        // Use axiosClient for GET request
+        const response = await axiosClient.get(`/api/ticket-logs/${ticketId}`);
+        setActivityLogs(response.data); // Axios automatically parses JSON
       } catch (error) {
         console.error('Error fetching activity logs:', error);
         toast.error('Failed to load activity logs');
@@ -54,7 +54,7 @@ const ActivityLog = ({ ticketId }) => {
   const getActivityIcon = (actionType) => {
     // Handle undefined or null actionType
     if (!actionType) return getDefaultIcon();
-    
+
     switch (actionType.toLowerCase()) {
       case 'status_change':
       case 'status_changed':
@@ -296,7 +296,7 @@ const ActivityLog = ({ ticketId }) => {
     return (
       <div className="text-center py-12 bg-gray-50 rounded-lg border border-dashed border-gray-300">
         <svg className="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002 2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
         </svg>
         <p className="text-gray-500 text-lg">No activity logs found</p>
         <p className="text-gray-400 text-sm mt-1">Activity will appear here as changes are made to this ticket.</p>
@@ -309,7 +309,7 @@ const ActivityLog = ({ ticketId }) => {
       <div className="flex justify-between items-center mb-6">
         <h4 className="font-semibold text-xl text-gray-800">Activity Log ({activityLogs.length})</h4>
       </div>
-      
+
       <div className="flow-root">
         <ul className="-mb-8">
           {activityLogs.map((log, logIdx) => (

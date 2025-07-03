@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import Select from 'react-select';
-import axios from 'axios';
+import axiosClient from '../../axiosClient'; // Changed from axios to axiosClient
 
 const SearchBar = ({
   onSystemFilterChange,
@@ -15,8 +15,8 @@ const SearchBar = ({
   useEffect(() => {
     const fetchOptions = async () => {
       try {
-        // Fetch systems
-        const systemsResponse = await axios.get('http://localhost:5000/system_registration');
+        // Fetch systems using axiosClient
+        const systemsResponse = await axiosClient.get('/system_registration');
         const systems = systemsResponse.data
           .filter(system => system.Status === 1) // Only active systems
           .map(system => ({
@@ -25,8 +25,8 @@ const SearchBar = ({
           }));
         setSystemOptions(systems);
 
-        // Fetch companies
-        const companiesResponse = await axios.get('http://localhost:5000/api/companies');
+        // Fetch companies using axiosClient
+        const companiesResponse = await axiosClient.get('/api/companies');
         const companies = companiesResponse.data.map(company => ({
           value: company.CompanyName,
           label: company.CompanyName
@@ -94,4 +94,4 @@ const SearchBar = ({
   );
 };
 
-export default SearchBar; 
+export default SearchBar;

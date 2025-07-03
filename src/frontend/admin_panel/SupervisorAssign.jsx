@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import axios from 'axios';
+import axiosClient from '../axiosClient'; // Changed from axios to axiosClient
 import { useParams, useNavigate } from 'react-router-dom';
 import AdminSideBar from '../../user_components/SideBar/AdminSideBar';
 import { toast } from 'react-toastify';
@@ -22,7 +22,8 @@ const SupervisorAssignPage = ({ ticketId }) => {
   const id = ticketId || params.id;
 
   useEffect(() => {
-    axios.get(`http://localhost:5000/api/ticket_view/${id}`)
+    // Use axiosClient and remove base URL
+    axiosClient.get(`/api/ticket_view/${id}`)
       .then(res => {
         setTicketData(res.data);
 
@@ -36,17 +37,25 @@ const SupervisorAssignPage = ({ ticketId }) => {
         const ids = supervisorStr.split(',').map(id => id.trim()).filter(Boolean);
         setSelectedSupervisors(ids);
       })
-      .catch(err => console.error('Error fetching ticket:', err));
+      .catch(err => {
+        console.error('Error fetching ticket:', err);
+        toast.error('Failed to load ticket data.');
+      });
 
-    axios.get('http://localhost:5000/api/supervisors')
+    // Use axiosClient and remove base URL
+    axiosClient.get('/api/supervisors')
       .then(res => {
         if (Array.isArray(res.data)) {
           setSupervisors(res.data);
         } else {
           console.error("Expected array but got:", res.data);
+          toast.error('Failed to load supervisor data.');
         }
       })
-      .catch(err => console.error('Error fetching supervisors:', err));
+      .catch(err => {
+        console.error('Error fetching supervisors:', err);
+        toast.error('Failed to load supervisor data.');
+      });
   }, [id]);
 
   useEffect(() => {
@@ -65,7 +74,8 @@ const SupervisorAssignPage = ({ ticketId }) => {
       return;
     }
 
-    axios.put(`http://localhost:5000/api/tickets/${id}/assign`, {
+    // Use axiosClient and remove base URL
+    axiosClient.put(`/api/tickets/${id}/assign`, {
       supervisorId: selectedSupervisors.join(','),
       status,
       priority,
@@ -152,10 +162,10 @@ const SupervisorAssignPage = ({ ticketId }) => {
           {/* Dropdown content */}
           {openDropdown && (
             <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded shadow max-h-35 overflow-y-auto">
-              {supervisors.map((user) => {
-                const userIdStr = String(user.UserID);
+              {supervisors.map((sUser) => { // Renamed 'user' to 'sUser' to avoid conflict with 'user' from useAuth
+                const userIdStr = String(sUser.UserID);
                 return (
-                  <label key={user.UserID} className="flex items-center px-4 py-2 hover:bg-gray-100">
+                  <label key={sUser.UserID} className="flex items-center px-4 py-2 hover:bg-gray-100">
                     <input
                       type="checkbox"
                       value={userIdStr}
@@ -172,7 +182,7 @@ const SupervisorAssignPage = ({ ticketId }) => {
                       }}
                       className="form-checkbox h-4 w-4 text-blue-600 mr-2"
                     />
-                    {user.FullName}
+                    {sUser.FullName}
                   </label>
                 );
               })}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import axiosClient from '../axiosClient'; // Changed from axios to axiosClient
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { toast } from 'react-toastify';
 
@@ -100,7 +100,8 @@ const Register = () => {
         }
 
         try {
-            await axios.post('http://localhost:5000/register', formData);
+            // Use axiosClient for POST request
+            await axiosClient.post('/register', formData);
             toast.success('Registration successful!');
             navigate('/login');
         } catch (error) {
@@ -204,4 +205,4 @@ const Register = () => {
     );
 };
 
-export default Register;       
+export default Register;

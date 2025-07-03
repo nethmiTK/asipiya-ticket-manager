@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import axiosClient from '../axiosClient'; // Changed from axios to axiosClient
 import { useNavigate, useLocation } from 'react-router-dom';
 import { toast } from 'react-toastify';
 
@@ -9,7 +9,7 @@ const ResetPassword = () => {
     const [errors, setErrors] = useState({});
     const [loading, setLoading] = useState(false);
     const [token, setToken] = useState(null);
-    const [email, setEmail] = useState(null); 
+    const [email, setEmail] = useState(null);
     const navigate = useNavigate();
     const location = useLocation();
 
@@ -17,11 +17,11 @@ const ResetPassword = () => {
     useEffect(() => {
         const params = new URLSearchParams(location.search);
         const urlToken = params.get('token');
-        const urlEmail = params.get('email'); 
+        const urlEmail = params.get('email');
 
         if (!urlToken || !urlEmail) {
             toast.error('Invalid or missing reset token/email. Please request a new link.');
-            navigate('/forgot-password'); 
+            navigate('/forgot-password');
             return;
         }
         setToken(urlToken);
@@ -79,10 +79,10 @@ const ResetPassword = () => {
 
         setLoading(true); // Start loading
         try {
-            // Send the new password, token, and email to the backend for verification and update
-            const response = await axios.post('http://localhost:5000/reset-password', {
-                email, 
-                token, 
+            // Send the new password, token, and email to the backend for verification and update using axiosClient
+            const response = await axiosClient.post('/reset-password', {
+                email,
+                token,
                 newPassword: password
             });
             toast.success(response.data.message || 'Your password has been reset successfully!');

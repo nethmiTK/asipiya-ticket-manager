@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import axios from 'axios';
+ import React, { useState, useEffect } from 'react';
+import axiosClient from '../axiosClient'; // Changed from axios to axiosClient
+ 
 import AdminSideBar from '../../user_components/SideBar/AdminSideBar';
 import AdminNavBar from '../../user_components/NavBar/AdminNavBar';
 import NotificationPanel from '../components/NotificationPanel';
@@ -77,16 +78,18 @@ const SystemRegistration = () => {
 
   const fetchSystems = async () => {
     try {
-      const res = await axios.get('http://localhost:5000/system_registration');
+      // Use axiosClient and remove base URL
+      const res = await axiosClient.get('/system_registration');
       setSystems(res.data);
     } catch (error) {
       setError('Error fetching systems: ' + error.message);
+      toast.error('Failed to fetch systems.');
     }
   };
 
   useEffect(() => {
     fetchSystems();
-  }, [editingId]);
+  }, [editingId]); // Re-fetch when editingId changes (after add/edit)
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -94,20 +97,23 @@ const SystemRegistration = () => {
 
     try {
       if (editingId) {
-        await axios.put(`http://localhost:5000/api/system_registration_update/${editingId}`, form);
+        // Use axiosClient and remove base URL
+        await axiosClient.put(`/api/system_registration_update/${editingId}`, form);
         toast.success('System updated successfully.');
       } else {
         const newSystem = { ...form, status: '1' };
-        await axios.post('http://localhost:5000/api/systems', newSystem);
+        // Use axiosClient and remove base URL
+        await axiosClient.post('/api/systems', newSystem);
         toast.success('System added successfully.');
       }
 
       setForm({ systemName: '', description: '', status: '1' });
       setEditingId(null);
       setShowModal(false);
-      await fetchSystems();
+      // No need to call fetchSystems here, useEffect will handle it based on editingId change
     } catch (error) {
       setError('Submit Error: ' + (error.response?.data?.message || error.message));
+      toast.error(error.response?.data?.message || 'Failed to submit system data.');
     }
   };
 
@@ -125,14 +131,16 @@ const SystemRegistration = () => {
 
   const confirmDelete = async () => {
     try {
-      const res = await axios.delete(`http://localhost:5000/api/system_registration_delete/${confirmDeleteId}`);
+      // Use axiosClient and remove base URL
+      const res = await axiosClient.delete(`/api/system_registration_delete/${confirmDeleteId}`);
       toast.success(res.data.message || 'System deleted successfully.');
-      await fetchSystems();
+      await fetchSystems(); // Re-fetch after successful deletion
     } catch (error) {
       if (error.response?.status === 403) {
         toast.error("This system is already in use and cannot be deleted.");
       } else {
         setError("Delete Error: " + (error.response?.data?.message || error.message));
+        toast.error("Failed to delete system: " + (error.response?.data?.message || error.message));
       }
     } finally {
       setConfirmDeleteId(null);

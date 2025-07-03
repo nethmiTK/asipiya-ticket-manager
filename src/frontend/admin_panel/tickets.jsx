@@ -1,13 +1,13 @@
 import React, { useEffect, useState, useRef, useCallback } from "react";
-import axios from "axios";
+import axiosClient from "../axiosClient"; // Changed from axios to axiosClient
 import { useNavigate, useSearchParams } from "react-router-dom";
 import AdminSideBar from "../../user_components/SideBar/AdminSideBar";
 import TicketTable from "./components/TicketTable";
 import SearchBar from "./components/SearchBar";
 import Pagination from "./components/Pagination";
-import AdminNavBar from "../../user_components/NavBar/AdminNavBar"; // Import AdminNavBar
-import { useAuth } from "../../App"; // Import useAuth for user context
-import NotificationPanel from "../components/NotificationPanel"; // Import NotificationPanel
+import AdminNavBar from "../../user_components/NavBar/AdminNavBar";
+import { useAuth } from "../../App";
+import NotificationPanel from "../components/NotificationPanel";
 
 const Tickets = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -16,7 +16,7 @@ const Tickets = () => {
   const [loading, setLoading] = useState(true);
   const [searchParams] = useSearchParams();
   const type = searchParams.get("type");
-  const ticketId = searchParams.get("id"); // Although ticketId isn't currently used in fetchTickets
+  const ticketId = searchParams.get("id");
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -24,8 +24,7 @@ const Tickets = () => {
   const [selectedSystem, setSelectedSystem] = useState(null);
   const [selectedCompany, setSelectedCompany] = useState(null);
 
-  // States for AdminNavBar and Notifications
-  const { loggedInUser: user } = useAuth(); // Get logged-in user from context
+  const { loggedInUser: user } = useAuth();
   const [showNotifications, setShowNotifications] = useState(false);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const notificationRef = useRef(null);
@@ -47,7 +46,8 @@ const Tickets = () => {
   const fetchUnreadNotifications = useCallback(async () => {
     if (!user?.UserID) return;
     try {
-      const response = await axios.get(`http://localhost:5000/api/notifications/count/${user.UserID}`);
+      // Use axiosClient for GET request
+      const response = await axiosClient.get(`/api/notifications/count/${user.UserID}`);
       setUnreadNotifications(response.data.count);
     } catch (error) {
       console.error('Error fetching unread notifications:', error);
@@ -63,16 +63,15 @@ const Tickets = () => {
   }, [user, fetchUnreadNotifications]);
 
   const handleNotificationPanelUpdate = useCallback(() => {
-    // Re-fetch the actual count from the backend to ensure consistency
     fetchUnreadNotifications();
   }, [fetchUnreadNotifications]);
   // --- End Notification Handling ---
 
   useEffect(() => {
     const fetchTickets = async () => {
-      setLoading(true); // Start loading
+      setLoading(true);
       try {
-        let url = 'http://localhost:5000/api/tickets/filter';
+        let url = '/api/tickets/filter'; // Use relative path with axiosClient
         const params = new URLSearchParams();
 
         if (type) {
@@ -88,18 +87,15 @@ const Tickets = () => {
         const queryString = params.toString();
         const finalUrl = queryString ? `${url}?${queryString}` : url;
 
-        const response = await axios.get(finalUrl);
+        // Use axiosClient for GET request
+        const response = await axiosClient.get(finalUrl);
 
         let fetchedTickets = response.data;
-        // The backend filter should ideally handle 'resolved' type.
-        // If it doesn't, this client-side filter will ensure correctness.
         if (type === 'resolved') {
           fetchedTickets = response.data.filter(ticket => ticket.Status?.toLowerCase() === 'resolved');
         }
 
         setTickets(fetchedTickets);
-        // Apply initial search term filter immediately after fetching
-        // This ensures that when new data arrives, the existing search term is applied.
         const initialFiltered = fetchedTickets.filter(ticket => {
           const searchString = searchTerm.toLowerCase();
           return (
@@ -113,17 +109,15 @@ const Tickets = () => {
 
       } catch (error) {
         console.error("Error fetching tickets:", error);
-        // Optionally set an error message for the user
       } finally {
-        setLoading(false); // End loading
+        setLoading(false);
       }
     };
 
     fetchTickets();
-  }, [type, selectedSystem, selectedCompany, searchTerm]); // Added searchTerm here so that if the type/system/company changes, and there's a searchTerm already, it gets re-applied.
+  }, [type, selectedSystem, selectedCompany, searchTerm]);
 
   useEffect(() => {
-    // This effect now primarily handles changes to `searchTerm` or `tickets` *after* the initial fetch.
     const filtered = tickets.filter(ticket => {
       const searchString = searchTerm.toLowerCase();
       return (
@@ -134,10 +128,9 @@ const Tickets = () => {
       );
     });
     setFilteredTickets(filtered);
-    setCurrentPage(1); // Reset to first page whenever filters change
-  }, [searchTerm, tickets]); // Depend on `tickets` and `searchTerm`
+    setCurrentPage(1);
+  }, [searchTerm, tickets]);
 
-  // Helper functions for styling and duration (no changes needed)
   const getStatusColor = (status) => {
     switch (status?.toLowerCase()) {
       case "open":
@@ -189,7 +182,6 @@ const Tickets = () => {
     setCurrentPage(1);
   };
 
-  // Pagination slicing (no changes needed)
   const paginatedTickets = filteredTickets.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
@@ -199,7 +191,6 @@ const Tickets = () => {
   const showingFrom = filteredTickets.length === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1;
   const showingTo = Math.min(currentPage * itemsPerPage, filteredTickets.length);
 
-  // Loading state render
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-screen bg-gray-100">
@@ -210,15 +201,12 @@ const Tickets = () => {
 
   return (
     <div className="flex">
-      {/* Admin Side Bar */}
       <AdminSideBar open={isSidebarOpen} setOpen={setIsSidebarOpen} />
 
-      {/* Admin Nav Bar */}
       <AdminNavBar
-        pageTitle="Tickets Overview" // Set a relevant page title
+        pageTitle="Tickets Overview"
         user={user}
         sidebarOpen={isSidebarOpen}
-        // Assuming you might want a profile click handler in the future
         onProfileClick={() => navigate('/admin-profile')}
         onNotificationClick={() => setShowNotifications(!showNotifications)}
         unreadNotifications={unreadNotifications}
@@ -226,14 +214,12 @@ const Tickets = () => {
         notificationRef={notificationRef}
       />
 
-      {/* Main Content */}
       <main
         className={`flex-1 min-h-screen bg-gray-100 transition-all duration-300 ${
-          isSidebarOpen ? "ml-72" : "ml-24" // Adjust margin based on sidebar state
+          isSidebarOpen ? "ml-72" : "ml-24"
         }`}
       >
         <div className="p-4 sm:p-6 lg:p-8">
-          {/* Notification Panel (conditionally rendered) */}
           {showNotifications && (
             <div ref={notificationRef} className="absolute right-4 top-14 z-50">
               <NotificationPanel
@@ -248,7 +234,6 @@ const Tickets = () => {
           <header className="mb-6">
             <h1 className="text-2xl font-bold mb-8"></h1>
             <div className="flex flex-wrap gap-4 mb-6">
-              {/* Filter Buttons */}
               <button
                 onClick={() => navigate('/tickets')}
                 className={`px-4 sm:px-6 py-2 rounded-lg transition-colors text-sm sm:text-base ${
@@ -299,7 +284,6 @@ const Tickets = () => {
               </button>
             </div>
 
-            {/* Search and Filters */}
             <div className="mb-6">
               <SearchBar
                 value={searchTerm}
@@ -313,24 +297,17 @@ const Tickets = () => {
             </div>
           </header>
 
-          {/* Ticket Table */}
           {filteredTickets.length === 0 && !loading ? (
             <p className="text-center text-gray-600 mt-8">No tickets found matching your criteria.</p>
           ) : (
             <TicketTable
               tickets={paginatedTickets}
-              // Pass helper functions to TicketTable if it uses them for display
               getStatusColor={getStatusColor}
               getPriorityColor={getPriorityColor}
               calculateDuration={calculateDuration}
-              // These props below might be redundant if TicketTable determines visibility itself
-              // showStatus={type !== 'pending' && type !== 'resolved'}
-              // showPriority={type !== 'pending'}
             />
           )}
 
-
-          {/* Pagination */}
           <Pagination
             currentPage={currentPage}
             totalPages={totalPages}
