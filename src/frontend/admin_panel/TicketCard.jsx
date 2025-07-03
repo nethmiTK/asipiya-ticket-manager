@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { BsFillTicketPerforatedFill } from "react-icons/bs";
 import { FaUser } from "react-icons/fa6";
 import { GrSystem } from "react-icons/gr";
+import { MessageCircle } from 'lucide-react';
 
 // Helper to format time difference
 const formatDuration = (ms) => {
@@ -40,7 +41,7 @@ const getStatusColor = (status) => {
   }
 };
 
-export default function TicketCard({ ticket, onClick }) {
+export default function TicketCard({ ticket, onClick, unreadChatCount }) {
   const [timeText, setTimeText] = useState("");
 
   const updateTimeText = () => {
@@ -109,6 +110,13 @@ export default function TicketCard({ ticket, onClick }) {
         >
         </span>
       </div>
+
+      {/* Unread Chat Message Alert */}
+      {ticket.status === "In Progress" && unreadChatCount > 0 && (
+        <div className="absolute top-2 right-14 bg-red-500 text-white rounded-full p-1 text-xs font-bold flex items-center justify-center min-w-[20px] h-[20px] shadow-md animate-bounce-custom">
+          <MessageCircle className="w-3 h-3 mr-1" /> {unreadChatCount}
+        </div>
+      )}
 
       {/* User Info */}
       <div className="flex items-center gap-2 text-gray-600 text-sm mt-1">
