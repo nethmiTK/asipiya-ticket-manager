@@ -162,77 +162,10 @@ const NotificationPanel = ({ userId, role, onClose, onNotificationUpdate }) => {
             );
         } else if (notification.Type === 'NEW_CHAT_MESSAGE') {
             // Handle new chat message notifications
-            // Try multiple possible field names for sender information
-            let senderName = notification.SourceUserFullName || 
-                             notification.SenderName || 
-                             notification.SourceName || 
-                             notification.UserName ||
-                             notification.sourceUserFullName ||
-                             'Someone';
-                             
-            let senderRole = notification.SourceUserRole || 
-                            notification.sourceUserRole || 
-                            null;
-            
-            // Debug logging to help track the issue
-            console.log('Chat notification details:', {
-                senderName,
-                senderRole,
-                fullNotification: notification
-            });
-            
-            // Clean up the message and extract sender name if needed
-            let cleanMessage = notification.Message;
-            
-            // If sender name is still 'Someone', try to extract from message
-            if (senderName === 'Someone' && cleanMessage.includes(':')) {
-                const messageParts = cleanMessage.split(':');
-                if (messageParts.length >= 2) {
-                    const potentialSender = messageParts[0].trim();
-                    // Only use it if it's not "Unknown"
-                    if (potentialSender !== 'Unknown') {
-                        senderName = potentialSender;
-                        cleanMessage = messageParts.slice(1).join(':').trim();
-                    } else {
-                        // Remove "Unknown:" prefix if it exists
-                        cleanMessage = cleanMessage.replace('Unknown:', '').trim();
-                    }
-                }
-            } else if (cleanMessage.startsWith('Unknown:')) {
-                cleanMessage = cleanMessage.replace('Unknown:', '').trim();
-            }
-            
-            // Extract time from message if it has "(Ticket #X)" format
-            const ticketMatch = cleanMessage.match(/\(Ticket #\d+\)$/);
-            if (ticketMatch) {
-                cleanMessage = cleanMessage.replace(ticketMatch[0], '').trim();
-            }
-            
-            // Determine sender display name based on sender's role
-            let displaySender = senderName;
-            
-            // Always show role-based display for admin/supervisor messages
-            if (senderRole === 'Admin') {
-                displaySender = 'Admin';
-            } else if (senderRole === 'Supervisor') {
-                displaySender = 'Supervisor';
-            } else if (senderRole === 'User' || senderRole === 'Client') {
-                // Keep the actual user/client name for user-to-admin messages
-                displaySender = senderName;
-            } else if (senderName && senderName !== 'Someone' && senderName !== 'Unknown') {
-                // If no role info but we have a name, check if it looks like an admin name
-                // This is a fallback - if the name is very long, it's likely an admin's full name
-                if (senderName.includes(' ') && senderName.length > 15) {
-                    displaySender = 'Admin';
-                } else {
-                    displaySender = senderName;
-                }
-            }
-            
             return (
                 <span>
-                    <span className="text-blue-600 font-medium">💬 New Message from {displaySender}</span><br />
-                    <span className="text-gray-600 text-sm">sent: {cleanMessage}</span>
+                    <span className="text-blue-600 font-medium">💬 New Message</span><br />
+                    {notification.Message}
                 </span>
             );
         } else if (notification.Type === 'NEW_CLIENT_REGISTRATION') {
@@ -266,23 +199,8 @@ const NotificationPanel = ({ userId, role, onClose, onNotificationUpdate }) => {
     const getNotificationProfilePic = (notification) => {
         const systemNotificationTypes = ['NEW_SYSTEM_ADDED', 'NEW_CATEGORY_ADDED', 'NEW_USER_REGISTRATION', 'NEW_CLIENT_REGISTRATION'];
         const supervisorNotificationTypes = ['SUPERVISOR_ASSIGNED', 'SUPERVISOR_UNASSIGNED', 'TICKET_UPDATED', 'SUPERVISOR_ADDED', 'SUPERVISOR_REMOVED', 'STATUS_UPDATE', 'RESOLUTION_UPDATE', 'DUE_DATE_UPDATE'];
+        const chatNotificationTypes = ['NEW_CHAT_MESSAGE'];
         
-        // Priority 1: Check if notification has source user information (for personalized notifications)
-        if (notification.SourceUserProfileImagePath) {
-            // Use the source user's profile picture
-            return {
-                imgSrc: `http://localhost:5000/uploads/profile_images/${notification.SourceUserProfileImagePath}`,
-                altText: notification.SourceUserFullName || 'User',
-            };
-        } else if (notification.SourceUserFullName) {
-             // Fallback to UI-avatars if path is missing but name exists
-            return {
-                imgSrc: `https://ui-avatars.com/api/?name=${encodeURIComponent(notification.SourceUserFullName)}&background=random&color=fff`,
-                altText: notification.SourceUserFullName,
-            };
-        }
-        
-        // Priority 2: System notifications (use icons)
         if (systemNotificationTypes.includes(notification.Type)) {
             // Use a specific icon or image for system notifications
             switch (notification.Type) {
@@ -297,15 +215,15 @@ const NotificationPanel = ({ userId, role, onClose, onNotificationUpdate }) => {
                 default:
                     return { icon: <FaLaptopCode className="w-6 h-6 text-gray-600" />, bgColor: 'bg-gradient-to-br from-gray-100 to-gray-200' };
             }
-        }
-        
-        // Priority 3: Chat notifications (use icon only if no user info)
-        if (notification.Type === 'NEW_CHAT_MESSAGE') {
-            return { icon: <FaComments className="w-6 h-6 text-blue-600" />, bgColor: 'bg-gradient-to-br from-blue-100 to-blue-200' };
-        }
-        
-        // Priority 4: Supervisor-related notifications (use icons)
-        if (supervisorNotificationTypes.includes(notification.Type)) {
+        } else if (chatNotificationTypes.includes(notification.Type)) {
+            // Use specific icons for chat-related notifications
+            switch (notification.Type) {
+                case 'NEW_CHAT_MESSAGE':
+                    return { icon: <FaComments className="w-6 h-6 text-blue-600" />, bgColor: 'bg-gradient-to-br from-blue-100 to-blue-200' };
+                default:
+                    return { icon: <FaComments className="w-6 h-6 text-blue-600" />, bgColor: 'bg-gradient-to-br from-blue-100 to-blue-200' };
+            }
+        } else if (supervisorNotificationTypes.includes(notification.Type)) {
             // Use specific icons for supervisor-related notifications
             switch (notification.Type) {
                 case 'SUPERVISOR_ASSIGNED':
@@ -327,10 +245,23 @@ const NotificationPanel = ({ userId, role, onClose, onNotificationUpdate }) => {
                 default:
                     return { icon: <FaUserCheck className="w-6 h-6 text-gray-600" />, bgColor: 'bg-gradient-to-br from-gray-100 to-gray-200' };
             }
+        } else if (notification.SourceUserProfileImagePath) {
+            // Use the source user's profile picture
+            return {
+                imgSrc: `http://localhost:5000/uploads/profile_images/${notification.SourceUserProfileImagePath}`,
+                altText: notification.SourceUserFullName || 'User',
+            };
+        } else if (notification.SourceUserFullName) {
+             // Fallback to UI-avatars if path is missing but name exists
+            return {
+                imgSrc: `https://ui-avatars.com/api/?name=${encodeURIComponent(notification.SourceUserFullName)}&background=random&color=fff`,
+                altText: notification.SourceUserFullName,
+            };
         }
-        
-        // Default fallback
-        return { icon: <FaUserPlus className="w-6 h-6 text-gray-600" />, bgColor: 'bg-gradient-to-br from-gray-100 to-gray-200' };
+         else {
+            // Default icon if no specific user or system type is matched
+            return { icon: <FaUserPlus className="w-6 h-6 text-gray-600" />, bgColor: 'bg-gradient-to-br from-gray-100 to-gray-200' };
+        }
     };
 
     const fetchNotifications = async () => {
@@ -374,9 +305,6 @@ const NotificationPanel = ({ userId, role, onClose, onNotificationUpdate }) => {
                         IsRead: false,
                         CreatedAt: newNotification.createdAt,
                         TicketID: newNotification.ticketId,
-                        SourceUserFullName: newNotification.sourceUserFullName || null,
-                        SourceUserRole: newNotification.sourceUserRole || null,
-                        SourceUserProfileImagePath: newNotification.sourceUserProfileImagePath || null,
                         justReceived: true // Flag to highlight new notifications
                     };
                     return [newNotificationWithDetails, ...prevNotifications];
