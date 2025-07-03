@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios"; // Using axios for all API calls for consistency
+import axiosClient from "../axiosClient"; // <--- Changed this import path
 import AdminSideBar from "../../user_components/SideBar/AdminSideBar";
 import { Tooltip } from "react-tooltip";
 import "react-tooltip/dist/react-tooltip.css";
@@ -53,7 +53,8 @@ export default function AddSupervisor() {
   const fetchUnreadNotifications = useCallback(async () => {
     if (!user?.UserID) return;
     try {
-      const response = await axios.get(`http://localhost:5000/api/notifications/count/${user.UserID}`);
+      // Changed to axiosClient and removed base URL
+      const response = await axiosClient.get(`/api/notifications/count/${user.UserID}`);
       setUnreadNotifications(response.data.count);
     } catch (error) {
       console.error('Error fetching unread notifications:', error);
@@ -79,7 +80,12 @@ export default function AddSupervisor() {
     setIsLoading(true);
     setError(null);
     try {
-      const res = await axios.get("http://localhost:5000/supervisor");
+      // Changed to axiosClient and removed base URL
+      // Assuming your supervisor endpoint is at the root of your API (e.g., http://localhost:5000/supervisor)
+      // If it's under /api, like http://localhost:5000/api/supervisor, then use `/supervisor`
+      // Given your notification path is `/api/notifications/...`, it's likely `/api/supervisor`
+      // So, let's assume `BASE_URL` in `axiosClient.js` is `http://localhost:5000/api`
+      const res = await axiosClient.get("/supervisor");
       setUsers(res.data);
     } catch (err) {
       console.error("Error fetching users:", err);
@@ -122,8 +128,9 @@ export default function AddSupervisor() {
     setIsLoading(true); // Indicate deletion is in progress
     setError(null);
     try {
-      const res = await axios.delete(
-        `http://localhost:5000/supervisor/${selectedUser.UserID}`
+      // Changed to axiosClient and removed base URL
+      const res = await axiosClient.delete(
+        `/supervisor/${selectedUser.UserID}`
       );
       if (res.status === 200) { // Axios uses status, not res.ok
         setUsers(users.filter((u) => u.UserID !== selectedUser.UserID));
@@ -145,7 +152,7 @@ export default function AddSupervisor() {
     <div className="flex">
       <AdminSideBar open={isSidebarOpen} setOpen={setIsSidebarOpen} />
       <AdminNavBar
-        pageTitle="Manage Members" 
+        pageTitle="Manage Members"
         user={user}
         sidebarOpen={isSidebarOpen}
         onProfileClick={handleProfileClick}
@@ -310,14 +317,14 @@ export default function AddSupervisor() {
             setShowEditModal(false);
             setEditUserId(null);
           }}
-          onUpdate={fetchSupervisors} 
+          onUpdate={fetchSupervisors}
         />
       )}
 
       {showAddModal && (
         <AddMemberModal
           onClose={() => setShowAddModal(false)}
-          onSuccess={fetchSupervisors} 
+          onSuccess={fetchSupervisors}
         />
       )}
 
