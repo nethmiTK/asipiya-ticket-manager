@@ -905,6 +905,8 @@ app.post("/ticketchat", upload.single("file"), (req, res) => {
   const { TicketID, Type, Note, UserID, Role } = req.body;
   const file = req.file;
 
+  console.log("Received chat message:", { TicketID, Type, Note, UserID, Role });
+
   if (!TicketID || !Note) {
     return res.status(400).json({ error: "TicketID and Note are required." });
   }
@@ -924,6 +926,8 @@ app.post("/ticketchat", upload.single("file"), (req, res) => {
     Role || null,
     filePath,
   ];
+
+  console.log("Inserting chat message with values:", values);
 
   db.query(sql, values, (err, result) => {
     if (err) {
