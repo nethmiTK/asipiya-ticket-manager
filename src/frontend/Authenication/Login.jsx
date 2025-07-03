@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import axios from 'axios';
+import axiosClient from '../axiosClient'; // Changed from axios to axiosClient
 import { useNavigate, Link } from 'react-router-dom';
 import { toast } from 'react-toastify';
 
@@ -19,14 +19,15 @@ const Login = ({ onLoginSuccess }) => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
-            const response = await axios.post('http://localhost:5000/login', credentials);
+            // Use axiosClient for POST request
+            const response = await axiosClient.post('/login', credentials);
             toast.success('Login successful!');
 
             // Pass the full user object received from the backend to onLoginSuccess
-            const loggedInUser = response.data.user; 
-            
+            const loggedInUser = response.data.user;
+
             if (onLoginSuccess) {
-                onLoginSuccess(loggedInUser); 
+                onLoginSuccess(loggedInUser);
             }
 
         } catch (error) {
@@ -69,7 +70,7 @@ const Login = ({ onLoginSuccess }) => {
                         Login
                     </button>
                 </form>
-                 <p className="mt-4 text-right text-gray-700">
+                <p className="mt-4 text-right text-gray-700">
                     <Link to="/forgot-password" className="text-blue-600 hover:underline font-semibold">
                         Forgot your password?
                     </Link>
