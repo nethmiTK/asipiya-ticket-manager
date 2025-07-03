@@ -20,7 +20,7 @@ const NavBar = ({ isSidebarOpen, showNotifications, unreadNotifications, setShow
 
     return (
         // <div className={`fixed top-0 ${isSidebarOpen ? 'left-72' : 'left-20'} right-0 h-[60px] bg-zinc-50 shadow-md flex items-center justify-between px-6 transition-all duration-300 z-40`}>
-        <div className={`fixed top-0 right-0 h-[60px] bg-zinc-50 shadow-md flex items-center justify-between px-6 transition-all duration-300 z-40
+        <div className={`fixed top-0 right-0 h-[60px] bg-gray-900 shadow-md flex items-center justify-between px-6 transition-all duration-300 z-40
             left-0 w-full /* Default for mobile: full width, no left margin */
             lg:left-20 lg:w-[calc(100%-5rem)] /* Desktop collapsed: width takes 20px sidebar into account */
             ${isSidebarOpen ? 'lg:left-72 lg:w-[calc(100%-18rem)]' : ''} /* Desktop expanded: width takes 72px sidebar into account */
@@ -49,7 +49,7 @@ const NavBar = ({ isSidebarOpen, showNotifications, unreadNotifications, setShow
             <div className="flex items-center gap-4">
                 {/* Profile Display Area */}
                 <div
-                    className="flex items-center gap-3 cursor-pointer hover:bg-gray-50 p-2 rounded-lg transition-colors"
+                    className="flex items-center gap-3 cursor-pointer hover:bg-gray-500 p-2 rounded-lg transition-colors"
                     onClick={handleProfileClick} // Entire block is clickable to go to profile
                     title="Go to Profile"
                 >
@@ -67,8 +67,8 @@ const NavBar = ({ isSidebarOpen, showNotifications, unreadNotifications, setShow
                         )}
                     </div>
                     <div className="text-right">
-                        <p className="font-semibold text-gray-800">{loggedInUser?.FullName}</p>
-                        <p className="text-sm text-gray-500">{loggedInUser?.Role}</p>
+                        <p className="font-semibold text-white">{loggedInUser?.FullName}</p>
+                        <p className="text-sm text-white">{loggedInUser?.Role}</p>
                     </div>
                 </div>
 
@@ -78,10 +78,10 @@ const NavBar = ({ isSidebarOpen, showNotifications, unreadNotifications, setShow
                         e.stopPropagation(); 
                         setShowNotifications(!showNotifications); 
                     }}
-                    className="relative p-2 hover:bg-gray-100 rounded-full transition-colors"
+                    className="relative p-2 hover:bg-gray-500 rounded-full transition-colors"
                     title="Notifications"
                 >
-                    <IoNotificationsOutline className="text-2xl text-gray-600" />
+                    <IoNotificationsOutline className="text-2xl text-white cursor-pointer" />
                     {unreadNotifications > 0 && ( 
                         <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
                             {unreadNotifications}

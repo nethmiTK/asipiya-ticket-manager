@@ -8,7 +8,8 @@ import { FaEye } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 
 const statusColors = {
-  pending: "bg-yellow-100 text-yellow-800",
+  pending: "bg-orange-100 text-orange-800",
+  open: "bg-yellow-100 text-yellow-800",
   "in progress": "bg-blue-100 text-blue-800",
   resolved: "bg-green-100 text-green-800",
   rejected: "bg-red-100 text-red-800",
@@ -287,7 +288,7 @@ const TicketView = () => {
               />
             </div>
           )}
-          <h1 className="text-2xl font-bold mb-4">My All Tickets</h1>
+          <h1 className="text-2xl font-bold mb-6 text-gray-800">My All Tickets</h1>
           {/* Filter Options Section */}
           <div className="mb-6 flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4">
             {/* Status Filter*/}
