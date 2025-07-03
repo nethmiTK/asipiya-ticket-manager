@@ -162,18 +162,77 @@ const NotificationPanel = ({ userId, role, onClose, onNotificationUpdate }) => {
             );
         } else if (notification.Type === 'NEW_CHAT_MESSAGE') {
             // Handle new chat message notifications
-            const senderName = notification.SourceUserFullName || 'Someone';
+            // Try multiple possible field names for sender information
+            let senderName = notification.SourceUserFullName || 
+                             notification.SenderName || 
+                             notification.SourceName || 
+                             notification.UserName ||
+                             notification.sourceUserFullName ||
+                             'Someone';
+                             
+            let senderRole = notification.SourceUserRole || 
+                            notification.sourceUserRole || 
+                            null;
             
-            // Clean up the message - remove "Unknown:" prefix if it exists
+            // Debug logging to help track the issue
+            console.log('Chat notification details:', {
+                senderName,
+                senderRole,
+                fullNotification: notification
+            });
+            
+            // Clean up the message and extract sender name if needed
             let cleanMessage = notification.Message;
-            if (cleanMessage.startsWith('Unknown:')) {
+            
+            // If sender name is still 'Someone', try to extract from message
+            if (senderName === 'Someone' && cleanMessage.includes(':')) {
+                const messageParts = cleanMessage.split(':');
+                if (messageParts.length >= 2) {
+                    const potentialSender = messageParts[0].trim();
+                    // Only use it if it's not "Unknown"
+                    if (potentialSender !== 'Unknown') {
+                        senderName = potentialSender;
+                        cleanMessage = messageParts.slice(1).join(':').trim();
+                    } else {
+                        // Remove "Unknown:" prefix if it exists
+                        cleanMessage = cleanMessage.replace('Unknown:', '').trim();
+                    }
+                }
+            } else if (cleanMessage.startsWith('Unknown:')) {
                 cleanMessage = cleanMessage.replace('Unknown:', '').trim();
+            }
+            
+            // Extract time from message if it has "(Ticket #X)" format
+            const ticketMatch = cleanMessage.match(/\(Ticket #\d+\)$/);
+            if (ticketMatch) {
+                cleanMessage = cleanMessage.replace(ticketMatch[0], '').trim();
+            }
+            
+            // Determine sender display name based on sender's role
+            let displaySender = senderName;
+            
+            // Always show role-based display for admin/supervisor messages
+            if (senderRole === 'Admin') {
+                displaySender = 'Admin';
+            } else if (senderRole === 'Supervisor') {
+                displaySender = 'Supervisor';
+            } else if (senderRole === 'User' || senderRole === 'Client') {
+                // Keep the actual user/client name for user-to-admin messages
+                displaySender = senderName;
+            } else if (senderName && senderName !== 'Someone' && senderName !== 'Unknown') {
+                // If no role info but we have a name, check if it looks like an admin name
+                // This is a fallback - if the name is very long, it's likely an admin's full name
+                if (senderName.includes(' ') && senderName.length > 15) {
+                    displaySender = 'Admin';
+                } else {
+                    displaySender = senderName;
+                }
             }
             
             return (
                 <span>
-                    <span className="text-blue-600 font-medium">💬 New Message from {senderName}</span><br />
-                    {cleanMessage}
+                    <span className="text-blue-600 font-medium">💬 New Message from {displaySender}</span><br />
+                    <span className="text-gray-600 text-sm">sent: {cleanMessage}</span>
                 </span>
             );
         } else if (notification.Type === 'NEW_CLIENT_REGISTRATION') {
@@ -316,6 +375,7 @@ const NotificationPanel = ({ userId, role, onClose, onNotificationUpdate }) => {
                         CreatedAt: newNotification.createdAt,
                         TicketID: newNotification.ticketId,
                         SourceUserFullName: newNotification.sourceUserFullName || null,
+                        SourceUserRole: newNotification.sourceUserRole || null,
                         SourceUserProfileImagePath: newNotification.sourceUserProfileImagePath || null,
                         justReceived: true // Flag to highlight new notifications
                     };
