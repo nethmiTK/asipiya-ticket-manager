@@ -372,9 +372,9 @@ const NotificationPanel = ({ userId, role, onClose, onNotificationUpdate }) => {
             
             if (userClickableTypes.includes(notification.Type) && notification.TicketID) {
                 if (notification.Type === 'NEW_CHAT_MESSAGE') {
-                    return `/users-dashboard?ticketId=${notification.TicketID}&tab=chat`;
+                    return `/ticket/${notification.TicketID}?tab=chat`;
                 }
-                return `/users-dashboard?ticketId=${notification.TicketID}`;
+                return `/ticket/${notification.TicketID}`;
             }
             
             // All other user notifications should not navigate
