@@ -1,14 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { formatDistanceToNow } from 'date-fns';
 import { IoClose } from 'react-icons/io5';
 import { Link } from 'react-router-dom';
-import { FaLaptopCode, FaUserPlus, FaLayerGroup, FaUserCheck, FaUserTimes, FaEdit, FaCheckCircle, FaCalendarAlt } from 'react-icons/fa';
+import { FaLaptopCode, FaUserPlus, FaLayerGroup, FaUserCheck, FaUserTimes, FaEdit, FaCheckCircle, FaCalendarAlt, FaComments } from 'react-icons/fa';
+import { io } from 'socket.io-client';
 
 const NotificationPanel = ({ userId, role, onClose, onNotificationUpdate }) => {
     const [notifications, setNotifications] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const socketRef = useRef(null);
 
     // Add some custom styles for animations
     const styles = `
@@ -158,6 +160,14 @@ const NotificationPanel = ({ userId, role, onClose, onNotificationUpdate }) => {
                     {notification.Message}
                 </span>
             );
+        } else if (notification.Type === 'NEW_CHAT_MESSAGE') {
+            // Handle new chat message notifications
+            return (
+                <span>
+                    <span className="text-blue-600 font-medium">💬 New Message</span><br />
+                    {notification.Message}
+                </span>
+            );
         } else if (notification.Type === 'NEW_CLIENT_REGISTRATION') {
             // Handle client registration notifications
             return (
@@ -189,6 +199,7 @@ const NotificationPanel = ({ userId, role, onClose, onNotificationUpdate }) => {
     const getNotificationProfilePic = (notification) => {
         const systemNotificationTypes = ['NEW_SYSTEM_ADDED', 'NEW_CATEGORY_ADDED', 'NEW_USER_REGISTRATION', 'NEW_CLIENT_REGISTRATION'];
         const supervisorNotificationTypes = ['SUPERVISOR_ASSIGNED', 'SUPERVISOR_UNASSIGNED', 'TICKET_UPDATED', 'SUPERVISOR_ADDED', 'SUPERVISOR_REMOVED', 'STATUS_UPDATE', 'RESOLUTION_UPDATE', 'DUE_DATE_UPDATE'];
+        const chatNotificationTypes = ['NEW_CHAT_MESSAGE'];
         
         if (systemNotificationTypes.includes(notification.Type)) {
             // Use a specific icon or image for system notifications
@@ -203,6 +214,14 @@ const NotificationPanel = ({ userId, role, onClose, onNotificationUpdate }) => {
                     return { icon: <FaUserPlus className="w-6 h-6 text-blue-600" />, bgColor: 'bg-gradient-to-br from-blue-100 to-blue-200' };
                 default:
                     return { icon: <FaLaptopCode className="w-6 h-6 text-gray-600" />, bgColor: 'bg-gradient-to-br from-gray-100 to-gray-200' };
+            }
+        } else if (chatNotificationTypes.includes(notification.Type)) {
+            // Use specific icons for chat-related notifications
+            switch (notification.Type) {
+                case 'NEW_CHAT_MESSAGE':
+                    return { icon: <FaComments className="w-6 h-6 text-blue-600" />, bgColor: 'bg-gradient-to-br from-blue-100 to-blue-200' };
+                default:
+                    return { icon: <FaComments className="w-6 h-6 text-blue-600" />, bgColor: 'bg-gradient-to-br from-blue-100 to-blue-200' };
             }
         } else if (supervisorNotificationTypes.includes(notification.Type)) {
             // Use specific icons for supervisor-related notifications
@@ -268,11 +287,49 @@ const NotificationPanel = ({ userId, role, onClose, onNotificationUpdate }) => {
     useEffect(() => {
         if (userId) {
             fetchNotifications();
+            
+            // Setup socket connection for real-time notifications
+            socketRef.current = io("http://localhost:5000");
+            
+            // Listen for new notifications for this specific user
+            socketRef.current.on(`notification-${userId}`, (newNotification) => {
+                console.log('Received new notification:', newNotification);
+                
+                // Add the new notification to the beginning of the list
+                setNotifications(prevNotifications => {
+                    const newNotificationWithDetails = {
+                        NotificationID: newNotification.notificationId,
+                        UserID: userId,
+                        Message: newNotification.message,
+                        Type: newNotification.type,
+                        IsRead: false,
+                        CreatedAt: newNotification.createdAt,
+                        TicketID: newNotification.ticketId,
+                        justReceived: true // Flag to highlight new notifications
+                    };
+                    return [newNotificationWithDetails, ...prevNotifications];
+                });
+                
+                // Update notification count in parent component
+                if (onNotificationUpdate) {
+                    onNotificationUpdate();
+                }
+            });
+            
             // Auto-update every 5 hours
             const interval = setInterval(fetchNotifications, 18000000); // 5 hours in milliseconds
-            return () => clearInterval(interval);
+            
+            // Cleanup function
+            return () => {
+                clearInterval(interval);
+                if (socketRef.current) {
+                    socketRef.current.off(`notification-${userId}`);
+                    socketRef.current.disconnect();
+                    socketRef.current = null;
+                }
+            };
         }
-    }, [userId]);
+    }, [userId, onNotificationUpdate]);
 
     const markAsRead = async (notificationId) => {
         try {
@@ -309,11 +366,15 @@ const NotificationPanel = ({ userId, role, onClose, onNotificationUpdate }) => {
             // Only specific notification types should be clickable for users
             const userClickableTypes = [
                 'COMMENT_ADDED',    // When someone comments on their ticket
-                'MENTION'           // When they are mentioned
+                'MENTION',          // When they are mentioned
+                'NEW_CHAT_MESSAGE'  // When they receive a chat message
             ];
             
             if (userClickableTypes.includes(notification.Type) && notification.TicketID) {
-                return `/users-dashboard?ticketId=${notification.TicketID}`;
+                if (notification.Type === 'NEW_CHAT_MESSAGE') {
+                    return `/ticket/${notification.TicketID}?tab=chat`;
+                }
+                return `/ticket/${notification.TicketID}`;
             }
             
             // All other user notifications should not navigate
@@ -339,6 +400,8 @@ const NotificationPanel = ({ userId, role, onClose, onNotificationUpdate }) => {
                 return `/ticket-manage?ticketId=${notification.TicketID}&tab=details`;
             } else if (notification.Type === 'MENTION' || notification.Type === 'COMMENT_ADDED') {
                 return `/ticket-manage?ticketId=${notification.TicketID}&tab=comments`;
+            } else if (notification.Type === 'NEW_CHAT_MESSAGE') {
+                return `/ticket-manage?ticketId=${notification.TicketID}&tab=chat`;
             } else if (notification.Type === 'TICKET_REJECTED' || 
                        notification.Type === 'TICKET_UPDATED' || 
                        notification.Type === 'SUPERVISOR_ASSIGNED' ||

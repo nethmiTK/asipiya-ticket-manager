@@ -691,6 +691,181 @@ function isImageFile(filename) {
   return [".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".svg"].includes(ext);
 }
 
+// Helper function to create chat notifications
+const createChatNotification = async (ticketId, senderUserId, senderRole, messageContent, messageType) => {
+  try {
+    if (senderRole === 'Admin' || senderRole === 'Supervisor') {
+      // Admin/Supervisor sending to User
+      const ticketQuery = `
+        SELECT t.UserId as UserID, au.FullName as UserName, 
+               sender.FullName as SenderName
+        FROM ticket t 
+        LEFT JOIN appuser au ON t.UserId = au.UserID
+        LEFT JOIN appuser sender ON sender.UserID = ?
+        WHERE t.TicketID = ?
+      `;
+
+      db.query(ticketQuery, [senderUserId, ticketId], (err, ticketResults) => {
+        if (err) {
+          console.error('Error fetching ticket details for notification:', err);
+          return;
+        }
+
+        if (ticketResults.length === 0) {
+          console.log('Ticket not found for notification');
+          return;
+        }
+
+        const ticket = ticketResults[0];
+        const recipientUserId = ticket.UserID;
+        const senderName = ticket.SenderName || 'Unknown';
+
+        // Don't send notification to the same user who sent the message
+        if (recipientUserId === senderUserId) {
+          return;
+        }
+
+        // Create notification message based on message type
+        let notificationMessage;
+        if (messageType === 'file') {
+          notificationMessage = `${senderName} sent you a file in ticket #${ticketId}`;
+        } else {
+          // Truncate message if it's too long
+          const truncatedContent = messageContent.length > 50 
+            ? messageContent.substring(0, 50) + '...' 
+            : messageContent;
+          notificationMessage = `${senderName}: ${truncatedContent} (Ticket #${ticketId})`;
+        }      // Insert notification
+      const notificationQuery = `
+        INSERT INTO notifications (UserID, Message, Type, IsRead, CreatedAt, TicketLogID)
+        VALUES (?, ?, ?, FALSE, NOW(), ?)
+      `;
+
+      db.query(notificationQuery, [
+        recipientUserId,
+        notificationMessage,
+        'NEW_CHAT_MESSAGE',
+        ticketId  // Store TicketID in TicketLogID field for chat messages
+      ], (notifErr, notifResult) => {
+          if (notifErr) {
+            console.error('Error creating chat notification:', notifErr);
+          } else {
+            console.log(`Chat notification created for user ${recipientUserId} about ticket ${ticketId}`);
+            
+            // Emit notification to the user via socket if they're online
+            io.emit(`notification-${recipientUserId}`, {
+              notificationId: notifResult.insertId,
+              message: notificationMessage,
+              type: 'NEW_CHAT_MESSAGE',
+              ticketId: ticketId,
+              createdAt: new Date().toISOString()
+            });
+          }
+        });
+      });
+
+    } else if (senderRole === 'User' || senderRole === 'Client') {
+      // User/Client sending to Admin/Supervisors
+      const supervisorQuery = `
+        SELECT t.SupervisorID, sender.FullName as SenderName
+        FROM ticket t
+        LEFT JOIN appuser sender ON sender.UserID = ?
+        WHERE t.TicketID = ?
+      `;
+
+      db.query(supervisorQuery, [senderUserId, ticketId], (err, supervisorResults) => {
+        if (err) {
+          console.error('Error fetching supervisors for notification:', err);
+          return;
+        }
+
+        if (supervisorResults.length === 0) {
+          console.log('No supervisors found for ticket');
+          return;
+        }
+
+        const senderName = supervisorResults[0].SenderName || 'User';
+        const supervisorIDsString = supervisorResults[0].SupervisorID;
+
+        // Parse supervisor IDs from comma-separated string
+        let supervisorIds = [];
+        if (supervisorIDsString) {
+          supervisorIds = supervisorIDsString.split(',').map(id => id.trim()).filter(id => id);
+        }
+
+        // Also get all admins
+        const adminQuery = `SELECT UserID FROM appuser WHERE Role = 'Admin'`;
+        
+        db.query(adminQuery, (adminErr, adminResults) => {
+          if (adminErr) {
+            console.error('Error fetching admins for notification:', adminErr);
+            return;
+          }
+
+          // Combine supervisors and admins
+          const allRecipients = [...supervisorIds];
+          adminResults.forEach(admin => {
+            if (!allRecipients.includes(admin.UserID.toString())) {
+              allRecipients.push(admin.UserID.toString());
+            }
+          });
+
+          // Send notifications to all recipients
+          allRecipients.forEach(recipientId => {
+            // Don't send notification to the same user who sent the message
+            if (recipientId == senderUserId) {
+              return;
+            }
+
+            // Create notification message based on message type
+            let notificationMessage;
+            if (messageType === 'file') {
+              notificationMessage = `${senderName} sent a file in ticket #${ticketId}`;
+            } else {
+              // Truncate message if it's too long
+              const truncatedContent = messageContent.length > 50 
+                ? messageContent.substring(0, 50) + '...' 
+                : messageContent;
+              notificationMessage = `${senderName}: ${truncatedContent} (Ticket #${ticketId})`;
+            }
+
+            // Insert notification
+            const notificationQuery = `
+              INSERT INTO notifications (UserID, Message, Type, IsRead, CreatedAt, TicketLogID)
+              VALUES (?, ?, ?, FALSE, NOW(), ?)
+            `;
+
+            db.query(notificationQuery, [
+              recipientId,
+              notificationMessage,
+              'NEW_CHAT_MESSAGE',
+              ticketId  // Store TicketID in TicketLogID field for chat messages
+            ], (notifErr, notifResult) => {
+              if (notifErr) {
+                console.error('Error creating chat notification for supervisor/admin:', notifErr);
+              } else {
+                console.log(`Chat notification created for user ${recipientId} about ticket ${ticketId}`);
+                
+                // Emit notification to the supervisor/admin via socket if they're online
+                io.emit(`notification-${recipientId}`, {
+                  notificationId: notifResult.insertId,
+                  message: notificationMessage,
+                  type: 'NEW_CHAT_MESSAGE',
+                  ticketId: ticketId,
+                  createdAt: new Date().toISOString()
+                });
+              }
+            });
+          });
+        });
+      });
+    }
+
+  } catch (error) {
+    console.error('Error in createChatNotification:', error);
+  }
+};
+
 // GET messages for ticket
 app.get("/messages/:ticketId", (req, res) => {
   const ticketId = req.params.ticketId;
@@ -778,6 +953,9 @@ app.post("/ticketchat", upload.single("file"), (req, res) => {
 
     io.to(TicketID.toString()).emit("receiveTicketMessage", newMessage);
 
+    // Create notification for chat message if sent by admin/supervisor
+    createChatNotification(TicketID, UserID, Role, Note, Type || "text");
+
     res.status(201).json({
       message: "Chat message added",
       chatId: result.insertId,
@@ -837,6 +1015,9 @@ app.post("/api/ticketchatUser", upload.single("file"), (req, res) => {
     };
 
     io.to(TicketID.toString()).emit("receiveTicketMessage", newMessage);
+
+    // Create notification for chat message when users send messages to admins/supervisors
+    createChatNotification(TicketID, UserID, Role || "User", Note, Type || "text");
 
     res.status(201).json({
       message: "Message saved",
@@ -2015,28 +2196,28 @@ app.get('/api/tickets/recent-activities', (req, res) => {
     });
 });
 
-// API endpoint to fetch ticket  
-app.get('/api/tickets/ ', (req, res) => {
+// API endpoint to fetch tickets
+app.get('/api/tickets', (req, res) => {
     const query = `
         SELECT 
             t.TicketID, 
             u.FullName AS UserName, 
-             t.Description, 
+            t.Description, 
             t.Status, 
             t.Priority, 
-            t.UserNote,
-         FROM 
-            ticket t
+            t.UserNote
+        FROM 
+            tickets t
         LEFT JOIN 
             appuser u 
         ON 
-            t.UserId = u.UserID;
+            t.UserID = u.UserID
     `;
 
     db.query(query, (err, results) => {
         if (err) {
-            console.error('Error fetching tickets  s:', err);
-            res.status(500).json({ error: 'Failed to fetch tickets ' });
+            console.error('Error fetching tickets:', err);
+            res.status(500).json({ error: 'Failed to fetch tickets' });
             return;
         }
         res.json(results);
@@ -2124,14 +2305,17 @@ app.get('/api/notifications/:userId', (req, res) => {
             n.Type,
             n.IsRead,
             n.CreatedAt,
-            tl.TicketID,
+            CASE 
+                WHEN n.Type = 'NEW_CHAT_MESSAGE' THEN n.TicketLogID
+                ELSE tl.TicketID 
+            END AS TicketID,
             tl.UserID AS SourceUserID,
             au.FullName AS SourceUserFullName,
             au.ProfileImagePath AS SourceUserProfileImagePath
         FROM
             notifications n
         LEFT JOIN
-            ticketlog tl ON n.TicketLogID = tl.TicketLogID
+            ticketlog tl ON n.TicketLogID = tl.TicketLogID AND n.Type != 'NEW_CHAT_MESSAGE'
         LEFT JOIN
             appuser au ON tl.UserID = au.UserID
         WHERE
