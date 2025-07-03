@@ -1,11 +1,12 @@
 import React, { useEffect, useState, useRef } from "react";
-import { useParams, useLocation } from "react-router-dom";
+import { useParams, useLocation, useNavigate  } from "react-router-dom";
 import axiosClient from "../axiosClient"; // Changed from axios to axiosClient
 import ChatUI from "../../user_components/ChatUI/ChatUI";
 import SideBar from "../../user_components/SideBar/SideBar";
 import NavBar from "../../user_components/NavBar/NavBar";
 import NotificationPanel from "../components/NotificationPanel";
 import { IoClose } from "react-icons/io5";
+import { FaArrowLeft } from "react-icons/fa";
 
 const TicketDetails = () => {
   const { ticketId } = useParams();
@@ -20,11 +21,14 @@ const TicketDetails = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
+
   const notificationRef = useRef(null);
 
   const [activeTab, setActiveTab] = useState("details");
 
   const [previewUrl, setPreviewUrl] = useState(null);
+
+  const navigate = useNavigate();
 
   const storedUser = localStorage.getItem("user");
   let parsedUser = null;
@@ -170,7 +174,17 @@ const TicketDetails = () => {
           setOpen={setIsSidebarOpen}
         />
 
-        <div className="p-6 mt-[60px]">
+  <div className="px-6 pt-4 mt-[60px]"> {/* Added mt-[60px] here */}
+      <button
+        onClick={() => navigate(-1)}
+        className="flex items-center text-blue-600 hover:text-blue-800 font-semibold text-lg transition duration-200 focus:outline-none"
+        aria-label="Go back"
+      >
+        <FaArrowLeft className="mr-2" /> Back
+      </button>
+    </div>
+
+        <div className="p-6">
           {showNotifications && (
             <div
               ref={notificationRef}
