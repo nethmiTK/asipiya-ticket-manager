@@ -570,25 +570,20 @@ const DashboardLayout = () => {
         showNotifications={showNotifications}
         notificationRef={notificationRef}
       >
-        <NotificationPanel
-          userId={user?.UserID}
-          role={user?.Role}
-          onClose={() => setShowNotifications(false)}
-          onNotificationUpdate={handleNotificationPanelUpdate}
-        />
       </AdminNavBar>
-      {showNotifications && (
-        <div ref={notificationRef} className="absolute right-4 top-32 z-50">
-          <NotificationPanel
-            userId={user?.UserID}
-            role={user?.Role}
-            onClose={() => setShowNotifications(false)}
-            onNotificationUpdate={handleNotificationPanelUpdate}
-          />
-        </div>
-      )}
+      
       <main className={`flex-1 min-h-screen mt-12 bg-gray-100 transition-all duration-300 ${isSidebarOpen ? "ml-72" : "ml-16"}`}>
         <div className="p-4 sm:p-6 lg:p-8">
+          {showNotifications && (
+            <div ref={notificationRef} className="absolute right-4 top-14 z-50">
+              <NotificationPanel
+                userId={user?.UserID}
+                role={user?.Role}
+                onClose={() => setShowNotifications(false)}
+                onNotificationUpdate={handleNotificationPanelUpdate}
+              />
+            </div>
+          )}
           <Dashboard />
         </div>
       </main>
