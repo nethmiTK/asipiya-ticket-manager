@@ -1,9 +1,14 @@
-import React, { useState, useEffect } from 'react';
-import axiosClient from '../axiosClient'; // Changed from axios to axiosClient
-import AdminSideBar from '../../user_components/SideBar/AdminSideBar';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import axiosClient from '../axiosClient';
 import { FaEdit, FaTrash } from 'react-icons/fa';
 import { FileText, AlignLeft, X } from 'lucide-react';
 import { toast } from 'react-toastify';
+import { useNavigate } from 'react-router-dom';
+
+import AdminSideBar from '../../user_components/SideBar/AdminSideBar';
+import AdminNavBar from '../../user_components/NavBar/AdminNavBar';
+import NotificationPanel from '../components/NotificationPanel';
+import { useAuth } from '../../App';
 
 const SystemRegistration = () => {
   const [form, setForm] = useState({ systemName: '', description: '', status: '1' });
@@ -13,6 +18,43 @@ const SystemRegistration = () => {
   const [showModal, setShowModal] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+
+  // Notifications and Auth
+  const { loggedInUser: user } = useAuth();
+  const navigate = useNavigate();
+  const notificationRef = useRef(null);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
+
+  const fetchUnreadNotifications = useCallback(async () => {
+    if (!user?.UserID) return;
+    try {
+      const res = await axiosClient.get(`/api/notifications/count/${user.UserID}`);
+      setUnreadNotifications(res.data.count);
+    } catch (error) {
+      console.error("Error fetching unread notifications", error);
+    }
+  }, [user?.UserID]);
+
+  useEffect(() => {
+    if (user?.UserID) {
+      fetchUnreadNotifications();
+      const interval = setInterval(fetchUnreadNotifications, 30000);
+      return () => clearInterval(interval);
+    }
+  }, [user, fetchUnreadNotifications]);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (notificationRef.current && !notificationRef.current.contains(event.target)) {
+        setShowNotifications(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -20,7 +62,6 @@ const SystemRegistration = () => {
 
   const fetchSystems = async () => {
     try {
-      // Use axiosClient and remove base URL
       const res = await axiosClient.get('/system_registration');
       setSystems(res.data);
     } catch (error) {
@@ -31,7 +72,7 @@ const SystemRegistration = () => {
 
   useEffect(() => {
     fetchSystems();
-  }, [editingId]); // Re-fetch when editingId changes (after add/edit)
+  }, [editingId]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -39,19 +80,16 @@ const SystemRegistration = () => {
 
     try {
       if (editingId) {
-        // Use axiosClient and remove base URL
         await axiosClient.put(`/api/system_registration_update/${editingId}`, form);
         toast.success('System updated successfully.');
 
-        setSystems((prevSystems) =>
-          prevSystems.map((sys) =>
+        setSystems((prev) =>
+          prev.map((sys) =>
             sys.AsipiyaSystemID === editingId ? { ...sys, ...form } : sys
           )
         );
       } else {
-        // Always set status to '1' when adding new system
         const newSystem = { ...form, status: '1' };
-        // Use axiosClient and remove base URL
         await axiosClient.post('/api/systems', newSystem);
         toast.success('System added successfully.');
       }
@@ -59,7 +97,6 @@ const SystemRegistration = () => {
       setForm({ systemName: '', description: '', status: '1' });
       setEditingId(null);
       setShowModal(false);
-      // No need to call fetchSystems here, useEffect will handle it based on editingId change
     } catch (error) {
       setError('Submit Error: ' + (error.response?.data?.message || error.message));
       toast.error(error.response?.data?.message || 'Failed to submit system data.');
@@ -70,7 +107,7 @@ const SystemRegistration = () => {
     setForm({
       systemName: system.SystemName || '',
       description: system.Description || '',
-      status: system.Status !== undefined ? system.Status.toString() : '1'
+      status: system.Status?.toString() || '1',
     });
     setEditingId(system.AsipiyaSystemID);
     setShowModal(true);
@@ -80,12 +117,21 @@ const SystemRegistration = () => {
     setConfirmDeleteId(id);
   };
 
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentSystems = systems.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(systems.length / itemsPerPage);
+  const paginate = (page) => setCurrentPage(page);
+  const handleItemsPerPageChange = (e) => {
+    setItemsPerPage(Number(e.target.value));
+    setCurrentPage(1);
+  };
+
   const confirmDelete = async () => {
     try {
-      // Use axiosClient and remove base URL
       const res = await axiosClient.delete(`/api/system_registration_delete/${confirmDeleteId}`);
       toast.success(res.data.message || 'System deleted successfully.');
-      await fetchSystems(); // Re-fetch after successful deletion
+      await fetchSystems();
     } catch (error) {
       if (error.response?.status === 403) {
         toast.error("This system is already in use and cannot be deleted.");
@@ -101,8 +147,30 @@ const SystemRegistration = () => {
   return (
     <div className="flex">
       <AdminSideBar open={isSidebarOpen} setOpen={setIsSidebarOpen} />
-      <div className={`flex-1 min-h-screen bg-gray-100 p-8 transition-all duration-300 ${isSidebarOpen ? "ml-72" : "ml-20"}`}>
-        <div className="bg-white rounded-lg shadow p-6">
+      <AdminNavBar
+        pageTitle="System Registration Management"
+        user={user}
+        sidebarOpen={isSidebarOpen}
+        onProfileClick={() => navigate('/admin-profile')}
+        onNotificationClick={() => setShowNotifications(!showNotifications)}
+        unreadNotifications={unreadNotifications}
+        showNotifications={showNotifications}
+        notificationRef={notificationRef}
+      />
+
+      <div className={`flex-1 min-h-screen bg-gray-100 p-8 transition-all duration-300 ${isSidebarOpen ? 'ml-72' : 'ml-20'}`}>
+        {showNotifications && (
+          <div ref={notificationRef} className="absolute right-4 top-16 z-50">
+            <NotificationPanel
+              userId={user?.UserID}
+              role={user?.Role}
+              onClose={() => setShowNotifications(false)}
+              onNotificationUpdate={fetchUnreadNotifications}
+            />
+          </div>
+        )}
+
+        <div className="bg-white rounded-lg shadow p-6 mt-10">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-2xl font-bold">System Registration Management</h2>
             <button
@@ -134,12 +202,12 @@ const SystemRegistration = () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {systems.map((system) => (
-                <tr key={system.AsipiyaSystemID} className="border-t">
-                  <td className="p-2 w-20">{system.AsipiyaSystemID}</td>
-                  <td className="p-2 w-64">{system.SystemName}</td>
-                  <td className="p-2 w-[500px]">{system.Description}</td>
-                  <td className="p-2 w-24">
+              {currentSystems.map((system) => (
+                <tr key={system.AsipiyaSystemID}>
+                  <td className="p-2">{system.AsipiyaSystemID}</td>
+                  <td className="p-2">{system.SystemName}</td>
+                  <td className="p-2">{system.Description}</td>
+                  <td className="p-2">
                     <span className={`px-2 py-1 text-sm font-semibold rounded 
                       ${parseInt(system.Status) === 1 
                         ? 'bg-green-100 text-green-700' 
@@ -147,18 +215,16 @@ const SystemRegistration = () => {
                       {parseInt(system.Status) === 1 ? 'Active' : 'Inactive'}
                     </span>
                   </td>
-                  <td className="p-2 w-24">
+                  <td className="p-2">
                     <button
                       onClick={() => handleEdit(system)}
                       className="text-blue-600 hover:text-blue-800 mr-4"
-                      title="Edit"
                     >
                       <FaEdit />
                     </button>
                     <button
                       onClick={() => handleDelete(system.AsipiyaSystemID)}
                       className="text-red-600 hover:text-red-800"
-                      title="Delete"
                     >
                       <FaTrash />
                     </button>
@@ -166,6 +232,7 @@ const SystemRegistration = () => {
                 </tr>
               ))}
             </tbody>
+
           </table>
         </div>
 
@@ -182,7 +249,7 @@ const SystemRegistration = () => {
               <h3 className="text-xl font-semibold mb-4">{editingId ? 'Update System' : 'Add System'}</h3>
               <form onSubmit={handleSubmit}>
                 <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">System Name</label>
+                  <label className="block text-sm font-medium mb-1">System Name</label>
                   <div className="relative">
                     <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400">
                       <FileText size={16} />
@@ -197,9 +264,8 @@ const SystemRegistration = () => {
                     />
                   </div>
                 </div>
-
                 <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                  <label className="block text-sm font-medium mb-1">Description</label>
                   <div className="relative">
                     <span className="absolute top-3 left-3 text-gray-400">
                       <AlignLeft size={16} />
@@ -214,24 +280,20 @@ const SystemRegistration = () => {
                     />
                   </div>
                 </div>
-
-                {/* Show status only in edit mode */}
-                {editingId !== null && (
+                {editingId && (
                   <div className="mb-4">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                    <label className="block text-sm font-medium mb-1">Status</label>
                     <select
                       name="status"
                       value={form.status}
                       onChange={handleChange}
                       className="border rounded px-4 py-2 w-full"
-                      required
                     >
                       <option value="1">Active</option>
                       <option value="0">Inactive</option>
                     </select>
                   </div>
                 )}
-
                 <div className="flex justify-end">
                   <button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded">
                     {editingId ? 'Update' : 'Add'}
@@ -253,24 +315,35 @@ const SystemRegistration = () => {
           </div>
         )}
 
+        {systems.length > 0 && (
+            <div className="flex justify-end items-center mt-4 p-4">
+              <div className="flex items-center space-x-4">
+                <span className="text-sm text-gray-700">Entries per page:</span>
+                <select value={itemsPerPage} onChange={handleItemsPerPageChange} className="border p-2 rounded text-sm">
+                  {[5, 10, 20, 50].map(num => (
+                    <option key={num} value={num}>{num}</option>
+                  ))}
+                </select>
+                <span className="text-sm text-gray-700">
+                  {`${indexOfFirstItem + 1}-${Math.min(indexOfLastItem, systems.length)} of ${systems.length}`}
+                </span>
+                <button onClick={() => paginate(1)} disabled={currentPage === 1} className="btn-page">&lt;&lt;</button>
+                <button onClick={() => paginate(currentPage - 1)} disabled={currentPage === 1} className="btn-page">&lt;</button>
+                <span className="text-sm">{currentPage}</span>
+                <button onClick={() => paginate(currentPage + 1)} disabled={currentPage === totalPages} className="btn-page">&gt;</button>
+                <button onClick={() => paginate(totalPages)} disabled={currentPage === totalPages} className="btn-page">&gt;&gt;</button>
+              </div>
+            </div>
+          )}
+
         {/* Confirm Delete Modal */}
         {confirmDeleteId !== null && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55">
             <div className="bg-white p-6 rounded shadow-md w-full max-w-sm text-center">
               <h4 className="text-lg font-semibold mb-4">Are you sure you want to delete this system?</h4>
               <div className="flex justify-center gap-4">
-                <button
-                  onClick={confirmDelete}
-                  className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded"
-                >
-                  Yes, Delete
-                </button>
-                <button
-                  onClick={() => setConfirmDeleteId(null)}
-                  className="bg-gray-400 hover:bg-gray-500 text-white px-4 py-2 rounded"
-                >
-                  Cancel
-                </button>
+                <button onClick={confirmDelete} className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded">Yes, Delete</button>
+                <button onClick={() => setConfirmDeleteId(null)} className="bg-gray-400 hover:bg-gray-500 text-white px-4 py-2 rounded">Cancel</button>
               </div>
             </div>
           </div>
