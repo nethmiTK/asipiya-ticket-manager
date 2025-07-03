@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useLocation } from "react-router-dom";
 import axios from "axios";
 import ChatUI from "../../user_components/ChatUI/ChatUI";
 import SideBar from "../../user_components/SideBar/SideBar";
@@ -9,6 +9,7 @@ import { IoClose } from "react-icons/io5";
 
 const TicketDetails = () => {
   const { ticketId } = useParams();
+  const location = useLocation();
   const [ticket, setTicket] = useState(null);
   const [evidenceFiles, setEvidenceFiles] = useState([]);
   const [ticketLoading, setTicketLoading] = useState(true);
@@ -130,6 +131,15 @@ const TicketDetails = () => {
       alert("Download failed.");
     }
   };
+
+  // Handle tab query parameter from notification links
+  useEffect(() => {
+    const urlParams = new URLSearchParams(location.search);
+    const tabParam = urlParams.get("tab");
+    if (tabParam && (tabParam === "details" || tabParam === "chat")) {
+      setActiveTab(tabParam);
+    }
+  }, [location.search]);
 
   if (ticketLoading) return <p>Loading ticket details...</p>;
   if (ticketError) return <p className="text-red-600">{ticketError}</p>;

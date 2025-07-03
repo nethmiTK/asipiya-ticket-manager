@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { FaTimes } from "react-icons/fa";
 import { toast } from "react-toastify";
+import axiosClient from "../axiosClient"; // <--- Added this import. Adjust path if necessary.
 
 export default function EditMemberModal({ memberId, onClose, onUpdate }) {
   const [formData, setFormData] = useState({
@@ -11,12 +12,11 @@ export default function EditMemberModal({ memberId, onClose, onUpdate }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch(`http://localhost:5000/supervisor/${memberId}`)
+    // Replaced fetch with axiosClient.get
+    axiosClient.get(`/supervisor/${memberId}`) // Removed full URL
       .then((res) => {
-        if (!res.ok) throw new Error("Failed to fetch member");
-        return res.json();
-      })
-      .then((data) => {
+        // Axios automatically throws for non-2xx status, so no need for `if (!res.ok)`
+        const data = res.data; // Axios response puts data directly on `res.data`
         setFormData({
           name: data.FullName || "",
           email: data.Email || "",
@@ -26,7 +26,14 @@ export default function EditMemberModal({ memberId, onClose, onUpdate }) {
       })
       .catch((err) => {
         console.error("Error loading member:", err);
-        toast.error("Error loading member data.");
+        // More specific error message based on Axios error structure
+        if (err.response) {
+          toast.error(err.response.data.message || "Error loading member data from server.");
+        } else if (err.request) {
+          toast.error("No response from server. Check your network.");
+        } else {
+          toast.error("An unexpected error occurred while loading member data.");
+        }
         onClose(); // Close modal if error
       });
   }, [memberId, onClose]);
@@ -37,26 +44,31 @@ export default function EditMemberModal({ memberId, onClose, onUpdate }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const res = await fetch(`http://localhost:5000/supervisor/${memberId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          FullName: formData.name,
-          Email: formData.email,
-          Role: formData.role,
-        }),
+      // Replaced fetch with axiosClient.put
+      const res = await axiosClient.put(`/supervisor/${memberId}`, { // Removed full URL, Axios auto-JSON.stringify
+        FullName: formData.name,
+        Email: formData.email,
+        Role: formData.role,
       });
 
-      if (res.ok) {
+      if (res.status === 200) { // Axios uses status
         toast.success("Member updated successfully!");
         onUpdate(); // Refresh data in parent
         onClose(); // Close modal
       } else {
-        toast.error("Failed to update member");
+        // This else block might be less common with Axios unless server returns specific non-2xx codes with messages
+        toast.error(res.data.message || "Failed to update member.");
       }
     } catch (err) {
-      toast.error("Server error. Please try again.");
       console.error("Update error:", err);
+      // More specific error message based on Axios error structure
+      if (err.response) {
+        toast.error(err.response.data.message || "Failed to update member (server error).");
+      } else if (err.request) {
+        toast.error("No response from server during update. Check your network.");
+      } else {
+        toast.error("An unexpected error occurred during update. Please try again.");
+      }
     }
   };
 

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { toast } from "react-toastify";
 import { FaTimes } from "react-icons/fa";
+import axiosClient from "../axiosClient"; // <--- Added this import. Adjust path if necessary.
 
 export default function AddMemberModal({ onClose, onSuccess }) {
   const [formData, setFormData] = useState({
@@ -14,23 +15,29 @@ export default function AddMemberModal({ onClose, onSuccess }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const res = await fetch("http://localhost:5000/api/invite", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
-      });
+      // Replaced fetch with axiosClient.post
+      const res = await axiosClient.post("/api/invite", formData); // Removed full URL, axiosClient handles headers automatically
 
-      const data = await res.json();
-
-      if (res.ok) {
+      // Axios automatically parses JSON, so res.data is already the parsed object
+      if (res.status === 200 || res.status === 201) { // Common success statuses for POST
         toast.success("Invitation sent successfully!");
         onSuccess(); // Call parent to refresh list
+        onClose(); // Close the modal on success
       } else {
-        toast.error(data.message || "Failed to send invite");
+        // This block might be less likely to be hit if Axios throws on non-2xx status,
+        // but included for completeness if the server returns non-error statuses with messages
+        toast.error(res.data.message || "Failed to send invite");
       }
     } catch (err) {
       console.error("Error:", err);
-      toast.error("Server error, try again");
+      // Axios errors often have a 'response' property with server details
+      if (err.response) {
+        toast.error(err.response.data.message || "Failed to send invite (server error)");
+      } else if (err.request) {
+        toast.error("No response from server. Check your network.");
+      } else {
+        toast.error("An unexpected error occurred. Try again.");
+      }
     }
   };
 
