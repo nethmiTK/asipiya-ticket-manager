@@ -1,46 +1,38 @@
-// TicketDetailsTab.jsx
 import React from 'react';
 import { toast } from 'react-toastify';
-import axios from 'axios';
-// You might need to import other components or hooks used within the details section
-// e.g., useAuth if you use 'user' within this component for permissions or user-specific logic
+import axiosClient from '../axiosClient'; // Changed from axios to axiosClient
 
 export default function TicketDetailsTab({
   selectedTicket,
   setSelectedTicket,
-  user, // Pass user if needed for permissions/logging
-  setTickets, // Pass setTickets if you want this component to update the main ticket list
+  user,
+  setTickets,
   evidenceList,
   setShowProblemModal,
   showProblemModal,
-  // Add any other props that are currently used in the 'details' section
 }) {
   const handleUpdateTicket = async () => {
     try {
       const oldResolution = selectedTicket?.resolution || "";
       const newResolution = selectedTicket.resolution || "";
-      const res = await fetch(
-        `http://localhost:5000/api/tickets/${selectedTicket.id}/resolution`, // Corrected endpoint for resolution update
+
+      // Use axiosClient for PUT request
+      const res = await axiosClient.put(
+        `/api/tickets/${selectedTicket.id}/resolution`, // Corrected endpoint for resolution update
         {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            resolution: newResolution,
-            userId: user.UserID, // Pass userId for backend logging/notification
-            oldResolution: oldResolution // Pass old resolution for backend logging
-          }),
+          resolution: newResolution,
+          userId: user.UserID, // Pass userId for backend logging/notification
+          oldResolution: oldResolution // Pass old resolution for backend logging
         }
       );
-      if (!res.ok) throw new Error("Failed to update ticket");
 
-      // Logging and notification for resolution update are now handled by the backend /api/tickets/:ticketId/resolution endpoint.
-      // The commented out code below is removed as it's no longer needed on the frontend.
+      // Check for successful response from axiosClient
+      if (res.status !== 200) { // Axios typically returns status 200 for success
+        throw new Error("Failed to update ticket");
+      }
 
       toast.success("Ticket updated successfully!");
-      // If you want to close the modal or perform other actions after save
-      // closeModal(); // You'd need to pass this as a prop if used
 
-      // Check if setTickets prop is provided before attempting to use it
       if (setTickets) {
         setTickets((prev) =>
           prev.map((t) =>
@@ -61,24 +53,24 @@ export default function TicketDetailsTab({
 
   const handleStatusChange = async (e) => {
     const newStatus = e.target.value;
-    const oldStatus = selectedTicket.status;
+    // const oldStatus = selectedTicket.status; // Not used in this block after backend handles notification
     setSelectedTicket((prev) => ({
       ...prev,
       status: newStatus,
     }));
     try {
-      const res = await fetch(
-        `http://localhost:5000/api/tickets/${selectedTicket.id}/status`,
-        {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ status: newStatus, userId: user.UserID }),
-        }
+      // Use axiosClient for PUT request
+      const res = await axiosClient.put(
+        `/api/tickets/${selectedTicket.id}/status`,
+        { status: newStatus, userId: user.UserID }
       );
-      if (!res.ok) throw new Error("Failed to update status");
+
+      // Check for successful response from axiosClient
+      if (res.status !== 200) { // Axios typically returns status 200 for success
+        throw new Error("Failed to update status");
+      }
 
       toast.success("Status updated successfully!");
-      // Check if setTickets prop is provided before attempting to use it
       if (setTickets) {
         setTickets((prevTickets) =>
           prevTickets.map((t) =>
@@ -95,36 +87,23 @@ export default function TicketDetailsTab({
   const handleDueDateChange = async (e) => {
     const rawDate = e.target.value;
     const newDueDate = rawDate;
-    const oldDueDate = selectedTicket.dueDate;
+    // const oldDueDate = selectedTicket.dueDate; // Not used in this block after backend handles notification
     setSelectedTicket((prev) => ({
       ...prev,
       dueDate: rawDate,
     }));
     try {
-      const res = await fetch(
-        `http://localhost:5000/api/tickets/${selectedTicket.id}/due-date`,
-        {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ dueDate: newDueDate, userId: user.UserID }),
-        }
+      // Use axiosClient for PUT request
+      const res = await axiosClient.put(
+        `/api/tickets/${selectedTicket.id}/due-date`,
+        { dueDate: newDueDate, userId: user.UserID }
       );
-      if (!res.ok) throw new Error("Failed to update due date");
 
-      // Send notifications to all admins and assigned supervisors
-      // This notification is now handled by the backend /api/tickets/:ticketId/due-date endpoint.
-      // try {
-      //   await axios.post('http://localhost:5000/api/notifications/due-date-update', {
-      //     ticketId: selectedTicket.id,
-      //     updatedByUserId: user.UserID,
-      //     oldDueDate: oldDueDate,
-      //     newDueDate: newDueDate
-      //   });
-      // } catch (notificationError) {
-      //   console.error("Failed to send due date update notifications:", notificationError);
-      // }
+      // Check for successful response from axiosClient
+      if (res.status !== 200) { // Axios typically returns status 200 for success
+        throw new Error("Failed to update due date");
+      }
 
-      // Check if setTickets prop is provided before attempting to use it
       if (setTickets) {
         setTickets((prevTickets) =>
           prevTickets.map((ticket) =>
@@ -255,7 +234,8 @@ export default function TicketDetailsTab({
         ) : (
           <div className=" overflow-y-auto grid grid-cols-2 gap-4 p-2 border rounded bg-gray-50">
             {evidenceList.map((evi, index) => {
-              const fileUrl = `http://localhost:5000/${evi.FilePath}`;
+              // Construct the fileUrl using axiosClient's base URL
+              const fileUrl = `${axiosClient.defaults.baseURL}/${evi.FilePath}`;
               const fileName = evi.FilePath.split("/").pop();
 
               const isImage =
@@ -269,14 +249,11 @@ export default function TicketDetailsTab({
               const isAudio = /\.(mp3|wav|ogg)$/i.test(
                 fileName
               );
-              // Removed isDoc as we will use a generic file icon for non-media/non-PDF
-              // const isDoc = /\.(docx?|xlsx?)$/i.test(fileName);
-
 
               return (
                 <div
                   key={index}
-                  className="border rounded p-2 bg-white shadow-sm flex flex-col items-center text-center justify-between" // Added justify-between for consistent spacing
+                  className="border rounded p-2 bg-white shadow-sm flex flex-col items-center text-center justify-between"
                 >
                   {isImage ? (
                     <img src={fileUrl} alt={fileName} className="w-24 h-24 object-cover rounded mb-2" />
@@ -297,9 +274,8 @@ export default function TicketDetailsTab({
                       Your browser does not support the audio element.
                     </audio>
                   ) : (
-                    // Generic file icon for other types (documents, etc.)
                     <img
-                      src="https://freesoft.ru/storage/images/729/7282/728101/728101_normal.png" // A more common generic file icon
+                      src="https://freesoft.ru/storage/images/729/7282/728101/728101_normal.png"
                       alt="File Icon"
                       className="w-20 h-20 object-contain mb-2"
                     />
@@ -311,7 +287,7 @@ export default function TicketDetailsTab({
                     href={fileUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    download={fileName} // This attribute prompts for download
+                    download={fileName}
                     className="inline-flex items-center px-3 py-1 bg-blue-500 text-white rounded-md text-xs hover:bg-blue-600 transition-colors duration-200"
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
