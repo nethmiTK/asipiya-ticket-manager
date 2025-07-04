@@ -67,7 +67,7 @@ const TicketCategory = () => {
 
   const fetchCategories = async () => {
     try {
-      const res = await axiosClient.get('/ticket_category');
+      const res = await axiosClient.get('/api/ticket_category');
       setCategories(res.data);
     } catch (error) {
       setError('Error fetching categories: ' + error.message);
