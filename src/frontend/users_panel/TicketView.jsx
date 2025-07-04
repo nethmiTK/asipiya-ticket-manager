@@ -9,11 +9,11 @@ import { useNavigate } from "react-router-dom";
 import { MessageCircle } from 'lucide-react'; // Import for chat icon
 
 const statusColors = {
-  pending: "bg-orange-100 text-orange-800",
-  open: "bg-yellow-100 text-yellow-800",
-  "in progress": "bg-blue-100 text-blue-800",
-  resolved: "bg-green-100 text-green-800",
-  rejected: "bg-red-100 text-red-800",
+  pending: "text-orange-600 bg-transparent",
+  open: "text-yellow-600 bg-transparent", 
+  "in progress": "text-blue-600 bg-transparent",
+  resolved: "text-green-600 bg-transparent",
+  rejected: "text-red-600 bg-transparent",
 };
 
 const truncateDescription = (text, maxLength = 80) => {
@@ -540,7 +540,7 @@ const TicketView = () => {
                   >
                     <div className="flex justify-between items-start mb-3">
                       <span className="font-bold text-gray-900 text-lg">#{ticket.id}</span>
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusColors[ticket.status?.toLowerCase()] || "bg-gray-200 text-gray-800"}`}>
+                      <span className={`text-xs font-medium ${statusColors[ticket.status?.toLowerCase()] || "text-gray-600 bg-transparent"}`}>
                         {ticket.status}
                       </span>
                     </div>
@@ -579,19 +579,19 @@ const TicketView = () => {
 
               {/* Desktop View - Table Layout */}
               <div className="hidden md:block overflow-x-auto rounded-lg shadow border border-gray-200 w-full mb-6">
-                <table className="min-w-full leading-normal">
-                  <thead>
-                    <tr className="bg-gray-200 text-gray-700 uppercase text-sm leading-normal">
-                      <th className="py-3 px-6 text-left rounded-tl-lg whitespace-nowrap">ID</th>
-                      <th className="py-3 px-6 text-left whitespace-nowrap">Status</th>
-                      <th className="py-3 px-6 text-left whitespace-nowrap">Description</th>
-                      <th className="py-3 px-6 text-left whitespace-nowrap">System Name</th>
-                      <th className="py-3 px-6 text-left whitespace-nowrap">Category</th>
-                      <th className="py-3 px-6 text-left whitespace-nowrap">Date & Time</th>
-                      <th className="py-3 px-6 text-center rounded-tr-lg whitespace-nowrap">Action</th>
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">System Name</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date & Time</th>
+                      <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-200">
+                  <tbody className="bg-white divide-y divide-gray-200">
                     {loading ? (
                       <tr>
                         <td colSpan="7" className="text-center py-4">
@@ -610,7 +610,7 @@ const TicketView = () => {
                           key={ticket.id}
                           className="hover:bg-gray-50 transition-colors"
                         >
-                          <td className="py-3 px-6 text-left whitespace-nowrap font-medium text-gray-900 flex items-center">
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 flex items-center">
                             {ticket.id}
                             {unreadChatCounts[ticket.id] > 0 && (
                               <span className="ml-2 bg-green-500 text-white text-xs px-2 py-1 rounded-full font-bold flex items-center shadow-md animate-bounce-custom">
@@ -618,24 +618,24 @@ const TicketView = () => {
                               </span>
                             )}
                           </td>
-                          <td
-                            className={`py-3 px-6 text-left font-medium ${statusColors[ticket.status?.toLowerCase()] || "text-gray-700"}`}
-                          >
+                          <td className={`px-6 py-4 whitespace-nowrap text-sm font-medium ${statusColors[ticket.status?.toLowerCase()] || "text-gray-600 bg-transparent"}`}>
                             {ticket.status}
                           </td>
-                          <td className="py-3 px-6 text-left">
-                            {truncateDescription(ticket.description)}
+                          <td className="px-6 py-4 text-sm text-gray-900">
+                            <div className="max-w-xs">
+                              {truncateDescription(ticket.description)}
+                            </div>
                           </td>
-                          <td className="py-3 px-6 text-left">
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                             {ticket.system_name || "N/A"}
                           </td>
-                          <td className="py-3 px-6 text-left">
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                             {ticket.category || "N/A"}
                           </td>
-                          <td className="py-3 px-6 text-left">
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                             {formatDateTime(ticket.datetime)}
                           </td>
-                          <td className="py-3 px-6 text-center">
+                          <td className="px-6 py-4 text-center">
                             <button
                               onClick={(e) => handleViewTicket(e, ticket.id)}
                               className="text-blue-600 hover:text-blue-900"
