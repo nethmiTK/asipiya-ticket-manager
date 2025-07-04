@@ -477,7 +477,7 @@ const Dashboard = () => {
                   }`}>
                     {user.ProfileImagePath ? (
                       <img
-                        src={`http://localhost:5000/uploads/${user.ProfileImagePath}`}
+                        src={`${axiosClient.defaults.baseURL}/uploads/${user.ProfileImagePath}`}
                         alt={user.FullName}
                         className="w-full h-full object-cover"
                         onError={(e) => {

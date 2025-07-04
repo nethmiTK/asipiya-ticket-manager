@@ -80,11 +80,6 @@ export default function AddSupervisor() {
     setIsLoading(true);
     setError(null);
     try {
-      // Changed to axiosClient and removed base URL
-      // Assuming your supervisor endpoint is at the root of your API (e.g., http://localhost:5000/supervisor)
-      // If it's under /api, like http://localhost:5000/api/supervisor, then use `/supervisor`
-      // Given your notification path is `/api/notifications/...`, it's likely `/api/supervisor`
-      // So, let's assume `BASE_URL` in `axiosClient.js` is `http://localhost:5000/api`
       const res = await axiosClient.get("/supervisor");
       setUsers(res.data);
     } catch (err) {

@@ -121,7 +121,7 @@ const TicketDetails = () => {
       // Otherwise, keep it as fetch or adjust axiosClient's configuration.
       // Assuming it's still a direct path for simplicity if axiosClient isn't configured for blobs.
       const response = await fetch(
-        `http://localhost:5000/download_evidence/${fileName}`
+        `${axiosClient.defaults.baseURL}/download_evidence/${fileName}`
       );
       if (!response.ok) throw new Error("Download failed");
       const blob = await response.blob();
@@ -271,7 +271,7 @@ const TicketDetails = () => {
                     <div className="flex flex-wrap gap-4">
                       {evidenceFiles.map((file) => {
                         const filePath = file.FilePath || file.filepath || "";
-                        const fileUrl = `http://localhost:5000/${filePath.replace(
+                        const fileUrl = `${axiosClient.defaults.baseURL}/${filePath.replace(
                           /\\/g,
                           "/"
                         )}`;
@@ -422,7 +422,7 @@ const TicketDetails = () => {
                   <div className="flex flex-wrap gap-4">
                     {evidenceFiles.map((file) => {
                       const filePath = file.FilePath || file.filepath || "";
-                      const fileUrl = `http://localhost:5000/${filePath.replace(
+                      const fileUrl = `${axiosClient.defaults.baseURL}/${filePath.replace(
                         /\\/g,
                         "/"
                       )}`;

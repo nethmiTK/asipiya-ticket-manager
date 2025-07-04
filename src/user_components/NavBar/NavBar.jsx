@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { AiOutlineUser } from 'react-icons/ai';
 import { IoNotificationsOutline } from "react-icons/io5";
 import { Menu } from "lucide-react";
+import axiosClient from "../../frontend/axiosClient.js";
 
 const NavBar = ({ isSidebarOpen, showNotifications, unreadNotifications, setShowNotifications, notificationRef,setOpen }) => {
     const { loggedInUser } = useAuth();
@@ -15,7 +16,7 @@ const NavBar = ({ isSidebarOpen, showNotifications, unreadNotifications, setShow
     };
 
     const profileImageUrl = loggedInUser?.ProfileImagePath
-        ? `http://localhost:5000/uploads/${loggedInUser.ProfileImagePath}`
+        ? `${axiosClient.defaults.baseURL}/uploads/${loggedInUser.ProfileImagePath}`
         : null;
 
     return (

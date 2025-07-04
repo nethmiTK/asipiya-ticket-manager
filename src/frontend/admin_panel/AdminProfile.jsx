@@ -47,7 +47,6 @@ const AdminProfile = () => {
             if (user && user.UserID) {
                 try {
                     setLoading(true);
-                    // Path now includes '/api' because BASE_URL is 'http://localhost:5000'
                     const response = await axiosClient.get(`/api/user/profile/${user.UserID}`);
                     const fetchedData = response.data;
                     setProfileData(fetchedData);
@@ -60,8 +59,8 @@ const AdminProfile = () => {
                         ConfirmNewPassword: ''
                     });
                     if (fetchedData.ProfileImagePath) {
-                        // This URL is for serving static files, so it needs the full base URL
-                        setPreviewUrl(`http://localhost:5000/uploads/${fetchedData.ProfileImagePath}`);
+                        // Correctly using axiosClient.defaults.baseURL here
+                        setPreviewUrl(`${axiosClient.defaults.baseURL}/uploads/${fetchedData.ProfileImagePath}`);
                     } else {
                         setPreviewUrl(null);
                     }
@@ -108,7 +107,8 @@ const AdminProfile = () => {
                 );
 
                 if (response.data.imagePath) {
-                    setPreviewUrl(`http://localhost:5000/uploads/${response.data.imagePath}`);
+                    // *** MODIFIED LINE HERE ***
+                    setPreviewUrl(`${axiosClient.defaults.baseURL}/uploads/${response.data.imagePath}`);
                     if (setLoggedInUser) {
                         const updatedUser = { ...user, ProfileImagePath: response.data.imagePath };
                         setLoggedInUser(updatedUser);
