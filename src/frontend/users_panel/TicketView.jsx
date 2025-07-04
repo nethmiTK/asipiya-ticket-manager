@@ -140,7 +140,7 @@ const TicketView = () => {
 
       try {
         // Use axiosClient and remove base URL from path
-        const res = await axiosClient.get("/userTickets", {
+        const res = await axiosClient.get("/api/userTickets", {
           params: { userId },
         });
         const fetchedTickets = res.data;

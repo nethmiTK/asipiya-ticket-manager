@@ -63,7 +63,7 @@ const TicketDetails = () => {
     setTicketLoading(true);
     setTicketError(null);
     axiosClient // Changed from axios
-      .get(`/userTicket/${ticketId}`)
+      .get(`/api/userTicket/${ticketId}`)
       .then((res) => setTicket(res.data))
       .catch(() => setTicketError("Error fetching ticket details"))
       .finally(() => setTicketLoading(false));
