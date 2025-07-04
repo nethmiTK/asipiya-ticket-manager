@@ -9,11 +9,11 @@ import { useNavigate } from "react-router-dom";
 import { MessageCircle } from 'lucide-react'; // Import for chat icon
 
 const statusColors = {
-  pending: "text-orange-600 bg-transparent",
-  open: "text-yellow-600 bg-transparent", 
-  "in progress": "text-blue-600 bg-transparent",
-  resolved: "text-green-600 bg-transparent",
-  rejected: "text-red-600 bg-transparent",
+  pending: "bg-orange-100 text-orange-700",
+  open: "bg-yellow-100 text-yellow-700",
+  "in progress": "bg-blue-100 text-blue-700",
+  resolved: "bg-green-100 text-green-700",
+  rejected: "bg-red-100 text-red-700",
 };
 
 const truncateDescription = (text, maxLength = 80) => {
@@ -540,7 +540,7 @@ const TicketView = () => {
                   >
                     <div className="flex justify-between items-start mb-3">
                       <span className="font-bold text-gray-900 text-lg">#{ticket.id}</span>
-                      <span className={`text-xs font-medium ${statusColors[ticket.status?.toLowerCase()] || "text-gray-600 bg-transparent"}`}>
+                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${statusColors[ticket.status?.toLowerCase()] || "bg-gray-100 text-gray-600"}`}>
                         {ticket.status}
                       </span>
                     </div>
@@ -618,8 +618,10 @@ const TicketView = () => {
                               </span>
                             )}
                           </td>
-                          <td className={`px-6 py-4 whitespace-nowrap text-sm font-medium ${statusColors[ticket.status?.toLowerCase()] || "text-gray-600 bg-transparent"}`}>
-                            {ticket.status}
+                          <td className="px-6 py-4 whitespace-nowrap text-sm">
+                            <span className={`px-3 py-1 rounded-full font-medium text-xs ${statusColors[ticket.status?.toLowerCase()] || "bg-gray-100 text-gray-600"}`}>
+                              {ticket.status}
+                            </span>
                           </td>
                           <td className="px-6 py-4 text-sm text-gray-900">
                             <div className="max-w-xs">
