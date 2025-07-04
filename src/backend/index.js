@@ -30,6 +30,7 @@ import notificationRoutes from './routes/notificationRoutes.js';
  import evidenceRoutes from './routes/evidenceRoutes.js';
 import commentRoutes from './routes/commentRoutes.js';
 import ticketUpdateRoutes from './routes/ticketUpdateRoutes.js';
+import dashboardRoutes from './routes/dashboardRoutes.js';
  
 const app = express();
 app.use(bodyParser.json());
@@ -64,6 +65,7 @@ app.use('/api', ticketRoutes);
  app.use('/api', evidenceRoutes);
 app.use('/api', commentRoutes);
 app.use('/api', ticketUpdateRoutes);
+app.use('/api', dashboardRoutes);
  
 //evidence uploads
 app.use("/uploads", express.static("uploads"));
@@ -1646,56 +1648,6 @@ app.get('/api/tickets/status-distribution', (req, res) => {
     }
 
     res.json(results[0]);
-  });
-});
-
-// API endpoint to fetch the last 6 ticket log activities
-app.get('/api/tickets/recent-activities', (req, res) => {
-  const query = `
-        SELECT 
-            tl.TicketID,
-            tl.DateTime,
-            tl.Type,
-            tl.Description
-        FROM ticketlog tl
-        ORDER BY tl.DateTime DESC
-        LIMIT 6
-    `;
-
-  db.query(query, (err, results) => {
-    if (err) {
-      console.error('Error fetching recent ticket log activities:', err);
-      return res.status(500).json({ error: 'Failed to fetch recent ticket log activities' });
-    }
-    res.json(results);
-  });
-});
-
-// API endpoint to fetch tickets
-app.get('/api/tickets', (req, res) => {
-  const query = `
-        SELECT 
-            t.TicketID, 
-            u.FullName AS UserName, 
-            t.Description, 
-            t.Status, 
-            t.Priority, 
-            t.UserNote
-        FROM 
-            tickets t
-        LEFT JOIN 
-            appuser u 
-        ON 
-            t.UserID = u.UserID
-    `;
-
-  db.query(query, (err, results) => {
-    if (err) {
-      console.error('Error fetching tickets:', err);
-      res.status(500).json({ error: 'Failed to fetch tickets' });
-      return;
-    }
-    res.json(results);
   });
 });
 
