@@ -9,7 +9,7 @@ import AdminSideBar from "../../user_components/SideBar/AdminSideBar";
 import { toast } from "react-toastify";
 import TicketLogView from "./TicketLogView";
 import TicketDetailsTab from "./TicketDetailsTab";
-import axios from "axios";
+import axiosClient from "../axiosClient";
 import { FaFilePdf, FaFileWord, FaFileArchive, FaFileAlt, FaFileImage } from 'react-icons/fa';
 import { FiMoreVertical } from 'react-icons/fi';
 import AdminNavBar from "../../user_components/NavBar/AdminNavBar";
@@ -221,7 +221,7 @@ export default function TicketManage() {
         const chatCounts = {};
         for (const ticket of mappedTickets) {
           try {
-            const response = await axios.get(`http://localhost:5000/api/notifications/chat/count/${user.UserID}/${ticket.id}`);
+            const response = await axiosClient.get(`/api/notifications/chat/count/${user.UserID}/${ticket.id}`);
             chatCounts[ticket.id] = response.data.count;
           } catch (chatError) {
             console.error(`Error fetching unread chat count for ticket ${ticket.id}:`, chatError);
@@ -306,7 +306,7 @@ export default function TicketManage() {
         const chatCounts = {};
         for (const ticket of mappedTickets) {
           try {
-            const response = await axios.get(`http://localhost:5000/api/notifications/chat/count/${user.UserID}/${ticket.id}`);
+            const response = await axiosClient.get(`/api/notifications/chat/count/${user.UserID}/${ticket.id}`);
             chatCounts[ticket.id] = response.data.count;
           } catch (chatError) {
             console.error(`Error fetching unread chat count for ticket ${ticket.id}:`, chatError);
@@ -329,8 +329,8 @@ export default function TicketManage() {
     const fetchComments = async () => {
       try {
         // Pass user.UserID to the backend to get UserHasLiked status
-        const res = await axios.get(
-          `http://localhost:5000/api/tickets/${selectedTicket.id}/comments?userId=${user.UserID}`
+        const res = await axiosClient.get(
+          `/api/tickets/${selectedTicket.id}/comments?userId=${user.UserID}`
         );
         const data = res.data;
         setCommentsList(data);
@@ -460,8 +460,8 @@ export default function TicketManage() {
     }
 
     try {
-      await axios.post(
-        `http://localhost:5000/api/tickets/${selectedTicket.id}/comments`,
+      await axiosClient.post(
+        `/api/tickets/${selectedTicket.id}/comments`,
         formData,
         {
           headers: {
@@ -490,7 +490,7 @@ export default function TicketManage() {
       toast.success("Comment added successfully");
 
       // Refresh comments after adding
-      const res = await axios.get(`http://localhost:5000/api/tickets/${selectedTicket.id}/comments?userId=${user.UserID}`); // Pass userId for likes
+      const res = await axiosClient.get(`/api/tickets/${selectedTicket.id}/comments?userId=${user.UserID}`); // Pass userId for likes
       setCommentsList(res.data);
 
       // Initialize userLikedComments state from refreshed data
@@ -592,7 +592,7 @@ export default function TicketManage() {
       // Log the resolution update to ticket log if resolution was added/changed
       if (newResolution && newResolution !== oldResolution) {
         try {
-          await axios.post('http://localhost:5000/api/ticket-logs', {
+          await axiosClient.post('/api/ticket-logs', {
             ticketId: selectedTicket.id,
             type: 'RESOLUTION_UPDATE',
             description: `Resolution summary updated: ${newResolution.substring(0, 100)}${newResolution.length > 100 ? '...' : ''}`,
@@ -842,15 +842,15 @@ export default function TicketManage() {
     try {
       if (hasLiked) {
         // Unlike
-        await axios.delete(
-          `http://localhost:5000/api/comments/${commentId}/like`,
+        await axiosClient.delete(
+          `/api/comments/${commentId}/like`,
           { data: { userId: user.UserID } }
         );
         toast.info("Comment unliked.");
       } else {
         // Like
-        await axios.post(
-          `http://localhost:5000/api/comments/${commentId}/like`,
+        await axiosClient.post(
+          `/api/comments/${commentId}/like`,
           { userId: user.UserID }
         );
         toast.success("Comment liked!");
@@ -858,7 +858,7 @@ export default function TicketManage() {
       // Toggle the local state immediately for responsiveness
       setUserLikedComments((prev) => ({ ...prev, [commentId]: !hasLiked }));
       // Re-fetch comments to get updated like counts from backend
-      const res = await axios.get(`http://localhost:5000/api/tickets/${selectedTicket.id}/comments?userId=${user.UserID}`); // Pass userId for likes
+      const res = await axiosClient.get(`/api/tickets/${selectedTicket.id}/comments?userId=${user.UserID}`); // Pass userId for likes
       setCommentsList(res.data);
     } catch (error) {
       console.error("Error toggling like:", error);
@@ -1060,7 +1060,7 @@ export default function TicketManage() {
   const fetchUnreadNotifications = useCallback(async () => {
     if (!user?.UserID) return;
     try {
-      const response = await axios.get(`http://localhost:5000/api/notifications/count/${user.UserID}`);
+      const response = await axiosClient.get(`/api/notifications/count/${user.UserID}`);
       setUnreadNotifications(response.data.count);
     } catch (error) {
       console.error('Error fetching unread notifications:', error);
@@ -1086,7 +1086,7 @@ export default function TicketManage() {
     setIsLoading(true);
     setError(null);
     try {
-      const res = await axios.get("http://localhost:5000/supervisor");
+      const res = await axiosClient.get("/supervisor");
       setUsers(res.data);
     } catch (err) {
       setError("Failed to load members. Please try again.");
@@ -1106,7 +1106,7 @@ export default function TicketManage() {
   // Mark chat messages as read when chat tab is active
   useEffect(() => {
     if (activeTab === "chat" && selectedTicket?.id && user?.UserID) {
-      axios.put(`http://localhost:5000/api/notifications/chat/read/${user.UserID}/${selectedTicket.id}`)
+      axiosClient.put(`/api/notifications/chat/read/${user.UserID}/${selectedTicket.id}`)
         .then(response => {
           console.log(`Marked ${response.data.updatedCount} chat notifications as read for ticket ${selectedTicket.id}`);
           // Update the unread count in state to reflect the change immediately
