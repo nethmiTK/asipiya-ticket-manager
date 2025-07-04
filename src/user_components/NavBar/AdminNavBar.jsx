@@ -1,5 +1,6 @@
 import React from "react";
 import { IoNotificationsOutline } from "react-icons/io5";
+import axiosClient from "../../frontend/axiosClient";
 
 const AdminNavBar = ({
   pageTitle = "Dashboard",
@@ -34,7 +35,7 @@ const AdminNavBar = ({
             <div className="w-9 h-9 rounded-full gap-4 overflow-hidden bg-gray-200 flex-shrink-0">
               {user?.ProfileImagePath ? (
                 <img
-                  src={`http://localhost:5000/uploads/${user.ProfileImagePath}`}
+                  src={`${axiosClient.defaults.baseURL}/uploads/${user.ProfileImagePath}`}
                   alt="Profile"
                   className="w-full h-full object-cover"
                 />

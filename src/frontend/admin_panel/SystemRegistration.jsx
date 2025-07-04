@@ -62,7 +62,7 @@ const SystemRegistration = () => {
 
   const fetchSystems = async () => {
     try {
-      const res = await axiosClient.get('/system_registration');
+      const res = await axiosClient.get('/api/system_registration');
       setSystems(res.data);
     } catch (error) {
       setError('Error fetching systems: ' + error.message);

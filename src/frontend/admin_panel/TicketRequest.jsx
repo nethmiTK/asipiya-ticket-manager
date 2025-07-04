@@ -15,8 +15,8 @@ const TicketRequest = () => {
     setError(null);
     try {
       const url = supervisorName
-        ? `http://localhost:5000/tickets/supervisor/${encodeURIComponent(supervisorName)}`
-        : `http://localhost:5000/tickets`;
+        ? `${axiosClient.defaults.baseURL}/tickets/supervisor/${encodeURIComponent(supervisorName)}`
+        : `${axiosClient.defaults.baseURL}/tickets`;
 
       const response = await fetch(url);
       if (!response.ok) throw new Error("Failed to fetch tickets");
@@ -44,7 +44,7 @@ const TicketRequest = () => {
 
   const handleAccept = async (ticketID) => {
   try {
-    const response = await fetch(`http://localhost:5000/tickets/accept/${ticketID}`, {
+    const response = await fetch(`${axiosClient.defaults.baseURL}/tickets/accept/${ticketID}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
