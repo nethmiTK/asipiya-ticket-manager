@@ -272,8 +272,8 @@ export default function SupervisorChatSection({
     }
 
     console.log(`ChatSection: useEffect for initial fetch - Fetching messages for ticket ${ticketId}.`);
-    axios
-      .get(`${axiosClient.defaults.baseURL}/messages/${ticketId}`)
+    axiosClient
+      .get(`/messages/${ticketId}`)
       .then((res) => {
         const formattedMessages = res.data.map((msg) => ({
           ...msg,
