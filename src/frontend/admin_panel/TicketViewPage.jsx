@@ -70,7 +70,7 @@ const TicketViewPage = ({ ticketId, popupMode = false, onClose }) => {
                 const ticketRes = await axiosClient.get(`/api/ticket_view/${id}`);
                 setTicketData(ticketRes.data);
 
-                const evidenceRes = await axiosClient.get(`/evidence/${id}`);
+                const evidenceRes = await axiosClient.get(`/api/evidence/${id}`);
                 setEvidenceList(evidenceRes.data);
 
                 setLoading(false);
