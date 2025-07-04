@@ -23,6 +23,7 @@ import inviteRoutes from './routes/inviteRoutes.js';
 import systemRoutes from './routes/systemRoutes.js';
 import categoryRoutes from './routes/categoryRoutes.js';
 import clientRoutes from './routes/clientRoutes.js';
+import supervisorAssignRoutes from './routes/supervisorAssignRoutes.js';
 
 const app = express();
 app.use(bodyParser.json());
@@ -51,6 +52,7 @@ app.use('/api/invite', inviteRoutes);
 app.use('/api', systemRoutes);
 app.use('/api', categoryRoutes);
 app.use('/api', clientRoutes);
+app.use('/api', supervisorAssignRoutes);
 
 //evidence uploads
 app.use("/uploads", express.static("uploads"));
@@ -1310,74 +1312,6 @@ app.put('/tickets/accept/:ticketID', (req, res) => {
 
 
 
-//View ticket details
-app.get('/api/ticket_view/:id', (req, res) => {
-  const ticketId = req.params.id;
-
-  const ticketQuery = `
-    SELECT 
-      t.TicketID,
-      u.FullName AS UserName,
-      u.Email AS UserEmail,    
-      s.SystemName,
-      c.CategoryName,
-      t.Description,
-      t.DateTime,
-      t.Status,
-      t.Priority,
-      t.FirstRespondedTime,
-      t.LastRespondedTime,
-      t.TicketDuration,
-      t.UserNote,
-      t.SupervisorID
-    FROM ticket t
-    JOIN appuser u ON t.UserId = u.UserID
-    JOIN asipiyasystem s ON t.AsipiyaSystemID = s.AsipiyaSystemID
-    JOIN ticketcategory c ON t.TicketCategoryID = c.TicketCategoryID
-    WHERE t.TicketID = ?
-  `;
-
-  db.query(ticketQuery, [ticketId], (err, results) => {
-    if (err) {
-      console.error("Error in ticket_view query:", err);
-      return res.status(500).json({ error: "Database query failed" });
-    }
-
-    if (results.length === 0) {
-      return res.status(404).json({ error: "Ticket not found" });
-    }
-
-    const ticket = results[0];
-
-    // ✅ FIX: Use SupervisorID from DB result, not supervisor_id
-    const supervisorIds = ticket.SupervisorID
-      ? ticket.SupervisorID.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id))
-      : [];
-
-    if (supervisorIds.length === 0) {
-      return res.status(200).json({ ...ticket, supervisor_id: [], supervisor_name: null });
-    }
-
-    const placeholders = supervisorIds.map(() => '?').join(',');
-    const nameQuery = `SELECT UserID, FullName FROM appuser WHERE UserID IN (${placeholders})`;
-
-    db.query(nameQuery, supervisorIds, (err, nameResults) => {
-      if (err) {
-        console.error("Error fetching supervisor names:", err);
-        return res.status(500).json({ error: "Error fetching supervisor names" });
-      }
-
-      const fullNames = nameResults.map(row => row.FullName);
-
-      // ✅ Append parsed supervisor info to response
-      res.json({
-        ...ticket,
-        supervisor_id: supervisorIds,
-        supervisor_name: fullNames.join(', '),
-      });
-    });
-  });
-});
 
 // PUT: Update supervisors for a ticket
 app.put("/update-supervisors/:id", async (req, res) => {
@@ -2730,33 +2664,6 @@ app.get('/api/tickets', (req, res) => {
   });
 });
 
-app.get('/api/pending_ticket', (req, res) => {
-  const query = `
-    SELECT 
-      t.TicketID,
-      s.SystemName AS SystemName,
-      c.CompanyName AS CompanyName,
-      u.FullName AS UserName,
-      t.Status,
-      t.DateTime
-    FROM ticket t
-    LEFT JOIN asipiyasystem s ON t.AsipiyaSystemID = s.AsipiyaSystemID
-    LEFT JOIN appuser u ON t.UserId = u.UserID
-    LEFT JOIN client c ON u.Email = c.ContactPersonEmail
-    ORDER BY t.TicketID ASC
-  `;
-
-  db.query(query, (err, results) => {
-    if (err) {
-      console.error('Error fetching tickets:', err);
-      res.status(500).json({ error: 'Failed to fetch tickets' });
-      return;
-    }
-    res.json(results);
-  });
-});
-
-
 // API endpoint to update ticket status (including rejection)
 // When a ticket is rejected, this endpoint will:
 // 1. Update the ticket status to 'Rejected' with the provided reason
@@ -2997,242 +2904,6 @@ app.post('/api/invite-supervisor', async (req, res) => {
     console.error('Error sending invitation email:', mailErr);
     res.status(500).json({ message: 'Failed to send invitation email.' });
   }
-});
-
-// Assign supervisor to ticket endpoint
-app.put('/api/tickets/:id/assign', (req, res) => {
-  const ticketId = req.params.id;
-  const { supervisorId, status, priority, assignerId } = req.body; // assignerId is received here
-
-  console.log('Assign endpoint: Received:', { ticketId, supervisorId, status, priority, assignerId }); // Add this line
-
-  if (!ticketId || !supervisorId || !assignerId) { // Assigner ID is required
-
-
-    return res.status(400).json({
-      error: 'Ticket ID, Supervisor ID, and Assigner ID are required'
-    });
-  }
-
-  const supervisorIds = supervisorId.split(',').map(id => id.trim());
-  const supervisorString = supervisorIds.join(',');
-
-  db.query('SELECT Status, Priority, SupervisorID, UserId as ticketCreatorId FROM ticket WHERE TicketID = ?', [ticketId], async (err, currentTicketResults) => {
-    if (err) {
-      console.error('Error fetching current ticket details for assignment:', err);
-      return res.status(500).json({ error: 'Server error while fetching ticket details' });
-    }
-    if (currentTicketResults.length === 0) {
-      return res.status(404).json({ error: 'Ticket not found' });
-    }
-
-    const oldStatus = currentTicketResults[0].Status;
-    const oldPriority = currentTicketResults[0].Priority;
-    const oldSupervisorId = currentTicketResults[0].SupervisorID;
-    const ticketCreatorId = currentTicketResults[0].ticketCreatorId; // Get ticket creator ID
-
-    console.log('Assign endpoint: Old Supervisor ID from DB:', oldSupervisorId); // Add this line
-
-    const updateQuery = `
-            UPDATE ticket
-            SET SupervisorID = ?,
-                Status = ?,
-                Priority = ?,
-                LastRespondedTime = NOW(),
-                FirstRespondedTime = COALESCE(FirstRespondedTime, NOW())
-            WHERE TicketID = ?
-        `;
-
-    db.query(updateQuery, [supervisorString, status, priority, ticketId], async (err, result) => {
-      if (err) {
-        console.error('Error updating ticket during assignment:', err);
-        return res.status(500).json({
-          error: 'Failed to assign supervisor',
-          message: err.message
-        });
-      }
-
-      if (result.affectedRows === 0) {
-        return res.status(404).json({
-          error: 'Ticket not found'
-        });
-      }
-
-      try {
-        // Get all supervisor IDs as an array
-        const supervisorIds = supervisorString.split(',').map(id => id.trim()).filter(Boolean);
-        const oldSupervisorIds = (oldSupervisorId || '').split(',').map(id => id.trim()).filter(Boolean);
-
-        // Fetch names for all supervisors and assigner
-        let getAllNamesQuery = `SELECT UserID, FullName FROM appuser WHERE `;
-        const queryParams = [];
-        const conditions = [];
-
-        // Add new supervisor IDs
-        if (supervisorIds.length > 0) {
-          conditions.push(`UserID IN (${supervisorIds.map(() => '?').join(',')})`);
-          queryParams.push(...supervisorIds);
-        }
-
-        // Add old supervisor IDs if they exist
-        if (oldSupervisorIds.length > 0) {
-          conditions.push(`UserID IN (${oldSupervisorIds.map(() => '?').join(',')})`);
-          queryParams.push(...oldSupervisorIds);
-        }
-
-        // Add assigner ID if it exists
-        if (assignerId) {
-          conditions.push(`UserID = ?`);
-          queryParams.push(assignerId);
-        }
-
-        getAllNamesQuery += conditions.join(' OR ');
-
-        const allNamesResult = await new Promise((resolve, reject) => {
-          db.query(getAllNamesQuery, queryParams, (err, results) => {
-            if (err) reject(err);
-            else resolve(results || []);
-          });
-        });
-
-        // Create name mappings
-        const nameMap = {};
-        if (allNamesResult) {
-          allNamesResult.forEach(user => {
-            nameMap[user.UserID] = user.FullName;
-          });
-        }
-
-        const newSupervisorNames = supervisorIds.map(id => nameMap[id] || `User ${id}`);
-        const oldSupervisorNames = oldSupervisorIds.map(id => nameMap[id] || `User ${id}`);
-        const assignerName = assignerId ? (nameMap[assignerId] || 'Unknown') : 'System';
-
-        console.log('Assign endpoint: New supervisor names:', newSupervisorNames);
-        console.log('Assign endpoint: Old supervisor names:', oldSupervisorNames);
-        console.log('Assign endpoint: Assigner name:', assignerName);
-
-        // Track what changed for a single comprehensive notification
-        const changes = [];
-        let logResults = [];
-
-        // Log supervisor change if it occurred
-        if (oldSupervisorId != supervisorString) {
-          const oldNamesStr = oldSupervisorNames.length > 0 ? oldSupervisorNames.join(', ') : 'No supervisors';
-          const newNamesStr = newSupervisorNames.join(', ');
-
-          const supervisorLogDescription = `assigned supervisors: ${newNamesStr} (Previously: ${oldNamesStr})`;
-          const logResult = await createTicketLog(
-            ticketId,
-            'SUPERVISOR_CHANGE',
-            supervisorLogDescription,
-            assignerId,
-            oldSupervisorId || null,
-            supervisorString,
-            null // Let createTicketLog handle the note
-          );
-          logResults.push(logResult);
-          changes.push(`supervisor(s) assigned: ${newNamesStr}`);
-
-          // Notify old supervisors if they were unassigned
-          for (const oldId of oldSupervisorIds) {
-            if (!supervisorIds.includes(oldId)) {
-              await createNotification(
-                oldId,
-                `You have been unassigned from ticket #${ticketId}${assignerName ? ` by ${assignerName}` : ''}.`,
-                'SUPERVISOR_UNASSIGNED',
-                logResult.insertId,
-                ticketId
-              );
-            }
-          }
-        }
-
-        // Log status change if it occurred
-        if ((oldStatus || '').trim().toLowerCase() !== (status || '').trim().toLowerCase()) {
-          const statusLogDescription = `changed status from ${oldStatus} to ${status}`;
-          const logResult = await createTicketLog(
-            ticketId,
-            'STATUS_CHANGE',
-            statusLogDescription,
-            assignerId,
-            oldStatus,
-            status,
-            null // Let createTicketLog handle the note
-          );
-          logResults.push(logResult);
-          changes.push(`status changed to ${status}`);
-        }
-
-        // Log priority change if it occurred
-        if ((oldPriority || '').trim().toLowerCase() !== (priority || '').trim().toLowerCase()) {
-          const priorityLogDescription = `changed priority from ${oldPriority} to ${priority}`;
-          const logResult = await createTicketLog(
-            ticketId,
-            'PRIORITY_CHANGE',
-            priorityLogDescription,
-            assignerId,
-            oldPriority,
-            priority,
-            null // Let createTicketLog handle the note
-          );
-          logResults.push(logResult);
-          changes.push(`priority changed to ${priority}`);
-        }
-
-        // Send a single comprehensive notification to ticket creator if any changes occurred
-        if (changes.length > 0 && ticketCreatorId) {
-          const changeMessage = changes.join(', ');
-          await createNotification(
-            ticketCreatorId,
-            `Your ticket #${ticketId} has been updated: ${changeMessage}${assignerName ? ` by ${assignerName}` : ''}.`,
-            'TICKET_UPDATED',
-            logResults[0]?.insertId || null,
-            ticketId
-          );
-        }
-
-        // Send notifications to assigned supervisors
-        for (const supId of supervisorIds) {
-          if (supId !== assignerId) { // Don't notify the assigner
-            if (!oldSupervisorIds.includes(supId)) {
-              // New assignment
-              const supervisorName = nameMap[supId] || `User ${supId}`;
-              await createNotification(
-                supId,
-                `You have been assigned to ticket #${ticketId}. Status: ${status}, Priority: ${priority}.${assignerName ? ` Assigned by ${assignerName}` : ''}`,
-                'SUPERVISOR_ASSIGNED',
-                logResults[0]?.insertId || null,
-                ticketId
-              );
-            } else if (changes.length > 0) {
-              // Changes to existing assignment
-              const changeMessage = changes.join(', ');
-              await createNotification(
-                supId,
-                `Ticket #${ticketId} assigned to you has been updated: ${changeMessage}${assignerName ? ` by ${assignerName}` : ''}.`,
-                'TICKET_UPDATED',
-                logResults[0]?.insertId || null,
-                ticketId
-              );
-            }
-          }
-        }
-
-
-        res.json({
-          message: 'Supervisor assigned and changes logged successfully',
-          status: 'success'
-        });
-
-      } catch (logErr) {
-        console.error('Error creating logs or sending notifications during assignment:', logErr);
-        res.status(500).json({
-          error: 'Assignment successful, but failed to log changes or send notifications',
-          message: logErr.message
-        });
-      }
-    });
-  });
 });
 
 // Create new ticket
