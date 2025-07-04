@@ -195,3 +195,21 @@ export const assignSupervisor = async (req, res) => {
     res.status(500).json({ error: "Server error", message: err.message });
   }
 };
+
+// Get all supervisors
+export const getSupervisors = (req, res) => {
+  const query = `
+    SELECT UserID, FullName FROM appuser 
+    WHERE Role IN ('supervisor')
+  `;
+
+  db.query(query, (err, results) => {
+    if (err) {
+      console.error("Error fetching supervisors:", err);
+      return res.status(500).json({ error: "Database error" });
+    }
+    console.log("Supervisor result:", results);
+    res.json(results);
+  });
+};
+

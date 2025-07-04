@@ -1504,25 +1504,6 @@ app.put("/update-supervisors/:id", async (req, res) => {
 });
 
 
-
-
-
-app.get('/api/supervisors', (req, res) => {
-  const query = `
-    SELECT UserID, FullName FROM appuser 
-    WHERE Role IN ('supervisor')
-  `;
-
-  db.query(query, (err, results) => {
-    if (err) {
-      console.error("Error fetching supervisors:", err);
-      return res.status(500).json({ error: "Database error" });
-    }
-    console.log("Supervisor result:", results); // Add this
-    res.json(results); // Make sure it's just `results`, not wrapped in an object
-  });
-});
-
 // Helper function to create a ticket log
 const createTicketLog = async (ticketId, type, description, userId, oldValue, newValue, note = null) => {
   return new Promise(async (resolve, reject) => {
