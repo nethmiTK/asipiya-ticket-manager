@@ -123,6 +123,7 @@ export default function TicketManage() {
   const notificationRef = useRef(null);
   const [isLoading, setIsLoading] = useState(true); // New loading state
   const [error, setError] = useState(null); // New error state
+  const [unreadChatCounts, setUnreadChatCounts] = useState({}); // New state for unread chat counts
 
   // Utility function to set cursor position reliably
   const setCursorPosition = (textarea, position) => {
@@ -215,6 +216,20 @@ export default function TicketManage() {
           systemName: ticket.AsipiyaSystemName || "N/A",
           userName: ticket.UserName,
         }));
+
+        // Fetch unread chat message counts for each ticket
+        const chatCounts = {};
+        for (const ticket of mappedTickets) {
+          try {
+            const response = await axios.get(`http://localhost:5000/api/notifications/chat/count/${user.UserID}/${ticket.id}`);
+            chatCounts[ticket.id] = response.data.count;
+          } catch (chatError) {
+            console.error(`Error fetching unread chat count for ticket ${ticket.id}:`, chatError);
+            chatCounts[ticket.id] = 0;
+          }
+        }
+        setUnreadChatCounts(chatCounts);
+
         setTickets(mappedTickets);
       } catch (err) {
         console.error("Error loading tickets", err);
@@ -222,7 +237,7 @@ export default function TicketManage() {
     };
 
     fetchTickets();
-  }, [selectedSupervisorId, selectedSystem]);
+  }, [selectedSupervisorId, selectedSystem, user.UserID]);
 
   useEffect(() => {
     // Fetch asipiya systems
@@ -286,6 +301,20 @@ export default function TicketManage() {
           systemName: ticket.AsipiyaSystemName || "N/A",
           userName: ticket.UserName,
         }));
+
+        // Fetch unread chat message counts for each ticket
+        const chatCounts = {};
+        for (const ticket of mappedTickets) {
+          try {
+            const response = await axios.get(`http://localhost:5000/api/notifications/chat/count/${user.UserID}/${ticket.id}`);
+            chatCounts[ticket.id] = response.data.count;
+          } catch (chatError) {
+            console.error(`Error fetching unread chat count for ticket ${ticket.id}:`, chatError);
+            chatCounts[ticket.id] = 0;
+          }
+        }
+        setUnreadChatCounts(chatCounts);
+
         setTickets(mappedTickets);
       } catch (err) {
         console.error("Fetch error:", err);
@@ -1074,6 +1103,26 @@ export default function TicketManage() {
     navigate('/admin-profile');
   };
 
+  // Mark chat messages as read when chat tab is active
+  useEffect(() => {
+    if (activeTab === "chat" && selectedTicket?.id && user?.UserID) {
+      axios.put(`http://localhost:5000/api/notifications/chat/read/${user.UserID}/${selectedTicket.id}`)
+        .then(response => {
+          console.log(`Marked ${response.data.updatedCount} chat notifications as read for ticket ${selectedTicket.id}`);
+          // Update the unread count in state to reflect the change immediately
+          setUnreadChatCounts(prevCounts => ({
+            ...prevCounts,
+            [selectedTicket.id]: 0
+          }));
+          // Re-fetch global unread notifications if necessary, as this is a chat specific read
+          fetchUnreadNotifications();
+        })
+        .catch(error => {
+          console.error('Error marking chat notifications as read:', error);
+        });
+    }
+  }, [activeTab, selectedTicket?.id, user?.UserID, fetchUnreadNotifications]); // Added fetchUnreadNotifications to dependencies
+
   return (
     <div className="flex">
       <AdminSideBar open={isSidebarOpen} setOpen={setIsSidebarOpen} />
@@ -1149,6 +1198,7 @@ export default function TicketManage() {
                   tickets={open}
                   onCardClick={handleCardClick}
                   color="text-green-700"
+                  unreadChatCounts={unreadChatCounts} // Pass unread chat counts
                 />
                 <hr className="border-t-2 border-gray-300" />
                 <Section
@@ -1156,6 +1206,7 @@ export default function TicketManage() {
                   tickets={inProcess}
                   onCardClick={handleCardClick}
                   color="text-yellow-700"
+                  unreadChatCounts={unreadChatCounts} // Pass unread chat counts
                 />
                 <hr className="border-t-2 border-gray-300" />
                 <Section
@@ -1163,6 +1214,7 @@ export default function TicketManage() {
                   tickets={resolved}
                   onCardClick={handleCardClick}
                   color="text-blue-700"
+                  unreadChatCounts={unreadChatCounts} // Pass unread chat counts
                 />
               </>
             ) : (
@@ -1846,7 +1898,7 @@ export default function TicketManage() {
 }
 
 // Section Component
-function Section({ title, tickets, onCardClick, color }) {
+function Section({ title, tickets, onCardClick, color, unreadChatCounts }) {
   return (
     <section>
       <h3 className={`text-lg sm:text-xl font-semibold ${color} mb-4`}>
@@ -1854,7 +1906,12 @@ function Section({ title, tickets, onCardClick, color }) {
       </h3>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {tickets.map((ticket) => (
-          <TicketCard key={ticket.id} ticket={ticket} onClick={onCardClick} />
+          <TicketCard
+            key={ticket.id}
+            ticket={ticket}
+            onClick={onCardClick}
+            unreadChatCount={unreadChatCounts[ticket.id] || 0} // Pass specific unread count
+          />
         ))}
       </div>
     </section>

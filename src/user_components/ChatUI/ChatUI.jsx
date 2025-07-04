@@ -44,8 +44,11 @@ const ChatUI = ({ ticketID: propTicketID }) => {
   const canvasRef = useRef(null);
 
   const markMessagesAsSeen = async () => {
-    if (!ticketID || !role) return;
-
+    if (!ticketID || !role) {
+      console.log("ChatUI: markMessagesAsSeen - Missing ticketID or role, skipping.", { ticketID, role });
+      return;
+    }
+    console.log(`ChatUI: markMessagesAsSeen - Attempting to mark messages as seen for TicketID: ${ticketID}, Role: ${role}`);
     try {
       const res = await fetch("http://localhost:5000/ticketchat/markSeen", {
         method: "POST",
@@ -53,9 +56,9 @@ const ChatUI = ({ ticketID: propTicketID }) => {
         body: JSON.stringify({ TicketID: ticketID, Role: role }),
       });
       if (!res.ok) throw new Error("Failed to mark messages as seen");
-      console.log("Messages marked as seen");
+      console.log(`ChatUI: markMessagesAsSeen - Successfully marked messages as seen for TicketID: ${ticketID}, Role: ${role}`);
     } catch (err) {
-      console.error("Error marking messages as seen:", err);
+      console.error("ChatUI: markMessagesAsSeen - Error marking messages as seen:", err);
     }
   };
 
@@ -64,6 +67,7 @@ const ChatUI = ({ ticketID: propTicketID }) => {
     if (storedUser) {
       setUserID(storedUser.UserID || storedUser.id);
       setRole(storedUser.Role || storedUser.role || "");
+      console.log("ChatUI: User data loaded.", { UserID: storedUser.UserID || storedUser.id, Role: storedUser.Role || storedUser.role });
     }
   }, []);
 
@@ -72,11 +76,16 @@ const ChatUI = ({ ticketID: propTicketID }) => {
     const effectiveTicketID = propTicketID || Number(storedTicketID);
     if (effectiveTicketID) {
       setTicketID(effectiveTicketID);
+      console.log("ChatUI: TicketID set.", { effectiveTicketID });
     }
   }, [propTicketID]);
 
   const fetchMessages = async () => {
-    if (!userID || !ticketID) return;
+    if (!userID || !ticketID) {
+      console.log("ChatUI: fetchMessages - Missing userID or ticketID, skipping.", { userID, ticketID });
+      return;
+    }
+    console.log(`ChatUI: fetchMessages - Attempting to fetch messages for TicketID: ${ticketID}, UserID: ${userID}`);
     try {
       const res = await fetch(
         `http://localhost:5000/api/ticketchatUser/${ticketID}`
@@ -100,15 +109,19 @@ const ChatUI = ({ ticketID: propTicketID }) => {
             };
           })
         );
-        markMessagesAsSeen();
+        console.log("ChatUI: fetchMessages - Messages fetched successfully. Calling markMessagesAsSeen.");
+        markMessagesAsSeen(); // Mark as seen immediately after fetching messages
       }
     } catch (err) {
-      console.error("Failed to fetch messages", err);
+      console.error("ChatUI: fetchMessages - Failed to fetch messages:", err);
     }
   };
 
   useEffect(() => {
-    if (userID && ticketID) fetchMessages();
+    if (userID && ticketID) {
+      console.log("ChatUI: useEffect [userID, ticketID] - Fetching messages.");
+      fetchMessages();
+    }
   }, [ticketID, userID]);
 
   useEffect(() => {
@@ -125,13 +138,18 @@ const ChatUI = ({ ticketID: propTicketID }) => {
             : m
         );
       }
+      console.log("ChatUI: addMessage - New message received/added.", message);
       return [...prev, message];
     });
   };
 
   useEffect(() => {
-    if (!userID || !ticketID) return;
+    if (!userID || !ticketID) {
+      console.log("ChatUI: useEffect for socket - Missing userID or ticketID, skipping socket setup.", { userID, ticketID });
+      return;
+    }
 
+    console.log(`ChatUI: useEffect for socket - Joining ticket room ${ticketID}.`);
     socket.emit("joinTicketRoom", ticketID);
 
     const handleIncomingMessage = (message) => {
@@ -148,19 +166,22 @@ const ChatUI = ({ ticketID: propTicketID }) => {
         status: message.status || "✓",
       };
 
+      console.log("ChatUI: Socket - Received incoming message.", formattedMessage);
       addMessage(formattedMessage);
 
-      if (
-        (role.toLowerCase() === "supervisor" &&
-          formattedMessage.sender === "user") ||
-        (role.toLowerCase() !== "supervisor" &&
-          formattedMessage.sender === "agent")
-      ) {
+      // Mark messages as seen ONLY IF the current user is the recipient (i.e., message is from the other party)
+      const isCurrentUserRecipient = 
+        ((role.toLowerCase() === "supervisor" || role.toLowerCase() === "admin") && formattedMessage.sender === "user") ||
+        (role.toLowerCase() === "user" && formattedMessage.sender === "agent");
+
+      if (document.visibilityState === "visible" && isCurrentUserRecipient) {
+        console.log("ChatUI: Socket - Document visible and current user is recipient. Calling markMessagesAsSeen.");
         markMessagesAsSeen();
       }
     };
 
     const handleSeenMessage = (seenData) => {
+      console.log("ChatUI: Socket - Received messagesSeen event.", seenData);
       setMessages((prev) =>
         prev.map((msg) =>
           String(msg.ticketid) === String(seenData.TicketID) &&
@@ -175,8 +196,10 @@ const ChatUI = ({ ticketID: propTicketID }) => {
     socket.on("messagesSeen", handleSeenMessage);
 
     return () => {
+      console.log(`ChatUI: Socket - Leaving ticket room ${ticketID} and disconnecting.`);
       socket.off("receiveTicketMessage", handleIncomingMessage);
       socket.off("messagesSeen", handleSeenMessage);
+      socket.emit("leaveTicketRoom", ticketID);
     };
   }, [ticketID, userID, role]);
 
@@ -188,14 +211,17 @@ const ChatUI = ({ ticketID: propTicketID }) => {
         role &&
         messages.length > 0
       ) {
+        console.log("ChatUI: Visibility Change - Document became visible. Calling markMessagesAsSeen.");
         markMessagesAsSeen();
       }
     };
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
-    return () =>
+    return () => {
+      console.log("ChatUI: Visibility Change - Removing event listener.");
       document.removeEventListener("visibilitychange", handleVisibilityChange);
-  }, [ticketID, role, messages]);
+    };
+  }, [ticketID, role, messages.length]);
 
   const handleFileDownload = async (fileUrl) => {
     try {
@@ -213,7 +239,7 @@ const ChatUI = ({ ticketID: propTicketID }) => {
       document.body.removeChild(a);
       window.URL.revokeObjectURL(downloadUrl);
     } catch (error) {
-      console.error("Download failed:", error);
+      console.error("ChatUI: handleFileDownload - Download failed:", error);
       alert("File download failed.");
     }
   };
@@ -230,6 +256,8 @@ const ChatUI = ({ ticketID: propTicketID }) => {
       formData.append("Role", role);
       if (selectedFile) formData.append("file", selectedFile);
 
+      console.log("ChatUI: handleSend - Sending message.", { ticketID, userID, role, type: formData.get("Type"), note: formData.get("Note") });
+
       const res = await fetch("http://localhost:5000/api/ticketchatUser", {
         method: "POST",
         body: formData,
@@ -237,10 +265,11 @@ const ChatUI = ({ ticketID: propTicketID }) => {
 
       if (!res.ok) throw new Error("Failed to send message");
 
+      console.log("ChatUI: handleSend - Message sent successfully.");
       setInput("");
       setSelectedFile(null);
     } catch (error) {
-      console.error("Send message failed:", error);
+      console.error("ChatUI: handleSend - Send message failed:", error);
       alert("Message sending failed!");
     }
   };
@@ -471,7 +500,7 @@ const ChatUI = ({ ticketID: propTicketID }) => {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter") {
+              if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
                 handleSend();
               }

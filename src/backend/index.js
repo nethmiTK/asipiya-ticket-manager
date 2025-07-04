@@ -4240,4 +4240,47 @@ app.delete('/api/user/profile/image/:id', async (req, res) => {
         res.status(500).json({ message: 'Failed to remove profile image.' });
     }
 });
+
+// API endpoint to get unread chat notifications count for a specific ticket
+app.get('/api/notifications/chat/count/:userId/:ticketId', (req, res) => {
+    const { userId, ticketId } = req.params;
+    const query = `
+        SELECT COUNT(*) as count
+        FROM notifications
+        WHERE UserID = ?
+        AND TicketLogID = ?  /* For chat messages, TicketLogID stores TicketID */
+        AND Type = 'NEW_CHAT_MESSAGE'
+        AND IsRead = FALSE;
+    `;
+
+    db.query(query, [userId, ticketId], (err, results) => {
+        if (err) {
+            console.error('Error fetching unread chat notification count:', err);
+            return res.status(500).json({ error: 'Failed to fetch unread chat notification count' });
+        }
+        res.json({ count: results[0].count });
+    });
+});
+
+// API endpoint to mark chat notifications as read for a specific ticket and user
+app.put('/api/notifications/chat/read/:userId/:ticketId', (req, res) => {
+    const { userId, ticketId } = req.params;
+
+    const query = `
+        UPDATE notifications
+        SET IsRead = TRUE
+        WHERE UserID = ?
+        AND TicketLogID = ?  /* For chat messages, TicketLogID stores TicketID */
+        AND Type = 'NEW_CHAT_MESSAGE'
+        AND IsRead = FALSE;
+    `;
+
+    db.query(query, [userId, ticketId], (err, result) => {
+        if (err) {
+            console.error('Error marking chat notifications as read:', err);
+            return res.status(500).json({ error: 'Failed to mark chat notifications as read' });
+        }
+        res.json({ message: 'Chat notifications marked as read', updatedCount: result.affectedRows });
+    });
+});
  

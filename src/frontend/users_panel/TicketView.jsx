@@ -6,6 +6,7 @@ import ChatUI from "../../user_components/ChatUI/ChatUI";
 import NotificationPanel from "../components/NotificationPanel";
 import { FaEye } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
+import { MessageCircle } from 'lucide-react'; // Import for chat icon
 
 const statusColors = {
   pending: "bg-orange-100 text-orange-800",
@@ -48,6 +49,7 @@ const TicketView = () => {
 
   const [searchQuery, setSearchQuery] = useState("");
   const navigate = useNavigate();
+  const [unreadChatCounts, setUnreadChatCounts] = useState({}); // New state for unread chat counts
 
   // States for custom dropdown visibility
   const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
@@ -141,7 +143,22 @@ const TicketView = () => {
         const res = await axiosClient.get("/userTickets", {
           params: { userId },
         });
-        setTickets(res.data);
+        const fetchedTickets = res.data;
+        setTickets(fetchedTickets);
+
+        // Fetch unread chat message counts for each ticket
+        const chatCounts = {};
+        for (const ticket of fetchedTickets) {
+          try {
+            const response = await axiosClient.get(`/api/notifications/chat/count/${userId}/${ticket.id}`);
+            chatCounts[ticket.id] = response.data.count;
+          } catch (chatError) {
+            console.error(`Error fetching unread chat count for ticket ${ticket.id}:`, chatError);
+            chatCounts[ticket.id] = 0;
+          }
+        }
+        setUnreadChatCounts(chatCounts);
+
       } catch (err) {
         console.error("Failed to fetch tickets:", err);
       } finally {
@@ -256,6 +273,39 @@ const TicketView = () => {
     const interval = setInterval(fetchUnreadNotifications, 30000);
     return () => clearInterval(interval);
   }, []);
+
+  // Mark chat messages as read when chat tab is active in the modal
+  useEffect(() => {
+    if (activeTab === "chat" && selectedTicket?.id && localStorage.getItem("user")) {
+      const userId = JSON.parse(localStorage.getItem("user")).UserID;
+      axiosClient.put(`/api/notifications/chat/read/${userId}/${selectedTicket.id}`)
+        .then(response => {
+          console.log(`Marked ${response.data.updatedCount} chat notifications as read for ticket ${selectedTicket.id}`);
+          // Update the unread count in state to reflect the change immediately
+          setUnreadChatCounts(prevCounts => ({
+            ...prevCounts,
+            [selectedTicket.id]: 0
+          }));
+          // Re-fetch global unread notifications if necessary, as this is a chat specific read
+          // This is important because marking chat messages as read will reduce the overall unread count.
+          const fetchUnreadNotifications = async () => {
+            const storedUser = localStorage.getItem("user");
+            const currentUserId = storedUser ? JSON.parse(storedUser).UserID : null;
+            if (!currentUserId) return;
+            try {
+              const res = await axiosClient.get(`/api/notifications/count/${currentUserId}`);
+              setUnreadNotifications(res.data.count);
+            } catch (error) {
+              console.error("Error fetching unread notifications:", error);
+            }
+          };
+          fetchUnreadNotifications();
+        })
+        .catch(error => {
+          console.error('Error marking chat notifications as read:', error);
+        });
+    }
+  }, [activeTab, selectedTicket?.id]); // No need for userId in dependencies here, it's fetched internally
 
   return (
     <div className="flex">
@@ -529,65 +579,73 @@ const TicketView = () => {
 
               {/* Desktop View - Table Layout */}
               <div className="hidden md:block overflow-x-auto rounded-lg shadow border border-gray-200 w-full mb-6">
-                <table className="min-w-[768px] w-full text-sm text-left border-collapse table-auto">
-                  <thead className="bg-gray-100 text-gray-700 uppercase">
-                    <tr>
-                      <th className="px-4 py-3 whitespace-nowrap">ID</th>
-                      <th className="px-4 py-3 whitespace-nowrap">Status</th>
-                      <th className="px-4 py-3 whitespace-nowrap">Description</th>
-                      <th className="px-4 py-3 whitespace-nowrap">System Name</th>
-                      <th className="px-4 py-3 whitespace-nowrap">Category</th>
-                      <th className="px-4 py-3 whitespace-nowrap">Date & Time</th>
-                      <th className="px-4 py-3 rounded-tr-lg text-center whitespace-nowrap">Action</th>
+                <table className="min-w-full leading-normal">
+                  <thead>
+                    <tr className="bg-gray-200 text-gray-700 uppercase text-sm leading-normal">
+                      <th className="py-3 px-6 text-left rounded-tl-lg whitespace-nowrap">ID</th>
+                      <th className="py-3 px-6 text-left whitespace-nowrap">Status</th>
+                      <th className="py-3 px-6 text-left whitespace-nowrap">Description</th>
+                      <th className="py-3 px-6 text-left whitespace-nowrap">System Name</th>
+                      <th className="py-3 px-6 text-left whitespace-nowrap">Category</th>
+                      <th className="py-3 px-6 text-left whitespace-nowrap">Date & Time</th>
+                      <th className="py-3 px-6 text-center rounded-tr-lg whitespace-nowrap">Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
-                    {currentTickets.map((ticket) => (
-                      <tr
-                        key={ticket.id}
-                        onClick={() => handleTicketClick(ticket)}
-                        className="hover:bg-gray-50 cursor-pointer"
-                      >
-                        <td className="px-4 py-2 font-medium text-gray-900">
-                          {ticket.id}
-                        </td>
-                        <td className="px-6 py-2">
-                          <span
-                            className={`px-2 py-1 rounded-full text-xs font-medium ${statusColors[ticket.status?.toLowerCase()] ||
-                              "bg-gray-200 text-gray-800"
-                              }`}
-                          >
-                            {ticket.status}
-                          </span>
-                        </td>
-                        {/* Description cell */}
-                        <td
-                          className="px-4 py-2 text-justify whitespace-normal overflow-hidden break-words"
-                          style={{
-                            maxHeight: "3.6em",
-                            lineHeight: "1.2em",
-                          }}
-                        >
-                          {truncateDescription(ticket.description, 80)}
-                        </td>
-
-                        <td className="px-4 py-2 whitespace-nowrap">{ticket.system_name}</td>
-                        <td className="px-4 py-2 whitespace-nowrap">{ticket.category}</td>
-                        <td className="px-4 py-2 text-gray-500 whitespace-nowrap">
-                          {formatDateTime(ticket.datetime)}
-                        </td>
-
-                        {/* Action Column */}
-                        <td className="px-4 py-2 flex justify-center items-center h-full">
-                          <button
-                            onClick={(e) => handleViewTicket(e, ticket.id)}
-                            className="text-blue-600 hover:text-blue-800 transition-colors cursor-pointer"
-                          >
-                            <FaEye className="w-5 h-5" />
-                          </button>
+                    {loading ? (
+                      <tr>
+                        <td colSpan="7" className="text-center py-4">
+                          Loading tickets...
                         </td>
                       </tr>
-                    ))}
+                    ) : currentTickets.length === 0 ? (
+                      <tr>
+                        <td colSpan="7" className="text-center py-4">
+                          No tickets found.
+                        </td>
+                      </tr>
+                    ) : (
+                      currentTickets.map((ticket) => (
+                        <tr
+                          key={ticket.id}
+                          className="hover:bg-gray-50 transition-colors"
+                        >
+                          <td className="py-3 px-6 text-left whitespace-nowrap font-medium text-gray-900 flex items-center">
+                            {ticket.id}
+                            {unreadChatCounts[ticket.id] > 0 && (
+                              <span className="ml-2 bg-green-500 text-white text-xs px-2 py-1 rounded-full font-bold flex items-center shadow-md animate-bounce-custom">
+                                <MessageCircle className="w-3 h-3 mr-1" />{unreadChatCounts[ticket.id]}
+                              </span>
+                            )}
+                          </td>
+                          <td
+                            className={`py-3 px-6 text-left font-medium ${statusColors[ticket.status?.toLowerCase()] || "text-gray-700"}`}
+                          >
+                            {ticket.status}
+                          </td>
+                          <td className="py-3 px-6 text-left">
+                            {truncateDescription(ticket.description)}
+                          </td>
+                          <td className="py-3 px-6 text-left">
+                            {ticket.system_name || "N/A"}
+                          </td>
+                          <td className="py-3 px-6 text-left">
+                            {ticket.category || "N/A"}
+                          </td>
+                          <td className="py-3 px-6 text-left">
+                            {formatDateTime(ticket.datetime)}
+                          </td>
+                          <td className="py-3 px-6 text-center">
+                            <button
+                              onClick={(e) => handleViewTicket(e, ticket.id)}
+                              className="text-blue-600 hover:text-blue-900"
+                            >
+                              <FaEye size={20} />
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>

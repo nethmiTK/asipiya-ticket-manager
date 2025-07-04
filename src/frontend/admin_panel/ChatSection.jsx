@@ -110,7 +110,11 @@ export default function SupervisorChatSection({
   };
 
   const markMessagesAsSeen = async () => {
-    if (!ticketId || !role) return;
+    if (!ticketId || !role) {
+      console.log("ChatSection: markMessagesAsSeen - Missing ticketId or role, skipping.", { ticketId, role });
+      return;
+    }
+    console.log(`ChatSection: markMessagesAsSeen - Attempting to mark messages as seen for TicketID: ${ticketId}, Role: ${role}`);
     try {
       await axios.post("http://localhost:5000/ticketchat/markSeen", {
         TicketID: ticketId,
@@ -120,8 +124,9 @@ export default function SupervisorChatSection({
       if (onNewMessageStatusChange) {
         onNewMessageStatusChange(false);
       }
+      console.log(`ChatSection: markMessagesAsSeen - Successfully marked messages as seen for TicketID: ${ticketId}, Role: ${role}`);
     } catch (error) {
-      console.error("Failed to mark messages as seen:", error);
+      console.error("ChatSection: markMessagesAsSeen - Failed to mark messages as seen:", error);
     }
   };
 
@@ -185,21 +190,36 @@ export default function SupervisorChatSection({
   }, []);
 
   useEffect(() => {
-    if (!ticketId) return;
+    if (!ticketId) {
+      console.log("ChatSection: useEffect for socket - Missing ticketId, skipping socket setup.");
+      return;
+    }
 
+    console.log(`ChatSection: useEffect for socket - Joining ticket room ${ticketId}.`);
     socketRef.current = io("http://localhost:5000");
     socketRef.current.emit("joinTicketRoom", ticketId);
 
     socketRef.current.on("receiveTicketMessage", (message) => {
-      if (String(message.ticketid) !== String(ticketId)) return;
+      console.log("ChatSection: Socket - Received incoming message.", message);
+      if (String(message.ticketid) !== String(ticketId)) {
+        console.log("ChatSection: Socket - Message ticket ID mismatch, skipping.");
+        return;
+      }
       const sender =
         (message.role || "").toLowerCase() === "user" ? "user" : "agent";
 
       setChatMessages((prevMsgs) => {
-        if (prevMsgs.find((m) => String(m.id) === String(message.id)))
+        if (prevMsgs.find((m) => String(m.id) === String(message.id))) {
+          console.log("ChatSection: Socket - Duplicate message, skipping.");
           return prevMsgs;
+        }
 
-        if (sender === "user" && document.visibilityState === "hidden") {
+        // Only set new unseen message flag if the message is from the *other* party
+        const isMessageFromOtherParty = (sender === "user" && (role === "Supervisor" || role === "Admin")) ||
+                                       (sender === "agent" && role === "User");
+
+        if (isMessageFromOtherParty && document.visibilityState === "hidden") {
+          console.log("ChatSection: Socket - New unseen message from other party, document hidden. Setting flag.");
           setHasNewUnseenMessage(true);
           if (onNewMessageStatusChange) {
             onNewMessageStatusChange(true);
@@ -210,12 +230,17 @@ export default function SupervisorChatSection({
       });
 
       if (document.visibilityState === "visible") {
+        console.log("ChatSection: Socket - Document visible. Calling markMessagesAsSeen.");
         markMessagesAsSeen();
       }
     });
 
     socketRef.current.on("messagesSeen", (seenData) => {
-      if (String(seenData.TicketID) !== String(ticketId)) return;
+      console.log("ChatSection: Socket - Received messagesSeen event.", seenData);
+      if (String(seenData.TicketID) !== String(ticketId)) {
+        console.log("ChatSection: Socket - Seen data ticket ID mismatch, skipping.");
+        return;
+      }
 
       setChatMessages((prevMsgs) =>
         prevMsgs.map((msg) =>
@@ -229,6 +254,7 @@ export default function SupervisorChatSection({
     });
 
     return () => {
+      console.log(`ChatSection: Socket - Leaving ticket room ${ticketId} and disconnecting.`);
       if (socketRef.current) {
         socketRef.current.emit("leaveTicketRoom", ticketId);
         socketRef.current.disconnect();
@@ -238,8 +264,12 @@ export default function SupervisorChatSection({
   }, [ticketId, role, onNewMessageStatusChange]);
 
   useEffect(() => {
-    if (!ticketId) return;
+    if (!ticketId) {
+      console.log("ChatSection: useEffect for initial fetch - Missing ticketId, skipping initial fetch.");
+      return;
+    }
 
+    console.log(`ChatSection: useEffect for initial fetch - Fetching messages for ticket ${ticketId}.`);
     axios
       .get(`http://localhost:5000/messages/${ticketId}`)
       .then((res) => {
@@ -248,23 +278,27 @@ export default function SupervisorChatSection({
           sender: (msg.role || "").toLowerCase() === "user" ? "user" : "agent",
         }));
         setChatMessages(deduplicateMessages(formattedMessages));
+        console.log("ChatSection: Initial fetch successful. Calling markMessagesAsSeen.");
+        return markMessagesAsSeen(); // Mark as seen immediately after fetching messages
       })
-      .then(() => {
-        markMessagesAsSeen();
-      })
-      .catch(console.error);
-  }, [ticketId, role]);
+      .catch((error) => {
+        console.error("ChatSection: Initial fetch failed:", error);
+      });
+  }, [ticketId, role]); // Added role to dependency array as it's used in markMessagesAsSeen
 
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") {
+        console.log("ChatSection: Visibility Change - Document became visible. Calling markMessagesAsSeen.");
         markMessagesAsSeen();
       }
     };
     document.addEventListener("visibilitychange", handleVisibilityChange);
-    return () =>
+    return () => {
+      console.log("ChatSection: Visibility Change - Removing event listener.");
       document.removeEventListener("visibilitychange", handleVisibilityChange);
-  }, [ticketId, role]);
+    };
+  }, [ticketId, role]); // Added ticketId and role to dependencies
 
   const handleSendMessage = async () => {
     if (!chatInput.trim() && !sendingFile) return;
