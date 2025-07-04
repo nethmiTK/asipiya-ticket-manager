@@ -25,6 +25,7 @@ import categoryRoutes from './routes/categoryRoutes.js';
 import clientRoutes from './routes/clientRoutes.js';
 import supervisorAssignRoutes from './routes/supervisorAssignRoutes.js';
 import ticketRoutes from './routes/ticketRoutes.js';
+import evidenceRoutes from './routes/evidenceRoutes.js';
 
 const app = express();
 app.use(bodyParser.json());
@@ -55,6 +56,7 @@ app.use('/api', categoryRoutes);
 app.use('/api', clientRoutes);
 app.use('/api', supervisorAssignRoutes);
 app.use('/api', ticketRoutes);
+app.use('/api', evidenceRoutes);
 
 //evidence uploads
 app.use("/uploads", express.static("uploads"));
@@ -1244,19 +1246,8 @@ app.put('/tickets/:id', (req, res) => {
     res.json({ message: "Ticket updated successfully" });
   });
 });
-//--------------------------------
-app.get("/evidence/:ticketId", (req, res) => {
-  const { ticketId } = req.params;
 
-  const sql = "SELECT FilePath FROM evidence WHERE ComplaintID = ?";
-  db.query(sql, [ticketId], (err, result) => {
-    if (err) {
-      console.error("Error fetching evidence:", err);
-      return res.status(500).json({ error: "Failed to fetch evidence" });
-    }
-    res.json(result);
-  });
-});
+
 
 app.get("/supervisors", (req, res) => {
   const sql = "SELECT UserID, FullName FROM appuser WHERE Role = 'Supervisor'";
@@ -1957,21 +1948,6 @@ app.get("/userTicket/:ticketId", (req, res) => {
   });
 });
 
-
-//User view evidence by ticketId
-app.get('/api/evidence/:ticketId', async (req, res) => {
-  const { ticketId } = req.params;
-  try {
-    const [rows] = await db.promise().query(
-      'SELECT * FROM evidence WHERE ComplaintID = ?',
-      [ticketId]
-    );
-    res.json(rows);
-  } catch (err) {
-    console.error('Error fetching evidence:', err);
-    res.status(500).json({ message: 'Failed to fetch evidence' });
-  }
-});
 
 // API endpoint to fetch ticket counts
 app.get('/api/tickets/counts', (req, res) => {
