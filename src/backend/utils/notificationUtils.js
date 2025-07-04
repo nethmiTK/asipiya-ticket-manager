@@ -1,28 +1,56 @@
 // src/backend/utils/notificationUtils.js
 import db from '../config/db.js';
 
-export async function createTicketLog(ticketId, type, description, userId, oldValue, newValue) {
-  const query = `
-    INSERT INTO ticketlog (TicketID, Type, Description, UserID, OldValue, NewValue, DateTime)
-    VALUES (?, ?, ?, ?, ?, ?, NOW())
-  `;
+export async function createTicketLog(ticketId, type, description, userId, oldValue, newValue, note = null) {
+  return new Promise(async (resolve, reject) => {
+    let userName = 'System';
+    if (userId) {
+      try {
+        const [userResult] = await db.promise().query('SELECT FullName FROM appuser WHERE UserID = ?', [userId]);
+        if (userResult.length > 0) {
+          userName = userResult[0].FullName;
+        }
+      } catch (userErr) {
+        console.error("Error fetching user name for ticket log:", userErr);
+        // Continue even if user name fetch fails
+      }
+    }
 
-  return new Promise((resolve, reject) => {
-    db.query(query, [ticketId, type, description, userId, oldValue, newValue], (err, result) => {
-      if (err) reject(err);
-      else resolve(result);
+    const logQuery = `
+      INSERT INTO ticketlog (TicketID, DateTime, Type, Description, UserID, OldValue, NewValue, Note)
+      VALUES (?, NOW(), ?, ?, ?, ?, ?, ?)
+    `;
+
+    const finalDescription = `${userName} ${description}`;
+    const finalNote = note ? `${note} by ${userName}` : `Updated by ${userName}`;
+
+    db.query(logQuery, [
+      ticketId,
+      type,
+      finalDescription,
+      userId,
+      oldValue,
+      newValue,
+      finalNote
+    ], (err, result) => {
+      if (err) {
+        console.error("Error creating ticket log:", err);
+        reject(err);
+        return;
+      }
+      resolve(result);
     });
   });
 }
 
 export async function createNotification(userId, message, type, logId, ticketId) {
   const query = `
-    INSERT INTO notification (UserID, Message, Type, LogID, TicketID, DateTime, IsRead)
-    VALUES (?, ?, ?, ?, ?, NOW(), 0)
+    INSERT INTO notifications (UserID, Message, Type, TicketLogID, CreatedAt, IsRead)
+    VALUES (?, ?, ?, ?, NOW(), 0)
   `;
 
   return new Promise((resolve, reject) => {
-    db.query(query, [userId, message, type, logId, ticketId], (err, result) => {
+    db.query(query, [userId, message, type, logId], (err, result) => {
       if (err) reject(err);
       else resolve(result);
     });

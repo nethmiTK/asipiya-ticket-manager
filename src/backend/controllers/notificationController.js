@@ -1,6 +1,6 @@
 // Get unread notifications count
 export const getUnreadNotificationsCount = async (req, res) => {
-  const userId = req.params.id;
+  const userId = req.params.userId;
   const query = `
         SELECT COUNT(*) as count 
         FROM notifications 
