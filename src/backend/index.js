@@ -21,7 +21,7 @@ import db from './config/db.js';
 import supervisorRoutes from './routes/supervisorRoutes.js';
 import inviteRoutes from './routes/inviteRoutes.js';
 import authRoutes from './routes/authRoutes.js';
-import authLoginRoutes from './routes/authLoginRoutes.js'; 
+import authLoginRoutes from './routes/authLoginRoutes.js';
 import authPasswordRoutes from './routes/authPasswordRoutes.js';
 import authResetRoutes from './routes/authResetRoutes.js';
 
@@ -32,11 +32,12 @@ import supervisorAssignRoutes from './routes/supervisorAssignRoutes.js';
 import ticketRoutes from './routes/ticketRoutes.js';
 import { sendNotificationsByRoles, createNotification, createTicketLog } from './utils/notificationUtils.js';
 import notificationRoutes from './routes/notificationRoutes.js';
- import evidenceRoutes from './routes/evidenceRoutes.js';
+import evidenceRoutes from './routes/evidenceRoutes.js';
 import commentRoutes from './routes/commentRoutes.js';
 import ticketUpdateRoutes from './routes/ticketUpdateRoutes.js';
 import dashboardRoutes from './routes/dashboardRoutes.js';
- 
+import userDashboardRoutes from './routes/userDashboardRoutes.js';
+
 const app = express();
 app.use(bodyParser.json());
 app.use(cors());
@@ -66,12 +67,17 @@ app.use('/api', categoryRoutes);
 app.use('/api', clientRoutes);
 app.use('/api', supervisorAssignRoutes);
 app.use('/api', ticketRoutes);
- app.use('/api/notifications', notificationRoutes);
- app.use('/api', evidenceRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api', evidenceRoutes);
 app.use('/api', commentRoutes);
 app.use('/api', ticketUpdateRoutes);
 app.use('/api', dashboardRoutes);
- 
+app.use(authRoutes);
+app.use(authLoginRoutes);
+app.use('/', authPasswordRoutes);
+app.use('/', authResetRoutes);
+app.use('/api/user/tickets', userDashboardRoutes);
+
 //evidence uploads
 app.use("/uploads", express.static("uploads"));
 const uploadDir = "uploads";
@@ -142,12 +148,6 @@ const isValidEmail = (email) => {
 //  Define salt rounds for bcrypt hashing.
 const saltRounds = 10;
 
-// -------Register endpoint------- //
-
-app.use(authRoutes); 
-
-/*------------------------------------------*/
-
 // API endpoint to fetch tickets
 app.get('/api/tickets', (req, res) => {
   const query = `
@@ -167,12 +167,6 @@ app.get('/api/tickets', (req, res) => {
     res.json(results);
   });
 });
-
-// Login endpoint
-
-app.use(authLoginRoutes);
-
-/*---------------------------------------------*/
 
 // Add Multer middleware for profile image uploads
 app.post(
@@ -230,22 +224,8 @@ app.delete('/api/user/profile/image/:id', async (req, res) => {
   }
 });
 
-/* ------------------------- Add Members ------------------------- */
 
 
-
-/*---------------------- Invite User via Email ----------------------*/
-
-// --- ADDED: FORGOT PASSWORD ENDPOINT ---
-
-app.use('/', authPasswordRoutes);
-
-/*----------------------------------------------*/
-
-// --- ADDED: RESET PASSWORD ENDPOINT ---
-app.use('/', authResetRoutes);
-
-/*---------------------------------------------------------------------------------------*/
 // Socket.io connection
 io.on("connection", (socket) => {
   console.log("New socket connection:", socket.id);
@@ -772,7 +752,7 @@ app.post("/ticketchat/markSeen", (req, res) => {
   });
 });
 
- 
+
 
 /*-------------------------------Fetch Requests-----------------------------------------*/
 // Route: Get tickets assigned to a specific supervisor
@@ -1323,76 +1303,6 @@ app.get('/api/tickets/system-distribution', (req, res) => {
     res.json(results);
   });
 });
-
- 
-/*------------------------------COUNT TICKETS----------------------------------------------------*/
-
-// API endpoint to fetch ticket counts for a SPECIFIC USER
-app.get('/api/user/tickets/counts/:userId', (req, res) => {
-  const userId = req.params.userId;
-  const queries = {
-    total: 'SELECT COUNT(*) AS count FROM ticket WHERE Userid = ?',
-    pending: "SELECT COUNT(*) AS count FROM ticket WHERE Userid = ? AND Status = 'Pending'",
-    resolved: "SELECT COUNT(*) AS count FROM ticket WHERE Userid = ? AND Status IN ('Resolved', 'Rejected')",
-    ongoing: "SELECT COUNT(*) AS count FROM ticket WHERE Userid = ? AND Status IN ('Open', 'In Progress')"
-  };
-
-  const results = {};
-  const totalQueries = Object.keys(queries).length;
-
-  const promises = Object.entries(queries).map(([key, query]) => {
-    return new Promise((resolve, reject) => {
-      db.query(query, [userId], (err, result) => {
-        if (err) {
-          console.error(`Error fetching user ${key} count:`, err);
-          reject({ error: `Failed to fetch user ${key} ticket count` });
-        } else {
-          results[key] = result[0].count;
-          resolve();
-        }
-      });
-    });
-  });
-
-  Promise.all(promises)
-    .then(() => {
-      res.json(results);
-    })
-    .catch(error => {
-      res.status(500).json(error);
-    });
-});
-
-// API endpoint to fetch the last five activities for a SPECIFIC USER
-app.get('/api/user/tickets/recent/:userId', (req, res) => {
-  const userId = req.params.userId;
-  const query = `
-        SELECT
-            t.TicketID,
-            t.Description,
-            t.Status,
-            t.Priority,
-            t.DateTime,
-            s.SystemName,       -- Added SystemName
-            tc.CategoryName     -- Added CategoryName
-        FROM ticket t
-        LEFT JOIN asipiyasystem s ON t.AsipiyaSystemID = s.AsipiyaSystemID
-        LEFT JOIN ticketcategory tc ON t.TicketCategoryID = tc.TicketCategoryID
-        WHERE t.UserId = ?
-        ORDER BY t.DateTime DESC
-        LIMIT 5
-    `;
-
-  db.query(query, [userId], (err, results) => {
-    if (err) {
-      console.error('Error fetching user recent activities:', err);
-      return res.status(500).json({ error: 'Failed to fetch user recent activities' });
-    }
-    res.json(results);
-  });
-});
-
-/*----------------------------------------------------------------------------------*/
 
 // Get user details by ID
 app.get('/api/users/:userId', (req, res) => {
