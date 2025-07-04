@@ -22,6 +22,7 @@ import supervisorRoutes from './routes/supervisorRoutes.js';
 import inviteRoutes from './routes/inviteRoutes.js';
 import systemRoutes from './routes/systemRoutes.js';
 import categoryRoutes from './routes/categoryRoutes.js';
+import clientRoutes from './routes/clientRoutes.js';
 
 const app = express();
 app.use(bodyParser.json());
@@ -49,6 +50,7 @@ app.use('/supervisor', supervisorRoutes);
 app.use('/api/invite', inviteRoutes);
 app.use('/api', systemRoutes);
 app.use('/api', categoryRoutes);
+app.use('/api', clientRoutes);
 
 //evidence uploads
 app.use("/uploads", express.static("uploads"));
@@ -3334,64 +3336,6 @@ app.post('/api/upload_evidence', upload_evidence.array('evidenceFiles'), async (
   }
 });
 
-/*-------------------------------------------------------------------------------------------------------------------------------*/
-
-//Client side
-
-app.get('/api/clients', (req, res) => {
-  const sql = "SELECT * FROM client";
-  db.query(sql, (err, results) => {
-    if (err) return res.status(500).json({ message: "Error fetching clients", error: err });
-    res.json(results);
-  });
-});
-
-// POST add new client
-
-
-app.post('/api/clients', async (req, res) => {
-  const { CompanyName, ContactNo, ContactPersonEmail, MobileNo } = req.body;
-
-  try {
-    // 1. Check if the email exists in appuser
-    const userResults = await query(
-      'SELECT UserID FROM appuser WHERE Email = ? LIMIT 1',
-      [ContactPersonEmail]
-    );
-
-    const matchedUserID = userResults.length > 0 ? userResults[0].UserID : null;
-
-    // 2. Insert into client table
-    const insertResult = await query(
-      `INSERT INTO client (CompanyName, ContactNo, ContactPersonEmail, MobileNo, UserID) VALUES (?, ?, ?, ?, ?)`,
-      [CompanyName, ContactNo, ContactPersonEmail, MobileNo, matchedUserID]
-    );
-
-    // 3. Fetch inserted client
-    const insertedClientID = insertResult.insertId;
-    const clientRows = await query('SELECT * FROM client WHERE ClientID = ?', [insertedClientID]);
-
-    // 4. Send notification to all admins about new client registration
-    try {
-      await sendNotificationsByRoles(
-        ['admin', 'manager'],
-        `New client registered: ${CompanyName} (Contact: ${ContactPersonEmail})`,
-        'NEW_CLIENT_REGISTRATION'
-      );
-    } catch (notificationError) {
-      console.error('Error sending client registration notifications:', notificationError);
-      // Don't fail the registration if notification fails
-    }
-
-    res.status(200).json({
-      message: 'Client registered successfully',
-      client: clientRows[0],
-    });
-  } catch (err) {
-    console.error('Client registration error:', err);
-    res.status(500).json({ message: 'Server error', error: err });
-  }
-});
 
 
 // Add ticket log routes
