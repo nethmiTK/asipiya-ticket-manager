@@ -14,6 +14,7 @@ import { FaFilePdf, FaFileWord, FaFileArchive, FaFileAlt, FaFileImage } from 're
 import { FiMoreVertical } from 'react-icons/fi';
 import AdminNavBar from "../../user_components/NavBar/AdminNavBar";
 import NotificationPanel from "../components/NotificationPanel";
+import { io } from 'socket.io-client';
 
 export const USER = {
   id: "user1",
@@ -1075,6 +1076,29 @@ export default function TicketManage() {
       return () => clearInterval(interval);
     }
   }, [user, fetchUnreadNotifications]);
+
+  // Socket listener for real-time notification updates
+  useEffect(() => {
+    if (user?.UserID) {
+      const socket = io("http://localhost:5000");
+      
+      // Listen for new notifications
+      socket.on(`notification-${user.UserID}`, () => {
+        fetchUnreadNotifications();
+      });
+      
+      // Listen for notification updates (like marking as read)
+      socket.on(`notification-update-${user.UserID}`, () => {
+        fetchUnreadNotifications();
+      });
+      
+      return () => {
+        socket.off(`notification-${user.UserID}`);
+        socket.off(`notification-update-${user.UserID}`);
+        socket.disconnect();
+      };
+    }
+  }, [user?.UserID, fetchUnreadNotifications]);
 
   // Function to handle updates from NotificationPanel (e.g., notification marked as read)
   const handleNotificationPanelUpdate = () => {

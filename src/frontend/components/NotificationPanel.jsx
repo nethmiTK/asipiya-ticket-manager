@@ -383,6 +383,29 @@ const NotificationPanel = ({ userId, role, onClose, onNotificationUpdate }) => {
                 }
             });
             
+            // Listen for notification updates (like marking notifications as read)
+            socketRef.current.on(`notification-update-${userId}`, (updateData) => {
+                console.log('Received notification update:', updateData);
+                
+                if (updateData.type === 'CHAT_NOTIFICATIONS_READ') {
+                    // Update notifications for this specific ticket
+                    setNotifications(prevNotifications => {
+                        return prevNotifications.map(notification => {
+                            if (notification.Type === 'NEW_CHAT_MESSAGE' && 
+                                notification.TicketID === updateData.ticketId) {
+                                return { ...notification, IsRead: true };
+                            }
+                            return notification;
+                        });
+                    });
+                    
+                    // Update notification count in parent component
+                    if (onNotificationUpdate) {
+                        onNotificationUpdate();
+                    }
+                }
+            });
+            
             // Auto-update every 5 hours
             const interval = setInterval(fetchNotifications, 18000000); // 5 hours in milliseconds
             
@@ -391,6 +414,7 @@ const NotificationPanel = ({ userId, role, onClose, onNotificationUpdate }) => {
                 clearInterval(interval);
                 if (socketRef.current) {
                     socketRef.current.off(`notification-${userId}`);
+                    socketRef.current.off(`notification-update-${userId}`);
                     socketRef.current.disconnect();
                     socketRef.current = null;
                 }
