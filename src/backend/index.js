@@ -228,77 +228,77 @@ app.post('/login', (req, res) => {
   });
 });
 
-// Get admin  profile endpoint 
-app.get('/api/user/profile/:id', (req, res) => {
-  const userId = req.params.id;
-  // Select all fields that the frontend profile form expects
-  const query = 'SELECT UserID, FullName, Email, Phone, Role, ProfileImagePath FROM appuser WHERE UserID = ?';
+// // Get admin  profile endpoint 
+// app.get('/api/user/profile/:id', (req, res) => {
+//   const userId = req.params.id;
+//   // Select all fields that the frontend profile form expects
+//   const query = 'SELECT UserID, FullName, Email, Phone, Role, ProfileImagePath FROM appuser WHERE UserID = ?';
 
-  db.query(query, [userId], (err, results) => {
-    if (err) {
-      console.error('Error fetching user profile:', err);
-      res.status(500).json({ message: 'Server error' });
-    } else if (results.length === 0) {
-      res.status(404).json({ message: 'User not found' });
-    } else {
-      res.status(200).json(results[0]);
-    }
-  });
-});
+//   db.query(query, [userId], (err, results) => {
+//     if (err) {
+//       console.error('Error fetching user profile:', err);
+//       res.status(500).json({ message: 'Server error' });
+//     } else if (results.length === 0) {
+//       res.status(404).json({ message: 'User not found' });
+//     } else {
+//       res.status(200).json(results[0]);
+//     }
+//   });
+// });
 
-// Get admin profile update endpoint 
-app.put('/api/user/profile/:id', async (req, res) => {
-  const userId = req.params.id;
-  const { FullName, Email, Phone, CurrentPassword, NewPassword } = req.body;
+// // Get admin profile update endpoint 
+// app.put('/api/user/profile/:id', async (req, res) => {
+//   const userId = req.params.id;
+//   const { FullName, Email, Phone, CurrentPassword, NewPassword } = req.body;
 
-  try {
-    // First get the current user data to verify password
-    const getUserQuery = 'SELECT Password FROM appuser WHERE UserID = ?';
-    const [user] = await db.promise().query(getUserQuery, [userId]);
+//   try {
+//     // First get the current user data to verify password
+//     const getUserQuery = 'SELECT Password FROM appuser WHERE UserID = ?';
+//     const [user] = await db.promise().query(getUserQuery, [userId]);
 
-    if (user.length === 0) {
-      return res.status(404).json({ message: 'User not found' });
-    }
+//     if (user.length === 0) {
+//       return res.status(404).json({ message: 'User not found' });
+//     }
 
-    // If password change is requested
-    if (CurrentPassword && NewPassword) {
-      // Verify current password
-      const isPasswordValid = await bcrypt.compare(CurrentPassword, user[0].Password);
+//     // If password change is requested
+//     if (CurrentPassword && NewPassword) {
+//       // Verify current password
+//       const isPasswordValid = await bcrypt.compare(CurrentPassword, user[0].Password);
 
-      if (!isPasswordValid) {
-        return res.status(400).json({ message: 'Current password is incorrect' });
-      }
+//       if (!isPasswordValid) {
+//         return res.status(400).json({ message: 'Current password is incorrect' });
+//       }
 
-      // Hash new password
-      const hashedNewPassword = await bcrypt.hash(NewPassword, saltRounds);
+//       // Hash new password
+//       const hashedNewPassword = await bcrypt.hash(NewPassword, saltRounds);
 
-      // Update all fields including password
-      const updateQuery = 'UPDATE appuser SET FullName = ?, Email = ?, Phone = ?, Password = ? WHERE UserID = ?';
-      await db.promise().query(updateQuery, [FullName, Email, Phone, hashedNewPassword, userId]);
-    } else {
-      // Update only non-password fields
-      const updateQuery = 'UPDATE appuser SET FullName = ?, Email = ?, Phone = ? WHERE UserID = ?';
-      await db.promise().query(updateQuery, [FullName, Email, Phone, userId]);
-    }
+//       // Update all fields including password
+//       const updateQuery = 'UPDATE appuser SET FullName = ?, Email = ?, Phone = ?, Password = ? WHERE UserID = ?';
+//       await db.promise().query(updateQuery, [FullName, Email, Phone, hashedNewPassword, userId]);
+//     } else {
+//       // Update only non-password fields
+//       const updateQuery = 'UPDATE appuser SET FullName = ?, Email = ?, Phone = ? WHERE UserID = ?';
+//       await db.promise().query(updateQuery, [FullName, Email, Phone, userId]);
+//     }
 
-    // Get updated user data
-    const getUpdatedUserQuery = 'SELECT UserID, FullName, Email, Phone, Role, ProfileImagePath FROM appuser WHERE UserID = ?';
-    const [updatedUser] = await db.promise().query(getUpdatedUserQuery, [userId]);
+//     // Get updated user data
+//     const getUpdatedUserQuery = 'SELECT UserID, FullName, Email, Phone, Role, ProfileImagePath FROM appuser WHERE UserID = ?';
+//     const [updatedUser] = await db.promise().query(getUpdatedUserQuery, [userId]);
 
-    if (updatedUser.length === 0) {
-      return res.status(404).json({ message: 'Failed to retrieve updated user data' });
-    }
+//     if (updatedUser.length === 0) {
+//       return res.status(404).json({ message: 'Failed to retrieve updated user data' });
+//     }
 
-    res.status(200).json({
-      message: 'Profile updated successfully',
-      user: updatedUser[0]
-    });
+//     res.status(200).json({
+//       message: 'Profile updated successfully',
+//       user: updatedUser[0]
+//     });
 
-  } catch (error) {
-    console.error('Error updating profile:', error);
-    res.status(500).json({ message: 'Server error while updating profile' });
-  }
-});
+//   } catch (error) {
+//     console.error('Error updating profile:', error);
+//     res.status(500).json({ message: 'Server error while updating profile' });
+//   }
+// });
 
 // Add Multer middleware for profile image uploads
 app.post(
@@ -2188,310 +2188,310 @@ app.get('/api/users/recent', (req, res) => {
   });
 });
 
-/*-------------------------------NOTIFICATIONS---------------------------------------------------*/
+// /*-------------------------------NOTIFICATIONS---------------------------------------------------*/
 
-// API endpoint to get unread notifications count
-app.get('/api/notifications/count/:id', (req, res) => {
-  const userId = req.params.id;
-  const query = `
-        SELECT COUNT(*) as count 
-        FROM notifications 
-        WHERE UserID = ? AND IsRead = FALSE
-    `;
+// // API endpoint to get unread notifications count
+// app.get('/api/notifications/count/:id', (req, res) => {
+//   const userId = req.params.id;
+//   const query = `
+//         SELECT COUNT(*) as count 
+//         FROM notifications 
+//         WHERE UserID = ? AND IsRead = FALSE
+//     `;
 
-  db.query(query, [userId], (err, results) => {
-    if (err) {
-      console.error('Error fetching notification count:', err);
-      return res.status(500).json({ error: 'Failed to fetch notification count' });
-    }
-    res.json({ count: results[0].count });
-  });
-});
+//   db.query(query, [userId], (err, results) => {
+//     if (err) {
+//       console.error('Error fetching notification count:', err);
+//       return res.status(500).json({ error: 'Failed to fetch notification count' });
+//     }
+//     res.json({ count: results[0].count });
+//   });
+// });
 
-// API endpoint to get user's notifications
-app.get('/api/notifications/:userId', (req, res) => {
-  const { userId } = req.params;
-  const query = `
-        SELECT
-            n.NotificationID,
-            n.UserID,
-            n.Message,
-            n.Type,
-            n.IsRead,
-            n.CreatedAt,
-            CASE 
-                WHEN n.Type = 'NEW_CHAT_MESSAGE' THEN n.TicketLogID
-                ELSE tl.TicketID 
-            END AS TicketID,
-            tl.UserID AS SourceUserID,
-            au.FullName AS SourceUserFullName,
-            au.ProfileImagePath AS SourceUserProfileImagePath
-        FROM
-            notifications n
-        LEFT JOIN
-            ticketlog tl ON n.TicketLogID = tl.TicketLogID AND n.Type != 'NEW_CHAT_MESSAGE'
-        LEFT JOIN
-            appuser au ON tl.UserID = au.UserID
-        WHERE
-            n.UserID = ?
-        ORDER BY
-            n.CreatedAt DESC;
-    `;
+// // API endpoint to get user's notifications
+// app.get('/api/notifications/:userId', (req, res) => {
+//   const { userId } = req.params;
+//   const query = `
+//         SELECT
+//             n.NotificationID,
+//             n.UserID,
+//             n.Message,
+//             n.Type,
+//             n.IsRead,
+//             n.CreatedAt,
+//             CASE 
+//                 WHEN n.Type = 'NEW_CHAT_MESSAGE' THEN n.TicketLogID
+//                 ELSE tl.TicketID 
+//             END AS TicketID,
+//             tl.UserID AS SourceUserID,
+//             au.FullName AS SourceUserFullName,
+//             au.ProfileImagePath AS SourceUserProfileImagePath
+//         FROM
+//             notifications n
+//         LEFT JOIN
+//             ticketlog tl ON n.TicketLogID = tl.TicketLogID AND n.Type != 'NEW_CHAT_MESSAGE'
+//         LEFT JOIN
+//             appuser au ON tl.UserID = au.UserID
+//         WHERE
+//             n.UserID = ?
+//         ORDER BY
+//             n.CreatedAt DESC;
+//     `;
 
-  db.query(query, [userId], (err, results) => {
-    if (err) {
-      console.error('Error fetching notifications:', err);
-      return res.status(500).json({ error: 'Failed to fetch notifications' });
-    }
-    res.json(results);
-  });
-});
+//   db.query(query, [userId], (err, results) => {
+//     if (err) {
+//       console.error('Error fetching notifications:', err);
+//       return res.status(500).json({ error: 'Failed to fetch notifications' });
+//     }
+//     res.json(results);
+//   });
+// });
 
-// API endpoint to mark notifications as read
-app.put('/api/notifications/read', (req, res) => {
-  const { notificationIds } = req.body;
+// // API endpoint to mark notifications as read
+// app.put('/api/notifications/read', (req, res) => {
+//   const { notificationIds } = req.body;
 
-  if (!notificationIds || !Array.isArray(notificationIds) || notificationIds.length === 0) {
-    return res.status(400).json({ error: 'Notification IDs array is required' });
-  }
+//   if (!notificationIds || !Array.isArray(notificationIds) || notificationIds.length === 0) {
+//     return res.status(400).json({ error: 'Notification IDs array is required' });
+//   }
 
-  const query = `
-        UPDATE notifications 
-        SET IsRead = TRUE 
-        WHERE NotificationID IN (?)
-    `;
+//   const query = `
+//         UPDATE notifications 
+//         SET IsRead = TRUE 
+//         WHERE NotificationID IN (?)
+//     `;
 
-  db.query(query, [notificationIds], (err, result) => {
-    if (err) {
-      console.error('Error marking notifications as read:', err);
-      return res.status(500).json({ error: 'Failed to mark notifications as read' });
-    }
-    res.json({ message: 'Notifications marked as read', updatedCount: result.affectedRows });
-  });
-});
+//   db.query(query, [notificationIds], (err, result) => {
+//     if (err) {
+//       console.error('Error marking notifications as read:', err);
+//       return res.status(500).json({ error: 'Failed to mark notifications as read' });
+//     }
+//     res.json({ message: 'Notifications marked as read', updatedCount: result.affectedRows });
+//   });
+// });
 
-// ADDED: API endpoint to mark all notifications for a user as read
-app.put('/api/notifications/read-all/:userId', (req, res) => {
-  const userId = req.params.userId;
+// // ADDED: API endpoint to mark all notifications for a user as read
+// app.put('/api/notifications/read-all/:userId', (req, res) => {
+//   const userId = req.params.userId;
 
-  if (!userId) {
-    return res.status(400).json({ error: 'User ID is required' });
-  }
+//   if (!userId) {
+//     return res.status(400).json({ error: 'User ID is required' });
+//   }
 
-  const query = `
-        UPDATE notifications 
-        SET IsRead = TRUE 
-        WHERE UserID = ? AND IsRead = FALSE
-    `;
+//   const query = `
+//         UPDATE notifications 
+//         SET IsRead = TRUE 
+//         WHERE UserID = ? AND IsRead = FALSE
+//     `;
 
-  db.query(query, [userId], (err, result) => {
-    if (err) {
-      console.error('Error marking all notifications as read:', err);
-      return res.status(500).json({ error: 'Failed to mark all notifications as read' });
-    }
-    res.json({ message: 'All notifications marked as read', updatedCount: result.affectedRows });
-  });
-});
+//   db.query(query, [userId], (err, result) => {
+//     if (err) {
+//       console.error('Error marking all notifications as read:', err);
+//       return res.status(500).json({ error: 'Failed to mark all notifications as read' });
+//     }
+//     res.json({ message: 'All notifications marked as read', updatedCount: result.affectedRows });
+//   });
+// });
 
-// API endpoint to send status update notifications to admins and supervisors
-app.post('/api/notifications/status-update', async (req, res) => {
-  try {
-    const { ticketId, updatedByUserId, oldStatus, newStatus } = req.body;
+// // API endpoint to send status update notifications to admins and supervisors
+// app.post('/api/notifications/status-update', async (req, res) => {
+//   try {
+//     const { ticketId, updatedByUserId, oldStatus, newStatus } = req.body;
 
-    // Get ticket information
-    const ticketQuery = 'SELECT * FROM ticket WHERE TicketID = ?';
-    const ticketResult = await new Promise((resolve, reject) => {
-      db.query(ticketQuery, [ticketId], (err, result) => {
-        if (err) reject(err);
-        else resolve(result);
-      });
-    });
+//     // Get ticket information
+//     const ticketQuery = 'SELECT * FROM ticket WHERE TicketID = ?';
+//     const ticketResult = await new Promise((resolve, reject) => {
+//       db.query(ticketQuery, [ticketId], (err, result) => {
+//         if (err) reject(err);
+//         else resolve(result);
+//       });
+//     });
 
-    if (ticketResult.length === 0) {
-      return res.status(404).json({ error: 'Ticket not found' });
-    }
+//     if (ticketResult.length === 0) {
+//       return res.status(404).json({ error: 'Ticket not found' });
+//     }
 
-    const ticket = ticketResult[0];
+//     const ticket = ticketResult[0];
 
-    // Get updater name
-    const updaterQuery = 'SELECT FullName FROM appuser WHERE UserID = ?';
-    const updaterResult = await new Promise((resolve, reject) => {
-      db.query(updaterQuery, [updatedByUserId], (err, result) => {
-        if (err) reject(err);
-        else resolve(result);
-      });
-    });
+//     // Get updater name
+//     const updaterQuery = 'SELECT FullName FROM appuser WHERE UserID = ?';
+//     const updaterResult = await new Promise((resolve, reject) => {
+//       db.query(updaterQuery, [updatedByUserId], (err, result) => {
+//         if (err) reject(err);
+//         else resolve(result);
+//       });
+//     });
 
-    const updaterName = updaterResult.length > 0 ? updaterResult[0].FullName : 'Admin';
+//     const updaterName = updaterResult.length > 0 ? updaterResult[0].FullName : 'Admin';
 
-    // Get all admins
-    const admins = await getUsersByRoles(['Admin']);
+//     // Get all admins
+//     const admins = await getUsersByRoles(['Admin']);
 
-    // Get assigned supervisors for this ticket
-    const supervisorQuery = `
-            SELECT DISTINCT appuser.UserID 
-            FROM ticket_supervisors 
-            JOIN appuser ON ticket_supervisors.SupervisorUserID = appuser.UserID 
-            WHERE ticket_supervisors.TicketID = ?
-        `;
-    const supervisors = await new Promise((resolve, reject) => {
-      db.query(supervisorQuery, [ticketId], (err, result) => {
-        if (err) reject(err);
-        else resolve(result);
-      });
-    });
+//     // Get assigned supervisors for this ticket
+//     const supervisorQuery = `
+//             SELECT DISTINCT appuser.UserID 
+//             FROM ticket_supervisors 
+//             JOIN appuser ON ticket_supervisors.SupervisorUserID = appuser.UserID 
+//             WHERE ticket_supervisors.TicketID = ?
+//         `;
+//     const supervisors = await new Promise((resolve, reject) => {
+//       db.query(supervisorQuery, [ticketId], (err, result) => {
+//         if (err) reject(err);
+//         else resolve(result);
+//       });
+//     });
 
-    // Combine admins and supervisors, excluding the updater
-    const allRecipients = [...admins, ...supervisors].filter(user => user.UserID != updatedByUserId);
+//     // Combine admins and supervisors, excluding the updater
+//     const allRecipients = [...admins, ...supervisors].filter(user => user.UserID != updatedByUserId);
 
-    // Create notifications for all recipients
-    const message = `Ticket #${ticketId} status has been updated from ${oldStatus} to ${newStatus} by ${updaterName}`;
-    const notifications = allRecipients.map(user =>
-      createNotification(user.UserID, message, 'STATUS_UPDATE', null, ticketId)
-    );
+//     // Create notifications for all recipients
+//     const message = `Ticket #${ticketId} status has been updated from ${oldStatus} to ${newStatus} by ${updaterName}`;
+//     const notifications = allRecipients.map(user =>
+//       createNotification(user.UserID, message, 'STATUS_UPDATE', null, ticketId)
+//     );
 
-    await Promise.all(notifications);
+//     await Promise.all(notifications);
 
-    res.json({ message: 'Status update notifications sent successfully' });
-  } catch (error) {
-    console.error('Error sending status update notifications:', error);
-    res.status(500).json({ error: 'Failed to send status update notifications' });
-  }
-});
+//     res.json({ message: 'Status update notifications sent successfully' });
+//   } catch (error) {
+//     console.error('Error sending status update notifications:', error);
+//     res.status(500).json({ error: 'Failed to send status update notifications' });
+//   }
+// });
 
-// API endpoint to send resolution update notifications to admins and supervisors
-app.post('/api/notifications/resolution-update', async (req, res) => {
-  try {
-    const { ticketId, updatedByUserId, resolutionText } = req.body;
+// // API endpoint to send resolution update notifications to admins and supervisors
+// app.post('/api/notifications/resolution-update', async (req, res) => {
+//   try {
+//     const { ticketId, updatedByUserId, resolutionText } = req.body;
 
-    // Get ticket information
-    const ticketQuery = 'SELECT * FROM ticket WHERE TicketID = ?';
-    const ticketResult = await new Promise((resolve, reject) => {
-      db.query(ticketQuery, [ticketId], (err, result) => {
-        if (err) reject(err);
-        else resolve(result);
-      });
-    });
+//     // Get ticket information
+//     const ticketQuery = 'SELECT * FROM ticket WHERE TicketID = ?';
+//     const ticketResult = await new Promise((resolve, reject) => {
+//       db.query(ticketQuery, [ticketId], (err, result) => {
+//         if (err) reject(err);
+//         else resolve(result);
+//       });
+//     });
 
-    if (ticketResult.length === 0) {
-      return res.status(404).json({ error: 'Ticket not found' });
-    }
+//     if (ticketResult.length === 0) {
+//       return res.status(404).json({ error: 'Ticket not found' });
+//     }
 
-    const ticket = ticketResult[0];
+//     const ticket = ticketResult[0];
 
-    // Get updater name
-    const updaterQuery = 'SELECT FullName FROM appuser WHERE UserID = ?';
-    const updaterResult = await new Promise((resolve, reject) => {
-      db.query(updaterQuery, [updatedByUserId], (err, result) => {
-        if (err) reject(err);
-        else resolve(result);
-      });
-    });
+//     // Get updater name
+//     const updaterQuery = 'SELECT FullName FROM appuser WHERE UserID = ?';
+//     const updaterResult = await new Promise((resolve, reject) => {
+//       db.query(updaterQuery, [updatedByUserId], (err, result) => {
+//         if (err) reject(err);
+//         else resolve(result);
+//       });
+//     });
 
-    const updaterName = updaterResult.length > 0 ? updaterResult[0].FullName : 'Admin';
+//     const updaterName = updaterResult.length > 0 ? updaterResult[0].FullName : 'Admin';
 
-    // Get all admins
-    const admins = await getUsersByRoles(['Admin']);
+//     // Get all admins
+//     const admins = await getUsersByRoles(['Admin']);
 
-    // Get assigned supervisors for this ticket
-    const supervisorQuery = `
-            SELECT DISTINCT appuser.UserID 
-            FROM ticket_supervisors 
-            JOIN appuser ON ticket_supervisors.SupervisorUserID = appuser.UserID 
-            WHERE ticket_supervisors.TicketID = ?
-        `;
-    const supervisors = await new Promise((resolve, reject) => {
-      db.query(supervisorQuery, [ticketId], (err, result) => {
-        if (err) reject(err);
-        else resolve(result);
-      });
-    });
+//     // Get assigned supervisors for this ticket
+//     const supervisorQuery = `
+//             SELECT DISTINCT appuser.UserID 
+//             FROM ticket_supervisors 
+//             JOIN appuser ON ticket_supervisors.SupervisorUserID = appuser.UserID 
+//             WHERE ticket_supervisors.TicketID = ?
+//         `;
+//     const supervisors = await new Promise((resolve, reject) => {
+//       db.query(supervisorQuery, [ticketId], (err, result) => {
+//         if (err) reject(err);
+//         else resolve(result);
+//       });
+//     });
 
-    // Combine admins and supervisors, excluding the updater
-    const allRecipients = [...admins, ...supervisors].filter(user => user.UserID != updatedByUserId);
+//     // Combine admins and supervisors, excluding the updater
+//     const allRecipients = [...admins, ...supervisors].filter(user => user.UserID != updatedByUserId);
 
-    // Create notifications for all recipients
-    const message = `Ticket #${ticketId} resolution updated by ${updaterName}: ${resolutionText}`;
-    const notifications = allRecipients.map(user =>
-      createNotification(user.UserID, message, 'RESOLUTION_UPDATE', null, ticketId)
-    );
+//     // Create notifications for all recipients
+//     const message = `Ticket #${ticketId} resolution updated by ${updaterName}: ${resolutionText}`;
+//     const notifications = allRecipients.map(user =>
+//       createNotification(user.UserID, message, 'RESOLUTION_UPDATE', null, ticketId)
+//     );
 
-    await Promise.all(notifications);
+//     await Promise.all(notifications);
 
-    res.json({ message: 'Resolution update notifications sent successfully' });
-  } catch (error) {
-    console.error('Error sending resolution update notifications:', error);
-    res.status(500).json({ error: 'Failed to send resolution update notifications' });
-  }
-});
+//     res.json({ message: 'Resolution update notifications sent successfully' });
+//   } catch (error) {
+//     console.error('Error sending resolution update notifications:', error);
+//     res.status(500).json({ error: 'Failed to send resolution update notifications' });
+//   }
+// });
 
-// API endpoint to send due date update notifications to admins and supervisors
-app.post('/api/notifications/due-date-update', async (req, res) => {
-  try {
-    const { ticketId, updatedByUserId, oldDueDate, newDueDate } = req.body;
+// // API endpoint to send due date update notifications to admins and supervisors
+// app.post('/api/notifications/due-date-update', async (req, res) => {
+//   try {
+//     const { ticketId, updatedByUserId, oldDueDate, newDueDate } = req.body;
 
-    // Get ticket information
-    const ticketQuery = 'SELECT * FROM ticket WHERE TicketID = ?';
-    const ticketResult = await new Promise((resolve, reject) => {
-      db.query(ticketQuery, [ticketId], (err, result) => {
-        if (err) reject(err);
-        else resolve(result);
-      });
-    });
+//     // Get ticket information
+//     const ticketQuery = 'SELECT * FROM ticket WHERE TicketID = ?';
+//     const ticketResult = await new Promise((resolve, reject) => {
+//       db.query(ticketQuery, [ticketId], (err, result) => {
+//         if (err) reject(err);
+//         else resolve(result);
+//       });
+//     });
 
-    if (ticketResult.length === 0) {
-      return res.status(404).json({ error: 'Ticket not found' });
-    }
+//     if (ticketResult.length === 0) {
+//       return res.status(404).json({ error: 'Ticket not found' });
+//     }
 
-    const ticket = ticketResult[0];
+//     const ticket = ticketResult[0];
 
-    // Get updater name
-    const updaterQuery = 'SELECT FullName FROM appuser WHERE UserID = ?';
-    const updaterResult = await new Promise((resolve, reject) => {
-      db.query(updaterQuery, [updatedByUserId], (err, result) => {
-        if (err) reject(err);
-        else resolve(result);
-      });
-    });
+//     // Get updater name
+//     const updaterQuery = 'SELECT FullName FROM appuser WHERE UserID = ?';
+//     const updaterResult = await new Promise((resolve, reject) => {
+//       db.query(updaterQuery, [updatedByUserId], (err, result) => {
+//         if (err) reject(err);
+//         else resolve(result);
+//       });
+//     });
 
-    const updaterName = updaterResult.length > 0 ? updaterResult[0].FullName : 'Admin';
+//     const updaterName = updaterResult.length > 0 ? updaterResult[0].FullName : 'Admin';
 
-    // Get all admins
-    const admins = await getUsersByRoles(['Admin']);
+//     // Get all admins
+//     const admins = await getUsersByRoles(['Admin']);
 
-    // Get assigned supervisors for this ticket
-    const supervisorQuery = `
-            SELECT DISTINCT appuser.UserID 
-            FROM ticket_supervisors 
-            JOIN appuser ON ticket_supervisors.SupervisorUserID = appuser.UserID 
-            WHERE ticket_supervisors.TicketID = ?
-        `;
-    const supervisors = await new Promise((resolve, reject) => {
-      db.query(supervisorQuery, [ticketId], (err, result) => {
-        if (err) reject(err);
-        else resolve(result);
-      });
-    });
+//     // Get assigned supervisors for this ticket
+//     const supervisorQuery = `
+//             SELECT DISTINCT appuser.UserID 
+//             FROM ticket_supervisors 
+//             JOIN appuser ON ticket_supervisors.SupervisorUserID = appuser.UserID 
+//             WHERE ticket_supervisors.TicketID = ?
+//         `;
+//     const supervisors = await new Promise((resolve, reject) => {
+//       db.query(supervisorQuery, [ticketId], (err, result) => {
+//         if (err) reject(err);
+//         else resolve(result);
+//       });
+//     });
 
-    // Combine admins and supervisors, excluding the updater
-    const allRecipients = [...admins, ...supervisors].filter(user => user.UserID != updatedByUserId);
+//     // Combine admins and supervisors, excluding the updater
+//     const allRecipients = [...admins, ...supervisors].filter(user => user.UserID != updatedByUserId);
 
-    // Create notifications for all recipients
-    const oldDateStr = oldDueDate ? new Date(oldDueDate).toLocaleDateString() : 'None';
-    const newDateStr = newDueDate ? new Date(newDueDate).toLocaleDateString() : 'None';
-    const message = `Ticket #${ticketId} due date updated by ${updaterName} from ${oldDateStr} to ${newDateStr}`;
-    const notifications = allRecipients.map(user =>
-      createNotification(user.UserID, message, 'DUE_DATE_UPDATE', null, ticketId)
-    );
+//     // Create notifications for all recipients
+//     const oldDateStr = oldDueDate ? new Date(oldDueDate).toLocaleDateString() : 'None';
+//     const newDateStr = newDueDate ? new Date(newDueDate).toLocaleDateString() : 'None';
+//     const message = `Ticket #${ticketId} due date updated by ${updaterName} from ${oldDateStr} to ${newDateStr}`;
+//     const notifications = allRecipients.map(user =>
+//       createNotification(user.UserID, message, 'DUE_DATE_UPDATE', null, ticketId)
+//     );
 
-    await Promise.all(notifications);
+//     await Promise.all(notifications);
 
-    res.json({ message: 'Due date update notifications sent successfully' });
-  } catch (error) {
-    console.error('Error sending due date update notifications:', error);
-    res.status(500).json({ error: 'Failed to send due date update notifications' });
-  }
-});
+//     res.json({ message: 'Due date update notifications sent successfully' });
+//   } catch (error) {
+//     console.error('Error sending due date update notifications:', error);
+//     res.status(500).json({ error: 'Failed to send due date update notifications' });
+//   }
+// });
 
 /*------------------------------COUNT TICKETS----------------------------------------------------*/
 
