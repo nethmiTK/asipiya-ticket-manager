@@ -107,7 +107,7 @@ const ChatUI = ({ ticketID: propTicketID }) => {
               type: msg.type || "text",
               role: msg.role || "",
               timestamp: msg.timestamp || new Date().toISOString(),
-              status: existingMsg?.status === "seen" ? "seen" : "✓",
+              status: existingMsg?.status === "seen" ? "seen" : "✓✓",
             };
           })
         );
