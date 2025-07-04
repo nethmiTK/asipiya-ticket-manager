@@ -113,7 +113,7 @@ export default function TicketCard({ ticket, onClick, unreadChatCount }) {
 
       {/* Unread Chat Message Alert */}
       {ticket.status === "In Progress" && unreadChatCount > 0 && (
-        <div className="absolute top-2 right-14 bg-red-500 text-white rounded-full p-1 text-xs font-bold flex items-center justify-center min-w-[20px] h-[20px] shadow-md animate-bounce-custom">
+        <div className="absolute top-2 right-14 bg-green-500 text-white rounded-full p-1 text-xs font-bold flex items-center justify-center min-w-[20px] h-[20px] shadow-md animate-bounce-custom">
           <MessageCircle className="w-3 h-3 mr-1" /> {unreadChatCount}
         </div>
       )}
