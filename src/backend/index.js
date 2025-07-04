@@ -1000,56 +1000,7 @@ app.post("/ticketchat/markSeen", (req, res) => {
   });
 });
 
-// Enhanced mark messages as seen with specific user ID
-app.post("/ticketchat/markSeen/user", (req, res) => {
-  const { TicketID, Role, UserID } = req.body;
-  if (!TicketID || !Role || !UserID) {
-    return res.status(400).json({ error: "TicketID, Role, and UserID are required" });
-  }
-
-  // Update chat messages as seen
-  const sql = `
-    UPDATE ticketchat
-    SET Seen = 1
-    WHERE TicketID = ? AND Role != ? AND Seen = 0
-  `;
-
-  db.query(sql, [TicketID, Role], (err, result) => {
-    if (err) return res.status(500).json({ error: "Failed to update seen status" });
-
-    // Update notifications as read for the specific user
-    const updateNotificationsSql = `
-      UPDATE notifications 
-      SET IsRead = TRUE 
-      WHERE TicketLogID = ? 
-      AND Type = 'NEW_CHAT_MESSAGE' 
-      AND UserID = ?
-      AND IsRead = FALSE
-    `;
-
-    db.query(updateNotificationsSql, [TicketID, UserID], (notifErr, notifResult) => {
-      if (notifErr) {
-        console.error('Error updating chat notifications:', notifErr);
-      } else {
-        console.log(`Updated ${notifResult.affectedRows} chat notifications as read for user ${UserID}, ticket ${TicketID}`);
-
-        // Emit notification count update to the specific user
-        io.emit(`notification-update-${UserID}`, {
-          ticketId: TicketID,
-          type: 'CHAT_NOTIFICATIONS_READ',
-          updatedCount: notifResult.affectedRows
-        });
-      }
-    });
-
-    // Emit the original messagesSeen event
-    io.to(String(TicketID)).emit("messagesSeen", { TicketID, Role });
-    res.status(200).json({
-      message: "Messages marked as seen.",
-      chatUpdated: result.affectedRows > 0
-    });
-  });
-});
+ 
 
 /*-------------------------------Fetch Requests-----------------------------------------*/
 // Route: Get tickets assigned to a specific supervisor

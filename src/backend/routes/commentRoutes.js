@@ -4,7 +4,9 @@ import {
   getMentionableUsers,
   likeComment,
   unlikeComment,
-  hasUserLikedComment
+  hasUserLikedComment,
+  addComment,
+  commentAttachmentUpload
 } from '../controllers/commentController.js';
 
 const router = express.Router();
@@ -23,5 +25,8 @@ router.delete('/comments/:commentId/like', unlikeComment);
 
 // Check if a user has liked a comment
 router.get('/comments/:commentId/hasLiked/:userId', hasUserLikedComment);
+
+// Add comment to ticket
+router.post('/tickets/:ticketId/comments', commentAttachmentUpload.array('file', 10), addComment);
 
 export default router;

@@ -1,4 +1,32 @@
 import db from '../config/db.js';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
+
+// Get __dirname equivalent for ES Modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// --- Multer Configuration for Comment Attachments ---
+const commentAttachmentStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadDir = path.join(__dirname, '..', 'uploads', 'comment_attachments');
+    fs.mkdirSync(uploadDir, { recursive: true });
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, 'comment-' + uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+export const commentAttachmentUpload = multer({
+  storage: commentAttachmentStorage,
+  limits: {
+    fileSize: 10 * 1024 * 1024 // 10MB limit
+  }
+});
 
 // Get all comments for a ticket
 export const getTicketComments = async (req, res) => {
@@ -173,5 +201,110 @@ export const hasUserLikedComment = async (req, res) => {
   } catch (err) {
     console.error('Error checking like status:', err);
     res.status(500).json({ message: 'Failed to check like status.', error: err.message });
+  }
+};
+
+// Add a comment to a ticket
+export const addComment = async (req, res) => {
+  const { ticketId } = req.params;
+  let { userId, comment, mentionedUserIds, replyToCommentId } = req.body;
+
+  try {
+    // Process mentions: Extract mentioned user IDs
+    let processedMentions = [];
+
+    if (mentionedUserIds && typeof mentionedUserIds === 'string') {
+      try {
+        processedMentions = JSON.parse(mentionedUserIds);
+      } catch (e) {
+        console.error('Error parsing mentionedUserIds:', e);
+        processedMentions = [];
+      }
+    } else if (Array.isArray(mentionedUserIds)) {
+      processedMentions = mentionedUserIds;
+    }
+
+    // IMPORTANT: Storing the original comment text (including @mentions) in CommentText for display.
+    // The mentioned user IDs are still separately stored in the Mentions column.
+
+    const sql = `
+      INSERT INTO comments (TicketID, UserID, CommentText, Mentions, ReplyToCommentID)
+      VALUES (?, ?, ?, ?, ?)
+    `;
+
+    const mentionsJson = processedMentions.length > 0 ? JSON.stringify(processedMentions) : null;
+
+    const [result] = await db.promise().query(sql, [
+      ticketId,
+      userId,
+      comment,
+      mentionsJson,
+      replyToCommentId || null
+    ]);
+
+    const commentId = result.insertId;
+
+    // Handle file uploads if any
+    if (req.files && req.files.length > 0) {
+      const attachmentPromises = req.files.map(file => {
+        const attachmentSql = `
+          INSERT INTO comment_attachments (CommentID, FilePath, FileName, FileType)
+          VALUES (?, ?, ?, ?)
+        `;
+
+        return db.promise().query(attachmentSql, [
+          commentId,
+          file.path,
+          file.filename,
+          file.mimetype
+        ]);
+      });
+
+      await Promise.all(attachmentPromises);
+    }
+
+    // Create notifications for mentioned users
+    if (processedMentions.length > 0) {
+      const getUserDetailsQuery = `
+        SELECT u.FullName as commenterName, t.TicketID
+        FROM appuser u
+        CROSS JOIN ticket t
+        WHERE u.UserID = ? AND t.TicketID = ?
+      `;
+
+      const [userDetails] = await db.promise().query(getUserDetailsQuery, [userId, ticketId]);
+
+      if (userDetails.length > 0) {
+        const commenterName = userDetails[0].commenterName;
+
+        // Create notifications for each mentioned user
+        const notificationPromises = processedMentions.map(mentionedUserId => {
+          const notificationSql = `
+            INSERT INTO notifications (UserID, Message, Type, IsRead, CreatedAt, TicketLogID)
+            VALUES (?, ?, ?, FALSE, NOW(), ?)
+          `;
+
+          const message = `${commenterName} mentioned you in a comment on ticket #${ticketId}`;
+
+          return db.promise().query(notificationSql, [
+            mentionedUserId,
+            message,
+            'COMMENT_MENTION',
+            commentId
+          ]);
+        });
+
+        await Promise.all(notificationPromises);
+      }
+    }
+
+    res.status(201).json({
+      message: 'Comment added successfully',
+      commentId: commentId
+    });
+
+  } catch (err) {
+    console.error('Error adding comment:', err);
+    res.status(500).json({ message: 'Failed to add comment', error: err.message });
   }
 };
