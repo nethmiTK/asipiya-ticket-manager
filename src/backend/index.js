@@ -1,6 +1,5 @@
 import dotenv from 'dotenv';
 dotenv.config();
-import mysql from 'mysql2';
 import express from 'express';
 import nodemailer from 'nodemailer';
 import bodyParser from 'body-parser';
@@ -13,29 +12,14 @@ import bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
 import moment from 'moment';
 import crypto from 'crypto';
-import util from 'util'; 
+import util from 'util';
 import ticketLogRoutes from './routes/ticketLog.js';
 import userProfileRoutes from './routes/userProfile.js';
-import axios from 'axios';
 import http from 'http';
 import { Server } from 'socket.io';
-
-// --- Database Connection ---
-const db = mysql.createConnection({
-    host: 'localhost',
-    user: 'root',
-    password: '',
-    database: 'ticketmanager'
-});
-
-// Connect to the database
-db.connect((err) => {
-    if (err) {
-        console.error('Error connecting to the database:', err);
-        return;
-    }
-    console.log('Connected to the MySQL database.');
-});
+import db from './config/db.js';
+import supervisorRoutes from './routes/supervisorRoutes.js';
+import inviteRoutes from './routes/inviteRoutes.js';
 
 const app = express();
 app.use(bodyParser.json());
@@ -52,19 +36,21 @@ const io = new Server(server, {
 
 // Add middleware to pass db connection to routes
 app.use((req, res, next) => {
-    req.db = db;
-    next();
+  req.db = db;
+  next();
 });
 
 // Configure routes
 app.use('/api/ticket-logs', ticketLogRoutes);
 app.use('/', userProfileRoutes);
+app.use('/supervisor', supervisorRoutes);
+app.use('/api/invite', inviteRoutes);
 
 //evidence uploads
 app.use("/uploads", express.static("uploads"));
 const uploadDir = "uploads";
 if (!fs.existsSync(uploadDir)) {
-    fs.mkdirSync(uploadDir);
+  fs.mkdirSync(uploadDir);
 }
 
 const query = util.promisify(db.query).bind(db);
@@ -77,39 +63,39 @@ app.use('/uploads', express.static(uploadPath));
 
 // --- Multer Configuration for Profile Images ---
 const profileImageStorage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        const uploadDir = path.join(__dirname, 'uploads', 'profile_images');
-        // Create the directory if it doesn't exist
-        fs.mkdirSync(uploadDir, { recursive: true });
-        cb(null, uploadDir);
-    },
-    filename: (req, file, cb) => {
-        const userId = req.params.id;
-        const fileExtension = file.originalname.split('.').pop();
-        cb(null, `${userId}-${Date.now()}.${fileExtension}`);
-    }
+  destination: (req, file, cb) => {
+    const uploadDir = path.join(__dirname, 'uploads', 'profile_images');
+    // Create the directory if it doesn't exist
+    fs.mkdirSync(uploadDir, { recursive: true });
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    const userId = req.params.id;
+    const fileExtension = file.originalname.split('.').pop();
+    cb(null, `${userId}-${Date.now()}.${fileExtension}`);
+  }
 });
 
 const upload = multer({ storage: profileImageStorage });
 
 // --- Multer Configuration for Comment Attachments ---
 const commentAttachmentStorage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        const uploadDir = path.join(__dirname, 'uploads', 'comment_attachments');
-        fs.mkdirSync(uploadDir, { recursive: true });
-        cb(null, uploadDir);
-    },
-    filename: (req, file, cb) => {
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        cb(null, 'comment-' + uniqueSuffix + path.extname(file.originalname));
-    }
+  destination: (req, file, cb) => {
+    const uploadDir = path.join(__dirname, 'uploads', 'comment_attachments');
+    fs.mkdirSync(uploadDir, { recursive: true });
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, 'comment-' + uniqueSuffix + path.extname(file.originalname));
+  }
 });
 
 const commentAttachmentUpload = multer({
-    storage: commentAttachmentStorage,
-    limits: {
-        fileSize: 10 * 1024 * 1024 // 10MB limit
-    }
+  storage: commentAttachmentStorage,
+  limits: {
+    fileSize: 10 * 1024 * 1024 // 10MB limit
+  }
 });
 
 //  Define salt rounds for bcrypt hashing.
@@ -172,7 +158,7 @@ app.post("/register", async (req, res) => {
 
 // API endpoint to fetch tickets
 app.get('/api/tickets', (req, res) => {
-    const query = `
+  const query = `
     SELECT t.TicketID, c.Email AS UserEmail, s.Description AS System, tc.Description AS Category, t.Status, t.Priority, t.DateTime
     FROM ticket t
     LEFT JOIN appuser c ON t.UserId = c.UserID
@@ -180,386 +166,243 @@ app.get('/api/tickets', (req, res) => {
     LEFT JOIN ticketcategory tc ON t.TicketCategoryID = tc.TicketCategoryID;
   `;
 
-    db.query(query, (err, results) => {
-        if (err) {
-            console.error('Error fetching tickets:', err);
-            res.status(500).json({ error: 'Failed to fetch tickets' });
-            return;
-        }
-        res.json(results);
-    });
+  db.query(query, (err, results) => {
+    if (err) {
+      console.error('Error fetching tickets:', err);
+      res.status(500).json({ error: 'Failed to fetch tickets' });
+      return;
+    }
+    res.json(results);
+  });
 });
 
 // Login endpoint
 app.post('/login', (req, res) => {
-    const { Email, Password } = req.body;
-    const query = 'SELECT UserID, FullName, Email, Phone, Role, ProfileImagePath, Password AS HashedPassword FROM appuser WHERE Email = ?';
+  const { Email, Password } = req.body;
+  const query = 'SELECT UserID, FullName, Email, Phone, Role, ProfileImagePath, Password AS HashedPassword FROM appuser WHERE Email = ?';
 
-    db.query(query, [Email], (err, results) => {
-        if (err) {
-            console.error('Error during login:', err);
-            return res.status(500).json({ message: 'Error during login' });
-        }
+  db.query(query, [Email], (err, results) => {
+    if (err) {
+      console.error('Error during login:', err);
+      return res.status(500).json({ message: 'Error during login' });
+    }
 
-        if (results.length === 0) {
-            return res.status(401).json({ message: 'Invalid credentials' });
-        }
+    if (results.length === 0) {
+      return res.status(401).json({ message: 'Invalid credentials' });
+    }
 
-        const user = results[0];
+    const user = results[0];
 
-        bcrypt.compare(Password, user.HashedPassword, (compareErr, isMatch) => {
-            if (compareErr) {
-                console.error('Error comparing passwords:', compareErr);
-                return res.status(500).json({ message: 'Error during login' });
-            }
+    bcrypt.compare(Password, user.HashedPassword, (compareErr, isMatch) => {
+      if (compareErr) {
+        console.error('Error comparing passwords:', compareErr);
+        return res.status(500).json({ message: 'Error during login' });
+      }
 
-            if (isMatch) {
-                // Passwords match! Login successful.
-                res.status(200).json({
-                    message: 'Login successful',
-                    user: {
-                        UserID: user.UserID,
-                        FullName: user.FullName,
-                        Email: user.Email,
-                        Phone: user.Phone,
-                        Role: user.Role,
-                        ProfileImagePath: user.ProfileImagePath || null
-                    }
-                });
-            } else {
-                // Passwords do not match
-                res.status(401).json({ message: 'Invalid credentials' });
-            }
+      if (isMatch) {
+        // Passwords match! Login successful.
+        res.status(200).json({
+          message: 'Login successful',
+          user: {
+            UserID: user.UserID,
+            FullName: user.FullName,
+            Email: user.Email,
+            Phone: user.Phone,
+            Role: user.Role,
+            ProfileImagePath: user.ProfileImagePath || null
+          }
         });
+      } else {
+        // Passwords do not match
+        res.status(401).json({ message: 'Invalid credentials' });
+      }
     });
+  });
 });
 
 // Get admin  profile endpoint 
 app.get('/api/user/profile/:id', (req, res) => {
-    const userId = req.params.id;
-    // Select all fields that the frontend profile form expects
-    const query = 'SELECT UserID, FullName, Email, Phone, Role, ProfileImagePath FROM appuser WHERE UserID = ?';
+  const userId = req.params.id;
+  // Select all fields that the frontend profile form expects
+  const query = 'SELECT UserID, FullName, Email, Phone, Role, ProfileImagePath FROM appuser WHERE UserID = ?';
 
-    db.query(query, [userId], (err, results) => {
-        if (err) {
-            console.error('Error fetching user profile:', err);
-            res.status(500).json({ message: 'Server error' });
-        } else if (results.length === 0) {
-            res.status(404).json({ message: 'User not found' });
-        } else {
-            res.status(200).json(results[0]);
-        }
-    });
+  db.query(query, [userId], (err, results) => {
+    if (err) {
+      console.error('Error fetching user profile:', err);
+      res.status(500).json({ message: 'Server error' });
+    } else if (results.length === 0) {
+      res.status(404).json({ message: 'User not found' });
+    } else {
+      res.status(200).json(results[0]);
+    }
+  });
 });
 
 // Get admin profile update endpoint 
 app.put('/api/user/profile/:id', async (req, res) => {
-    const userId = req.params.id;
-    const { FullName, Email, Phone, CurrentPassword, NewPassword } = req.body;
+  const userId = req.params.id;
+  const { FullName, Email, Phone, CurrentPassword, NewPassword } = req.body;
 
-    try {
-        // First get the current user data to verify password
-        const getUserQuery = 'SELECT Password FROM appuser WHERE UserID = ?';
-        const [user] = await db.promise().query(getUserQuery, [userId]);
+  try {
+    // First get the current user data to verify password
+    const getUserQuery = 'SELECT Password FROM appuser WHERE UserID = ?';
+    const [user] = await db.promise().query(getUserQuery, [userId]);
 
-        if (user.length === 0) {
-            return res.status(404).json({ message: 'User not found' });
-        }
-
-        // If password change is requested
-        if (CurrentPassword && NewPassword) {
-            // Verify current password
-            const isPasswordValid = await bcrypt.compare(CurrentPassword, user[0].Password);
-
-            if (!isPasswordValid) {
-                return res.status(400).json({ message: 'Current password is incorrect' });
-            }
-
-            // Hash new password
-            const hashedNewPassword = await bcrypt.hash(NewPassword, saltRounds);
-
-            // Update all fields including password
-            const updateQuery = 'UPDATE appuser SET FullName = ?, Email = ?, Phone = ?, Password = ? WHERE UserID = ?';
-            await db.promise().query(updateQuery, [FullName, Email, Phone, hashedNewPassword, userId]);
-        } else {
-            // Update only non-password fields
-            const updateQuery = 'UPDATE appuser SET FullName = ?, Email = ?, Phone = ? WHERE UserID = ?';
-            await db.promise().query(updateQuery, [FullName, Email, Phone, userId]);
-        }
-
-        // Get updated user data
-        const getUpdatedUserQuery = 'SELECT UserID, FullName, Email, Phone, Role, ProfileImagePath FROM appuser WHERE UserID = ?';
-        const [updatedUser] = await db.promise().query(getUpdatedUserQuery, [userId]);
-
-        if (updatedUser.length === 0) {
-            return res.status(404).json({ message: 'Failed to retrieve updated user data' });
-        }
-
-        res.status(200).json({
-            message: 'Profile updated successfully',
-            user: updatedUser[0]
-        });
-
-    } catch (error) {
-        console.error('Error updating profile:', error);
-        res.status(500).json({ message: 'Server error while updating profile' });
+    if (user.length === 0) {
+      return res.status(404).json({ message: 'User not found' });
     }
+
+    // If password change is requested
+    if (CurrentPassword && NewPassword) {
+      // Verify current password
+      const isPasswordValid = await bcrypt.compare(CurrentPassword, user[0].Password);
+
+      if (!isPasswordValid) {
+        return res.status(400).json({ message: 'Current password is incorrect' });
+      }
+
+      // Hash new password
+      const hashedNewPassword = await bcrypt.hash(NewPassword, saltRounds);
+
+      // Update all fields including password
+      const updateQuery = 'UPDATE appuser SET FullName = ?, Email = ?, Phone = ?, Password = ? WHERE UserID = ?';
+      await db.promise().query(updateQuery, [FullName, Email, Phone, hashedNewPassword, userId]);
+    } else {
+      // Update only non-password fields
+      const updateQuery = 'UPDATE appuser SET FullName = ?, Email = ?, Phone = ? WHERE UserID = ?';
+      await db.promise().query(updateQuery, [FullName, Email, Phone, userId]);
+    }
+
+    // Get updated user data
+    const getUpdatedUserQuery = 'SELECT UserID, FullName, Email, Phone, Role, ProfileImagePath FROM appuser WHERE UserID = ?';
+    const [updatedUser] = await db.promise().query(getUpdatedUserQuery, [userId]);
+
+    if (updatedUser.length === 0) {
+      return res.status(404).json({ message: 'Failed to retrieve updated user data' });
+    }
+
+    res.status(200).json({
+      message: 'Profile updated successfully',
+      user: updatedUser[0]
+    });
+
+  } catch (error) {
+    console.error('Error updating profile:', error);
+    res.status(500).json({ message: 'Server error while updating profile' });
+  }
 });
 
 // Add Multer middleware for profile image uploads
 app.post(
-    "/api/user/profile/upload/:id",
-    upload.single("profileImage"),
-    async (req, res) => {
-        const userId = req.params.id;
-        if (!req.file) {
-            return res.status(400).json({ message: "No file uploaded." });
-        }
-
-        const imagePath = `profile_images/${req.file.filename}`; // Store relative path
-
-        try {
-            // Update the user's profile image path in the database
-            const updateQuery =
-                "UPDATE appuser SET ProfileImagePath = ? WHERE UserID = ?";
-            await db.promise().query(updateQuery, [imagePath, userId]);
-
-            res.status(200).json({
-                message: "Profile image uploaded successfully",
-                imagePath: imagePath, // Send back the relative path
-            });
-        } catch (error) {
-            console.error("Error updating profile image path in DB:", error);
-            res.status(500).json({ message: "Failed to update profile image." });
-        }
+  "/api/user/profile/upload/:id",
+  upload.single("profileImage"),
+  async (req, res) => {
+    const userId = req.params.id;
+    if (!req.file) {
+      return res.status(400).json({ message: "No file uploaded." });
     }
+
+    const imagePath = `profile_images/${req.file.filename}`; // Store relative path
+
+    try {
+      // Update the user's profile image path in the database
+      const updateQuery =
+        "UPDATE appuser SET ProfileImagePath = ? WHERE UserID = ?";
+      await db.promise().query(updateQuery, [imagePath, userId]);
+
+      res.status(200).json({
+        message: "Profile image uploaded successfully",
+        imagePath: imagePath, // Send back the relative path
+      });
+    } catch (error) {
+      console.error("Error updating profile image path in DB:", error);
+      res.status(500).json({ message: "Failed to update profile image." });
+    }
+  }
 );
 
 // Delete profile image endpoint
 app.delete('/api/user/profile/image/:id', async (req, res) => {
-    const userId = req.params.id;
-    try {
-        // Get the current image path to delete the file from the server
-        const [results] = await db.promise().query('SELECT ProfileImagePath FROM appuser WHERE UserID = ?', [userId]);
-        if (results.length > 0 && results[0].ProfileImagePath) {
-            const filePath = path.join(__dirname, 'uploads', results[0].ProfileImagePath);
-            fs.unlink(filePath, (err) => {
-                if (err) {
-                    console.error('Error deleting old profile image file:', err);
-                    // Continue even if file deletion fails, as DB update is more critical
-                }
-            });
+  const userId = req.params.id;
+  try {
+    // Get the current image path to delete the file from the server
+    const [results] = await db.promise().query('SELECT ProfileImagePath FROM appuser WHERE UserID = ?', [userId]);
+    if (results.length > 0 && results[0].ProfileImagePath) {
+      const filePath = path.join(__dirname, 'uploads', results[0].ProfileImagePath);
+      fs.unlink(filePath, (err) => {
+        if (err) {
+          console.error('Error deleting old profile image file:', err);
+          // Continue even if file deletion fails, as DB update is more critical
         }
-
-        // Update the database to remove the profile image path
-        const updateQuery = 'UPDATE appuser SET ProfileImagePath = NULL WHERE UserID = ?';
-        await db.promise().query(updateQuery, [userId]);
-
-        res.status(200).json({ message: 'Profile image removed successfully' });
-    } catch (error) {
-        console.error('Error removing profile image:', error);
-        res.status(500).json({ message: 'Failed to remove profile image.' });
+      });
     }
+
+    // Update the database to remove the profile image path
+    const updateQuery = 'UPDATE appuser SET ProfileImagePath = NULL WHERE UserID = ?';
+    await db.promise().query(updateQuery, [userId]);
+
+    res.status(200).json({ message: 'Profile image removed successfully' });
+  } catch (error) {
+    console.error('Error removing profile image:', error);
+    res.status(500).json({ message: 'Failed to remove profile image.' });
+  }
 });
 
 /* ------------------------- Add Members ------------------------- */
 
-// Get all supervisors (excluding users)
-app.get('/supervisor', (req, res) => {
-    const query = "SELECT UserID, FullName, Email, Role FROM appuser WHERE Role NOT IN ('user', 'User')";
-    db.query(query, (err, results) => {
-        if (err) {
-            console.error('Error fetching users:', err);
-            return res.status(500).json({ message: 'Server error' });
-        }
-        res.status(200).json(results);
-    });
-});
 
-// Get supervisor by ID
-app.get('/supervisor/:id', (req, res) => {
-    const query = "SELECT * FROM appuser WHERE UserID = ?";
-    db.query(query, [req.params.id], (err, results) => {
-        if (err) {
-            console.error('Error fetching user:', err);
-            return res.status(500).json({ message: 'Server error' });
-        }
-        res.status(200).json(results[0]);
-    });
-});
-
-// Update supervisor by ID
-app.put('/supervisor/:id', (req, res) => {
-    const { FullName, Email, Role } = req.body;
-    const query = "UPDATE appuser SET FullName = ?, Email = ?, Role = ? WHERE UserID = ?";
-    db.query(query, [FullName, Email, Role, req.params.id], (err, result) => {
-        if (err) {
-            console.error('Error updating user:', err);
-            return res.status(500).json({ message: 'Server error' });
-        }
-        res.sendStatus(200);
-    });
-});
-
-
-// Delete supervisor by ID
-app.delete('/supervisor/:id', (req, res) => {
-    const query = "DELETE FROM appuser WHERE UserID = ?";
-    db.query(query, [req.params.id], (err, result) => {
-        if (err) {
-            console.error('Error deleting user:', err);
-            return res.status(500).json({ message: 'Server error' });
-        }
-        res.sendStatus(200);
-    });
-});
 
 /*---------------------- Invite User via Email ----------------------*/
 
-const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS
-    }
-});
-
-function isValidEmail(email) {
-    const re = /\S+@\S+\.\S+/;
-    return re.test(email);
-}
-
-app.post('/api/invite', (req, res) => {
-    const { email, role } = req.body;
-
-    // --- Validation ----
-    const allowedRoles = ['User', 'Supervisor', 'Manager', 'Developer'];
-    if (!allowedRoles.includes(role)) {
-        return res.status(400).json({ message: `Invalid role specified: ${role}. Allowed roles are: ${allowedRoles.join(', ')}` });
-    }
-
-    if (!email || !role || !isValidEmail(email)) {
-        return res.status(400).json({ message: 'Valid email and role are required' });
-    }
-
-    const checkQuery = 'SELECT * FROM appuser WHERE Email = ?';
-    db.query(checkQuery, [email], async (err, results) => {
-        if (err) {
-            console.error('Error checking existing user:', err);
-            return res.status(500).json({ message: 'Server error' });
-        }
-
-        const mailOptions = {
-            from: `"Asipiya Soft Solution (PVT) LTD" <${process.env.EMAIL_USER}>`,
-            to: email,
-            subject: `You're invited to manage user complaints - Role: ${role}`,
-            html: `
-    <div style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: auto; background-color: #ffe6f0; border: 1px solid #ddd; border-radius: 10px; padding: 20px;">
-
-     <!-- 1. Logo and Company Name Inline -->
-      <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 20px;">
-        <img src="https://miro.medium.com/v2/resize:fit:2400/1*-okfOPV73mecuWxCZz6uJA.jpeg" alt="Asipiya Logo" style="width: 50px; height: auto;">
-        <h2 style="margin: 0; color: #005baa;">Asipiya Soft Solution (PVT) LTD</h2>
-      </div>
-
-       <!-- 2. Personalized Welcome -->
-      <h3 style="text-align: center; color: #005baa;">Welcome Aboard!</h3>
-      <p>Hello <strong>${role}</strong>,</p>
-
-      <!-- 3. Description of Role & Responsibilities -->
-      <p>You have been invited to join our internal complaint management system to help <strong>supervise, manage, or resolve user complaints</strong> for Asipiya Soft Solution systems.</p>
-
-      <!-- 4. Role-specific Responsibilities -->
-      <ul>
-        <li>🛠 Resolve reported issues from users</li>
-        <li>📊 View and track ticket status in real time</li>
-        <li>💬 Collaborate with your team to solve problems efficiently</li>
-      </ul>
-
-          <!-- 5. Onboarding Step -->
-      <p><strong>Step 1:</strong> Set your password to activate your account.</p>
-
-       <!-- 6. CTA Button -->
-      <div style="text-align: center; margin: 30px 0;">
-        <a href="${process.env.APP_URL}/register?email=${encodeURIComponent(email)}&role=${encodeURIComponent(role)}"
-           style="background: #005baa; color: #fff; text-decoration: none; padding: 14px 24px; border-radius: 6px; font-size: 16px;">
-          Activate Your Account
-        </a>
-      </div>
-
-      <!-- 7. Security Note -->
-      <p style="font-size: 12px; color: #888;">
-        🔒 This invitation is intended only for <strong>${email}</strong>. This link is unique and cannot be shared. It will expire in 24 hours.
-      </p>
-
-      <!-- 8. Support Info -->
-      <p>❓ Need help? Contact our support team at <a href="mailto:support@asipiya.lk">support@asipiya.lk</a></p>
-
-       <!-- Footer -->
-      <hr style="margin-top: 30px;">
-      <p style="font-size: 12px; text-align: center; color: #aaa;">&copy; ${new Date().getFullYear()} Asipiya Soft Solution (PVT) LTD. All rights reserved.</p>
-    </div>
-  `
-        };
-
-        try {
-            await transporter.sendMail(mailOptions);
-            res.json({ message: 'Invitation email sent successfully.' });
-        } catch (mailErr) {
-            console.error(mailErr);
-            res.status(500).json({ message: 'Failed to send email' });
-        }
-    });
-});
 
 
 // --- ADDED: FORGOT PASSWORD ENDPOINT ---
 app.post('/forgot-password', (req, res) => {
-    const { email } = req.body;
+  const { email } = req.body;
 
-    if (!email || !isValidEmail(email)) {
-        return res.status(400).json({ message: 'A valid email address is required.' });
+  if (!email || !isValidEmail(email)) {
+    return res.status(400).json({ message: 'A valid email address is required.' });
+  }
+
+  // 1. Find the user by email
+  db.query('SELECT UserID, FullName FROM appuser WHERE Email = ?', [email], (err, users) => {
+    if (err) {
+      console.error('Error finding user for password reset:', err);
+      return res.status(500).json({ message: 'Server error. Please try again later.' });
     }
 
-    // 1. Find the user by email
-    db.query('SELECT UserID, FullName FROM appuser WHERE Email = ?', [email], (err, users) => {
-        if (err) {
-            console.error('Error finding user for password reset:', err);
-            return res.status(500).json({ message: 'Server error. Please try again later.' });
+    if (users.length === 0) {
+      // For security, always send a generic success message even if email not found
+      return res.status(200).json({ message: 'If an account with that email exists, a password reset link has been sent.' });
+    }
+
+    const user = users[0];
+    const token = uuidv4(); // Generate a unique token
+    const expiresAt = moment().add(1, 'hour').format('YYYY-MM-DD HH:mm:ss'); // Token expires in 1 hour
+
+    // 2. Invalidate any existing tokens for this user
+    db.query('DELETE FROM password_reset_tokens WHERE user_id = ?', [user.UserID], (deleteErr) => {
+      if (deleteErr) {
+        console.error('Error deleting old tokens:', deleteErr);
+        return res.status(500).json({ message: 'Server error during token invalidation.' });
+      }
+
+      // 3. Store the new token in the database
+      const insertTokenQuery = 'INSERT INTO password_reset_tokens (user_id, token, expires_at) VALUES (?, ?, ?)';
+      db.query(insertTokenQuery, [user.UserID, token, expiresAt], (insertErr) => {
+        if (insertErr) {
+          console.error('Error storing new token:', insertErr);
+          return res.status(500).json({ message: 'Server error during token storage.' });
         }
 
-        if (users.length === 0) {
-            // For security, always send a generic success message even if email not found
-            return res.status(200).json({ message: 'If an account with that email exists, a password reset link has been sent.' });
-        }
+        // 4. Send the password reset email
+        const resetLink = `${process.env.APP_URL}/reset-password?token=${token}&email=${encodeURIComponent(email)}`;
 
-        const user = users[0];
-        const token = uuidv4(); // Generate a unique token
-        const expiresAt = moment().add(1, 'hour').format('YYYY-MM-DD HH:mm:ss'); // Token expires in 1 hour
-
-        // 2. Invalidate any existing tokens for this user
-        db.query('DELETE FROM password_reset_tokens WHERE user_id = ?', [user.UserID], (deleteErr) => {
-            if (deleteErr) {
-                console.error('Error deleting old tokens:', deleteErr);
-                return res.status(500).json({ message: 'Server error during token invalidation.' });
-            }
-
-            // 3. Store the new token in the database
-            const insertTokenQuery = 'INSERT INTO password_reset_tokens (user_id, token, expires_at) VALUES (?, ?, ?)';
-            db.query(insertTokenQuery, [user.UserID, token, expiresAt], (insertErr) => {
-                if (insertErr) {
-                    console.error('Error storing new token:', insertErr);
-                    return res.status(500).json({ message: 'Server error during token storage.' });
-                }
-
-                // 4. Send the password reset email
-                const resetLink = `${process.env.APP_URL}/reset-password?token=${token}&email=${encodeURIComponent(email)}`;
-
-                const mailOptions = {
-                    from: `"Asipiya Soft Solution (PVT) LTD" <${process.env.EMAIL_USER}>`,
-                    to: email,
-                    subject: 'Password Reset Request',
-                    html: `
+        const mailOptions = {
+          from: `"Asipiya Soft Solution (PVT) LTD" <${process.env.EMAIL_USER}>`,
+          to: email,
+          subject: 'Password Reset Request',
+          html: `
                         <div style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: auto; background-color: #f0f8ff; border: 1px solid #ddd; border-radius: 10px; padding: 20px;">
                             <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 20px;">
                                 <img src="https://miro.medium.com/v2/resize:fit:2400/1*-okfOPV73mecuWxCZz6uJA.jpeg" alt="Asipiya Logo" style="width: 50px; height: auto;">
@@ -587,86 +430,86 @@ app.post('/forgot-password', (req, res) => {
                             <p style="font-size: 12px; text-align: center; color: #aaa;">&copy; ${new Date().getFullYear()} Asipiya Soft Solution (PVT) LTD. All rights reserved.</p>
                         </div>
                     `
-                };
+        };
 
-                transporter.sendMail(mailOptions, (mailErr) => {
-                    if (mailErr) {
-                        console.error('Error sending password reset email:', mailErr);
-                        return res.status(500).json({ message: 'Failed to send email' });
-                    }
-                    res.status(200).json({ message: 'If an account with that email exists, a password reset link has been sent.' });
-                });
-            });
+        transporter.sendMail(mailOptions, (mailErr) => {
+          if (mailErr) {
+            console.error('Error sending password reset email:', mailErr);
+            return res.status(500).json({ message: 'Failed to send email' });
+          }
+          res.status(200).json({ message: 'If an account with that email exists, a password reset link has been sent.' });
         });
+      });
     });
+  });
 });
 
 // --- ADDED: RESET PASSWORD ENDPOINT ---
 app.post('/reset-password', (req, res) => {
-    const { email, token, newPassword } = req.body;
+  const { email, token, newPassword } = req.body;
 
-    if (!email || !token || !newPassword) {
-        return res.status(400).json({ message: 'Email, token, and new password are required.' });
+  if (!email || !token || !newPassword) {
+    return res.status(400).json({ message: 'Email, token, and new password are required.' });
+  }
+
+  // 1. Find and validate the token
+  db.query('SELECT user_id, expires_at FROM password_reset_tokens WHERE token = ?', [token], (err, tokens) => {
+    if (err) {
+      console.error('Error finding token:', err);
+      return res.status(500).json({ message: 'Server error during token validation.' });
     }
 
-    // 1. Find and validate the token
-    db.query('SELECT user_id, expires_at FROM password_reset_tokens WHERE token = ?', [token], (err, tokens) => {
-        if (err) {
-            console.error('Error finding token:', err);
-            return res.status(500).json({ message: 'Server error during token validation.' });
+    if (tokens.length === 0) {
+      return res.status(400).json({ message: 'Invalid or expired token. Please request a new password reset link.' });
+    }
+
+    const resetToken = tokens[0];
+    const currentDateTime = moment();
+    const expiryDateTime = moment(resetToken.expires_at);
+
+    if (currentDateTime.isAfter(expiryDateTime)) {
+      // Token has expired, delete it from the database
+      db.query('DELETE FROM password_reset_tokens WHERE token = ?', [token], (deleteErr) => {
+        if (deleteErr) console.error('Error deleting expired token:', deleteErr);
+        return res.status(400).json({ message: 'Token has expired. Please request a new password reset link.' });
+      });
+      return; // Exit here after sending response
+    }
+
+    // 2. Verify the user associated with the token matches the provided email
+    db.query('SELECT UserID FROM appuser WHERE UserID = ? AND Email = ?', [resetToken.user_id, email], (err, users) => {
+      if (err) {
+        console.error('Error verifying user for reset:', err);
+        return res.status(500).json({ message: 'Server error during user verification.' });
+      }
+
+      if (users.length === 0) {
+        return res.status(400).json({ message: 'Invalid user for this token.' });
+      }
+
+      // 3. Hash the new password
+      bcrypt.hash(newPassword, saltRounds, (hashErr, hashedPassword) => {
+        if (hashErr) {
+          console.error('Error hashing new password:', hashErr);
+          return res.status(500).json({ message: 'Error processing new password.' });
         }
 
-        if (tokens.length === 0) {
-            return res.status(400).json({ message: 'Invalid or expired token. Please request a new password reset link.' });
-        }
+        // 4. Update the user's password
+        db.query('UPDATE appuser SET Password = ? WHERE UserID = ?', [hashedPassword, resetToken.user_id], (updateErr) => {
+          if (updateErr) {
+            console.error('Error updating password:', updateErr);
+            return res.status(500).json({ message: 'Server error during password update.' });
+          }
 
-        const resetToken = tokens[0];
-        const currentDateTime = moment();
-        const expiryDateTime = moment(resetToken.expires_at);
-
-        if (currentDateTime.isAfter(expiryDateTime)) {
-            // Token has expired, delete it from the database
-            db.query('DELETE FROM password_reset_tokens WHERE token = ?', [token], (deleteErr) => {
-                if (deleteErr) console.error('Error deleting expired token:', deleteErr);
-                return res.status(400).json({ message: 'Token has expired. Please request a new password reset link.' });
-            });
-            return; // Exit here after sending response
-        }
-
-        // 2. Verify the user associated with the token matches the provided email
-        db.query('SELECT UserID FROM appuser WHERE UserID = ? AND Email = ?', [resetToken.user_id, email], (err, users) => {
-            if (err) {
-                console.error('Error verifying user for reset:', err);
-                return res.status(500).json({ message: 'Server error during user verification.' });
-            }
-
-            if (users.length === 0) {
-                return res.status(400).json({ message: 'Invalid user for this token.' });
-            }
-
-            // 3. Hash the new password
-            bcrypt.hash(newPassword, saltRounds, (hashErr, hashedPassword) => {
-                if (hashErr) {
-                    console.error('Error hashing new password:', hashErr);
-                    return res.status(500).json({ message: 'Error processing new password.' });
-                }
-
-                // 4. Update the user's password
-                db.query('UPDATE appuser SET Password = ? WHERE UserID = ?', [hashedPassword, resetToken.user_id], (updateErr) => {
-                    if (updateErr) {
-                        console.error('Error updating password:', updateErr);
-                        return res.status(500).json({ message: 'Server error during password update.' });
-                    }
-
-                    // 5. Invalidate (delete) the used token from the database
-                    db.query('DELETE FROM password_reset_tokens WHERE token = ?', [token], (deleteUsedTokenErr) => {
-                        if (deleteUsedTokenErr) console.error('Error deleting used token:', deleteUsedTokenErr);
-                        res.status(200).json({ message: 'Password has been reset successfully.' });
-                    });
-                });
-            });
+          // 5. Invalidate (delete) the used token from the database
+          db.query('DELETE FROM password_reset_tokens WHERE token = ?', [token], (deleteUsedTokenErr) => {
+            if (deleteUsedTokenErr) console.error('Error deleting used token:', deleteUsedTokenErr);
+            res.status(200).json({ message: 'Password has been reset successfully.' });
+          });
         });
+      });
     });
+  });
 });
 
 
@@ -731,27 +574,27 @@ const createChatNotification = async (ticketId, senderUserId, senderRole, messag
           notificationMessage = `${senderName} sent you a file in ticket #${ticketId}`;
         } else {
           // Truncate message if it's too long
-          const truncatedContent = messageContent.length > 50 
-            ? messageContent.substring(0, 50) + '...' 
+          const truncatedContent = messageContent.length > 50
+            ? messageContent.substring(0, 50) + '...'
             : messageContent;
           notificationMessage = `${senderName}: ${truncatedContent} (Ticket #${ticketId})`;
         }      // Insert notification
-      const notificationQuery = `
+        const notificationQuery = `
         INSERT INTO notifications (UserID, Message, Type, IsRead, CreatedAt, TicketLogID)
         VALUES (?, ?, ?, FALSE, NOW(), ?)
       `;
 
-      db.query(notificationQuery, [
-        recipientUserId,
-        notificationMessage,
-        'NEW_CHAT_MESSAGE',
-        ticketId  // Store TicketID in TicketLogID field for chat messages
-      ], (notifErr, notifResult) => {
+        db.query(notificationQuery, [
+          recipientUserId,
+          notificationMessage,
+          'NEW_CHAT_MESSAGE',
+          ticketId  // Store TicketID in TicketLogID field for chat messages
+        ], (notifErr, notifResult) => {
           if (notifErr) {
             console.error('Error creating chat notification:', notifErr);
           } else {
             console.log(`Chat notification created for user ${recipientUserId} about ticket ${ticketId}`);
-            
+
             // Emit notification to the user via socket if they're online
             io.emit(`notification-${recipientUserId}`, {
               notificationId: notifResult.insertId,
@@ -795,7 +638,7 @@ const createChatNotification = async (ticketId, senderUserId, senderRole, messag
 
         // Also get all admins
         const adminQuery = `SELECT UserID FROM appuser WHERE Role = 'Admin'`;
-        
+
         db.query(adminQuery, (adminErr, adminResults) => {
           if (adminErr) {
             console.error('Error fetching admins for notification:', adminErr);
@@ -823,8 +666,8 @@ const createChatNotification = async (ticketId, senderUserId, senderRole, messag
               notificationMessage = `${senderName} sent a file in ticket #${ticketId}`;
             } else {
               // Truncate message if it's too long
-              const truncatedContent = messageContent.length > 50 
-                ? messageContent.substring(0, 50) + '...' 
+              const truncatedContent = messageContent.length > 50
+                ? messageContent.substring(0, 50) + '...'
                 : messageContent;
               notificationMessage = `${senderName}: ${truncatedContent} (Ticket #${ticketId})`;
             }
@@ -845,7 +688,7 @@ const createChatNotification = async (ticketId, senderUserId, senderRole, messag
                 console.error('Error creating chat notification for supervisor/admin:', notifErr);
               } else {
                 console.log(`Chat notification created for user ${recipientId} about ticket ${ticketId}`);
-                
+
                 // Emit notification to the supervisor/admin via socket if they're online
                 io.emit(`notification-${recipientId}`, {
                   notificationId: notifResult.insertId,
@@ -947,10 +790,10 @@ app.post("/ticketchat", upload.single("file"), (req, res) => {
       timestamp: new Date().toISOString(),
       file: filePath
         ? {
-            url: `${baseUrl}/uploads/profile_images/${filePath}`,
-            isImage: isImageFile(filePath),
-            name: file.originalname,
-          }
+          url: `${baseUrl}/uploads/profile_images/${filePath}`,
+          isImage: isImageFile(filePath),
+          name: file.originalname,
+        }
         : null,
       status: "✓",
     };
@@ -1010,10 +853,10 @@ app.post("/api/ticketchatUser", upload.single("file"), (req, res) => {
       timestamp: new Date().toISOString(),
       file: filePath
         ? {
-            url: `${baseUrl}/uploads/profile_images/${filePath}`,
-            isImage: isImageFile(filePath),
-            name: file.originalname,
-          }
+          url: `${baseUrl}/uploads/profile_images/${filePath}`,
+          isImage: isImageFile(filePath),
+          name: file.originalname,
+        }
         : null,
       status: "✓",
     };
@@ -1061,10 +904,10 @@ app.get("/api/ticketchatUser/:ticketID", (req, res) => {
       timestamp: msg.timestamp ? new Date(msg.timestamp).toISOString() : null,
       file: msg.Path
         ? {
-            url: `${baseUrl}/uploads/profile_images/${msg.Path}`,
-            isImage: isImageFile(msg.Path),
-            name: path.basename(msg.Path),
-          }
+          url: `${baseUrl}/uploads/profile_images/${msg.Path}`,
+          isImage: isImageFile(msg.Path),
+          name: path.basename(msg.Path),
+        }
         : null,
       status: "✓",
     }));
@@ -1115,10 +958,10 @@ app.post("/ticketchat/markSeen", (req, res) => {
     SET Seen = 1
     WHERE TicketID = ? AND Role != ? AND Seen = 0
   `;
-  
+
   db.query(sql, [TicketID, Role], (err, result) => {
     if (err) return res.status(500).json({ error: "Failed to update seen status" });
-    
+
     // Now update related notifications as read
     if (Role === 'User' || Role === 'Client') {
       // User/Client is marking admin/supervisor messages as seen
@@ -1131,13 +974,13 @@ app.post("/ticketchat/markSeen", (req, res) => {
         AND UserID = (SELECT UserId FROM ticket WHERE TicketID = ?)
         AND IsRead = FALSE
       `;
-      
+
       db.query(updateNotificationsSql, [TicketID, TicketID], (notifErr, notifResult) => {
         if (notifErr) {
           console.error('Error updating chat notifications:', notifErr);
         } else {
           console.log(`Updated ${notifResult.affectedRows} chat notifications as read for ticket ${TicketID}`);
-          
+
           // Get the user ID to emit notification update
           db.query(getUserIdQuery, getUserIdParams, (userErr, userResults) => {
             if (!userErr && userResults.length > 0) {
@@ -1168,13 +1011,13 @@ app.post("/ticketchat/markSeen", (req, res) => {
         )
         AND IsRead = FALSE
       `;
-      
+
       db.query(updateNotificationsSql, [TicketID, TicketID], (notifErr, notifResult) => {
         if (notifErr) {
           console.error('Error updating chat notifications:', notifErr);
         } else {
           console.log(`Updated ${notifResult.affectedRows} chat notifications as read for ticket ${TicketID}`);
-          
+
           // Get all admin/supervisor user IDs to emit notification updates
           db.query(getUserIdQuery, getUserIdParams, (userErr, userResults) => {
             if (!userErr && userResults.length > 0) {
@@ -1190,7 +1033,7 @@ app.post("/ticketchat/markSeen", (req, res) => {
         }
       });
     }
-    
+
     // Emit the original messagesSeen event
     io.to(String(TicketID)).emit("messagesSeen", { TicketID, Role });
     res.status(200).json({ message: "Messages marked as seen." });
@@ -1210,10 +1053,10 @@ app.post("/ticketchat/markSeen/user", (req, res) => {
     SET Seen = 1
     WHERE TicketID = ? AND Role != ? AND Seen = 0
   `;
-  
+
   db.query(sql, [TicketID, Role], (err, result) => {
     if (err) return res.status(500).json({ error: "Failed to update seen status" });
-    
+
     // Update notifications as read for the specific user
     const updateNotificationsSql = `
       UPDATE notifications 
@@ -1223,13 +1066,13 @@ app.post("/ticketchat/markSeen/user", (req, res) => {
       AND UserID = ?
       AND IsRead = FALSE
     `;
-    
+
     db.query(updateNotificationsSql, [TicketID, UserID], (notifErr, notifResult) => {
       if (notifErr) {
         console.error('Error updating chat notifications:', notifErr);
       } else {
         console.log(`Updated ${notifResult.affectedRows} chat notifications as read for user ${UserID}, ticket ${TicketID}`);
-        
+
         // Emit notification count update to the specific user
         io.emit(`notification-update-${UserID}`, {
           ticketId: TicketID,
@@ -1238,12 +1081,12 @@ app.post("/ticketchat/markSeen/user", (req, res) => {
         });
       }
     });
-    
+
     // Emit the original messagesSeen event
     io.to(String(TicketID)).emit("messagesSeen", { TicketID, Role });
-    res.status(200).json({ 
-      message: "Messages marked as seen.", 
-      chatUpdated: result.affectedRows > 0 
+    res.status(200).json({
+      message: "Messages marked as seen.",
+      chatUpdated: result.affectedRows > 0
     });
   });
 });
@@ -1253,16 +1096,16 @@ app.post("/ticketchat/markSeen/user", (req, res) => {
 
 // Get tickets assigned to a specific supervisor (by UserID in appuser)
 app.get("/tickets", (req, res) => {
-    const { supervisorId, role } = req.query;
+  const { supervisorId, role } = req.query;
 
-    // Role is required
-    if (!role) {
-        return res.status(400).json({ error: "User role is required" });
-    }
+  // Role is required
+  if (!role) {
+    return res.status(400).json({ error: "User role is required" });
+  }
 
-    // Admin: Return all tickets
-    if (role === "Admin") {
-        const sql = `SELECT 
+  // Admin: Return all tickets
+  if (role === "Admin") {
+    const sql = `SELECT 
                     t.*, 
                     asys.SystemName AS AsipiyaSystemName, 
                     u.FullName AS UserName
@@ -1270,22 +1113,22 @@ app.get("/tickets", (req, res) => {
                     LEFT JOIN asipiyasystem asys ON t.AsipiyaSystemID = asys.AsipiyaSystemID
                     LEFT JOIN appuser u ON t.UserId = u.UserID`;
 
-        db.query(sql, (err, results) => {
-            if (err) {
-                console.error("Error fetching all tickets:", err);
-                return res.status(500).json({ error: "Error fetching tickets" });
-            }
-            return res.json(results);
-        });
+    db.query(sql, (err, results) => {
+      if (err) {
+        console.error("Error fetching all tickets:", err);
+        return res.status(500).json({ error: "Error fetching tickets" });
+      }
+      return res.json(results);
+    });
+  }
+
+  // Supervisor: Return only their tickets
+  else if (role === "Supervisor") {
+    if (!supervisorId) {
+      return res.status(400).json({ error: "Supervisor ID is required for supervisors" });
     }
 
-    // Supervisor: Return only their tickets
-    else if (role === "Supervisor") {
-        if (!supervisorId) {
-            return res.status(400).json({ error: "Supervisor ID is required for supervisors" });
-        }
-
-        const sql = `SELECT 
+    const sql = `SELECT 
                         t.*, 
                         asys.SystemName AS AsipiyaSystemName, 
                         u.FullName AS UserName
@@ -1294,19 +1137,19 @@ app.get("/tickets", (req, res) => {
                         LEFT JOIN appuser u ON t.UserId = u.UserID
                         WHERE t.SupervisorID = ?`;
 
-        db.query(sql, [supervisorId], (err, results) => {
-            if (err) {
-                console.error("Error fetching supervisor's tickets:", err);
-                return res.status(500).json({ error: "Error fetching tickets" });
-            }
-            return res.json(results);
-        });
-    }
+    db.query(sql, [supervisorId], (err, results) => {
+      if (err) {
+        console.error("Error fetching supervisor's tickets:", err);
+        return res.status(500).json({ error: "Error fetching tickets" });
+      }
+      return res.json(results);
+    });
+  }
 
-    // If the role is invalid
-    else {
-        return res.status(400).json({ error: "Invalid role specified" });
-    }
+  // If the role is invalid
+  else {
+    return res.status(400).json({ error: "Invalid role specified" });
+  }
 });
 
 app.get("/getting/tickets", (req, res) => {
@@ -1354,107 +1197,107 @@ app.get("/getting/tickets", (req, res) => {
 
 
 app.put('/tickets/:id', (req, res) => {
-    const { id } = req.params;
-    const { status, dueDate, resolution } = req.body;
+  const { id } = req.params;
+  const { status, dueDate, resolution } = req.body;
 
-    // Build the SET clause dynamically
-    const fields = [];
-    const values = [];
+  // Build the SET clause dynamically
+  const fields = [];
+  const values = [];
 
-    if (status !== undefined) {
-        fields.push("Status = ?");
-        values.push(status);
+  if (status !== undefined) {
+    fields.push("Status = ?");
+    values.push(status);
+  }
+
+  if (dueDate !== undefined) {
+    fields.push("DueDate = ?");
+    values.push(dueDate);
+  }
+
+  if (resolution !== undefined) {
+    fields.push("Resolution = ?");
+    values.push(resolution);
+  }
+
+  if (fields.length === 0) {
+    return res.status(400).json({ message: "No fields provided to update." });
+  }
+
+  const sql = `UPDATE ticket SET ${fields.join(', ')} WHERE TicketID = ?`;
+  values.push(id); // Add id to the end of values array for WHERE clause
+
+  db.query(sql, values, (err, result) => {
+    if (err) {
+      console.error("Failed to update ticket:", err);
+      return res.status(500).json({ message: "Server error" });
     }
-
-    if (dueDate !== undefined) {
-        fields.push("DueDate = ?");
-        values.push(dueDate);
-    }
-
-    if (resolution !== undefined) {
-        fields.push("Resolution = ?");
-        values.push(resolution);
-    }
-
-    if (fields.length === 0) {
-        return res.status(400).json({ message: "No fields provided to update." });
-    }
-
-    const sql = `UPDATE ticket SET ${fields.join(', ')} WHERE TicketID = ?`;
-    values.push(id); // Add id to the end of values array for WHERE clause
-
-    db.query(sql, values, (err, result) => {
-        if (err) {
-            console.error("Failed to update ticket:", err);
-            return res.status(500).json({ message: "Server error" });
-        }
-        res.json({ message: "Ticket updated successfully" });
-    });
+    res.json({ message: "Ticket updated successfully" });
+  });
 });
 //--------------------------------
 app.get("/evidence/:ticketId", (req, res) => {
-    const { ticketId } = req.params;
+  const { ticketId } = req.params;
 
-    const sql = "SELECT FilePath FROM evidence WHERE ComplaintID = ?";
-    db.query(sql, [ticketId], (err, result) => {
-        if (err) {
-            console.error("Error fetching evidence:", err);
-            return res.status(500).json({ error: "Failed to fetch evidence" });
-        }
-        res.json(result);
-    });
+  const sql = "SELECT FilePath FROM evidence WHERE ComplaintID = ?";
+  db.query(sql, [ticketId], (err, result) => {
+    if (err) {
+      console.error("Error fetching evidence:", err);
+      return res.status(500).json({ error: "Failed to fetch evidence" });
+    }
+    res.json(result);
+  });
 });
 
 app.get("/supervisors", (req, res) => {
-    const sql = "SELECT UserID, FullName FROM appuser WHERE Role = 'Supervisor'";
-    db.query(sql, (err, results) => {
-        if (err) {
-            console.error("Error fetching supervisors:", err);
-            return res.status(500).json({ error: "Error fetching supervisors" });
-        }
-        res.json(results);
-    });
+  const sql = "SELECT UserID, FullName FROM appuser WHERE Role = 'Supervisor'";
+  db.query(sql, (err, results) => {
+    if (err) {
+      console.error("Error fetching supervisors:", err);
+      return res.status(500).json({ error: "Error fetching supervisors" });
+    }
+    res.json(results);
+  });
 });
 
 app.get("/asipiyasystems", (req, res) => {
-    const sql = "SELECT AsipiyaSystemID, SystemName FROM asipiyasystem";
-    db.query(sql, (err, results) => {
-        if (err) {
-            console.error("Error fetching systems:", err);
-            return res.status(500).json({ error: "Error fetching systems" });
-        }
-        res.json(results);
-    });
+  const sql = "SELECT AsipiyaSystemID, SystemName FROM asipiyasystem";
+  db.query(sql, (err, results) => {
+    if (err) {
+      console.error("Error fetching systems:", err);
+      return res.status(500).json({ error: "Error fetching systems" });
+    }
+    res.json(results);
+  });
 });
 
 //nope
 app.get("/tickets", (req, res) => {
-    const query = `
+  const query = `
     SELECT * 
     FROM ticket 
   `;
 
-    db.query(query, (err, results) => {
-        if (err) {
-            console.error("Error fetching tickets for supervisor:", err);
-            return res.status(500).json({ error: "Internal server error" });
-        }
+  db.query(query, (err, results) => {
+    if (err) {
+      console.error("Error fetching tickets for supervisor:", err);
+      return res.status(500).json({ error: "Internal server error" });
+    }
 
-        res.json(results);
-    });
+    res.json(results);
+  });
 });
 
 // Add this to your existing Node.js/Express backend
 app.put('/tickets/accept/:ticketID', (req, res) => {
-    const { ticketID } = req.params;
+  const { ticketID } = req.params;
 
-    db.query('UPDATE ticket SET Status = "Accepted" WHERE TicketID = ?', [ticketID], (err, result) => {
-        if (err) {
-            console.error(err);
-            return res.status(500).json({ error: "Database error" });
-        }
-        return res.json({ message: "Ticket accepted successfully" });
-    });
+  db.query('UPDATE ticket SET Status = "Accepted" WHERE TicketID = ?', [ticketID], (err, result) => {
+    if (err) {
+      console.error(err);
+      return res.status(500).json({ error: "Database error" });
+    }
+    return res.json({ message: "Ticket accepted successfully" });
+  });
 });
 
 /*---------------------------------------------------------------------------------------*/
@@ -1560,7 +1403,7 @@ app.put("/update-supervisors/:id", async (req, res) => {
       FROM ticket 
       WHERE TicketID = ?
     `;
-    
+
     const currentTicketData = await new Promise((resolve, reject) => {
       db.query(getTicketQuery, [id], (err, results) => {
         if (err) reject(err);
@@ -1572,10 +1415,10 @@ app.put("/update-supervisors/:id", async (req, res) => {
       return res.status(404).json({ error: "Ticket not found." });
     }
 
-    const oldSupervisorIds = currentTicketData.SupervisorID 
+    const oldSupervisorIds = currentTicketData.SupervisorID
       ? currentTicketData.SupervisorID.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id))
       : [];
-    
+
     const newSupervisorIds = validSupervisorIds;
     const ticketCreatorId = currentTicketData.ticketCreatorId;
 
@@ -1599,7 +1442,7 @@ app.put("/update-supervisors/:id", async (req, res) => {
           else resolve(results[0] || null);
         });
       });
-      
+
       if (currentUserResult) {
         currentUserName = currentUserResult.FullName;
         currentUserRole = currentUserResult.Role;
@@ -1621,7 +1464,7 @@ app.put("/update-supervisors/:id", async (req, res) => {
       FROM appuser 
       WHERE UserID IN (${[...addedSupervisorIds, ...removedSupervisorIds].map(() => '?').join(',')})
     `;
-    
+
     let supervisorNames = {};
     if (addedSupervisorIds.length > 0 || removedSupervisorIds.length > 0) {
       const nameResults = await new Promise((resolve, reject) => {
@@ -1630,7 +1473,7 @@ app.put("/update-supervisors/:id", async (req, res) => {
           else resolve(results);
         });
       });
-      
+
       nameResults.forEach(supervisor => {
         supervisorNames[supervisor.UserID] = supervisor.FullName;
       });
@@ -1640,7 +1483,7 @@ app.put("/update-supervisors/:id", async (req, res) => {
     if (addedSupervisorIds.length > 0) {
       const addedNames = addedSupervisorIds.map(id => supervisorNames[id] || `Supervisor ${id}`);
       const logDescription = `added supervisors: ${addedNames.join(', ')}`;
-      
+
       const logResult = await createTicketLog(
         id,
         'SUPERVISOR_ADDED',
@@ -1677,7 +1520,7 @@ app.put("/update-supervisors/:id", async (req, res) => {
     if (removedSupervisorIds.length > 0) {
       const removedNames = removedSupervisorIds.map(id => supervisorNames[id] || `Supervisor ${id}`);
       const logDescription = `removed supervisors: ${removedNames.join(', ')}`;
-      
+
       const logResult = await createTicketLog(
         id,
         'SUPERVISOR_REMOVED',
@@ -1725,62 +1568,62 @@ app.put("/update-supervisors/:id", async (req, res) => {
 
 
 app.get('/api/supervisors', (req, res) => {
-    const query = `
+  const query = `
     SELECT UserID, FullName FROM appuser 
     WHERE Role IN ('supervisor')
   `;
 
-    db.query(query, (err, results) => {
-        if (err) {
-            console.error("Error fetching supervisors:", err);
-            return res.status(500).json({ error: "Database error" });
-        }
-        console.log("Supervisor result:", results); // Add this
-        res.json(results); // Make sure it's just `results`, not wrapped in an object
-    });
+  db.query(query, (err, results) => {
+    if (err) {
+      console.error("Error fetching supervisors:", err);
+      return res.status(500).json({ error: "Database error" });
+    }
+    console.log("Supervisor result:", results); // Add this
+    res.json(results); // Make sure it's just `results`, not wrapped in an object
+  });
 });
 
 // Helper function to create a ticket log
 const createTicketLog = async (ticketId, type, description, userId, oldValue, newValue, note = null) => {
-    return new Promise(async (resolve, reject) => {
-        let userName = 'System';
-        if (userId) {
-            try {
-                const [userResult] = await db.promise().query('SELECT FullName FROM appuser WHERE UserID = ?', [userId]);
-                if (userResult.length > 0) {
-                    userName = userResult[0].FullName;
-                }
-            } catch (userErr) {
-                console.error("Error fetching user name for ticket log:", userErr);
-                // Continue even if user name fetch fails
-            }
+  return new Promise(async (resolve, reject) => {
+    let userName = 'System';
+    if (userId) {
+      try {
+        const [userResult] = await db.promise().query('SELECT FullName FROM appuser WHERE UserID = ?', [userId]);
+        if (userResult.length > 0) {
+          userName = userResult[0].FullName;
         }
+      } catch (userErr) {
+        console.error("Error fetching user name for ticket log:", userErr);
+        // Continue even if user name fetch fails
+      }
+    }
 
-        const logQuery = `
+    const logQuery = `
             INSERT INTO ticketlog (TicketID, DateTime, Type, Description, UserID, OldValue, NewValue, Note)
             VALUES (?, NOW(), ?, ?, ?, ?, ?, ?)
         `;
-        
-        const finalDescription = `${userName} ${description}`;
-        const finalNote = note ? `${note} by ${userName}` : `Updated by ${userName}`;
-            
-        db.query(logQuery, [
-            ticketId,
-            type,
-            finalDescription,
-            userId,
-            oldValue,
-            newValue,
-            finalNote
-        ], (err, result) => {
-            if (err) {
-                console.error("Error creating ticket log:", err);
-                reject(err);
-                return;
-            }
-            resolve(result);
-        });
+
+    const finalDescription = `${userName} ${description}`;
+    const finalNote = note ? `${note} by ${userName}` : `Updated by ${userName}`;
+
+    db.query(logQuery, [
+      ticketId,
+      type,
+      finalDescription,
+      userId,
+      oldValue,
+      newValue,
+      finalNote
+    ], (err, result) => {
+      if (err) {
+        console.error("Error creating ticket log:", err);
+        reject(err);
+        return;
+      }
+      resolve(result);
     });
+  });
 };
 
 // In the status change handler:
@@ -1865,11 +1708,11 @@ app.put('/api/tickets/:ticketId/status', async (req, res) => {
 
 // Update ticket priority
 app.put('/api/tickets/:ticketId/priority', async (req, res) => {
-    const { ticketId } = req.params;
-    const { priority, userId } = req.body;
+  const { ticketId } = req.params;
+  const { priority, userId } = req.body;
 
-    // First get the current ticket and user details
-    const getTicket = `
+  // First get the current ticket and user details
+  const getTicket = `
         SELECT 
             t.Priority,
             t.UserId as ticketUserId,
@@ -1881,84 +1724,84 @@ app.put('/api/tickets/:ticketId/priority', async (req, res) => {
         LEFT JOIN appuser au_creator ON au_creator.UserID = t.UserId
         WHERE t.TicketID = ?
     `;
-    
-    try {
-        const [ticketResults] = await new Promise((resolve, reject) => {
-            db.query(getTicket, [userId, ticketId], (err, results) => {
-                if (err) reject(err);
-                else resolve(results);
-            });
-        });
 
-        if (!ticketResults) {
-            return res.status(404).json({ message: "Ticket not found" });
-        }
+  try {
+    const [ticketResults] = await new Promise((resolve, reject) => {
+      db.query(getTicket, [userId, ticketId], (err, results) => {
+        if (err) reject(err);
+        else resolve(results);
+      });
+    });
 
-        const oldPriority = ticketResults.Priority;
-        const ticketUserId = ticketResults.ticketUserId;
-        const updatedByName = ticketResults.updatedByName;
+    if (!ticketResults) {
+      return res.status(404).json({ message: "Ticket not found" });
+    }
 
-        // Update the ticket priority
-        const updateQuery = "UPDATE ticket SET Priority = ?, LastRespondedTime = NOW() WHERE TicketID = ?";
-        
-        await new Promise((resolve, reject) => {
-            db.query(updateQuery, [priority, ticketId], (err, result) => {
-                if (err) reject(err);
-                else resolve(result);
-            });
-        });
+    const oldPriority = ticketResults.Priority;
+    const ticketUserId = ticketResults.ticketUserId;
+    const updatedByName = ticketResults.updatedByName;
 
-        // Create ticket log entry
-        const logQuery = `
+    // Update the ticket priority
+    const updateQuery = "UPDATE ticket SET Priority = ?, LastRespondedTime = NOW() WHERE TicketID = ?";
+
+    await new Promise((resolve, reject) => {
+      db.query(updateQuery, [priority, ticketId], (err, result) => {
+        if (err) reject(err);
+        else resolve(result);
+      });
+    });
+
+    // Create ticket log entry
+    const logQuery = `
             INSERT INTO ticketlog 
             (TicketID, DateTime, Type, Description, UserID, OldValue, NewValue, Note)
             VALUES (?, NOW(), ?, ?, ?, ?, ?, ?)
         `;
 
-        const description = `changed priority from ${oldPriority} to ${priority}`;
+    const description = `changed priority from ${oldPriority} to ${priority}`;
 
-        const [logResult] = await new Promise((resolve, reject) => {
-            db.query(
-                logQuery,
-                [ticketId, 'PRIORITY_CHANGE', description, userId, oldPriority, priority, null],
-                (err, result) => {
-                    if (err) reject(err);
-                    else resolve(result);
-                }
-            );
-        });
-
-        // Create notifications
-        try {
-            // Notify ticket creator
-            await createNotification(
-                ticketUserId,
-                `Your ticket #${ticketId} priority has been changed from ${oldPriority} to ${priority}${updatedByName ? ` by ${updatedByName}` : ''}`,
-                'PRIORITY_UPDATE',
-                logResult.insertId
-            );
-
-            // If priority changed to High, notify supervisor
-            if (priority === 'High' && ticketResults.SupervisorID) {
-                await createNotification(
-                    ticketResults.SupervisorID,
-                    `Ticket #${ticketId} has been marked as High priority. Immediate attention required. ${updatedByName ? `Updated by ${updatedByName}` : ''}`,
-                    'HIGH_PRIORITY_ALERT',
-                    logResult.insertId
-                );
-            }
-        } catch (error) {
-            console.error("Error creating notifications:", error);
+    const [logResult] = await new Promise((resolve, reject) => {
+      db.query(
+        logQuery,
+        [ticketId, 'PRIORITY_CHANGE', description, userId, oldPriority, priority, null],
+        (err, result) => {
+          if (err) reject(err);
+          else resolve(result);
         }
+      );
+    });
 
-        res.json({ 
-            message: "Ticket priority updated successfully",
-            logId: logResult.insertId
-        });
+    // Create notifications
+    try {
+      // Notify ticket creator
+      await createNotification(
+        ticketUserId,
+        `Your ticket #${ticketId} priority has been changed from ${oldPriority} to ${priority}${updatedByName ? ` by ${updatedByName}` : ''}`,
+        'PRIORITY_UPDATE',
+        logResult.insertId
+      );
+
+      // If priority changed to High, notify supervisor
+      if (priority === 'High' && ticketResults.SupervisorID) {
+        await createNotification(
+          ticketResults.SupervisorID,
+          `Ticket #${ticketId} has been marked as High priority. Immediate attention required. ${updatedByName ? `Updated by ${updatedByName}` : ''}`,
+          'HIGH_PRIORITY_ALERT',
+          logResult.insertId
+        );
+      }
     } catch (error) {
-        console.error("Error updating ticket priority:", error);
-        res.status(500).json({ message: "Server error" });
+      console.error("Error creating notifications:", error);
     }
+
+    res.json({
+      message: "Ticket priority updated successfully",
+      logId: logResult.insertId
+    });
+  } catch (error) {
+    console.error("Error updating ticket priority:", error);
+    res.status(500).json({ message: "Server error" });
+  }
 });
 
 // Add comment to ticket
@@ -1971,9 +1814,9 @@ app.post('/api/tickets/:ticketId/comments', commentAttachmentUpload.array('file'
     let processedMentions = [];
 
     if (mentionedUserIds && typeof mentionedUserIds === 'string') {
-        processedMentions = mentionedUserIds.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id));
+      processedMentions = mentionedUserIds.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id));
     }
-    
+
     // IMPORTANT: Storing the original comment text (including @mentions) in CommentText for display.
     // The mentioned user IDs are still separately stored in the Mentions column.
 
@@ -2029,7 +1872,7 @@ app.post('/api/tickets/:ticketId/comments', commentAttachmentUpload.array('file'
       // Fetch user's name for the log description
       const [userResult] = await db.promise().query('SELECT FullName FROM appuser WHERE UserID = ?', [userId]);
       const userName = userResult.length > 0 ? userResult[0].FullName : 'Unknown User';
-      
+
       const logDescription = `added a comment: "${comment.substring(0, 100)}..."`; // Use original comment for log description
       await createTicketLog(ticketId, 'COMMENT', logDescription, userId, null, null, null); // Use createTicketLog
 
@@ -2059,60 +1902,60 @@ app.post('/api/tickets/:ticketId/comments', commentAttachmentUpload.array('file'
 });
 
 const storage = multer.diskStorage({
-    destination: function (req, file, cb) {
-        cb(null, "uploads/");
-    },
-    filename: function (req, file, cb) {
-        const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-        cb(
-            null,
-            file.fieldname + "-" + uniqueSuffix + path.extname(file.originalname)
-        );
-    },
+  destination: function (req, file, cb) {
+    cb(null, "uploads/");
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    cb(
+      null,
+      file.fieldname + "-" + uniqueSuffix + path.extname(file.originalname)
+    );
+  },
 });
 
 const upload_evidence = multer({ storage: storage });
 
 app.post("/upload_evidence", upload_evidence.array("evidenceFiles"), (req, res) => {
-    const { ticketId, description } = req.body;
+  const { ticketId, description } = req.body;
 
-    if (!req.files || req.files.length === 0) {
-        return res.status(400).json({ message: "No files uploaded" });
-    }
+  if (!req.files || req.files.length === 0) {
+    return res.status(400).json({ message: "No files uploaded" });
+  }
 
-    if (!ticketId) {
-        return res.status(400).json({ message: "Ticket ID is required" });
-    }
+  if (!ticketId) {
+    return res.status(400).json({ message: "Ticket ID is required" });
+  }
 
-    const values = req.files.map((file) => [ticketId, file.path, description]);
+  const values = req.files.map((file) => [ticketId, file.path, description]);
 
-    const insertEvidenceQuery = `
+  const insertEvidenceQuery = `
     INSERT INTO evidence (ComplaintID, FilePath, Description) VALUES ?
   `;
 
-    db.query(insertEvidenceQuery, [values], (err, result) => {
-        if (err) {
-            console.error("Error inserting evidence:", err);
-            return res.status(500).json({ message: "Error saving evidence" });
-        }
-        res
-            .status(200)
-            .json({
-                message: "Evidence files uploaded",
-                inserted: result.affectedRows,
-            });
-    });
+  db.query(insertEvidenceQuery, [values], (err, result) => {
+    if (err) {
+      console.error("Error inserting evidence:", err);
+      return res.status(500).json({ message: "Error saving evidence" });
+    }
+    res
+      .status(200)
+      .json({
+        message: "Evidence files uploaded",
+        inserted: result.affectedRows,
+      });
+  });
 });
 
 //user ticket view
 app.get("/userTickets", (req, res) => {
-    const { userId } = req.query;
+  const { userId } = req.query;
 
-    if (!userId) {
-        return res.status(400).json({ message: "User ID is required" });
-    }
+  if (!userId) {
+    return res.status(400).json({ message: "User ID is required" });
+  }
 
-    const sql = `
+  const sql = `
     SELECT 
       t.TicketID AS id,
       t.Description AS description,
@@ -2130,13 +1973,13 @@ app.get("/userTickets", (req, res) => {
     ORDER BY t.DateTime DESC
   `;
 
-    db.query(sql, [userId], (err, results) => {
-        if (err) {
-            console.error("Error fetching tickets:", err);
-            return res.status(500).json({ message: "Error fetching tickets" });
-        }
-        res.status(200).json(results);
-    });
+  db.query(sql, [userId], (err, results) => {
+    if (err) {
+      console.error("Error fetching tickets:", err);
+      return res.status(500).json({ message: "Error fetching tickets" });
+    }
+    res.status(200).json(results);
+  });
 });
 
 app.get("/userTicket/:ticketId", (req, res) => {
@@ -2209,40 +2052,40 @@ app.get('/api/evidence/:ticketId', async (req, res) => {
 
 // API endpoint to fetch ticket counts
 app.get('/api/tickets/counts', (req, res) => {
-    const queries = {
-        total: 'SELECT COUNT(*) AS count FROM ticket',
-        open: "SELECT COUNT(*) AS count FROM ticket WHERE Status IN ('Open', 'In Progress') AND Status != 'Rejected'",
-        today: "SELECT COUNT(*) AS count FROM ticket WHERE DATE(DateTime) = CURDATE()",
-        highPriority: "SELECT COUNT(*) AS count FROM ticket WHERE Priority = 'High' AND Status != 'Rejected'",
-        resolved: "SELECT COUNT(*) AS count FROM ticket WHERE Status = 'Resolved'",
-        pending: "SELECT COUNT(*) AS count FROM ticket WHERE Status = 'Pending'"
-    };
+  const queries = {
+    total: 'SELECT COUNT(*) AS count FROM ticket',
+    open: "SELECT COUNT(*) AS count FROM ticket WHERE Status IN ('Open', 'In Progress') AND Status != 'Rejected'",
+    today: "SELECT COUNT(*) AS count FROM ticket WHERE DATE(DateTime) = CURDATE()",
+    highPriority: "SELECT COUNT(*) AS count FROM ticket WHERE Priority = 'High' AND Status != 'Rejected'",
+    resolved: "SELECT COUNT(*) AS count FROM ticket WHERE Status = 'Resolved'",
+    pending: "SELECT COUNT(*) AS count FROM ticket WHERE Status = 'Pending'"
+  };
 
-    const results = {};
-    let completed = 0;
+  const results = {};
+  let completed = 0;
 
-    Object.entries(queries).forEach(([key, query]) => {
-        db.query(query, (err, result) => {
-            if (err) {
-                console.error(`Error fetching ${key} count:`, err);
-                return res.status(500).json({ error: `Failed to fetch ${key} ticket count` });
-            }
+  Object.entries(queries).forEach(([key, query]) => {
+    db.query(query, (err, result) => {
+      if (err) {
+        console.error(`Error fetching ${key} count:`, err);
+        return res.status(500).json({ error: `Failed to fetch ${key} ticket count` });
+      }
 
-            results[key] = result[0].count;
-            completed++;
+      results[key] = result[0].count;
+      completed++;
 
-            if (completed === Object.keys(queries).length) {
-                res.json(results);
-            }
-        });
+      if (completed === Object.keys(queries).length) {
+        res.json(results);
+      }
     });
+  });
 });
 
 // API endpoint to fetch filtered tickets  
 app.get('/api/tickets/filter', (req, res) => {
-    const { type, company, system } = req.query; // <-- ADD company, system
+  const { type, company, system } = req.query; // <-- ADD company, system
 
-    let baseQuery = `
+  let baseQuery = `
         SELECT 
             t.TicketID,
             u.FullName AS UserName,
@@ -2258,54 +2101,54 @@ app.get('/api/tickets/filter', (req, res) => {
         LEFT JOIN asipiyasystem s ON t.AsipiyaSystemID = s.AsipiyaSystemID
     `;
 
-    let whereClause = [];
-    let orderClause = 'ORDER BY t.DateTime DESC';
+  let whereClause = [];
+  let orderClause = 'ORDER BY t.DateTime DESC';
 
-    // Type-based filter
-    switch (type) {
-        case 'pending':
-            whereClause.push("t.Status = 'Pending'");
-            break;
-        case 'open':
-            whereClause.push("t.Status IN ('Open', 'In Progress') AND t.Status != 'Rejected'");
-            break;
-        case 'today':
-            whereClause.push("DATE(t.DateTime) = CURDATE()");
-            break;
-        case 'high-priority':
-            whereClause.push("t.Status != 'Rejected'");
-            orderClause = "ORDER BY FIELD(t.Priority, 'High', 'Medium', 'Low'), t.DateTime DESC";
-            break;
-        case 'resolved':
-            whereClause.push("t.Status = 'Resolved'");
-            break;
+  // Type-based filter
+  switch (type) {
+    case 'pending':
+      whereClause.push("t.Status = 'Pending'");
+      break;
+    case 'open':
+      whereClause.push("t.Status IN ('Open', 'In Progress') AND t.Status != 'Rejected'");
+      break;
+    case 'today':
+      whereClause.push("DATE(t.DateTime) = CURDATE()");
+      break;
+    case 'high-priority':
+      whereClause.push("t.Status != 'Rejected'");
+      orderClause = "ORDER BY FIELD(t.Priority, 'High', 'Medium', 'Low'), t.DateTime DESC";
+      break;
+    case 'resolved':
+      whereClause.push("t.Status = 'Resolved'");
+      break;
+  }
+
+  // Company filter
+  if (company && company !== 'all') {
+    whereClause.push("c.CompanyName = " + db.escape(company));
+  }
+  // System filter
+  if (system && system !== 'all') {
+    whereClause.push("s.SystemName = " + db.escape(system));
+  }
+
+  const finalWhere = whereClause.length > 0 ? 'WHERE ' + whereClause.join(' AND ') : '';
+  const query = `${baseQuery} ${finalWhere} ${orderClause}`;
+
+  db.query(query, (err, results) => {
+    if (err) {
+      console.error('Error fetching filtered tickets:', err);
+      res.status(500).json({ error: 'Failed to fetch tickets' });
+      return;
     }
-
-    // Company filter
-    if (company && company !== 'all') {
-        whereClause.push("c.CompanyName = " + db.escape(company));
-    }
-    // System filter
-    if (system && system !== 'all') {
-        whereClause.push("s.SystemName = " + db.escape(system));
-    }
-
-    const finalWhere = whereClause.length > 0 ? 'WHERE ' + whereClause.join(' AND ') : '';
-    const query = `${baseQuery} ${finalWhere} ${orderClause}`;
-
-    db.query(query, (err, results) => {
-        if (err) {
-            console.error('Error fetching filtered tickets:', err);
-            res.status(500).json({ error: 'Failed to fetch tickets' });
-            return;
-        }
-        res.json(results);
-    });
+    res.json(results);
+  });
 });
 
 // API endpoint to fetch ticket status distribution
 app.get('/api/tickets/status-distribution', (req, res) => {
-    const query = `
+  const query = `
         SELECT 
             SUM(CASE WHEN Priority = 'High' THEN 1 ELSE 0 END) AS high,
             SUM(CASE WHEN Priority = 'Medium' THEN 1 ELSE 0 END) AS medium,
@@ -2313,20 +2156,20 @@ app.get('/api/tickets/status-distribution', (req, res) => {
         FROM ticket;
     `;
 
-    db.query(query, (err, results) => {
-        if (err) {
-            console.error('Error fetching ticket status distribution:', err);
-            res.status(500).json({ error: 'Failed to fetch ticket status distribution' });
-            return;
-        }
+  db.query(query, (err, results) => {
+    if (err) {
+      console.error('Error fetching ticket status distribution:', err);
+      res.status(500).json({ error: 'Failed to fetch ticket status distribution' });
+      return;
+    }
 
-        res.json(results[0]);
-    });
+    res.json(results[0]);
+  });
 });
 
 // API endpoint to fetch the last 6 ticket log activities
 app.get('/api/tickets/recent-activities', (req, res) => {
-    const query = `
+  const query = `
         SELECT 
             tl.TicketID,
             tl.DateTime,
@@ -2337,18 +2180,18 @@ app.get('/api/tickets/recent-activities', (req, res) => {
         LIMIT 6
     `;
 
-    db.query(query, (err, results) => {
-        if (err) {
-            console.error('Error fetching recent ticket log activities:', err);
-            return res.status(500).json({ error: 'Failed to fetch recent ticket log activities' });
-        }
-        res.json(results);
-    });
+  db.query(query, (err, results) => {
+    if (err) {
+      console.error('Error fetching recent ticket log activities:', err);
+      return res.status(500).json({ error: 'Failed to fetch recent ticket log activities' });
+    }
+    res.json(results);
+  });
 });
 
 // API endpoint to fetch tickets
 app.get('/api/tickets', (req, res) => {
-    const query = `
+  const query = `
         SELECT 
             t.TicketID, 
             u.FullName AS UserName, 
@@ -2364,19 +2207,19 @@ app.get('/api/tickets', (req, res) => {
             t.UserID = u.UserID
     `;
 
-    db.query(query, (err, results) => {
-        if (err) {
-            console.error('Error fetching tickets:', err);
-            res.status(500).json({ error: 'Failed to fetch tickets' });
-            return;
-        }
-        res.json(results);
-    });
+  db.query(query, (err, results) => {
+    if (err) {
+      console.error('Error fetching tickets:', err);
+      res.status(500).json({ error: 'Failed to fetch tickets' });
+      return;
+    }
+    res.json(results);
+  });
 });
 
 // API endpoint to fetch ticket counts by system
 app.get('/api/tickets/system-distribution', (req, res) => {
-    const query = `
+  const query = `
         SELECT 
             s.SystemName,
             COUNT(t.TicketID) as TicketCount
@@ -2386,19 +2229,19 @@ app.get('/api/tickets/system-distribution', (req, res) => {
         ORDER BY TicketCount DESC;
     `;
 
-    db.query(query, (err, results) => {
-        if (err) {
-            console.error('Error fetching ticket system distribution:', err);
-            res.status(500).json({ error: 'Failed to fetch ticket system distribution' });
-            return;
-        }
-        res.json(results);
-    });
+  db.query(query, (err, results) => {
+    if (err) {
+      console.error('Error fetching ticket system distribution:', err);
+      res.status(500).json({ error: 'Failed to fetch ticket system distribution' });
+      return;
+    }
+    res.json(results);
+  });
 });
 
 // Update endpoint for recent users
 app.get('/api/users/recent', (req, res) => {
-    const query = `
+  const query = `
         SELECT DISTINCT 
             u.UserID,
             u.FullName,
@@ -2415,39 +2258,39 @@ app.get('/api/users/recent', (req, res) => {
         LIMIT 5
     `;
 
-    db.query(query, (err, results) => {
-        if (err) {
-            console.error('Error fetching recent users:', err);
-            return res.status(500).json({ error: 'Failed to fetch recent users' });
-        }
-        res.json(results);
-    });
+  db.query(query, (err, results) => {
+    if (err) {
+      console.error('Error fetching recent users:', err);
+      return res.status(500).json({ error: 'Failed to fetch recent users' });
+    }
+    res.json(results);
+  });
 });
 
 /*-------------------------------NOTIFICATIONS---------------------------------------------------*/
 
 // API endpoint to get unread notifications count
 app.get('/api/notifications/count/:id', (req, res) => {
-    const userId = req.params.id;
-    const query = `
+  const userId = req.params.id;
+  const query = `
         SELECT COUNT(*) as count 
         FROM notifications 
         WHERE UserID = ? AND IsRead = FALSE
     `;
 
-    db.query(query, [userId], (err, results) => {
-        if (err) {
-            console.error('Error fetching notification count:', err);
-            return res.status(500).json({ error: 'Failed to fetch notification count' });
-        }
-        res.json({ count: results[0].count });
-    });
+  db.query(query, [userId], (err, results) => {
+    if (err) {
+      console.error('Error fetching notification count:', err);
+      return res.status(500).json({ error: 'Failed to fetch notification count' });
+    }
+    res.json({ count: results[0].count });
+  });
 });
 
 // API endpoint to get user's notifications
 app.get('/api/notifications/:userId', (req, res) => {
-    const { userId } = req.params;
-    const query = `
+  const { userId } = req.params;
+  const query = `
         SELECT
             n.NotificationID,
             n.UserID,
@@ -2474,303 +2317,303 @@ app.get('/api/notifications/:userId', (req, res) => {
             n.CreatedAt DESC;
     `;
 
-    db.query(query, [userId], (err, results) => {
-        if (err) {
-            console.error('Error fetching notifications:', err);
-            return res.status(500).json({ error: 'Failed to fetch notifications' });
-        }
-        res.json(results);
-    });
+  db.query(query, [userId], (err, results) => {
+    if (err) {
+      console.error('Error fetching notifications:', err);
+      return res.status(500).json({ error: 'Failed to fetch notifications' });
+    }
+    res.json(results);
+  });
 });
 
 // API endpoint to mark notifications as read
 app.put('/api/notifications/read', (req, res) => {
-    const { notificationIds } = req.body;
+  const { notificationIds } = req.body;
 
-    if (!notificationIds || !Array.isArray(notificationIds) || notificationIds.length === 0) {
-        return res.status(400).json({ error: 'Notification IDs array is required' });
-    }
+  if (!notificationIds || !Array.isArray(notificationIds) || notificationIds.length === 0) {
+    return res.status(400).json({ error: 'Notification IDs array is required' });
+  }
 
-    const query = `
+  const query = `
         UPDATE notifications 
         SET IsRead = TRUE 
         WHERE NotificationID IN (?)
     `;
 
-    db.query(query, [notificationIds], (err, result) => {
-        if (err) {
-            console.error('Error marking notifications as read:', err);
-            return res.status(500).json({ error: 'Failed to mark notifications as read' });
-        }
-        res.json({ message: 'Notifications marked as read', updatedCount: result.affectedRows });
-    });
+  db.query(query, [notificationIds], (err, result) => {
+    if (err) {
+      console.error('Error marking notifications as read:', err);
+      return res.status(500).json({ error: 'Failed to mark notifications as read' });
+    }
+    res.json({ message: 'Notifications marked as read', updatedCount: result.affectedRows });
+  });
 });
 
 // ADDED: API endpoint to mark all notifications for a user as read
 app.put('/api/notifications/read-all/:userId', (req, res) => {
-    const userId = req.params.userId;
+  const userId = req.params.userId;
 
-    if (!userId) {
-        return res.status(400).json({ error: 'User ID is required' });
-    }
+  if (!userId) {
+    return res.status(400).json({ error: 'User ID is required' });
+  }
 
-    const query = `
+  const query = `
         UPDATE notifications 
         SET IsRead = TRUE 
         WHERE UserID = ? AND IsRead = FALSE
     `;
 
-    db.query(query, [userId], (err, result) => {
-        if (err) {
-            console.error('Error marking all notifications as read:', err);
-            return res.status(500).json({ error: 'Failed to mark all notifications as read' });
-        }
-        res.json({ message: 'All notifications marked as read', updatedCount: result.affectedRows });
-    });
+  db.query(query, [userId], (err, result) => {
+    if (err) {
+      console.error('Error marking all notifications as read:', err);
+      return res.status(500).json({ error: 'Failed to mark all notifications as read' });
+    }
+    res.json({ message: 'All notifications marked as read', updatedCount: result.affectedRows });
+  });
 });
 
 // API endpoint to send status update notifications to admins and supervisors
 app.post('/api/notifications/status-update', async (req, res) => {
-    try {
-        const { ticketId, updatedByUserId, oldStatus, newStatus } = req.body;
+  try {
+    const { ticketId, updatedByUserId, oldStatus, newStatus } = req.body;
 
-        // Get ticket information
-        const ticketQuery = 'SELECT * FROM ticket WHERE TicketID = ?';
-        const ticketResult = await new Promise((resolve, reject) => {
-            db.query(ticketQuery, [ticketId], (err, result) => {
-                if (err) reject(err);
-                else resolve(result);
-            });
-        });
+    // Get ticket information
+    const ticketQuery = 'SELECT * FROM ticket WHERE TicketID = ?';
+    const ticketResult = await new Promise((resolve, reject) => {
+      db.query(ticketQuery, [ticketId], (err, result) => {
+        if (err) reject(err);
+        else resolve(result);
+      });
+    });
 
-        if (ticketResult.length === 0) {
-            return res.status(404).json({ error: 'Ticket not found' });
-        }
+    if (ticketResult.length === 0) {
+      return res.status(404).json({ error: 'Ticket not found' });
+    }
 
-        const ticket = ticketResult[0];
+    const ticket = ticketResult[0];
 
-        // Get updater name
-        const updaterQuery = 'SELECT FullName FROM appuser WHERE UserID = ?';
-        const updaterResult = await new Promise((resolve, reject) => {
-            db.query(updaterQuery, [updatedByUserId], (err, result) => {
-                if (err) reject(err);
-                else resolve(result);
-            });
-        });
+    // Get updater name
+    const updaterQuery = 'SELECT FullName FROM appuser WHERE UserID = ?';
+    const updaterResult = await new Promise((resolve, reject) => {
+      db.query(updaterQuery, [updatedByUserId], (err, result) => {
+        if (err) reject(err);
+        else resolve(result);
+      });
+    });
 
-        const updaterName = updaterResult.length > 0 ? updaterResult[0].FullName : 'Admin';
+    const updaterName = updaterResult.length > 0 ? updaterResult[0].FullName : 'Admin';
 
-        // Get all admins
-        const admins = await getUsersByRoles(['Admin']);
+    // Get all admins
+    const admins = await getUsersByRoles(['Admin']);
 
-        // Get assigned supervisors for this ticket
-        const supervisorQuery = `
+    // Get assigned supervisors for this ticket
+    const supervisorQuery = `
             SELECT DISTINCT appuser.UserID 
             FROM ticket_supervisors 
             JOIN appuser ON ticket_supervisors.SupervisorUserID = appuser.UserID 
             WHERE ticket_supervisors.TicketID = ?
         `;
-        const supervisors = await new Promise((resolve, reject) => {
-            db.query(supervisorQuery, [ticketId], (err, result) => {
-                if (err) reject(err);
-                else resolve(result);
-            });
-        });
+    const supervisors = await new Promise((resolve, reject) => {
+      db.query(supervisorQuery, [ticketId], (err, result) => {
+        if (err) reject(err);
+        else resolve(result);
+      });
+    });
 
-        // Combine admins and supervisors, excluding the updater
-        const allRecipients = [...admins, ...supervisors].filter(user => user.UserID != updatedByUserId);
+    // Combine admins and supervisors, excluding the updater
+    const allRecipients = [...admins, ...supervisors].filter(user => user.UserID != updatedByUserId);
 
-        // Create notifications for all recipients
-        const message = `Ticket #${ticketId} status has been updated from ${oldStatus} to ${newStatus} by ${updaterName}`;
-        const notifications = allRecipients.map(user =>
-            createNotification(user.UserID, message, 'STATUS_UPDATE', null, ticketId)
-        );
+    // Create notifications for all recipients
+    const message = `Ticket #${ticketId} status has been updated from ${oldStatus} to ${newStatus} by ${updaterName}`;
+    const notifications = allRecipients.map(user =>
+      createNotification(user.UserID, message, 'STATUS_UPDATE', null, ticketId)
+    );
 
-        await Promise.all(notifications);
+    await Promise.all(notifications);
 
-        res.json({ message: 'Status update notifications sent successfully' });
-    } catch (error) {
-        console.error('Error sending status update notifications:', error);
-        res.status(500).json({ error: 'Failed to send status update notifications' });
-    }
+    res.json({ message: 'Status update notifications sent successfully' });
+  } catch (error) {
+    console.error('Error sending status update notifications:', error);
+    res.status(500).json({ error: 'Failed to send status update notifications' });
+  }
 });
 
 // API endpoint to send resolution update notifications to admins and supervisors
 app.post('/api/notifications/resolution-update', async (req, res) => {
-    try {
-        const { ticketId, updatedByUserId, resolutionText } = req.body;
+  try {
+    const { ticketId, updatedByUserId, resolutionText } = req.body;
 
-        // Get ticket information
-        const ticketQuery = 'SELECT * FROM ticket WHERE TicketID = ?';
-        const ticketResult = await new Promise((resolve, reject) => {
-            db.query(ticketQuery, [ticketId], (err, result) => {
-                if (err) reject(err);
-                else resolve(result);
-            });
-        });
+    // Get ticket information
+    const ticketQuery = 'SELECT * FROM ticket WHERE TicketID = ?';
+    const ticketResult = await new Promise((resolve, reject) => {
+      db.query(ticketQuery, [ticketId], (err, result) => {
+        if (err) reject(err);
+        else resolve(result);
+      });
+    });
 
-        if (ticketResult.length === 0) {
-            return res.status(404).json({ error: 'Ticket not found' });
-        }
+    if (ticketResult.length === 0) {
+      return res.status(404).json({ error: 'Ticket not found' });
+    }
 
-        const ticket = ticketResult[0];
+    const ticket = ticketResult[0];
 
-        // Get updater name
-        const updaterQuery = 'SELECT FullName FROM appuser WHERE UserID = ?';
-        const updaterResult = await new Promise((resolve, reject) => {
-            db.query(updaterQuery, [updatedByUserId], (err, result) => {
-                if (err) reject(err);
-                else resolve(result);
-            });
-        });
+    // Get updater name
+    const updaterQuery = 'SELECT FullName FROM appuser WHERE UserID = ?';
+    const updaterResult = await new Promise((resolve, reject) => {
+      db.query(updaterQuery, [updatedByUserId], (err, result) => {
+        if (err) reject(err);
+        else resolve(result);
+      });
+    });
 
-        const updaterName = updaterResult.length > 0 ? updaterResult[0].FullName : 'Admin';
+    const updaterName = updaterResult.length > 0 ? updaterResult[0].FullName : 'Admin';
 
-        // Get all admins
-        const admins = await getUsersByRoles(['Admin']);
+    // Get all admins
+    const admins = await getUsersByRoles(['Admin']);
 
-        // Get assigned supervisors for this ticket
-        const supervisorQuery = `
+    // Get assigned supervisors for this ticket
+    const supervisorQuery = `
             SELECT DISTINCT appuser.UserID 
             FROM ticket_supervisors 
             JOIN appuser ON ticket_supervisors.SupervisorUserID = appuser.UserID 
             WHERE ticket_supervisors.TicketID = ?
         `;
-        const supervisors = await new Promise((resolve, reject) => {
-            db.query(supervisorQuery, [ticketId], (err, result) => {
-                if (err) reject(err);
-                else resolve(result);
-            });
-        });
+    const supervisors = await new Promise((resolve, reject) => {
+      db.query(supervisorQuery, [ticketId], (err, result) => {
+        if (err) reject(err);
+        else resolve(result);
+      });
+    });
 
-        // Combine admins and supervisors, excluding the updater
-        const allRecipients = [...admins, ...supervisors].filter(user => user.UserID != updatedByUserId);
+    // Combine admins and supervisors, excluding the updater
+    const allRecipients = [...admins, ...supervisors].filter(user => user.UserID != updatedByUserId);
 
-        // Create notifications for all recipients
-        const message = `Ticket #${ticketId} resolution updated by ${updaterName}: ${resolutionText}`;
-        const notifications = allRecipients.map(user =>
-            createNotification(user.UserID, message, 'RESOLUTION_UPDATE', null, ticketId)
-        );
+    // Create notifications for all recipients
+    const message = `Ticket #${ticketId} resolution updated by ${updaterName}: ${resolutionText}`;
+    const notifications = allRecipients.map(user =>
+      createNotification(user.UserID, message, 'RESOLUTION_UPDATE', null, ticketId)
+    );
 
-        await Promise.all(notifications);
+    await Promise.all(notifications);
 
-        res.json({ message: 'Resolution update notifications sent successfully' });
-    } catch (error) {
-        console.error('Error sending resolution update notifications:', error);
-        res.status(500).json({ error: 'Failed to send resolution update notifications' });
-    }
+    res.json({ message: 'Resolution update notifications sent successfully' });
+  } catch (error) {
+    console.error('Error sending resolution update notifications:', error);
+    res.status(500).json({ error: 'Failed to send resolution update notifications' });
+  }
 });
 
 // API endpoint to send due date update notifications to admins and supervisors
 app.post('/api/notifications/due-date-update', async (req, res) => {
-    try {
-        const { ticketId, updatedByUserId, oldDueDate, newDueDate } = req.body;
+  try {
+    const { ticketId, updatedByUserId, oldDueDate, newDueDate } = req.body;
 
-        // Get ticket information
-        const ticketQuery = 'SELECT * FROM ticket WHERE TicketID = ?';
-        const ticketResult = await new Promise((resolve, reject) => {
-            db.query(ticketQuery, [ticketId], (err, result) => {
-                if (err) reject(err);
-                else resolve(result);
-            });
-        });
+    // Get ticket information
+    const ticketQuery = 'SELECT * FROM ticket WHERE TicketID = ?';
+    const ticketResult = await new Promise((resolve, reject) => {
+      db.query(ticketQuery, [ticketId], (err, result) => {
+        if (err) reject(err);
+        else resolve(result);
+      });
+    });
 
-        if (ticketResult.length === 0) {
-            return res.status(404).json({ error: 'Ticket not found' });
-        }
+    if (ticketResult.length === 0) {
+      return res.status(404).json({ error: 'Ticket not found' });
+    }
 
-        const ticket = ticketResult[0];
+    const ticket = ticketResult[0];
 
-        // Get updater name
-        const updaterQuery = 'SELECT FullName FROM appuser WHERE UserID = ?';
-        const updaterResult = await new Promise((resolve, reject) => {
-            db.query(updaterQuery, [updatedByUserId], (err, result) => {
-                if (err) reject(err);
-                else resolve(result);
-            });
-        });
+    // Get updater name
+    const updaterQuery = 'SELECT FullName FROM appuser WHERE UserID = ?';
+    const updaterResult = await new Promise((resolve, reject) => {
+      db.query(updaterQuery, [updatedByUserId], (err, result) => {
+        if (err) reject(err);
+        else resolve(result);
+      });
+    });
 
-        const updaterName = updaterResult.length > 0 ? updaterResult[0].FullName : 'Admin';
+    const updaterName = updaterResult.length > 0 ? updaterResult[0].FullName : 'Admin';
 
-        // Get all admins
-        const admins = await getUsersByRoles(['Admin']);
+    // Get all admins
+    const admins = await getUsersByRoles(['Admin']);
 
-        // Get assigned supervisors for this ticket
-        const supervisorQuery = `
+    // Get assigned supervisors for this ticket
+    const supervisorQuery = `
             SELECT DISTINCT appuser.UserID 
             FROM ticket_supervisors 
             JOIN appuser ON ticket_supervisors.SupervisorUserID = appuser.UserID 
             WHERE ticket_supervisors.TicketID = ?
         `;
-        const supervisors = await new Promise((resolve, reject) => {
-            db.query(supervisorQuery, [ticketId], (err, result) => {
-                if (err) reject(err);
-                else resolve(result);
-            });
-        });
+    const supervisors = await new Promise((resolve, reject) => {
+      db.query(supervisorQuery, [ticketId], (err, result) => {
+        if (err) reject(err);
+        else resolve(result);
+      });
+    });
 
-        // Combine admins and supervisors, excluding the updater
-        const allRecipients = [...admins, ...supervisors].filter(user => user.UserID != updatedByUserId);
+    // Combine admins and supervisors, excluding the updater
+    const allRecipients = [...admins, ...supervisors].filter(user => user.UserID != updatedByUserId);
 
-        // Create notifications for all recipients
-        const oldDateStr = oldDueDate ? new Date(oldDueDate).toLocaleDateString() : 'None';
-        const newDateStr = newDueDate ? new Date(newDueDate).toLocaleDateString() : 'None';
-        const message = `Ticket #${ticketId} due date updated by ${updaterName} from ${oldDateStr} to ${newDateStr}`;
-        const notifications = allRecipients.map(user =>
-            createNotification(user.UserID, message, 'DUE_DATE_UPDATE', null, ticketId)
-        );
+    // Create notifications for all recipients
+    const oldDateStr = oldDueDate ? new Date(oldDueDate).toLocaleDateString() : 'None';
+    const newDateStr = newDueDate ? new Date(newDueDate).toLocaleDateString() : 'None';
+    const message = `Ticket #${ticketId} due date updated by ${updaterName} from ${oldDateStr} to ${newDateStr}`;
+    const notifications = allRecipients.map(user =>
+      createNotification(user.UserID, message, 'DUE_DATE_UPDATE', null, ticketId)
+    );
 
-        await Promise.all(notifications);
+    await Promise.all(notifications);
 
-        res.json({ message: 'Due date update notifications sent successfully' });
-    } catch (error) {
-        console.error('Error sending due date update notifications:', error);
-        res.status(500).json({ error: 'Failed to send due date update notifications' });
-    }
+    res.json({ message: 'Due date update notifications sent successfully' });
+  } catch (error) {
+    console.error('Error sending due date update notifications:', error);
+    res.status(500).json({ error: 'Failed to send due date update notifications' });
+  }
 });
 
 /*------------------------------COUNT TICKETS----------------------------------------------------*/
 
 // API endpoint to fetch ticket counts for a SPECIFIC USER
 app.get('/api/user/tickets/counts/:userId', (req, res) => {
-    const userId = req.params.userId;
-    const queries = {
-        total: 'SELECT COUNT(*) AS count FROM ticket WHERE Userid = ?',
-        pending: "SELECT COUNT(*) AS count FROM ticket WHERE Userid = ? AND Status = 'Pending'",
-        resolved: "SELECT COUNT(*) AS count FROM ticket WHERE Userid = ? AND Status IN ('Resolved', 'Rejected')",
-        ongoing: "SELECT COUNT(*) AS count FROM ticket WHERE Userid = ? AND Status IN ('Open', 'In Progress')"
-    };
+  const userId = req.params.userId;
+  const queries = {
+    total: 'SELECT COUNT(*) AS count FROM ticket WHERE Userid = ?',
+    pending: "SELECT COUNT(*) AS count FROM ticket WHERE Userid = ? AND Status = 'Pending'",
+    resolved: "SELECT COUNT(*) AS count FROM ticket WHERE Userid = ? AND Status IN ('Resolved', 'Rejected')",
+    ongoing: "SELECT COUNT(*) AS count FROM ticket WHERE Userid = ? AND Status IN ('Open', 'In Progress')"
+  };
 
-    const results = {};
-    const totalQueries = Object.keys(queries).length;
+  const results = {};
+  const totalQueries = Object.keys(queries).length;
 
-    const promises = Object.entries(queries).map(([key, query]) => {
-        return new Promise((resolve, reject) => {
-            db.query(query, [userId], (err, result) => {
-                if (err) {
-                    console.error(`Error fetching user ${key} count:`, err);
-                    reject({ error: `Failed to fetch user ${key} ticket count` });
-                } else {
-                    results[key] = result[0].count;
-                    resolve();
-                }
-            });
-        });
+  const promises = Object.entries(queries).map(([key, query]) => {
+    return new Promise((resolve, reject) => {
+      db.query(query, [userId], (err, result) => {
+        if (err) {
+          console.error(`Error fetching user ${key} count:`, err);
+          reject({ error: `Failed to fetch user ${key} ticket count` });
+        } else {
+          results[key] = result[0].count;
+          resolve();
+        }
+      });
     });
+  });
 
-    Promise.all(promises)
-        .then(() => {
-            res.json(results);
-        })
-        .catch(error => {
-            res.status(500).json(error);
-        });
+  Promise.all(promises)
+    .then(() => {
+      res.json(results);
+    })
+    .catch(error => {
+      res.status(500).json(error);
+    });
 });
 
 // API endpoint to fetch the last five activities for a SPECIFIC USER
 app.get('/api/user/tickets/recent/:userId', (req, res) => {
-    const userId = req.params.userId;
-    const query = `
+  const userId = req.params.userId;
+  const query = `
         SELECT
             t.TicketID,
             t.Description,
@@ -2787,21 +2630,21 @@ app.get('/api/user/tickets/recent/:userId', (req, res) => {
         LIMIT 5
     `;
 
-    db.query(query, [userId], (err, results) => {
-        if (err) {
-            console.error('Error fetching user recent activities:', err);
-            return res.status(500).json({ error: 'Failed to fetch user recent activities' });
-        }
-        res.json(results);
-    });
+  db.query(query, [userId], (err, results) => {
+    if (err) {
+      console.error('Error fetching user recent activities:', err);
+      return res.status(500).json({ error: 'Failed to fetch user recent activities' });
+    }
+    res.json(results);
+  });
 });
 
 /*----------------------------------------------------------------------------------*/
 
 // Get user details by ID
 app.get('/api/users/:userId', (req, res) => {
-    const userId = req.params.userId;
-    const query = `
+  const userId = req.params.userId;
+  const query = `
     SELECT 
       u.UserID,
       u.FullName,
@@ -2817,22 +2660,22 @@ app.get('/api/users/:userId', (req, res) => {
     GROUP BY u.UserID
   `;
 
-    db.query(query, [userId], (err, results) => {
-        if (err) {
-            console.error('Error fetching user details:', err);
-            return res.status(500).json({ error: 'Database error' });
-        }
-        if (results.length === 0) {
-            return res.status(404).json({ error: 'User not found' });
-        }
-        res.json(results[0]);
-    });
+  db.query(query, [userId], (err, results) => {
+    if (err) {
+      console.error('Error fetching user details:', err);
+      return res.status(500).json({ error: 'Database error' });
+    }
+    if (results.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    res.json(results[0]);
+  });
 });
 
 // Get user's tickets
 app.get('/api/tickets/user/:userId', (req, res) => {
-    const userId = req.params.userId;
-    const query = `
+  const userId = req.params.userId;
+  const query = `
     SELECT 
       t.TicketID,
       t.Description,
@@ -2849,13 +2692,13 @@ app.get('/api/tickets/user/:userId', (req, res) => {
     ORDER BY t.DateTime DESC
   `;
 
-    db.query(query, [userId], (err, results) => {
-        if (err) {
-            console.error('Error fetching user tickets:', err);
-            return res.status(500).json({ error: 'Database error' });
-        }
-        res.json(results);
-    });
+  db.query(query, [userId], (err, results) => {
+    if (err) {
+      console.error('Error fetching user tickets:', err);
+      return res.status(500).json({ error: 'Database error' });
+    }
+    res.json(results);
+  });
 });
 
 /* ----------------------------------------------------------------------------------------------*/
@@ -2863,7 +2706,7 @@ app.get('/api/tickets/user/:userId', (req, res) => {
 // API endpoint to fetch tickets
 
 app.get('/api/tickets', (req, res) => {
-    const query = `
+  const query = `
     SELECT t.TicketID, c.CompanyName AS Client, s.Description AS System, tc.Description AS Category, t.Status, t.Priority
     FROM ticket t
     LEFT JOIN client c ON t.UserId = c.ClientID
@@ -2871,14 +2714,14 @@ app.get('/api/tickets', (req, res) => {
     LEFT JOIN ticketcategory tc ON t.TicketCategoryID = tc.TicketCategoryID;
   `;
 
-    db.query(query, (err, results) => {
-        if (err) {
-            console.error('Error fetching tickets:', err);
-            res.status(500).json({ error: 'Failed to fetch tickets' });
-            return;
-        }
-        res.json(results);
-    });
+  db.query(query, (err, results) => {
+    if (err) {
+      console.error('Error fetching tickets:', err);
+      res.status(500).json({ error: 'Failed to fetch tickets' });
+      return;
+    }
+    res.json(results);
+  });
 });
 
 app.get('/api/pending_ticket', (req, res) => {
@@ -2919,24 +2762,24 @@ app.post('/api/systems', async (req, res) => {
       return res.status(500).json({ message: "Database error" });
     }
 
-        // Send notification to supervisors, developers, and admins
-        try {
-            await sendNotificationsByRoles(
-                ['Supervisor', 'Developer', 'Admin'],
-                `New system added: ${systemName}`,
-                'NEW_SYSTEM_ADDED'
-            );
-        } catch (error) {
-            console.error('Error sending system registration notifications:', error);
-        }
+    // Send notification to supervisors, developers, and admins
+    try {
+      await sendNotificationsByRoles(
+        ['Supervisor', 'Developer', 'Admin'],
+        `New system added: ${systemName}`,
+        'NEW_SYSTEM_ADDED'
+      );
+    } catch (error) {
+      console.error('Error sending system registration notifications:', error);
+    }
 
-        res.status(200).json({ message: 'System registered successfully' });
-    });
+    res.status(200).json({ message: 'System registered successfully' });
+  });
 });
 
 //View systems
 app.get('/system_registration', (req, res) => {
-    const sql = `
+  const sql = `
     SELECT
       s.*,
       CASE
@@ -2950,37 +2793,37 @@ app.get('/system_registration', (req, res) => {
     ORDER BY s.AsipiyaSystemID;
   `;
 
-    db.query(sql, (err, results) => {
-        if (err) {
-            console.error('Error fetching system status:', err);
-            return res.status(500).json({ message: 'Database error during status fetch' });
-        }
-        res.status(200).json(results);
-    });
+  db.query(sql, (err, results) => {
+    if (err) {
+      console.error('Error fetching system status:', err);
+      return res.status(500).json({ message: 'Database error during status fetch' });
+    }
+    res.status(200).json(results);
+  });
 });
 
 app.put('/api/system_registration_update/:id', (req, res) => {
-    const { id } = req.params;
-    const { systemName, description, status } = req.body;
-    const sql = 'UPDATE asipiyasystem SET SystemName = ?, Description = ?, Status = ? WHERE AsipiyaSystemID = ?';
+  const { id } = req.params;
+  const { systemName, description, status } = req.body;
+  const sql = 'UPDATE asipiyasystem SET SystemName = ?, Description = ?, Status = ? WHERE AsipiyaSystemID = ?';
 
-    db.query(sql, [systemName, description, status, id], (err, result) => {
-        if (err) {
-            console.error('Update error:', err);
-            return res.status(500).json({ error: 'Error updating system' });
-        }
+  db.query(sql, [systemName, description, status, id], (err, result) => {
+    if (err) {
+      console.error('Update error:', err);
+      return res.status(500).json({ error: 'Error updating system' });
+    }
 
-        if (result.affectedRows === 0) {
-            return res.status(404).json({ message: 'System not found' });
-        }
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: 'System not found' });
+    }
 
-        res.status(200).json({ message: 'System updated successfully' });
-    });
+    res.status(200).json({ message: 'System updated successfully' });
+  });
 });
 
 
 app.delete('/api/system_registration_delete/:id', (req, res) => {
-    const { id } = req.params;
+  const { id } = req.params;
 
   const checkStatusSql = 'SELECT Status FROM asipiyasystem WHERE AsipiyaSystemID = ?';
   db.query(checkStatusSql, [id], (err, results) => {
@@ -2998,20 +2841,20 @@ app.delete('/api/system_registration_delete/:id', (req, res) => {
       return res.status(403).json({ message: 'Cannot delete active system (status = 1)' });
     }
 
-        const deleteSql = 'DELETE FROM asipiyasystem WHERE AsipiyaSystemID = ?';
-        db.query(deleteSql, [id], (err, result) => {
-            if (err) {
-                console.error('Delete error:', err);
-                return res.status(500).json({ error: 'Error deleting system' });
-            }
+    const deleteSql = 'DELETE FROM asipiyasystem WHERE AsipiyaSystemID = ?';
+    db.query(deleteSql, [id], (err, result) => {
+      if (err) {
+        console.error('Delete error:', err);
+        return res.status(500).json({ error: 'Error deleting system' });
+      }
 
-            if (result.affectedRows === 0) {
-                return res.status(404).json({ message: 'System not found' });
-            }
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ message: 'System not found' });
+      }
 
-            res.status(200).json({ message: 'System deleted successfully' });
-        });
+      res.status(200).json({ message: 'System deleted successfully' });
     });
+  });
 });
 
 
@@ -3027,26 +2870,26 @@ app.post('/api/ticket_category', async (req, res) => {
       return res.status(500).json({ message: "Failed to add ticket category" });
     }
 
-        try {
-            await sendNotificationsByRoles(
-                ['Supervisor', 'Developer', 'Admin'],
-                `New ticket category added: ${CategoryName}`,
-                'NEW_CATEGORY_ADDED'
-            );
-        } catch (error) {
-            console.error('Error sending category addition notifications:', error);
-        }
+    try {
+      await sendNotificationsByRoles(
+        ['Supervisor', 'Developer', 'Admin'],
+        `New ticket category added: ${CategoryName}`,
+        'NEW_CATEGORY_ADDED'
+      );
+    } catch (error) {
+      console.error('Error sending category addition notifications:', error);
+    }
 
-        res.status(200).json({
-            message: 'Ticket category added successfully',
-            categoryId: result.insertId
-        });
+    res.status(200).json({
+      message: 'Ticket category added successfully',
+      categoryId: result.insertId
     });
+  });
 });
 
 //View Categories
 app.get('/ticket_category', (req, res) => {
-    const sql = `
+  const sql = `
     SELECT
       tc.*,
       CASE
@@ -3060,37 +2903,37 @@ app.get('/ticket_category', (req, res) => {
       tc.TicketCategoryID, tc.CategoryName, tc.Description, tc.Status
     ORDER BY tc.TicketCategoryID;
   `;
-    db.query(sql, (err, results) => {
-        if (err) {
-            console.error('Error fetching categories:', err);
-            return res.status(500).json({ message: 'Error fetching categories' });
-        }
-        res.status(200).json(results);
-    });
+  db.query(sql, (err, results) => {
+    if (err) {
+      console.error('Error fetching categories:', err);
+      return res.status(500).json({ message: 'Error fetching categories' });
+    }
+    res.status(200).json(results);
+  });
 });
 
 app.put('/api/ticket_category_update/:id', (req, res) => {
-    const { id } = req.params;
-    const { CategoryName, Description, Status } = req.body;
+  const { id } = req.params;
+  const { CategoryName, Description, Status } = req.body;
 
-    const sql = 'UPDATE ticketcategory SET CategoryName = ?, Description = ?, Status = ? WHERE TicketCategoryID = ?';
-    db.query(sql, [CategoryName, Description, Status, id], (err, result) => {
-        if (err) {
-            console.error('Update error:', err);
-            return res.status(500).json({ error: 'Error updating category' });
-        }
+  const sql = 'UPDATE ticketcategory SET CategoryName = ?, Description = ?, Status = ? WHERE TicketCategoryID = ?';
+  db.query(sql, [CategoryName, Description, Status, id], (err, result) => {
+    if (err) {
+      console.error('Update error:', err);
+      return res.status(500).json({ error: 'Error updating category' });
+    }
 
-        if (result.affectedRows === 0) {
-            return res.status(404).json({ message: 'Category not found' });
-        }
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: 'Category not found' });
+    }
 
-        res.status(200).json({ message: 'Category updated successfully' });
-    });
+    res.status(200).json({ message: 'Category updated successfully' });
+  });
 });
 
 
 app.delete('/api/ticket_category_delete/:id', (req, res) => {
-    const { id } = req.params;
+  const { id } = req.params;
 
   const checkSql = 'SELECT Status FROM ticketcategory WHERE TicketCategoryID = ?';
   db.query(checkSql, [id], (err, results) => {
@@ -3115,13 +2958,13 @@ app.delete('/api/ticket_category_delete/:id', (req, res) => {
         return res.status(500).json({ error: 'Error deleting category' });
       }
 
-            if (result.affectedRows === 0) {
-                return res.status(404).json({ message: 'Category not found' });
-            }
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ message: 'Category not found' });
+      }
 
-            res.status(200).json({ message: 'Category deleted successfully' });
-        });
+      res.status(200).json({ message: 'Category deleted successfully' });
     });
+  });
 });
 
 // API endpoint to update ticket status (including rejection)
@@ -3130,88 +2973,88 @@ app.delete('/api/ticket_category_delete/:id', (req, res) => {
 // 2. Create a ticket log entry for the rejection
 // 3. Send a notification to the ticket creator with the rejection reason
 app.put('/api/ticket_status/:id', async (req, res) => {
-    const { id } = req.params;
-    const { status, reason, userId } = req.body; // Added userId to track who performed the action
-    const now = new Date();
-    const firstRespondedTimeValue = now;
+  const { id } = req.params;
+  const { status, reason, userId } = req.body; // Added userId to track who performed the action
+  const now = new Date();
+  const firstRespondedTimeValue = now;
 
-    try {
-        // First, get the ticket details including the creator
-        const getTicketQuery = 'SELECT UserId as ticketCreatorId, Status as oldStatus FROM ticket WHERE TicketID = ?';
-        const ticketResult = await new Promise((resolve, reject) => {
-            db.query(getTicketQuery, [id], (err, results) => {
-                if (err) reject(err);
-                else resolve(results);
-            });
-        });
+  try {
+    // First, get the ticket details including the creator
+    const getTicketQuery = 'SELECT UserId as ticketCreatorId, Status as oldStatus FROM ticket WHERE TicketID = ?';
+    const ticketResult = await new Promise((resolve, reject) => {
+      db.query(getTicketQuery, [id], (err, results) => {
+        if (err) reject(err);
+        else resolve(results);
+      });
+    });
 
-        if (ticketResult.length === 0) {
-            return res.status(404).json({ error: 'Ticket not found' });
-        }
-
-        const ticketCreatorId = ticketResult[0].ticketCreatorId;
-        const oldStatus = ticketResult[0].oldStatus;
-
-        // Update the ticket status
-        const sql = 'UPDATE ticket SET Status = ?, FirstRespondedTime = ?, Reason = ? WHERE TicketID = ?';
-        await new Promise((resolve, reject) => {
-            db.query(sql, [status, firstRespondedTimeValue, reason, id], (err, result) => {
-                if (err) reject(err);
-                else resolve(result);
-            });
-        });
-
-        // Create ticket log
-        const logDescription = `${status.toLowerCase()} ticket: ${reason}`;
-        const logType = status === 'Rejected' ? 'TICKET_REJECTED' : 'STATUS_CHANGE';
-        
-        const logResult = await createTicketLog(
-            id,
-            logType,
-            logDescription,
-            userId,
-            oldStatus,
-            status,
-            reason // Keep reason in note for specific rejection detail
-        );
-
-        // Send notification to the ticket creator
-        if (ticketCreatorId && status === 'Rejected') {
-            // Get the name of the person who rejected the ticket
-            let rejectorName = 'System';
-            if (userId) {
-                const getRejectorNameQuery = 'SELECT FullName FROM appuser WHERE UserID = ?';
-                const rejectorResult = await new Promise((resolve, reject) => {
-                    db.query(getRejectorNameQuery, [userId], (err, results) => {
-                        if (err) reject(err);
-                        else resolve(results);
-                    });
-                });
-                
-                if (rejectorResult.length > 0) {
-                    rejectorName = rejectorResult[0].FullName;
-                }
-            }
-
-            const notificationMessage = `Your ticket #${id} has been rejected by ${rejectorName}. Reason: ${reason}`;
-            
-            await createNotification(
-                ticketCreatorId,
-                notificationMessage,
-                'TICKET_REJECTED',
-                logResult.insertId
-            );
-        }
-
-        res.status(200).json({ 
-            message: status === 'Rejected' ? 'Ticket rejected successfully' : 'Ticket status updated successfully',
-            status: 'success'
-        });
-
-    } catch (error) {
-        console.error('Error updating ticket status:', error);
-        res.status(500).json({ error: 'Error updating the ticket status' });
+    if (ticketResult.length === 0) {
+      return res.status(404).json({ error: 'Ticket not found' });
     }
+
+    const ticketCreatorId = ticketResult[0].ticketCreatorId;
+    const oldStatus = ticketResult[0].oldStatus;
+
+    // Update the ticket status
+    const sql = 'UPDATE ticket SET Status = ?, FirstRespondedTime = ?, Reason = ? WHERE TicketID = ?';
+    await new Promise((resolve, reject) => {
+      db.query(sql, [status, firstRespondedTimeValue, reason, id], (err, result) => {
+        if (err) reject(err);
+        else resolve(result);
+      });
+    });
+
+    // Create ticket log
+    const logDescription = `${status.toLowerCase()} ticket: ${reason}`;
+    const logType = status === 'Rejected' ? 'TICKET_REJECTED' : 'STATUS_CHANGE';
+
+    const logResult = await createTicketLog(
+      id,
+      logType,
+      logDescription,
+      userId,
+      oldStatus,
+      status,
+      reason // Keep reason in note for specific rejection detail
+    );
+
+    // Send notification to the ticket creator
+    if (ticketCreatorId && status === 'Rejected') {
+      // Get the name of the person who rejected the ticket
+      let rejectorName = 'System';
+      if (userId) {
+        const getRejectorNameQuery = 'SELECT FullName FROM appuser WHERE UserID = ?';
+        const rejectorResult = await new Promise((resolve, reject) => {
+          db.query(getRejectorNameQuery, [userId], (err, results) => {
+            if (err) reject(err);
+            else resolve(results);
+          });
+        });
+
+        if (rejectorResult.length > 0) {
+          rejectorName = rejectorResult[0].FullName;
+        }
+      }
+
+      const notificationMessage = `Your ticket #${id} has been rejected by ${rejectorName}. Reason: ${reason}`;
+
+      await createNotification(
+        ticketCreatorId,
+        notificationMessage,
+        'TICKET_REJECTED',
+        logResult.insertId
+      );
+    }
+
+    res.status(200).json({
+      message: status === 'Rejected' ? 'Ticket rejected successfully' : 'Ticket status updated successfully',
+      status: 'success'
+    });
+
+  } catch (error) {
+    console.error('Error updating ticket status:', error);
+    res.status(500).json({ error: 'Error updating the ticket status' });
+  }
 });
 
 app.get("/download_evidence/:filename", (req, res) => {
@@ -3242,165 +3085,165 @@ app.get("/download_evidence/:filename", (req, res) => {
 
 // Helper function to create a notification
 const createNotification = async (userId, message, type, ticketLogId = null, ticketId = null) => {
-    return new Promise((resolve, reject) => {
-        let query, params;
-        
-        if (ticketLogId) {
-            // If we have a ticketLogId, use the existing structure
-            query = `
+  return new Promise((resolve, reject) => {
+    let query, params;
+
+    if (ticketLogId) {
+      // If we have a ticketLogId, use the existing structure
+      query = `
                 INSERT INTO notifications (UserID, Message, Type, TicketLogID)
                 VALUES (?, ?, ?, ?)
             `;
-            params = [userId, message, type, ticketLogId];
-        } else if (ticketId) {
-            // If we only have a ticketId, we need to create a simple log entry first or handle it differently
-            // For these notification types, we'll create a temporary log entry
-            const createTempLogQuery = `
+      params = [userId, message, type, ticketLogId];
+    } else if (ticketId) {
+      // If we only have a ticketId, we need to create a simple log entry first or handle it differently
+      // For these notification types, we'll create a temporary log entry
+      const createTempLogQuery = `
                 INSERT INTO ticketlog (TicketID, Type, Description, UserID, CreatedAt)
                 VALUES (?, ?, ?, ?, NOW())
             `;
-            
-            db.query(createTempLogQuery, [ticketId, type, message, userId || 1], (logErr, logResult) => {
-                if (logErr) {
-                    console.error('Error creating temporary log:', logErr);
-                    reject(logErr);
-                    return;
-                }
-                
-                // Now create the notification with the new log ID
-                const notificationQuery = `
+
+      db.query(createTempLogQuery, [ticketId, type, message, userId || 1], (logErr, logResult) => {
+        if (logErr) {
+          console.error('Error creating temporary log:', logErr);
+          reject(logErr);
+          return;
+        }
+
+        // Now create the notification with the new log ID
+        const notificationQuery = `
                     INSERT INTO notifications (UserID, Message, Type, TicketLogID)
                     VALUES (?, ?, ?, ?)
                 `;
-                db.query(notificationQuery, [userId, message, type, logResult.insertId], (err, result) => {
-                    if (err) {
-                        console.error('Error creating notification:', err);
-                        reject(err);
-                    } else {
-                        resolve(result);
-                    }
-                });
-            });
-            return;
-        } else {
-            // Original structure for notifications without tickets
-            query = `
+        db.query(notificationQuery, [userId, message, type, logResult.insertId], (err, result) => {
+          if (err) {
+            console.error('Error creating notification:', err);
+            reject(err);
+          } else {
+            resolve(result);
+          }
+        });
+      });
+      return;
+    } else {
+      // Original structure for notifications without tickets
+      query = `
                 INSERT INTO notifications (UserID, Message, Type, TicketLogID)
                 VALUES (?, ?, ?, ?)
             `;
-            params = [userId, message, type, null];
-        }
-        
-        db.query(query, params, (err, result) => {
-            if (err) {
-                console.error('Error creating notification:', err);
-                reject(err);
-            } else {
-                resolve(result);
-            }
-        });
+      params = [userId, message, type, null];
+    }
+
+    db.query(query, params, (err, result) => {
+      if (err) {
+        console.error('Error creating notification:', err);
+        reject(err);
+      } else {
+        resolve(result);
+      }
     });
+  });
 };
 
 // Helper function to get users by roles
 const getUsersByRoles = async (roles) => {
-    return new Promise((resolve, reject) => {
-        const query = 'SELECT UserID FROM appuser WHERE Role IN (?)';
-        db.query(query, [roles], (err, results) => {
-            if (err) {
-                console.error('Error fetching users by roles:', err);
-                reject(err);
-            } else {
-                resolve(results);
-            }
-        });
+  return new Promise((resolve, reject) => {
+    const query = 'SELECT UserID FROM appuser WHERE Role IN (?)';
+    db.query(query, [roles], (err, results) => {
+      if (err) {
+        console.error('Error fetching users by roles:', err);
+        reject(err);
+      } else {
+        resolve(results);
+      }
     });
+  });
 };
 
 // Helper function to send notifications to users by roles
 const sendNotificationsByRoles = async (roles, message, type, ticketLogId = null) => {
-    try {
-        const users = await getUsersByRoles(roles);
-        const notifications = users.map(user =>
-            createNotification(user.UserID, message, type, ticketLogId)
-        );
-        await Promise.all(notifications);
-    } catch (error) {
-        console.error('Error sending notifications by roles:', error);
-    }
+  try {
+    const users = await getUsersByRoles(roles);
+    const notifications = users.map(user =>
+      createNotification(user.UserID, message, type, ticketLogId)
+    );
+    await Promise.all(notifications);
+  } catch (error) {
+    console.error('Error sending notifications by roles:', error);
+  }
 };
 
 // Invite supervisor endpoint
 app.post('/api/invite-supervisor', async (req, res) => {
-    const { email, role } = req.body;
+  const { email, role } = req.body;
 
-    // Generate invitation token
-    const token = crypto.randomBytes(32).toString('hex');
-    const mailOptions = {
-        from: process.env.EMAIL_USER,
-        to: email,
-        subject: 'Invitation to Join as Supervisor',
-        html: `
+  // Generate invitation token
+  const token = crypto.randomBytes(32).toString('hex');
+  const mailOptions = {
+    from: process.env.EMAIL_USER,
+    to: email,
+    subject: 'Invitation to Join as Supervisor',
+    html: `
       <h2>You've been invited to join as a Supervisor</h2>
       <p>Please click the link below to complete your registration:</p>
       <a href="${process.env.FRONTEND_URL}/register?token=${token}&role=${role}">Complete Registration</a>
     `
-    };
+  };
 
-    try {
-        await transporter.sendMail(mailOptions);
+  try {
+    await transporter.sendMail(mailOptions);
 
-        // If inviting a supervisor, notify admins and existing supervisors
-        if (role === 'Supervisor') {
-            await sendNotificationsByRoles(
-                ['Admin', 'Supervisor'],
-                `New supervisor invitation sent to ${email}`,
-                'NEW_SUPERVISOR_INVITED'
-            );
-        }
-
-        res.json({ message: 'Invitation email sent successfully.' });
-    } catch (mailErr) {
-        console.error('Error sending invitation email:', mailErr);
-        res.status(500).json({ message: 'Failed to send invitation email.' });
+    // If inviting a supervisor, notify admins and existing supervisors
+    if (role === 'Supervisor') {
+      await sendNotificationsByRoles(
+        ['Admin', 'Supervisor'],
+        `New supervisor invitation sent to ${email}`,
+        'NEW_SUPERVISOR_INVITED'
+      );
     }
+
+    res.json({ message: 'Invitation email sent successfully.' });
+  } catch (mailErr) {
+    console.error('Error sending invitation email:', mailErr);
+    res.status(500).json({ message: 'Failed to send invitation email.' });
+  }
 });
 
 // Assign supervisor to ticket endpoint
 app.put('/api/tickets/:id/assign', (req, res) => {
-    const ticketId = req.params.id;
-    const { supervisorId, status, priority, assignerId } = req.body; // assignerId is received here
+  const ticketId = req.params.id;
+  const { supervisorId, status, priority, assignerId } = req.body; // assignerId is received here
 
-    console.log('Assign endpoint: Received:', { ticketId, supervisorId, status, priority, assignerId }); // Add this line
+  console.log('Assign endpoint: Received:', { ticketId, supervisorId, status, priority, assignerId }); // Add this line
 
-    if (!ticketId || !supervisorId || !assignerId) { // Assigner ID is required
+  if (!ticketId || !supervisorId || !assignerId) { // Assigner ID is required
 
 
-        return res.status(400).json({
-            error: 'Ticket ID, Supervisor ID, and Assigner ID are required'
-        });
+    return res.status(400).json({
+      error: 'Ticket ID, Supervisor ID, and Assigner ID are required'
+    });
+  }
+
+  const supervisorIds = supervisorId.split(',').map(id => id.trim());
+  const supervisorString = supervisorIds.join(',');
+
+  db.query('SELECT Status, Priority, SupervisorID, UserId as ticketCreatorId FROM ticket WHERE TicketID = ?', [ticketId], async (err, currentTicketResults) => {
+    if (err) {
+      console.error('Error fetching current ticket details for assignment:', err);
+      return res.status(500).json({ error: 'Server error while fetching ticket details' });
+    }
+    if (currentTicketResults.length === 0) {
+      return res.status(404).json({ error: 'Ticket not found' });
     }
 
-    const supervisorIds = supervisorId.split(',').map(id => id.trim());
-    const supervisorString = supervisorIds.join(',');
+    const oldStatus = currentTicketResults[0].Status;
+    const oldPriority = currentTicketResults[0].Priority;
+    const oldSupervisorId = currentTicketResults[0].SupervisorID;
+    const ticketCreatorId = currentTicketResults[0].ticketCreatorId; // Get ticket creator ID
 
-     db.query('SELECT Status, Priority, SupervisorID, UserId as ticketCreatorId FROM ticket WHERE TicketID = ?', [ticketId], async (err, currentTicketResults) => {
-        if (err) {
-            console.error('Error fetching current ticket details for assignment:', err);
-            return res.status(500).json({ error: 'Server error while fetching ticket details' });
-        }
-        if (currentTicketResults.length === 0) {
-            return res.status(404).json({ error: 'Ticket not found' });
-        }
+    console.log('Assign endpoint: Old Supervisor ID from DB:', oldSupervisorId); // Add this line
 
-        const oldStatus = currentTicketResults[0].Status;
-        const oldPriority = currentTicketResults[0].Priority;
-        const oldSupervisorId = currentTicketResults[0].SupervisorID;
-        const ticketCreatorId = currentTicketResults[0].ticketCreatorId; // Get ticket creator ID
-
-        console.log('Assign endpoint: Old Supervisor ID from DB:', oldSupervisorId); // Add this line
-
-         const updateQuery = `
+    const updateQuery = `
             UPDATE ticket
             SET SupervisorID = ?,
                 Status = ?,
@@ -3410,196 +3253,196 @@ app.put('/api/tickets/:id/assign', (req, res) => {
             WHERE TicketID = ?
         `;
 
-        db.query(updateQuery, [supervisorString, status, priority, ticketId], async (err, result) => {
-            if (err) {
-                console.error('Error updating ticket during assignment:', err);
-                return res.status(500).json({
-                    error: 'Failed to assign supervisor',
-                    message: err.message
-                });
-            }
-
-            if (result.affectedRows === 0) {
-                return res.status(404).json({
-                    error: 'Ticket not found'
-                });
-            }
-
-            try {
-                // Get all supervisor IDs as an array
-                const supervisorIds = supervisorString.split(',').map(id => id.trim()).filter(Boolean);
-                const oldSupervisorIds = (oldSupervisorId || '').split(',').map(id => id.trim()).filter(Boolean);
-
-                // Fetch names for all supervisors and assigner
-                let getAllNamesQuery = `SELECT UserID, FullName FROM appuser WHERE `;
-                const queryParams = [];
-                const conditions = [];
-
-                // Add new supervisor IDs
-                if (supervisorIds.length > 0) {
-                    conditions.push(`UserID IN (${supervisorIds.map(() => '?').join(',')})`);
-                    queryParams.push(...supervisorIds);
-                }
-
-                // Add old supervisor IDs if they exist
-                if (oldSupervisorIds.length > 0) {
-                    conditions.push(`UserID IN (${oldSupervisorIds.map(() => '?').join(',')})`);
-                    queryParams.push(...oldSupervisorIds);
-                }
-
-                // Add assigner ID if it exists
-                if (assignerId) {
-                    conditions.push(`UserID = ?`);
-                    queryParams.push(assignerId);
-                }
-
-                getAllNamesQuery += conditions.join(' OR ');
-
-                const allNamesResult = await new Promise((resolve, reject) => {
-                    db.query(getAllNamesQuery, queryParams, (err, results) => {
-                        if (err) reject(err);
-                        else resolve(results || []);
-                    });
-                });
-
-                // Create name mappings
-                const nameMap = {};
-                if (allNamesResult) {
-                    allNamesResult.forEach(user => {
-                        nameMap[user.UserID] = user.FullName;
-                    });
-                }
-
-                const newSupervisorNames = supervisorIds.map(id => nameMap[id] || `User ${id}`);
-                const oldSupervisorNames = oldSupervisorIds.map(id => nameMap[id] || `User ${id}`);
-                const assignerName = assignerId ? (nameMap[assignerId] || 'Unknown') : 'System';
-
-                console.log('Assign endpoint: New supervisor names:', newSupervisorNames);
-                console.log('Assign endpoint: Old supervisor names:', oldSupervisorNames);
-                console.log('Assign endpoint: Assigner name:', assignerName);
-
-                // Track what changed for a single comprehensive notification
-                const changes = [];
-                let logResults = [];
-
-                // Log supervisor change if it occurred
-                if (oldSupervisorId != supervisorString) {
-                    const oldNamesStr = oldSupervisorNames.length > 0 ? oldSupervisorNames.join(', ') : 'No supervisors';
-                    const newNamesStr = newSupervisorNames.join(', ');
-                    
-                    const supervisorLogDescription = `assigned supervisors: ${newNamesStr} (Previously: ${oldNamesStr})`;
-                    const logResult = await createTicketLog(
-                        ticketId,
-                        'SUPERVISOR_CHANGE',
-                        supervisorLogDescription,
-                        assignerId,
-                        oldSupervisorId || null,
-                        supervisorString,
-                        null // Let createTicketLog handle the note
-                    );
-                    logResults.push(logResult);
-                    changes.push(`supervisor(s) assigned: ${newNamesStr}`);
-
-                    // Notify old supervisors if they were unassigned
-                    for (const oldId of oldSupervisorIds) {
-                        if (!supervisorIds.includes(oldId)) {
-                            await createNotification(
-                                oldId,
-                                `You have been unassigned from ticket #${ticketId}${assignerName ? ` by ${assignerName}` : ''}.`,
-                                'SUPERVISOR_UNASSIGNED',
-                                logResult.insertId,
-                                ticketId
-                            );
-                        }
-                    }
-                }
-
-                // Log status change if it occurred
-                if ((oldStatus || '').trim().toLowerCase() !== (status || '').trim().toLowerCase()) {
-                    const statusLogDescription = `changed status from ${oldStatus} to ${status}`;
-                    const logResult = await createTicketLog(
-                        ticketId,
-                        'STATUS_CHANGE',
-                        statusLogDescription,
-                        assignerId,
-                        oldStatus,
-                        status,
-                        null // Let createTicketLog handle the note
-                    );
-                    logResults.push(logResult);
-                    changes.push(`status changed to ${status}`);
-                }
-
-                // Log priority change if it occurred
-                if ((oldPriority || '').trim().toLowerCase() !== (priority || '').trim().toLowerCase()) {
-                    const priorityLogDescription = `changed priority from ${oldPriority} to ${priority}`;
-                    const logResult = await createTicketLog(
-                        ticketId,
-                        'PRIORITY_CHANGE',
-                        priorityLogDescription,
-                        assignerId,
-                        oldPriority,
-                        priority,
-                        null // Let createTicketLog handle the note
-                    );
-                    logResults.push(logResult);
-                    changes.push(`priority changed to ${priority}`);
-                }
-
-                // Send a single comprehensive notification to ticket creator if any changes occurred
-                if (changes.length > 0 && ticketCreatorId) {
-                    const changeMessage = changes.join(', ');
-                    await createNotification(
-                        ticketCreatorId,
-                        `Your ticket #${ticketId} has been updated: ${changeMessage}${assignerName ? ` by ${assignerName}` : ''}.`,
-                        'TICKET_UPDATED',
-                        logResults[0]?.insertId || null,
-                        ticketId
-                    );
-                }
-
-                // Send notifications to assigned supervisors
-                for (const supId of supervisorIds) {
-                    if (supId !== assignerId) { // Don't notify the assigner
-                        if (!oldSupervisorIds.includes(supId)) {
-                            // New assignment
-                            const supervisorName = nameMap[supId] || `User ${supId}`;
-                            await createNotification(
-                                supId,
-                                `You have been assigned to ticket #${ticketId}. Status: ${status}, Priority: ${priority}.${assignerName ? ` Assigned by ${assignerName}` : ''}`,
-                                'SUPERVISOR_ASSIGNED',
-                                logResults[0]?.insertId || null,
-                                ticketId
-                            );
-                        } else if (changes.length > 0) {
-                            // Changes to existing assignment
-                            const changeMessage = changes.join(', ');
-                            await createNotification(
-                                supId,
-                                `Ticket #${ticketId} assigned to you has been updated: ${changeMessage}${assignerName ? ` by ${assignerName}` : ''}.`,
-                                'TICKET_UPDATED',
-                                logResults[0]?.insertId || null,
-                                ticketId
-                            );
-                        }
-                    }
-                }
-
-
-                res.json({
-                    message: 'Supervisor assigned and changes logged successfully',
-                    status: 'success'
-                });
-
-            } catch (logErr) {
-                console.error('Error creating logs or sending notifications during assignment:', logErr);
-                 res.status(500).json({
-                    error: 'Assignment successful, but failed to log changes or send notifications',
-                    message: logErr.message
-                });
-            }
+    db.query(updateQuery, [supervisorString, status, priority, ticketId], async (err, result) => {
+      if (err) {
+        console.error('Error updating ticket during assignment:', err);
+        return res.status(500).json({
+          error: 'Failed to assign supervisor',
+          message: err.message
         });
+      }
+
+      if (result.affectedRows === 0) {
+        return res.status(404).json({
+          error: 'Ticket not found'
+        });
+      }
+
+      try {
+        // Get all supervisor IDs as an array
+        const supervisorIds = supervisorString.split(',').map(id => id.trim()).filter(Boolean);
+        const oldSupervisorIds = (oldSupervisorId || '').split(',').map(id => id.trim()).filter(Boolean);
+
+        // Fetch names for all supervisors and assigner
+        let getAllNamesQuery = `SELECT UserID, FullName FROM appuser WHERE `;
+        const queryParams = [];
+        const conditions = [];
+
+        // Add new supervisor IDs
+        if (supervisorIds.length > 0) {
+          conditions.push(`UserID IN (${supervisorIds.map(() => '?').join(',')})`);
+          queryParams.push(...supervisorIds);
+        }
+
+        // Add old supervisor IDs if they exist
+        if (oldSupervisorIds.length > 0) {
+          conditions.push(`UserID IN (${oldSupervisorIds.map(() => '?').join(',')})`);
+          queryParams.push(...oldSupervisorIds);
+        }
+
+        // Add assigner ID if it exists
+        if (assignerId) {
+          conditions.push(`UserID = ?`);
+          queryParams.push(assignerId);
+        }
+
+        getAllNamesQuery += conditions.join(' OR ');
+
+        const allNamesResult = await new Promise((resolve, reject) => {
+          db.query(getAllNamesQuery, queryParams, (err, results) => {
+            if (err) reject(err);
+            else resolve(results || []);
+          });
+        });
+
+        // Create name mappings
+        const nameMap = {};
+        if (allNamesResult) {
+          allNamesResult.forEach(user => {
+            nameMap[user.UserID] = user.FullName;
+          });
+        }
+
+        const newSupervisorNames = supervisorIds.map(id => nameMap[id] || `User ${id}`);
+        const oldSupervisorNames = oldSupervisorIds.map(id => nameMap[id] || `User ${id}`);
+        const assignerName = assignerId ? (nameMap[assignerId] || 'Unknown') : 'System';
+
+        console.log('Assign endpoint: New supervisor names:', newSupervisorNames);
+        console.log('Assign endpoint: Old supervisor names:', oldSupervisorNames);
+        console.log('Assign endpoint: Assigner name:', assignerName);
+
+        // Track what changed for a single comprehensive notification
+        const changes = [];
+        let logResults = [];
+
+        // Log supervisor change if it occurred
+        if (oldSupervisorId != supervisorString) {
+          const oldNamesStr = oldSupervisorNames.length > 0 ? oldSupervisorNames.join(', ') : 'No supervisors';
+          const newNamesStr = newSupervisorNames.join(', ');
+
+          const supervisorLogDescription = `assigned supervisors: ${newNamesStr} (Previously: ${oldNamesStr})`;
+          const logResult = await createTicketLog(
+            ticketId,
+            'SUPERVISOR_CHANGE',
+            supervisorLogDescription,
+            assignerId,
+            oldSupervisorId || null,
+            supervisorString,
+            null // Let createTicketLog handle the note
+          );
+          logResults.push(logResult);
+          changes.push(`supervisor(s) assigned: ${newNamesStr}`);
+
+          // Notify old supervisors if they were unassigned
+          for (const oldId of oldSupervisorIds) {
+            if (!supervisorIds.includes(oldId)) {
+              await createNotification(
+                oldId,
+                `You have been unassigned from ticket #${ticketId}${assignerName ? ` by ${assignerName}` : ''}.`,
+                'SUPERVISOR_UNASSIGNED',
+                logResult.insertId,
+                ticketId
+              );
+            }
+          }
+        }
+
+        // Log status change if it occurred
+        if ((oldStatus || '').trim().toLowerCase() !== (status || '').trim().toLowerCase()) {
+          const statusLogDescription = `changed status from ${oldStatus} to ${status}`;
+          const logResult = await createTicketLog(
+            ticketId,
+            'STATUS_CHANGE',
+            statusLogDescription,
+            assignerId,
+            oldStatus,
+            status,
+            null // Let createTicketLog handle the note
+          );
+          logResults.push(logResult);
+          changes.push(`status changed to ${status}`);
+        }
+
+        // Log priority change if it occurred
+        if ((oldPriority || '').trim().toLowerCase() !== (priority || '').trim().toLowerCase()) {
+          const priorityLogDescription = `changed priority from ${oldPriority} to ${priority}`;
+          const logResult = await createTicketLog(
+            ticketId,
+            'PRIORITY_CHANGE',
+            priorityLogDescription,
+            assignerId,
+            oldPriority,
+            priority,
+            null // Let createTicketLog handle the note
+          );
+          logResults.push(logResult);
+          changes.push(`priority changed to ${priority}`);
+        }
+
+        // Send a single comprehensive notification to ticket creator if any changes occurred
+        if (changes.length > 0 && ticketCreatorId) {
+          const changeMessage = changes.join(', ');
+          await createNotification(
+            ticketCreatorId,
+            `Your ticket #${ticketId} has been updated: ${changeMessage}${assignerName ? ` by ${assignerName}` : ''}.`,
+            'TICKET_UPDATED',
+            logResults[0]?.insertId || null,
+            ticketId
+          );
+        }
+
+        // Send notifications to assigned supervisors
+        for (const supId of supervisorIds) {
+          if (supId !== assignerId) { // Don't notify the assigner
+            if (!oldSupervisorIds.includes(supId)) {
+              // New assignment
+              const supervisorName = nameMap[supId] || `User ${supId}`;
+              await createNotification(
+                supId,
+                `You have been assigned to ticket #${ticketId}. Status: ${status}, Priority: ${priority}.${assignerName ? ` Assigned by ${assignerName}` : ''}`,
+                'SUPERVISOR_ASSIGNED',
+                logResults[0]?.insertId || null,
+                ticketId
+              );
+            } else if (changes.length > 0) {
+              // Changes to existing assignment
+              const changeMessage = changes.join(', ');
+              await createNotification(
+                supId,
+                `Ticket #${ticketId} assigned to you has been updated: ${changeMessage}${assignerName ? ` by ${assignerName}` : ''}.`,
+                'TICKET_UPDATED',
+                logResults[0]?.insertId || null,
+                ticketId
+              );
+            }
+          }
+        }
+
+
+        res.json({
+          message: 'Supervisor assigned and changes logged successfully',
+          status: 'success'
+        });
+
+      } catch (logErr) {
+        console.error('Error creating logs or sending notifications during assignment:', logErr);
+        res.status(500).json({
+          error: 'Assignment successful, but failed to log changes or send notifications',
+          message: logErr.message
+        });
+      }
     });
+  });
 });
 
 // Create new ticket
@@ -3682,7 +3525,7 @@ app.post('/api/upload_evidence', upload_evidence.array('evidenceFiles'), async (
   try {
     const values = req.files.map(file => [
       ticketId,
-      `uploads/${file.filename}`, 
+      `uploads/${file.filename}`,
       description
     ]);
 
@@ -3776,81 +3619,81 @@ export default db;
 
 // Add attachment endpoint
 app.post('/api/tickets/:ticketId/attachments', async (req, res) => {
-    const { ticketId } = req.params;
-    const { fileName, fileUrl, userId } = req.body;
+  const { ticketId } = req.params;
+  const { fileName, fileUrl, userId } = req.body;
 
-    try {
-        // Create log entry for the attachment
-        const logResult = await createTicketLog(
-            ticketId,
-            'ATTACHMENT',
-            `added an attachment: ${fileName}`,
-            userId,
-            null,
-            fileUrl
+  try {
+    // Create log entry for the attachment
+    const logResult = await createTicketLog(
+      ticketId,
+      'ATTACHMENT',
+      `added an attachment: ${fileName}`,
+      userId,
+      null,
+      fileUrl
+    );
+
+    // Get ticket creator ID for notification
+    const getTicket = "SELECT UserId as ticketUserId FROM ticket WHERE TicketID = ?";
+    const [ticketResult] = await new Promise((resolve, reject) => {
+      db.query(getTicket, [ticketId], (err, results) => {
+        if (err) reject(err);
+        else resolve(results);
+      });
+    });
+
+    if (ticketResult) {
+      try {
+        await createNotification(
+          ticketResult.ticketUserId,
+          `New attachment added to your ticket #${ticketId}`,
+          'NEW_ATTACHMENT',
+          logResult.insertId
         );
-
-        // Get ticket creator ID for notification
-        const getTicket = "SELECT UserId as ticketUserId FROM ticket WHERE TicketID = ?";
-        const [ticketResult] = await new Promise((resolve, reject) => {
-            db.query(getTicket, [ticketId], (err, results) => {
-                if (err) reject(err);
-                else resolve(results);
-            });
-        });
-
-        if (ticketResult) {
-            try {
-                await createNotification(
-                    ticketResult.ticketUserId,
-                    `New attachment added to your ticket #${ticketId}`,
-                    'NEW_ATTACHMENT',
-                    logResult.insertId
-                );
-            } catch (error) {
-                console.error("Error creating notification:", error);
-            }
-        }
-
-        res.json({ message: "Attachment added successfully" });
-    } catch (error) {
-        console.error("Error adding attachment:", error);
-        res.status(500).json({ message: "Server error" });
+      } catch (error) {
+        console.error("Error creating notification:", error);
+      }
     }
+
+    res.json({ message: "Attachment added successfully" });
+  } catch (error) {
+    console.error("Error adding attachment:", error);
+    res.status(500).json({ message: "Server error" });
+  }
 });
 
 // Configure multer for attachments
 const attachmentStorage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        const uploadDir = path.join(__dirname, 'uploads', 'attachments');
-        fs.mkdirSync(uploadDir, { recursive: true });
-        cb(null, uploadDir);
-    },
-    filename: (req, file, cb) => {
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        cb(null, uniqueSuffix + '-' + file.originalname);
-    }
+  destination: (req, file, cb) => {
+    const uploadDir = path.join(__dirname, 'uploads', 'attachments');
+    fs.mkdirSync(uploadDir, { recursive: true });
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, uniqueSuffix + '-' + file.originalname);
+  }
 });
 
-const attachmentUpload = multer({ 
-    storage: attachmentStorage,
-    limits: {
-        fileSize: 10 * 1024 * 1024 // 10MB limit
-    }
+const attachmentUpload = multer({
+  storage: attachmentStorage,
+  limits: {
+    fileSize: 10 * 1024 * 1024 // 10MB limit
+  }
 });
 
 // Add attachment endpoint
 app.post('/api/tickets/:ticketId/attachments', attachmentUpload.single('file'), async (req, res) => {
-    const { ticketId } = req.params;
-    const { userId } = req.body;
-    const file = req.file;
+  const { ticketId } = req.params;
+  const { userId } = req.body;
+  const file = req.file;
 
-    if (!file) {
-        return res.status(400).json({ message: "No file uploaded" });
-    }
+  if (!file) {
+    return res.status(400).json({ message: "No file uploaded" });
+  }
 
-    // Get user details
-    const getUserQuery = `
+  // Get user details
+  const getUserQuery = `
         SELECT 
             au.FullName as uploaderName,
             t.UserId as ticketUserId,
@@ -3860,109 +3703,109 @@ app.post('/api/tickets/:ticketId/attachments', attachmentUpload.single('file'), 
         WHERE au.UserID = ?
     `;
 
-    try {
-        const [userResults] = await new Promise((resolve, reject) => {
-            db.query(getUserQuery, [ticketId, userId], (err, results) => {
-                if (err) reject(err);
-                else resolve(results);
-            });
-        });
+  try {
+    const [userResults] = await new Promise((resolve, reject) => {
+      db.query(getUserQuery, [ticketId, userId], (err, results) => {
+        if (err) reject(err);
+        else resolve(results);
+      });
+    });
 
-        if (!userResults) {
-            return res.status(404).json({ message: "User or ticket not found" });
-        }
+    if (!userResults) {
+      return res.status(404).json({ message: "User or ticket not found" });
+    }
 
-        const uploaderName = userResults.uploaderName;
-        const filePath = file.path;
-        const fileName = file.originalname;
-        const fileSize = file.size;
-        const fileType = file.mimetype;
+    const uploaderName = userResults.uploaderName;
+    const filePath = file.path;
+    const fileName = file.originalname;
+    const fileSize = file.size;
+    const fileType = file.mimetype;
 
-        // Create ticket log entry
-        const logQuery = `
+    // Create ticket log entry
+    const logQuery = `
             INSERT INTO ticketlog 
             (TicketID, DateTime, Type, Description, UserID, Note, NewValue)
             VALUES (?, NOW(), ?, ?, ?, ?, ?)
         `;
 
-        const description = `uploaded file "${fileName}"`;
-        const fileDetails = JSON.stringify({
-            name: fileName,
-            size: fileSize,
-            type: fileType,
-            path: filePath
-        });
+    const description = `uploaded file "${fileName}"`;
+    const fileDetails = JSON.stringify({
+      name: fileName,
+      size: fileSize,
+      type: fileType,
+      path: filePath
+    });
 
-        const [logResult] = await createTicketLog(
-            ticketId,
-            'ATTACHMENT',
-            description,
-            userId,
-            null,
-            fileDetails,
-            `File size: ${Math.round(fileSize/1024)}KB`
-        );
+    const [logResult] = await createTicketLog(
+      ticketId,
+      'ATTACHMENT',
+      description,
+      userId,
+      null,
+      fileDetails,
+      `File size: ${Math.round(fileSize / 1024)}KB`
+    );
 
-        // Update LastRespondedTime
-        await new Promise((resolve, reject) => {
-            db.query(
-                "UPDATE ticket SET LastRespondedTime = NOW() WHERE TicketID = ?",
-                [ticketId],
-                (err, result) => {
-                    if (err) reject(err);
-                    else resolve(result);
-                }
-            );
-        });
-
-        // Create notifications
-        try {
-            // Notify ticket creator if attachment is from someone else
-            if (userId !== userResults.ticketUserId) {
-                await createNotification(
-                    userResults.ticketUserId,
-                    `New file "${fileName}" attached to ticket #${ticketId} by ${uploaderName}`,
-                    'NEW_ATTACHMENT',
-                    logResult.insertId
-                );
-            }
-
-            // Notify supervisor if exists and attachment is from ticket creator
-            if (userResults.SupervisorID && userId === userResults.ticketUserId) {
-                await createNotification(
-                    userResults.SupervisorID,
-                    `Ticket creator attached a file "${fileName}" to ticket #${ticketId}`,
-                    'CREATOR_ATTACHMENT',
-                    logResult.insertId
-                );
-            }
-        } catch (error) {
-            console.error("Error creating notifications:", error);
+    // Update LastRespondedTime
+    await new Promise((resolve, reject) => {
+      db.query(
+        "UPDATE ticket SET LastRespondedTime = NOW() WHERE TicketID = ?",
+        [ticketId],
+        (err, result) => {
+          if (err) reject(err);
+          else resolve(result);
         }
+      );
+    });
 
-        res.json({ 
-            message: "File uploaded successfully",
-            file: {
-                name: fileName,
-                path: filePath,
-                size: fileSize,
-                type: fileType
-            },
-            logId: logResult.insertId
-        });
+    // Create notifications
+    try {
+      // Notify ticket creator if attachment is from someone else
+      if (userId !== userResults.ticketUserId) {
+        await createNotification(
+          userResults.ticketUserId,
+          `New file "${fileName}" attached to ticket #${ticketId} by ${uploaderName}`,
+          'NEW_ATTACHMENT',
+          logResult.insertId
+        );
+      }
+
+      // Notify supervisor if exists and attachment is from ticket creator
+      if (userResults.SupervisorID && userId === userResults.ticketUserId) {
+        await createNotification(
+          userResults.SupervisorID,
+          `Ticket creator attached a file "${fileName}" to ticket #${ticketId}`,
+          'CREATOR_ATTACHMENT',
+          logResult.insertId
+        );
+      }
     } catch (error) {
-        console.error("Error uploading file:", error);
-        res.status(500).json({ message: "Server error" });
+      console.error("Error creating notifications:", error);
     }
+
+    res.json({
+      message: "File uploaded successfully",
+      file: {
+        name: fileName,
+        path: filePath,
+        size: fileSize,
+        type: fileType
+      },
+      logId: logResult.insertId
+    });
+  } catch (error) {
+    console.error("Error uploading file:", error);
+    res.status(500).json({ message: "Server error" });
+  }
 });
 
 // Assign supervisor to ticket
 app.put('/api/tickets/:ticketId/supervisor', async (req, res) => {
-    const { ticketId } = req.params;
-    const { supervisorId, userId } = req.body;
+  const { ticketId } = req.params;
+  const { supervisorId, userId } = req.body;
 
-    // Get current ticket and user details
-    const getDetailsQuery = `
+  // Get current ticket and user details
+  const getDetailsQuery = `
         SELECT 
             t.SupervisorID as currentSupervisorId,
             t.UserId as ticketUserId,
@@ -3976,102 +3819,102 @@ app.put('/api/tickets/:ticketId/supervisor', async (req, res) => {
         WHERE t.TicketID = ?
     `;
 
-    try {
-        const [details] = await new Promise((resolve, reject) => {
-            db.query(getDetailsQuery, [supervisorId, userId, ticketId], (err, results) => {
-                if (err) reject(err);
-                else resolve(results);
-            });
-        });
+  try {
+    const [details] = await new Promise((resolve, reject) => {
+      db.query(getDetailsQuery, [supervisorId, userId, ticketId], (err, results) => {
+        if (err) reject(err);
+        else resolve(results);
+      });
+    });
 
-        if (!details) {
-            return res.status(404).json({ message: "Ticket not found" });
-        }
+    if (!details) {
+      return res.status(404).json({ message: "Ticket not found" });
+    }
 
-        // Update supervisor
-        const updateQuery = "UPDATE ticket SET SupervisorID = ?, LastRespondedTime = NOW() WHERE TicketID = ?";
-        
-        await new Promise((resolve, reject) => {
-            db.query(updateQuery, [supervisorId, ticketId], (err, result) => {
-                if (err) reject(err);
-                else resolve(result);
-            });
-        });
+    // Update supervisor
+    const updateQuery = "UPDATE ticket SET SupervisorID = ?, LastRespondedTime = NOW() WHERE TicketID = ?";
 
-        // Create ticket log entry
-        const logQuery = `
+    await new Promise((resolve, reject) => {
+      db.query(updateQuery, [supervisorId, ticketId], (err, result) => {
+        if (err) reject(err);
+        else resolve(result);
+      });
+    });
+
+    // Create ticket log entry
+    const logQuery = `
             INSERT INTO ticketlog 
             (TicketID, DateTime, Type, Description, UserID, OldValue, NewValue, Note)
             VALUES (?, NOW(), ?, ?, ?, ?, ?, ?)
         `;
 
-        let description;
-        if (!details.currentSupervisorId) {
-            description = `Supervisor assigned: ${details.newSupervisorName}`;
-        } else {
-            description = `Supervisor changed from ${details.currentSupervisorName} to ${details.newSupervisorName}`;
-        }
-
-        const note = `Updated by ${details.assignerName}`;
-
-        const [logResult] = await new Promise((resolve, reject) => {
-            db.query(
-                logQuery,
-                [
-                    ticketId, 
-                    'SUPERVISOR_CHANGE', 
-                    description, 
-                    userId,
-                    details.currentSupervisorId,
-                    supervisorId,
-                    note
-                ],
-                (err, result) => {
-                    if (err) reject(err);
-                    else resolve(result);
-                }
-            );
-        });
-
-        // Create notifications
-        try {
-            // Notify new supervisor
-            await createNotification(
-                supervisorId,
-                `You have been assigned as supervisor for ticket #${ticketId} by ${details.assignerName}`,
-                'SUPERVISOR_ASSIGNED',
-                logResult.insertId
-            );
-
-            // Notify ticket creator
-            await createNotification(
-                details.ticketUserId,
-                `${details.newSupervisorName} has been assigned as supervisor for your ticket #${ticketId}`,
-                'SUPERVISOR_UPDATED',
-                logResult.insertId
-            );
-
-            // Notify old supervisor if exists
-            if (details.currentSupervisorId && details.currentSupervisorId !== supervisorId) {
-                await createNotification(
-                    details.currentSupervisorId,
-                    `You have been unassigned from ticket #${ticketId} by ${details.assignerName}`,
-                    'SUPERVISOR_UNASSIGNED',
-                    logResult.insertId
-                );
-            }
-        } catch (error) {
-            console.error("Error creating notifications:", error);
-        }
-
-        res.json({ 
-            message: "Supervisor assigned successfully",
-            logId: logResult.insertId
-        });
-    } catch (error) {
-        console.error("Error assigning supervisor:", error);
-        res.status(500).json({ message: "Server error" });
+    let description;
+    if (!details.currentSupervisorId) {
+      description = `Supervisor assigned: ${details.newSupervisorName}`;
+    } else {
+      description = `Supervisor changed from ${details.currentSupervisorName} to ${details.newSupervisorName}`;
     }
+
+    const note = `Updated by ${details.assignerName}`;
+
+    const [logResult] = await new Promise((resolve, reject) => {
+      db.query(
+        logQuery,
+        [
+          ticketId,
+          'SUPERVISOR_CHANGE',
+          description,
+          userId,
+          details.currentSupervisorId,
+          supervisorId,
+          note
+        ],
+        (err, result) => {
+          if (err) reject(err);
+          else resolve(result);
+        }
+      );
+    });
+
+    // Create notifications
+    try {
+      // Notify new supervisor
+      await createNotification(
+        supervisorId,
+        `You have been assigned as supervisor for ticket #${ticketId} by ${details.assignerName}`,
+        'SUPERVISOR_ASSIGNED',
+        logResult.insertId
+      );
+
+      // Notify ticket creator
+      await createNotification(
+        details.ticketUserId,
+        `${details.newSupervisorName} has been assigned as supervisor for your ticket #${ticketId}`,
+        'SUPERVISOR_UPDATED',
+        logResult.insertId
+      );
+
+      // Notify old supervisor if exists
+      if (details.currentSupervisorId && details.currentSupervisorId !== supervisorId) {
+        await createNotification(
+          details.currentSupervisorId,
+          `You have been unassigned from ticket #${ticketId} by ${details.assignerName}`,
+          'SUPERVISOR_UNASSIGNED',
+          logResult.insertId
+        );
+      }
+    } catch (error) {
+      console.error("Error creating notifications:", error);
+    }
+
+    res.json({
+      message: "Supervisor assigned successfully",
+      logId: logResult.insertId
+    });
+  } catch (error) {
+    console.error("Error assigning supervisor:", error);
+    res.status(500).json({ message: "Server error" });
+  }
 });
 
 // Update ticket due date
@@ -4161,7 +4004,7 @@ app.get('/api/companies', (req, res) => {
 app.get('/api/tickets/:ticketId/comments', async (req, res) => {
   const { ticketId } = req.params;
   const { userId } = req.query; // Get userId from query parameters
-  
+
   try {
     // First get all comments for the ticket
     const commentsQuery = `
@@ -4183,13 +4026,13 @@ app.get('/api/tickets/:ticketId/comments', async (req, res) => {
       WHERE c.TicketID = ?
       ORDER BY c.CreatedAt ASC
     `;
-    
+
     const [comments] = await db.promise().query(commentsQuery, [ticketId]);
-    
+
     // Get all attachments for these comments
     const commentIds = comments.map(c => c.CommentID);
     let attachments = [];
-    
+
     if (commentIds.length > 0) {
       const attachmentsQuery = `
         SELECT 
@@ -4200,15 +4043,15 @@ app.get('/api/tickets/:ticketId/comments', async (req, res) => {
         FROM comment_attachments 
         WHERE CommentID IN (${commentIds.map(() => '?').join(',')})
       `;
-      
+
       const [attachmentResults] = await db.promise().query(attachmentsQuery, commentIds);
       attachments = attachmentResults;
     }
-    
+
     // Group attachments by comment ID and add them to comments
     const commentsWithAttachments = comments.map(comment => {
       const commentAttachments = attachments.filter(att => att.CommentID === comment.CommentID);
-      
+
       // For backward compatibility, if there's an attachment, add the first one as single properties
       let formattedComment = { ...comment };
       if (commentAttachments.length > 0) {
@@ -4218,7 +4061,7 @@ app.get('/api/tickets/:ticketId/comments', async (req, res) => {
         formattedComment.AttachmentFileType = firstAttachment.AttachmentFileType;
         formattedComment.AttachmentFullUrl = `http://localhost:5000/${firstAttachment.AttachmentFilePath.replace(/\\/g, '/')}`;
       }
-      
+
       // Add all attachments as an array for complete access
       formattedComment.attachments = commentAttachments.map(att => ({
         filePath: att.AttachmentFilePath,
@@ -4226,7 +4069,7 @@ app.get('/api/tickets/:ticketId/comments', async (req, res) => {
         fileType: att.AttachmentFileType,
         fullUrl: `http://localhost:5000/${att.AttachmentFilePath.replace(/\\/g, '/')}`
       }));
-      
+
       return formattedComment;
     });
 
@@ -4239,7 +4082,7 @@ app.get('/api/tickets/:ticketId/comments', async (req, res) => {
 
 app.get('/api/mentionable-users', (req, res) => {
   const { ticketId } = req.query;
-  
+
   if (!ticketId) {
     return res.status(400).json({ error: 'Ticket ID is required' });
   }
@@ -4259,7 +4102,7 @@ app.get('/api/mentionable-users', (req, res) => {
     
     ORDER BY Role DESC, FullName ASC
   `;
-  
+
   db.query(sql, [ticketId], (err, results) => {
     if (err) {
       console.error('Error fetching mentionable users:', err);
@@ -4334,63 +4177,63 @@ app.get('/api/comments/:commentId/hasLiked/:userId', async (req, res) => {
 
 // Add Multer middleware for profile image uploads
 app.post(
-    "/api/user/profile/upload/:id",
-    upload.single("profileImage"),
-    async (req, res) => {
-        const userId = req.params.id;
-        if (!req.file) {
-            return res.status(400).json({ message: "No file uploaded." });
-        }
-
-        const imagePath = `profile_images/${req.file.filename}`; // Store relative path
-
-        try {
-            // Update the user's profile image path in the database
-            const updateQuery =
-                "UPDATE appuser SET ProfileImagePath = ? WHERE UserID = ?";
-            await db.promise().query(updateQuery, [imagePath, userId]);
-
-            res.status(200).json({
-                message: "Profile image uploaded successfully",
-                imagePath: imagePath, // Send back the relative path
-            });
-        } catch (error) {
-            console.error("Error updating profile image path in DB:", error);
-            res.status(500).json({ message: "Failed to update profile image." });
-        }
+  "/api/user/profile/upload/:id",
+  upload.single("profileImage"),
+  async (req, res) => {
+    const userId = req.params.id;
+    if (!req.file) {
+      return res.status(400).json({ message: "No file uploaded." });
     }
+
+    const imagePath = `profile_images/${req.file.filename}`; // Store relative path
+
+    try {
+      // Update the user's profile image path in the database
+      const updateQuery =
+        "UPDATE appuser SET ProfileImagePath = ? WHERE UserID = ?";
+      await db.promise().query(updateQuery, [imagePath, userId]);
+
+      res.status(200).json({
+        message: "Profile image uploaded successfully",
+        imagePath: imagePath, // Send back the relative path
+      });
+    } catch (error) {
+      console.error("Error updating profile image path in DB:", error);
+      res.status(500).json({ message: "Failed to update profile image." });
+    }
+  }
 );
 
 app.delete('/api/user/profile/image/:id', async (req, res) => {
-    const userId = req.params.id;
-    try {
-        // Get the current image path to delete the file from the server
-        const [results] = await db.promise().query('SELECT ProfileImagePath FROM appuser WHERE UserID = ?', [userId]);
-        if (results.length > 0 && results[0].ProfileImagePath) {
-            const filePath = path.join(__dirname, 'uploads', results[0].ProfileImagePath);
-            fs.unlink(filePath, (err) => {
-                if (err) {
-                    console.error('Error deleting old profile image file:', err);
-                    // Continue even if file deletion fails, as DB update is more critical
-                }
-            });
+  const userId = req.params.id;
+  try {
+    // Get the current image path to delete the file from the server
+    const [results] = await db.promise().query('SELECT ProfileImagePath FROM appuser WHERE UserID = ?', [userId]);
+    if (results.length > 0 && results[0].ProfileImagePath) {
+      const filePath = path.join(__dirname, 'uploads', results[0].ProfileImagePath);
+      fs.unlink(filePath, (err) => {
+        if (err) {
+          console.error('Error deleting old profile image file:', err);
+          // Continue even if file deletion fails, as DB update is more critical
         }
-
-        // Update the database to remove the profile image path
-        const updateQuery = 'UPDATE appuser SET ProfileImagePath = NULL WHERE UserID = ?';
-        await db.promise().query(updateQuery, [userId]);
-
-        res.status(200).json({ message: 'Profile image removed successfully' });
-    } catch (error) {
-        console.error('Error removing profile image:', error);
-        res.status(500).json({ message: 'Failed to remove profile image.' });
+      });
     }
+
+    // Update the database to remove the profile image path
+    const updateQuery = 'UPDATE appuser SET ProfileImagePath = NULL WHERE UserID = ?';
+    await db.promise().query(updateQuery, [userId]);
+
+    res.status(200).json({ message: 'Profile image removed successfully' });
+  } catch (error) {
+    console.error('Error removing profile image:', error);
+    res.status(500).json({ message: 'Failed to remove profile image.' });
+  }
 });
 
 // API endpoint to get unread chat notifications count for a specific ticket
 app.get('/api/notifications/chat/count/:userId/:ticketId', (req, res) => {
-    const { userId, ticketId } = req.params;
-    const query = `
+  const { userId, ticketId } = req.params;
+  const query = `
         SELECT COUNT(*) as count
         FROM notifications
         WHERE UserID = ?
@@ -4399,20 +4242,20 @@ app.get('/api/notifications/chat/count/:userId/:ticketId', (req, res) => {
         AND IsRead = FALSE;
     `;
 
-    db.query(query, [userId, ticketId], (err, results) => {
-        if (err) {
-            console.error('Error fetching unread chat notification count:', err);
-            return res.status(500).json({ error: 'Failed to fetch unread chat notification count' });
-        }
-        res.json({ count: results[0].count });
-    });
+  db.query(query, [userId, ticketId], (err, results) => {
+    if (err) {
+      console.error('Error fetching unread chat notification count:', err);
+      return res.status(500).json({ error: 'Failed to fetch unread chat notification count' });
+    }
+    res.json({ count: results[0].count });
+  });
 });
 
 // API endpoint to mark chat notifications as read for a specific ticket and user
 app.put('/api/notifications/chat/read/:userId/:ticketId', (req, res) => {
-    const { userId, ticketId } = req.params;
+  const { userId, ticketId } = req.params;
 
-    const query = `
+  const query = `
         UPDATE notifications
         SET IsRead = TRUE
         WHERE UserID = ?
@@ -4421,12 +4264,11 @@ app.put('/api/notifications/chat/read/:userId/:ticketId', (req, res) => {
         AND IsRead = FALSE;
     `;
 
-    db.query(query, [userId, ticketId], (err, result) => {
-        if (err) {
-            console.error('Error marking chat notifications as read:', err);
-            return res.status(500).json({ error: 'Failed to mark chat notifications as read' });
-        }
-        res.json({ message: 'Chat notifications marked as read', updatedCount: result.affectedRows });
-    });
+  db.query(query, [userId, ticketId], (err, result) => {
+    if (err) {
+      console.error('Error marking chat notifications as read:', err);
+      return res.status(500).json({ error: 'Failed to mark chat notifications as read' });
+    }
+    res.json({ message: 'Chat notifications marked as read', updatedCount: result.affectedRows });
+  });
 });
- 
