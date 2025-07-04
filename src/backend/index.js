@@ -42,6 +42,7 @@ import ticketManagementRoutes from './routes/ticketManagementRoutes.js';
 import companyRoutes from './routes/companyRoutes.js';
 import profileRoutes from './routes/profileRoutes.js';
 import chatNotificationRoutes from './routes/chatNotificationRoutes.js';
+import commentAttachmentRoutes from './routes/commentAttachmentRoutes.js';
 
 const app = express();
 app.use(bodyParser.json());
@@ -87,6 +88,7 @@ app.use('/api', ticketManagementRoutes);
 app.use('/api', companyRoutes);
 app.use('/api', profileRoutes);
 app.use('/api', chatNotificationRoutes);
+app.use('/api', commentAttachmentRoutes);
 
 //evidence uploads
 app.use("/uploads", express.static("uploads"));
@@ -119,26 +121,6 @@ const profileImageStorage = multer.diskStorage({
 });
 
 const upload = multer({ storage: profileImageStorage });
-
-// --- Multer Configuration for Comment Attachments ---
-const commentAttachmentStorage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const uploadDir = path.join(__dirname, 'uploads', 'comment_attachments');
-    fs.mkdirSync(uploadDir, { recursive: true });
-    cb(null, uploadDir);
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, 'comment-' + uniqueSuffix + path.extname(file.originalname));
-  }
-});
-
-const commentAttachmentUpload = multer({
-  storage: commentAttachmentStorage,
-  limits: {
-    fileSize: 10 * 1024 * 1024 // 10MB limit
-  }
-});
 
 // Configure nodemailer transporter
 const transporter = nodemailer.createTransport({
