@@ -101,7 +101,7 @@ const Register = () => {
 
         try {
             // Use axiosClient for POST request
-            await axiosClient.post('/register', formData);
+            await axiosClient.post('/api/register', formData);
             toast.success('Registration successful!');
             navigate('/login');
         } catch (error) {

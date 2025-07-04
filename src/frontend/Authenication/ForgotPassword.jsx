@@ -17,7 +17,7 @@ const ForgotPassword = () => {
         setLoading(true); // Start loading
         try {
             // Send the email to the backend to initiate password reset using axiosClient
-            const response = await axiosClient.post('/forgot-password', { email });
+            const response = await axiosClient.post('/api/forgot-password', { email });
             toast.success(response.data.message || 'Password reset link sent to your email!');
             navigate('/login'); // Redirect to login page after sending link
         } catch (error) {

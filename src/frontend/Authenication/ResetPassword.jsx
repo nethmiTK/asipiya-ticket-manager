@@ -80,7 +80,7 @@ const ResetPassword = () => {
         setLoading(true); // Start loading
         try {
             // Send the new password, token, and email to the backend for verification and update using axiosClient
-            const response = await axiosClient.post('/reset-password', {
+            const response = await axiosClient.post('/api/reset-password', {
                 email,
                 token,
                 newPassword: password
