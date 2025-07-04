@@ -30,6 +30,7 @@ import notificationRoutes from './routes/notificationRoutes.js';
  import evidenceRoutes from './routes/evidenceRoutes.js';
 import commentRoutes from './routes/commentRoutes.js';
 import ticketUpdateRoutes from './routes/ticketUpdateRoutes.js';
+import dashboardRoutes from './routes/dashboardRoutes.js';
  
 const app = express();
 app.use(bodyParser.json());
@@ -64,6 +65,7 @@ app.use('/api', ticketRoutes);
  app.use('/api', evidenceRoutes);
 app.use('/api', commentRoutes);
 app.use('/api', ticketUpdateRoutes);
+app.use('/api', dashboardRoutes);
  
 //evidence uploads
 app.use("/uploads", express.static("uploads"));
@@ -1398,103 +1400,6 @@ app.put("/update-supervisors/:id", async (req, res) => {
 });
 
 
-// Add comment to ticket
-app.post('/api/tickets/:ticketId/comments', commentAttachmentUpload.array('file', 10), async (req, res) => { // Changed to 'file' to match frontend
-  const { ticketId } = req.params;
-  let { userId, comment, mentionedUserIds, replyToCommentId } = req.body; // Added replyToCommentId
-
-  try {
-    // Process mentions: Extract mentioned user IDs
-    let processedMentions = [];
-
-    if (mentionedUserIds && typeof mentionedUserIds === 'string') {
-      processedMentions = mentionedUserIds.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id));
-    }
-
-    // IMPORTANT: Storing the original comment text (including @mentions) in CommentText for display.
-    // The mentioned user IDs are still separately stored in the Mentions column.
-
-    const sql = `
-      INSERT INTO comments (TicketID, UserID, CommentText, Mentions, ReplyToCommentID)
-      VALUES (?, ?, ?, ?, ?)
-    `;
-    const result = await db.promise().query(sql, [
-      ticketId,
-      userId,
-      comment.trim(), // Store original comment text
-      processedMentions.length > 0 ? processedMentions.join(',') : null, // Store only user IDs
-      replyToCommentId || null
-    ]);
-
-    const newCommentId = result[0].insertId;
-
-    // Handle multiple file attachments
-    if (req.files && req.files.length > 0) {
-      for (const file of req.files) {
-        const attachmentFilePath = path.join('uploads', 'comment_attachments', file.filename).replace(/\\/g, '/');
-        const attachmentFileName = file.originalname;
-        const attachmentFileType = file.mimetype;
-
-        const attachmentSql = `
-          INSERT INTO comment_attachments (CommentID, FilePath, FileName, FileType)
-          VALUES (?, ?, ?, ?)
-        `;
-        await db.promise().query(attachmentSql, [
-          newCommentId,
-          attachmentFilePath,
-          attachmentFileName,
-          attachmentFileType
-        ]);
-      }
-    }
-
-    // IMPORTANT: Log and notify asynchronously after sending success response
-    // This ensures the frontend gets a success message even if logging/notifications fail.
-    // Errors in this section will be logged on the server but won't block the frontend response.
-    res.status(201).json({
-      message: 'Comment added successfully',
-      commentId: newCommentId
-    });
-
-    // Perform logging and notifications AFTER sending the response
-    try {
-      // Add to ticketlog
-      const logSql = `
-        INSERT INTO ticketlog (TicketID, DateTime, Type, Description, UserID) 
-        VALUES (?, NOW(), 'COMMENT', ?, ?)
-      `;
-      // Fetch user's name for the log description
-      const [userResult] = await db.promise().query('SELECT FullName FROM appuser WHERE UserID = ?', [userId]);
-      const userName = userResult.length > 0 ? userResult[0].FullName : 'Unknown User';
-
-      const logDescription = `added a comment: "${comment.substring(0, 100)}..."`; // Use original comment for log description
-      await createTicketLog(ticketId, 'COMMENT', logDescription, userId, null, null, null); // Use createTicketLog
-
-      // Notify mentioned users
-      if (processedMentions.length > 0) {
-        for (const mentionedUserId of processedMentions) {
-          // Exclude the user who made the comment from receiving a mention notification for their own comment
-          if (mentionedUserId !== parseInt(userId)) { // Ensure userId is compared as a number
-            await createNotification(
-              mentionedUserId,
-              `You were mentioned in a comment on ticket #${ticketId} by ${userName}`,
-              'MENTION',
-              newCommentId // Link notification to the new comment
-            );
-          }
-        }
-      }
-    } catch (logOrNotifyError) {
-      console.error('Error during post-comment logging or notification:', logOrNotifyError);
-      // Do not send an error response to frontend here, as the comment itself was saved.
-    }
-
-  } catch (err) {
-    console.error('Error adding comment (main flow):', err);
-    res.status(500).json({ message: 'Failed to add comment', error: err.message });
-  }
-});
-
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
     cb(null, "uploads/");
@@ -1629,173 +1534,6 @@ app.get("/userTicket/:ticketId", (req, res) => {
 });
 
 
-// API endpoint to fetch ticket counts
-app.get('/api/tickets/counts', (req, res) => {
-  const queries = {
-    total: 'SELECT COUNT(*) AS count FROM ticket',
-    open: "SELECT COUNT(*) AS count FROM ticket WHERE Status IN ('Open', 'In Progress') AND Status != 'Rejected'",
-    today: "SELECT COUNT(*) AS count FROM ticket WHERE DATE(DateTime) = CURDATE()",
-    highPriority: "SELECT COUNT(*) AS count FROM ticket WHERE Priority = 'High' AND Status != 'Rejected'",
-    resolved: "SELECT COUNT(*) AS count FROM ticket WHERE Status = 'Resolved'",
-    pending: "SELECT COUNT(*) AS count FROM ticket WHERE Status = 'Pending'"
-  };
-
-  const results = {};
-  let completed = 0;
-
-  Object.entries(queries).forEach(([key, query]) => {
-    db.query(query, (err, result) => {
-      if (err) {
-        console.error(`Error fetching ${key} count:`, err);
-        return res.status(500).json({ error: `Failed to fetch ${key} ticket count` });
-      }
-
-      results[key] = result[0].count;
-      completed++;
-
-      if (completed === Object.keys(queries).length) {
-        res.json(results);
-      }
-    });
-  });
-});
-
-// API endpoint to fetch filtered tickets  
-app.get('/api/tickets/filter', (req, res) => {
-  const { type, company, system } = req.query; // <-- ADD company, system
-
-  let baseQuery = `
-        SELECT 
-            t.TicketID,
-            u.FullName AS UserName,
-            c.CompanyName AS CompanyName,
-            s.SystemName AS SystemName,
-            t.Description,
-            t.Status,
-            t.Priority,
-            t.DateTime
-        FROM ticket t
-        LEFT JOIN appuser u ON t.UserId = u.UserID
-        LEFT JOIN client c ON u.Email = c.ContactPersonEmail
-        LEFT JOIN asipiyasystem s ON t.AsipiyaSystemID = s.AsipiyaSystemID
-    `;
-
-  let whereClause = [];
-  let orderClause = 'ORDER BY t.DateTime DESC';
-
-  // Type-based filter
-  switch (type) {
-    case 'pending':
-      whereClause.push("t.Status = 'Pending'");
-      break;
-    case 'open':
-      whereClause.push("t.Status IN ('Open', 'In Progress') AND t.Status != 'Rejected'");
-      break;
-    case 'today':
-      whereClause.push("DATE(t.DateTime) = CURDATE()");
-      break;
-    case 'high-priority':
-      whereClause.push("t.Status != 'Rejected'");
-      orderClause = "ORDER BY FIELD(t.Priority, 'High', 'Medium', 'Low'), t.DateTime DESC";
-      break;
-    case 'resolved':
-      whereClause.push("t.Status = 'Resolved'");
-      break;
-  }
-
-  // Company filter
-  if (company && company !== 'all') {
-    whereClause.push("c.CompanyName = " + db.escape(company));
-  }
-  // System filter
-  if (system && system !== 'all') {
-    whereClause.push("s.SystemName = " + db.escape(system));
-  }
-
-  const finalWhere = whereClause.length > 0 ? 'WHERE ' + whereClause.join(' AND ') : '';
-  const query = `${baseQuery} ${finalWhere} ${orderClause}`;
-
-  db.query(query, (err, results) => {
-    if (err) {
-      console.error('Error fetching filtered tickets:', err);
-      res.status(500).json({ error: 'Failed to fetch tickets' });
-      return;
-    }
-    res.json(results);
-  });
-});
-
-// API endpoint to fetch ticket status distribution
-app.get('/api/tickets/status-distribution', (req, res) => {
-  const query = `
-        SELECT 
-            SUM(CASE WHEN Priority = 'High' THEN 1 ELSE 0 END) AS high,
-            SUM(CASE WHEN Priority = 'Medium' THEN 1 ELSE 0 END) AS medium,
-            SUM(CASE WHEN Priority = 'Low' THEN 1 ELSE 0 END) AS low
-        FROM ticket;
-    `;
-
-  db.query(query, (err, results) => {
-    if (err) {
-      console.error('Error fetching ticket status distribution:', err);
-      res.status(500).json({ error: 'Failed to fetch ticket status distribution' });
-      return;
-    }
-
-    res.json(results[0]);
-  });
-});
-
-// API endpoint to fetch the last 6 ticket log activities
-app.get('/api/tickets/recent-activities', (req, res) => {
-  const query = `
-        SELECT 
-            tl.TicketID,
-            tl.DateTime,
-            tl.Type,
-            tl.Description
-        FROM ticketlog tl
-        ORDER BY tl.DateTime DESC
-        LIMIT 6
-    `;
-
-  db.query(query, (err, results) => {
-    if (err) {
-      console.error('Error fetching recent ticket log activities:', err);
-      return res.status(500).json({ error: 'Failed to fetch recent ticket log activities' });
-    }
-    res.json(results);
-  });
-});
-
-// API endpoint to fetch tickets
-app.get('/api/tickets', (req, res) => {
-  const query = `
-        SELECT 
-            t.TicketID, 
-            u.FullName AS UserName, 
-            t.Description, 
-            t.Status, 
-            t.Priority, 
-            t.UserNote
-        FROM 
-            tickets t
-        LEFT JOIN 
-            appuser u 
-        ON 
-            t.UserID = u.UserID
-    `;
-
-  db.query(query, (err, results) => {
-    if (err) {
-      console.error('Error fetching tickets:', err);
-      res.status(500).json({ error: 'Failed to fetch tickets' });
-      return;
-    }
-    res.json(results);
-  });
-});
-
 // API endpoint to fetch ticket counts by system
 app.get('/api/tickets/system-distribution', (req, res) => {
   const query = `
@@ -1813,34 +1551,6 @@ app.get('/api/tickets/system-distribution', (req, res) => {
       console.error('Error fetching ticket system distribution:', err);
       res.status(500).json({ error: 'Failed to fetch ticket system distribution' });
       return;
-    }
-    res.json(results);
-  });
-});
-
-// Update endpoint for recent users
-app.get('/api/users/recent', (req, res) => {
-  const query = `
-        SELECT DISTINCT 
-            u.UserID,
-            u.FullName,
-            u.ProfileImagePath,
-            EXISTS(
-                SELECT 1 
-                FROM ticket t 
-                WHERE t.UserId = u.UserID 
-                AND t.Status = 'Pending'
-            ) as hasPendingTicket
-        FROM appuser u
-        WHERE u.Role = 'User'
-        ORDER BY u.UserID DESC
-        LIMIT 5
-    `;
-
-  db.query(query, (err, results) => {
-    if (err) {
-      console.error('Error fetching recent users:', err);
-      return res.status(500).json({ error: 'Failed to fetch recent users' });
     }
     res.json(results);
   });
