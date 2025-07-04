@@ -331,7 +331,7 @@ const OpenTickets = () => {
     const fetchSystems = async () => {
         try {
             // Use axiosClient and remove base URL
-            const res = await axiosClient.get("/system_registration");
+            const res = await axiosClient.get("/api/system_registration");
             const activeSystems = res.data.filter(system => system.Status === 1);
             setSystemNames(activeSystems);
         } catch (error) {
@@ -346,7 +346,7 @@ const OpenTickets = () => {
     const fetchCategory = async () => {
         try {
             // Use axiosClient and remove base URL
-            const res = await axiosClient.get("/ticket_category");
+            const res = await axiosClient.get("/api/ticket_category");
             const activeCategories = res.data.filter(cat => cat.Status === 1);
             setCategoryName(activeCategories);
         } catch (error) {

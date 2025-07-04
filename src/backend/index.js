@@ -23,6 +23,7 @@ import inviteRoutes from './routes/inviteRoutes.js';
 import systemRoutes from './routes/systemRoutes.js';
 import categoryRoutes from './routes/categoryRoutes.js';
 import clientRoutes from './routes/clientRoutes.js';
+import ticketRoutes from './routes/ticketRoutes.js';
 
 const app = express();
 app.use(bodyParser.json());
@@ -51,6 +52,7 @@ app.use('/api/invite', inviteRoutes);
 app.use('/api', systemRoutes);
 app.use('/api', categoryRoutes);
 app.use('/api', clientRoutes);
+app.use('/api', ticketRoutes);
 
 //evidence uploads
 app.use("/uploads", express.static("uploads"));
@@ -3235,71 +3237,7 @@ app.put('/api/tickets/:id/assign', (req, res) => {
   });
 });
 
-// Create new ticket
-app.post('/api/tickets', async (req, res) => {
-  const { userId, systemName, ticketCategory, description } = req.body;
 
-  try {
-    // Get system ID
-    const getSystemId = "SELECT AsipiyaSystemID FROM asipiyasystem WHERE SystemName = ?";
-    const [systemResult] = await db.promise().query(getSystemId, [systemName]);
-
-    if (systemResult.length === 0) {
-      return res.status(400).json({ message: "Invalid system name" });
-    }
-
-    const systemID = systemResult[0].AsipiyaSystemID;
-
-    // Get category ID
-    const getCategoryId = "SELECT TicketCategoryID FROM ticketcategory WHERE CategoryName = ?";
-    const [categoryResult] = await db.promise().query(getCategoryId, [ticketCategory]);
-
-    if (categoryResult.length === 0) {
-      return res.status(400).json({ message: "Invalid ticket category" });
-    }
-
-    const categoryID = categoryResult[0].TicketCategoryID;
-
-    // Insert ticket
-    const insertTicket = `
-      INSERT INTO ticket (UserId, AsipiyaSystemID, TicketCategoryID, Description, Status, Priority)
-      VALUES (?, ?, ?, ?, 'Pending', 'Medium')
-    `;
-
-    const [result] = await db.promise().query(insertTicket, [
-      userId,
-      systemID,
-      categoryID,
-      description
-    ]);
-
-    const updateSql = `
-      UPDATE asipiyasystem
-      SET Status = 1
-      WHERE AsipiyaSystemID = ?
-    `;
-    await db.promise().query(updateSql, [systemID]);
-
-    try {
-      await sendNotificationsByRoles(
-        ['Admin'],
-        `New ticket created by User #${userId}: ${description.substring(0, 50)}...`,
-        'NEW_TICKET'
-      );
-    } catch (error) {
-      console.error('Error sending ticket creation notifications:', error);
-    }
-
-    res.status(201).json({
-      message: 'Ticket created successfully',
-      ticketId: result.insertId
-    });
-
-  } catch (error) {
-    console.error('Error creating ticket:', error);
-    res.status(500).json({ message: 'Error creating ticket' });
-  }
-});
 
 app.post('/api/upload_evidence', upload_evidence.array('evidenceFiles'), async (req, res) => {
   const { ticketId, description } = req.body;
