@@ -337,8 +337,8 @@ export default function SupervisorChatSection({
       formData.append("Role", role || "Supervisor");
       if (sendingFile) formData.append("file", sendingFile);
 
-      const res = await axios.post(
-        `${axiosClient.defaults.baseURL}/ticketchat`,
+      const res = await axiosClient.post(
+        `/ticketchat`,
         formData,
         {
           headers: { "Content-Type": "multipart/form-data" },
