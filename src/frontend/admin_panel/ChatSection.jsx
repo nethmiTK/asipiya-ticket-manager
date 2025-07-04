@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
-import axios from "axios";
 import { io } from "socket.io-client";
 import { IoMdAttach } from "react-icons/io";
 import { MdSend } from "react-icons/md";
 import { FaFilter, FaTimes, FaChevronUp, FaChevronDown } from "react-icons/fa";
+import axiosClient from "../axiosClient";
 
 // Helper function to render messages with links (unchanged)
 function renderMessageWithLinks(text) {
@@ -116,7 +116,7 @@ export default function SupervisorChatSection({
     }
     console.log(`ChatSection: markMessagesAsSeen - Attempting to mark messages as seen for TicketID: ${ticketId}, Role: ${role}`);
     try {
-      await axios.post("http://localhost:5000/ticketchat/markSeen", {
+      await axiosClient.post("/ticketchat/markSeen", {
         TicketID: ticketId,
         Role: role,
       });
@@ -196,7 +196,7 @@ export default function SupervisorChatSection({
     }
 
     console.log(`ChatSection: useEffect for socket - Joining ticket room ${ticketId}.`);
-    socketRef.current = io("http://localhost:5000");
+    socketRef.current = io(`${axiosClient.defaults.baseURL}`);
     socketRef.current.emit("joinTicketRoom", ticketId);
 
     socketRef.current.on("receiveTicketMessage", (message) => {
@@ -271,7 +271,7 @@ export default function SupervisorChatSection({
 
     console.log(`ChatSection: useEffect for initial fetch - Fetching messages for ticket ${ticketId}.`);
     axios
-      .get(`http://localhost:5000/messages/${ticketId}`)
+      .get(`${axiosClient.defaults.baseURL}/messages/${ticketId}`)
       .then((res) => {
         const formattedMessages = res.data.map((msg) => ({
           ...msg,
@@ -336,7 +336,7 @@ export default function SupervisorChatSection({
       if (sendingFile) formData.append("file", sendingFile);
 
       const res = await axios.post(
-        "http://localhost:5000/ticketchat",
+        `${axiosClient.defaults.baseURL}/ticketchat`,
         formData,
         {
           headers: { "Content-Type": "multipart/form-data" },
@@ -695,7 +695,7 @@ export default function SupervisorChatSection({
                     <img
                       src={
                         user?.ProfileImagePath
-                          ? `http://localhost:5000/uploads/profile_images/${user.ProfileImagePath}`
+                          ? `${axiosClient.defaults.baseURL}/uploads/profile_images/${user.ProfileImagePath}`
                           : `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.FullName || 'User')}&background=random&color=fff`
                       }
                       alt={user?.FullName || 'User'}
@@ -818,7 +818,7 @@ export default function SupervisorChatSection({
                   {!isClient && (
                     <img
                       src={currentUser?.ProfileImagePath 
-                        ? `http://localhost:5000/uploads/profile_images/${currentUser.ProfileImagePath}`
+                        ? `${axiosClient.defaults.baseURL}/uploads/profile_images/${currentUser.ProfileImagePath}`
                         : `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser?.FullName || 'Admin')}&background=random&color=fff`
                       }
                       alt={currentUser?.FullName || 'Admin'}

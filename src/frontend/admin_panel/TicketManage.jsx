@@ -197,7 +197,7 @@ export default function TicketManage() {
   useEffect(() => {
     const fetchTickets = async () => {
       try {
-        const url = `http://localhost:5000/getting/tickets?supervisorId=${supervisorIdToUse}&systemId=${selectedSystem}`;
+        const url = `${axiosClient.defaults.baseURL}/getting/tickets?supervisorId=${supervisorIdToUse}&systemId=${selectedSystem}`;
         const res = await fetch(url);
         const data = await res.json();
 
@@ -241,14 +241,14 @@ export default function TicketManage() {
 
   useEffect(() => {
     // Fetch asipiya systems
-    fetch("http://localhost:5000/asipiyasystems")
+    fetch(`${axiosClient.defaults.baseURL}/asipiyasystems`)
       .then((res) => res.json())
       .then((data) => setSystems(data))
       .catch((err) => console.error("Error fetching systems", err));
 
     // Fetch supervisors if user is admin
     if (user.Role === "Admin") {
-      fetch("http://localhost:5000/supervisors")
+      fetch(`${axiosClient.defaults.baseURL}/supervisors`)
         .then((res) => res.json())
         .then((data) => setSupervisors(data))
         .catch((err) => console.error("Error fetching supervisors", err));
@@ -261,7 +261,7 @@ export default function TicketManage() {
     const fetchEvidence = async () => {
       try {
         const res = await fetch(
-          `http://localhost:5000/evidence/${selectedTicket.id}`
+          `${axiosClient.defaults.baseURL}/evidence/${selectedTicket.id}`
         );
         const data = await res.json();
         setEvidenceList(data);
@@ -278,8 +278,8 @@ export default function TicketManage() {
       try {
         const url =
           supervisorIdToUse === "all"
-            ? `http://localhost:5000/tickets?role=${user.Role}`
-            : `http://localhost:5000/tickets?supervisorId=${supervisorIdToUse}&role=${user.Role}`;
+            ? `${axiosClient.defaults.baseURL}/tickets?role=${user.Role}`
+            : `${axiosClient.defaults.baseURL}/tickets?supervisorId=${supervisorIdToUse}&role=${user.Role}`;
 
         const res = await fetch(url);
         if (!res.ok) throw new Error("Failed to fetch");
@@ -350,7 +350,7 @@ export default function TicketManage() {
 
   useEffect(() => {
     if (selectedTicket) {
-      fetch(`http://localhost:5000/api/mentionable-users?ticketId=${selectedTicket.id}`)
+      fetch(`${axiosClient.defaults.baseURL}/api/mentionable-users?ticketId=${selectedTicket.id}`)
         .then(res => {
           if (!res.ok) throw new Error('Failed to fetch mentionable users');
           return res.json();
@@ -577,7 +577,7 @@ export default function TicketManage() {
       const newResolution = selectedTicket.resolution || "";
 
       const res = await fetch(
-        `http://localhost:5000/tickets/${selectedTicket.id}`,
+        `${axiosClient.defaults.baseURL}/tickets/${selectedTicket.id}`,
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
@@ -635,7 +635,7 @@ export default function TicketManage() {
 
     try {
       const res = await fetch(
-        `http://localhost:5000/api/tickets/${selectedTicket.id}/status`,
+        `${axiosClient.defaults.baseURL}/api/tickets/${selectedTicket.id}/status`,
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
@@ -668,7 +668,7 @@ export default function TicketManage() {
 
     try {
       const res = await fetch(
-        `http://localhost:5000/api/tickets/${selectedTicket.id}/due-date`,
+        `${axiosClient.defaults.baseURL}/api/tickets/${selectedTicket.id}/due-date`,
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
@@ -1295,7 +1295,7 @@ export default function TicketManage() {
                             <img
                               src={
                                 user?.ProfileImagePath
-                                  ? `http://localhost:5000/uploads/profile_images/${user.ProfileImagePath}`
+                                  ? `${axiosClient.defaults.baseURL}/uploads/profile_images/${user.ProfileImagePath}`
                                   : `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.FullName || 'User')}&background=random&color=fff`
                               }
                               alt={user?.FullName || 'User'}
@@ -1677,7 +1677,7 @@ export default function TicketManage() {
                                   <img
                                     src={
                                       user.ProfileImagePath
-                                        ? `http://localhost:5000/uploads/${user.ProfileImagePath}`
+                                        ? `${axiosClient.defaults.baseURL}/uploads/${user.ProfileImagePath}`
                                         : `https://ui-avatars.com/api/?name=${encodeURIComponent(user.FullName)}&background=random&color=fff`
                                     }
                                     alt={user.FullName}
@@ -2020,7 +2020,7 @@ function CommentItem({
           <img
             src={
               comment.ProfileImagePath
-                ? `http://localhost:5000/uploads/${comment.ProfileImagePath}`
+                ? `${axiosClient.defaults.baseURL}/uploads/${comment.ProfileImagePath}`
                 : `https://ui-avatars.com/api/?name=${encodeURIComponent(comment.FullName)}&background=random&color=fff`
             }
             alt={comment.FullName}

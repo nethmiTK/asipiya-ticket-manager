@@ -62,7 +62,7 @@ const UserDetails = () => {
               <div className="w-32 h-32 rounded-full overflow-hidden bg-gray-200">
                 {userData.ProfileImagePath ? (
                   <img
-                    src={`http://localhost:5000/uploads/${userData.ProfileImagePath}`} // Keep this as it's for static file serving
+                    src={`${axiosClient.defaults.baseURL}/uploads/${userData.ProfileImagePath}`} // Keep this as it's for static file serving
                     alt={userData.FullName}
                     className="w-full h-full object-cover"
                   />

@@ -266,7 +266,7 @@ const NotificationPanel = ({ userId, role, onClose, onNotificationUpdate }) => {
         if (notification.SourceUserProfileImagePath) {
             // Use the source user's profile picture
             return {
-                imgSrc: `http://localhost:5000/uploads/profile_images/${notification.SourceUserProfileImagePath}`,
+                imgSrc: `${axiosClient.defaults.baseURL}/uploads/profile_images/${notification.SourceUserProfileImagePath}`,
                 altText: notification.SourceUserFullName || 'User',
             };
         } else if (notification.SourceUserFullName) {
@@ -353,7 +353,7 @@ const NotificationPanel = ({ userId, role, onClose, onNotificationUpdate }) => {
             fetchNotifications();
             
             // Setup socket connection for real-time notifications
-            socketRef.current = io("http://localhost:5000");
+            socketRef.current = io(`${axiosClient.defaults.baseURL}`);
             
             // Listen for new notifications for this specific user
             socketRef.current.on(`notification-${userId}`, (newNotification) => {

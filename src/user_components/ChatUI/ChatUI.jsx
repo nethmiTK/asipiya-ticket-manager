@@ -3,8 +3,9 @@ import { IoMdAttach } from "react-icons/io";
 import { MdSend } from "react-icons/md";
 import * as pdfjsLib from "pdfjs-dist";
 import { io } from "socket.io-client";
+import axiosClient from "../../frontend/axiosClient";
 
-const socket = io("http://localhost:5000");
+const socket = io(`${axiosClient.defaults.baseURL}`);
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
   "pdfjs-dist/build/pdf.worker.min.js",
@@ -50,7 +51,7 @@ const ChatUI = ({ ticketID: propTicketID }) => {
     }
     console.log(`ChatUI: markMessagesAsSeen - Attempting to mark messages as seen for TicketID: ${ticketID}, Role: ${role}`);
     try {
-      const res = await fetch("http://localhost:5000/ticketchat/markSeen", {
+      const res = await fetch(`${axiosClient.defaults.baseURL}/ticketchat/markSeen`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ TicketID: ticketID, Role: role }),
@@ -88,7 +89,7 @@ const ChatUI = ({ ticketID: propTicketID }) => {
     console.log(`ChatUI: fetchMessages - Attempting to fetch messages for TicketID: ${ticketID}, UserID: ${userID}`);
     try {
       const res = await fetch(
-        `http://localhost:5000/api/ticketchatUser/${ticketID}`
+        `${axiosClient.defaults.baseURL}/api/ticketchatUser/${ticketID}`
       );
       const data = await res.json();
       if (Array.isArray(data)) {
@@ -258,7 +259,7 @@ const ChatUI = ({ ticketID: propTicketID }) => {
 
       console.log("ChatUI: handleSend - Sending message.", { ticketID, userID, role, type: formData.get("Type"), note: formData.get("Note") });
 
-      const res = await fetch("http://localhost:5000/api/ticketchatUser", {
+      const res = await fetch(`${axiosClient.defaults.baseURL}/api/ticketchatUser`, {
         method: "POST",
         body: formData,
       });
