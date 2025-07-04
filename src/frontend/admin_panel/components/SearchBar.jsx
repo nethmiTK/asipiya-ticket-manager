@@ -16,7 +16,7 @@ const SearchBar = ({
     const fetchOptions = async () => {
       try {
         // Fetch systems using axiosClient
-        const systemsResponse = await axiosClient.get('/system_registration');
+        const systemsResponse = await axiosClient.get('/api/system_registration');
         const systems = systemsResponse.data
           .filter(system => system.Status === 1) // Only active systems
           .map(system => ({
