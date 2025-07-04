@@ -17,9 +17,6 @@ import ticketLogRoutes from './routes/ticketLog.js';
 import userProfileRoutes from './routes/userProfile.js';
 import http from 'http';
 import { Server } from 'socket.io';
-import userProfileRoutes from './routes/userProfile.js';
-import http from 'http';
-import { Server } from 'socket.io';
 import db from './config/db.js';
 import supervisorRoutes from './routes/supervisorRoutes.js';
 import inviteRoutes from './routes/inviteRoutes.js';
@@ -2280,25 +2277,6 @@ app.get('/api/tickets/user/:userId', (req, res) => {
 /* ----------------------------------------------------------------------------------------------*/
 
 // API endpoint to fetch tickets
-
-app.get('/api/tickets', (req, res) => {
-  const query = `
-    SELECT t.TicketID, c.CompanyName AS Client, s.Description AS System, tc.Description AS Category, t.Status, t.Priority
-    FROM ticket t
-    LEFT JOIN client c ON t.UserId = c.ClientID
-    LEFT JOIN asipiyasystem s ON t.AsipiyaSystemID = s.AsipiyaSystemID
-    LEFT JOIN ticketcategory tc ON t.TicketCategoryID = tc.TicketCategoryID;
-  `;
-
-  db.query(query, (err, results) => {
-    if (err) {
-      console.error('Error fetching tickets:', err);
-      res.status(500).json({ error: 'Failed to fetch tickets' });
-      return;
-    }
-    res.json(results);
-  });
-});
 
 // API endpoint to update ticket status (including rejection)
 // When a ticket is rejected, this endpoint will:
