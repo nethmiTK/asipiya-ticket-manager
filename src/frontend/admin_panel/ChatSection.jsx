@@ -110,21 +110,22 @@ export default function SupervisorChatSection({
   };
 
   const markMessagesAsSeen = async () => {
-    if (!ticketId || !role) {
-      console.log("ChatSection: markMessagesAsSeen - Missing ticketId or role, skipping.", { ticketId, role });
+    if (!ticketId || !role || !currentUser?.UserID) {
+      console.log("ChatSection: markMessagesAsSeen - Missing ticketId, role, or currentUser, skipping.", { ticketId, role, currentUser });
       return;
     }
-    console.log(`ChatSection: markMessagesAsSeen - Attempting to mark messages as seen for TicketID: ${ticketId}, Role: ${role}`);
+    console.log(`ChatSection: markMessagesAsSeen - Attempting to mark messages as seen for TicketID: ${ticketId}, Role: ${role}, UserID: ${currentUser.UserID}`);
     try {
-      await axios.post("http://localhost:5000/ticketchat/markSeen", {
+      await axios.post("http://localhost:5000/ticketchat/markSeen/user", {
         TicketID: ticketId,
         Role: role,
+        UserID: currentUser.UserID,
       });
       setHasNewUnseenMessage(false);
       if (onNewMessageStatusChange) {
         onNewMessageStatusChange(false);
       }
-      console.log(`ChatSection: markMessagesAsSeen - Successfully marked messages as seen for TicketID: ${ticketId}, Role: ${role}`);
+      console.log(`ChatSection: markMessagesAsSeen - Successfully marked messages as seen for TicketID: ${ticketId}, Role: ${role}, UserID: ${currentUser.UserID}`);
     } catch (error) {
       console.error("ChatSection: markMessagesAsSeen - Failed to mark messages as seen:", error);
     }
