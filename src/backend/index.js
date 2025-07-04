@@ -17,6 +17,9 @@ import ticketLogRoutes from './routes/ticketLog.js';
 import userProfileRoutes from './routes/userProfile.js';
 import http from 'http';
 import { Server } from 'socket.io';
+import userProfileRoutes from './routes/userProfile.js';
+import http from 'http';
+import { Server } from 'socket.io';
 import db from './config/db.js';
 import supervisorRoutes from './routes/supervisorRoutes.js';
 import inviteRoutes from './routes/inviteRoutes.js';
@@ -25,7 +28,10 @@ import categoryRoutes from './routes/categoryRoutes.js';
 import clientRoutes from './routes/clientRoutes.js';
 import supervisorAssignRoutes from './routes/supervisorAssignRoutes.js';
 import ticketRoutes from './routes/ticketRoutes.js';
-
+import { sendNotificationsByRoles, createNotification, createTicketLog } from './utils/notificationUtils.js';
+import notificationRoutes from './routes/notificationRoutes.js';
+ import evidenceRoutes from './routes/evidenceRoutes.js';
+ 
 const app = express();
 app.use(bodyParser.json());
 app.use(cors());
@@ -55,7 +61,9 @@ app.use('/api', categoryRoutes);
 app.use('/api', clientRoutes);
 app.use('/api', supervisorAssignRoutes);
 app.use('/api', ticketRoutes);
-
+ app.use('/api/notifications', notificationRoutes);
+ app.use('/api', evidenceRoutes);
+ 
 //evidence uploads
 app.use("/uploads", express.static("uploads"));
 const uploadDir = "uploads";
