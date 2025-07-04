@@ -67,7 +67,7 @@ app.use('/api', clientRoutes);
 app.use('/api', supervisorAssignRoutes);
 app.use('/api', ticketRoutes);
  app.use('/api/notifications', notificationRoutes);
- app.use('/api', evidenceRoutes);
+ app.use('/', evidenceRoutes);
 app.use('/api', commentRoutes);
 app.use('/api', ticketUpdateRoutes);
 app.use('/api', dashboardRoutes);

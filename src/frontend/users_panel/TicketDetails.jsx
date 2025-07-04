@@ -75,7 +75,7 @@ const TicketDetails = () => {
     setEvidenceLoading(true);
     setEvidenceError(null);
     axiosClient // Changed from axios
-      .get(`/api/evidence/${ticketId}`)
+      .get(`/evidence/${ticketId}`)
       .then((res) => setEvidenceFiles(res.data))
       .catch(() => setEvidenceError("Error fetching evidence files"))
       .finally(() => setEvidenceLoading(false));

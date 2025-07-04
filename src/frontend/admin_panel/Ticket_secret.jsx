@@ -54,7 +54,7 @@ const Ticket_secret = ({ ticket, onClose }) => {
   useEffect(() => {
     if (!ticket?.TicketID) return;
     // Use axiosClient and remove base URL
-    axiosClient.get(`/api/evidence/${ticket.TicketID}`)
+    axiosClient.get(`/evidence/${ticket.TicketID}`)
       .then(res => setEvidenceList(res.data))
       .catch(err => console.error("Evidence fetch failed", err));
   }, [ticket?.TicketID]);

@@ -262,7 +262,7 @@ export default function TicketManage() {
     const fetchEvidence = async () => {
       try {
         const res = await fetch(
-          `${axiosClient.defaults.baseURL}/api/evidence/${selectedTicket.id}`
+          `${axiosClient.defaults.baseURL}/evidence/${selectedTicket.id}`
         );
         const data = await res.json();
         setEvidenceList(data);
