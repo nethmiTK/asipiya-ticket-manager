@@ -25,6 +25,8 @@ import categoryRoutes from './routes/categoryRoutes.js';
 import clientRoutes from './routes/clientRoutes.js';
 import supervisorAssignRoutes from './routes/supervisorAssignRoutes.js';
 import ticketRoutes from './routes/ticketRoutes.js';
+import { sendNotificationsByRoles, createNotification, createTicketLog } from './utils/notificationUtils.js';
+import notificationRoutes from './routes/notificationRoutes.js';
 
 const app = express();
 app.use(bodyParser.json());
@@ -55,6 +57,7 @@ app.use('/api', categoryRoutes);
 app.use('/api', clientRoutes);
 app.use('/api', supervisorAssignRoutes);
 app.use('/api', ticketRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 //evidence uploads
 app.use("/uploads", express.static("uploads"));
@@ -107,6 +110,21 @@ const commentAttachmentUpload = multer({
     fileSize: 10 * 1024 * 1024 // 10MB limit
   }
 });
+
+// Configure nodemailer transporter
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS
+  }
+});
+
+// Helper function to validate email
+const isValidEmail = (email) => {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+};
 
 //  Define salt rounds for bcrypt hashing.
 const saltRounds = 10;
@@ -1507,48 +1525,6 @@ app.put("/update-supervisors/:id", async (req, res) => {
 
 
 // Helper function to create a ticket log
-const createTicketLog = async (ticketId, type, description, userId, oldValue, newValue, note = null) => {
-  return new Promise(async (resolve, reject) => {
-    let userName = 'System';
-    if (userId) {
-      try {
-        const [userResult] = await db.promise().query('SELECT FullName FROM appuser WHERE UserID = ?', [userId]);
-        if (userResult.length > 0) {
-          userName = userResult[0].FullName;
-        }
-      } catch (userErr) {
-        console.error("Error fetching user name for ticket log:", userErr);
-        // Continue even if user name fetch fails
-      }
-    }
-
-    const logQuery = `
-            INSERT INTO ticketlog (TicketID, DateTime, Type, Description, UserID, OldValue, NewValue, Note)
-            VALUES (?, NOW(), ?, ?, ?, ?, ?, ?)
-        `;
-
-    const finalDescription = `${userName} ${description}`;
-    const finalNote = note ? `${note} by ${userName}` : `Updated by ${userName}`;
-
-    db.query(logQuery, [
-      ticketId,
-      type,
-      finalDescription,
-      userId,
-      oldValue,
-      newValue,
-      finalNote
-    ], (err, result) => {
-      if (err) {
-        console.error("Error creating ticket log:", err);
-        reject(err);
-        return;
-      }
-      resolve(result);
-    });
-  });
-};
-
 // In the status change handler:
 app.put('/api/tickets/:ticketId/status', async (req, res) => {
   const { ticketId } = req.params;
@@ -2190,311 +2166,7 @@ app.get('/api/users/recent', (req, res) => {
   });
 });
 
-// /*-------------------------------NOTIFICATIONS---------------------------------------------------*/
-
-// // API endpoint to get unread notifications count
-// app.get('/api/notifications/count/:id', (req, res) => {
-//   const userId = req.params.id;
-//   const query = `
-//         SELECT COUNT(*) as count 
-//         FROM notifications 
-//         WHERE UserID = ? AND IsRead = FALSE
-//     `;
-
-//   db.query(query, [userId], (err, results) => {
-//     if (err) {
-//       console.error('Error fetching notification count:', err);
-//       return res.status(500).json({ error: 'Failed to fetch notification count' });
-//     }
-//     res.json({ count: results[0].count });
-//   });
-// });
-
-// // API endpoint to get user's notifications
-// app.get('/api/notifications/:userId', (req, res) => {
-//   const { userId } = req.params;
-//   const query = `
-//         SELECT
-//             n.NotificationID,
-//             n.UserID,
-//             n.Message,
-//             n.Type,
-//             n.IsRead,
-//             n.CreatedAt,
-//             CASE 
-//                 WHEN n.Type = 'NEW_CHAT_MESSAGE' THEN n.TicketLogID
-//                 ELSE tl.TicketID 
-//             END AS TicketID,
-//             tl.UserID AS SourceUserID,
-//             au.FullName AS SourceUserFullName,
-//             au.ProfileImagePath AS SourceUserProfileImagePath
-//         FROM
-//             notifications n
-//         LEFT JOIN
-//             ticketlog tl ON n.TicketLogID = tl.TicketLogID AND n.Type != 'NEW_CHAT_MESSAGE'
-//         LEFT JOIN
-//             appuser au ON tl.UserID = au.UserID
-//         WHERE
-//             n.UserID = ?
-//         ORDER BY
-//             n.CreatedAt DESC;
-//     `;
-
-//   db.query(query, [userId], (err, results) => {
-//     if (err) {
-//       console.error('Error fetching notifications:', err);
-//       return res.status(500).json({ error: 'Failed to fetch notifications' });
-//     }
-//     res.json(results);
-//   });
-// });
-
-// // API endpoint to mark notifications as read
-// app.put('/api/notifications/read', (req, res) => {
-//   const { notificationIds } = req.body;
-
-//   if (!notificationIds || !Array.isArray(notificationIds) || notificationIds.length === 0) {
-//     return res.status(400).json({ error: 'Notification IDs array is required' });
-//   }
-
-//   const query = `
-//         UPDATE notifications 
-//         SET IsRead = TRUE 
-//         WHERE NotificationID IN (?)
-//     `;
-
-//   db.query(query, [notificationIds], (err, result) => {
-//     if (err) {
-//       console.error('Error marking notifications as read:', err);
-//       return res.status(500).json({ error: 'Failed to mark notifications as read' });
-//     }
-//     res.json({ message: 'Notifications marked as read', updatedCount: result.affectedRows });
-//   });
-// });
-
-// // ADDED: API endpoint to mark all notifications for a user as read
-// app.put('/api/notifications/read-all/:userId', (req, res) => {
-//   const userId = req.params.userId;
-
-//   if (!userId) {
-//     return res.status(400).json({ error: 'User ID is required' });
-//   }
-
-//   const query = `
-//         UPDATE notifications 
-//         SET IsRead = TRUE 
-//         WHERE UserID = ? AND IsRead = FALSE
-//     `;
-
-//   db.query(query, [userId], (err, result) => {
-//     if (err) {
-//       console.error('Error marking all notifications as read:', err);
-//       return res.status(500).json({ error: 'Failed to mark all notifications as read' });
-//     }
-//     res.json({ message: 'All notifications marked as read', updatedCount: result.affectedRows });
-//   });
-// });
-
-// // API endpoint to send status update notifications to admins and supervisors
-// app.post('/api/notifications/status-update', async (req, res) => {
-//   try {
-//     const { ticketId, updatedByUserId, oldStatus, newStatus } = req.body;
-
-//     // Get ticket information
-//     const ticketQuery = 'SELECT * FROM ticket WHERE TicketID = ?';
-//     const ticketResult = await new Promise((resolve, reject) => {
-//       db.query(ticketQuery, [ticketId], (err, result) => {
-//         if (err) reject(err);
-//         else resolve(result);
-//       });
-//     });
-
-//     if (ticketResult.length === 0) {
-//       return res.status(404).json({ error: 'Ticket not found' });
-//     }
-
-//     const ticket = ticketResult[0];
-
-//     // Get updater name
-//     const updaterQuery = 'SELECT FullName FROM appuser WHERE UserID = ?';
-//     const updaterResult = await new Promise((resolve, reject) => {
-//       db.query(updaterQuery, [updatedByUserId], (err, result) => {
-//         if (err) reject(err);
-//         else resolve(result);
-//       });
-//     });
-
-//     const updaterName = updaterResult.length > 0 ? updaterResult[0].FullName : 'Admin';
-
-//     // Get all admins
-//     const admins = await getUsersByRoles(['Admin']);
-
-//     // Get assigned supervisors for this ticket
-//     const supervisorQuery = `
-//             SELECT DISTINCT appuser.UserID 
-//             FROM ticket_supervisors 
-//             JOIN appuser ON ticket_supervisors.SupervisorUserID = appuser.UserID 
-//             WHERE ticket_supervisors.TicketID = ?
-//         `;
-//     const supervisors = await new Promise((resolve, reject) => {
-//       db.query(supervisorQuery, [ticketId], (err, result) => {
-//         if (err) reject(err);
-//         else resolve(result);
-//       });
-//     });
-
-//     // Combine admins and supervisors, excluding the updater
-//     const allRecipients = [...admins, ...supervisors].filter(user => user.UserID != updatedByUserId);
-
-//     // Create notifications for all recipients
-//     const message = `Ticket #${ticketId} status has been updated from ${oldStatus} to ${newStatus} by ${updaterName}`;
-//     const notifications = allRecipients.map(user =>
-//       createNotification(user.UserID, message, 'STATUS_UPDATE', null, ticketId)
-//     );
-
-//     await Promise.all(notifications);
-
-//     res.json({ message: 'Status update notifications sent successfully' });
-//   } catch (error) {
-//     console.error('Error sending status update notifications:', error);
-//     res.status(500).json({ error: 'Failed to send status update notifications' });
-//   }
-// });
-
-// // API endpoint to send resolution update notifications to admins and supervisors
-// app.post('/api/notifications/resolution-update', async (req, res) => {
-//   try {
-//     const { ticketId, updatedByUserId, resolutionText } = req.body;
-
-//     // Get ticket information
-//     const ticketQuery = 'SELECT * FROM ticket WHERE TicketID = ?';
-//     const ticketResult = await new Promise((resolve, reject) => {
-//       db.query(ticketQuery, [ticketId], (err, result) => {
-//         if (err) reject(err);
-//         else resolve(result);
-//       });
-//     });
-
-//     if (ticketResult.length === 0) {
-//       return res.status(404).json({ error: 'Ticket not found' });
-//     }
-
-//     const ticket = ticketResult[0];
-
-//     // Get updater name
-//     const updaterQuery = 'SELECT FullName FROM appuser WHERE UserID = ?';
-//     const updaterResult = await new Promise((resolve, reject) => {
-//       db.query(updaterQuery, [updatedByUserId], (err, result) => {
-//         if (err) reject(err);
-//         else resolve(result);
-//       });
-//     });
-
-//     const updaterName = updaterResult.length > 0 ? updaterResult[0].FullName : 'Admin';
-
-//     // Get all admins
-//     const admins = await getUsersByRoles(['Admin']);
-
-//     // Get assigned supervisors for this ticket
-//     const supervisorQuery = `
-//             SELECT DISTINCT appuser.UserID 
-//             FROM ticket_supervisors 
-//             JOIN appuser ON ticket_supervisors.SupervisorUserID = appuser.UserID 
-//             WHERE ticket_supervisors.TicketID = ?
-//         `;
-//     const supervisors = await new Promise((resolve, reject) => {
-//       db.query(supervisorQuery, [ticketId], (err, result) => {
-//         if (err) reject(err);
-//         else resolve(result);
-//       });
-//     });
-
-//     // Combine admins and supervisors, excluding the updater
-//     const allRecipients = [...admins, ...supervisors].filter(user => user.UserID != updatedByUserId);
-
-//     // Create notifications for all recipients
-//     const message = `Ticket #${ticketId} resolution updated by ${updaterName}: ${resolutionText}`;
-//     const notifications = allRecipients.map(user =>
-//       createNotification(user.UserID, message, 'RESOLUTION_UPDATE', null, ticketId)
-//     );
-
-//     await Promise.all(notifications);
-
-//     res.json({ message: 'Resolution update notifications sent successfully' });
-//   } catch (error) {
-//     console.error('Error sending resolution update notifications:', error);
-//     res.status(500).json({ error: 'Failed to send resolution update notifications' });
-//   }
-// });
-
-// // API endpoint to send due date update notifications to admins and supervisors
-// app.post('/api/notifications/due-date-update', async (req, res) => {
-//   try {
-//     const { ticketId, updatedByUserId, oldDueDate, newDueDate } = req.body;
-
-//     // Get ticket information
-//     const ticketQuery = 'SELECT * FROM ticket WHERE TicketID = ?';
-//     const ticketResult = await new Promise((resolve, reject) => {
-//       db.query(ticketQuery, [ticketId], (err, result) => {
-//         if (err) reject(err);
-//         else resolve(result);
-//       });
-//     });
-
-//     if (ticketResult.length === 0) {
-//       return res.status(404).json({ error: 'Ticket not found' });
-//     }
-
-//     const ticket = ticketResult[0];
-
-//     // Get updater name
-//     const updaterQuery = 'SELECT FullName FROM appuser WHERE UserID = ?';
-//     const updaterResult = await new Promise((resolve, reject) => {
-//       db.query(updaterQuery, [updatedByUserId], (err, result) => {
-//         if (err) reject(err);
-//         else resolve(result);
-//       });
-//     });
-
-//     const updaterName = updaterResult.length > 0 ? updaterResult[0].FullName : 'Admin';
-
-//     // Get all admins
-//     const admins = await getUsersByRoles(['Admin']);
-
-//     // Get assigned supervisors for this ticket
-//     const supervisorQuery = `
-//             SELECT DISTINCT appuser.UserID 
-//             FROM ticket_supervisors 
-//             JOIN appuser ON ticket_supervisors.SupervisorUserID = appuser.UserID 
-//             WHERE ticket_supervisors.TicketID = ?
-//         `;
-//     const supervisors = await new Promise((resolve, reject) => {
-//       db.query(supervisorQuery, [ticketId], (err, result) => {
-//         if (err) reject(err);
-//         else resolve(result);
-//       });
-//     });
-
-//     // Combine admins and supervisors, excluding the updater
-//     const allRecipients = [...admins, ...supervisors].filter(user => user.UserID != updatedByUserId);
-
-//     // Create notifications for all recipients
-//     const oldDateStr = oldDueDate ? new Date(oldDueDate).toLocaleDateString() : 'None';
-//     const newDateStr = newDueDate ? new Date(newDueDate).toLocaleDateString() : 'None';
-//     const message = `Ticket #${ticketId} due date updated by ${updaterName} from ${oldDateStr} to ${newDateStr}`;
-//     const notifications = allRecipients.map(user =>
-//       createNotification(user.UserID, message, 'DUE_DATE_UPDATE', null, ticketId)
-//     );
-
-//     await Promise.all(notifications);
-
-//     res.json({ message: 'Due date update notifications sent successfully' });
-//   } catch (error) {
-//     console.error('Error sending due date update notifications:', error);
-//     res.status(500).json({ error: 'Failed to send due date update notifications' });
-//   }
-// });
-
+ 
 /*------------------------------COUNT TICKETS----------------------------------------------------*/
 
 // API endpoint to fetch ticket counts for a SPECIFIC USER
@@ -2764,95 +2436,6 @@ app.get("/download_evidence/:filename", (req, res) => {
 /* ------------------------------NOTIFY ROLE BASED----------------------------------------------------------------*/
 
 // Helper function to create a notification
-const createNotification = async (userId, message, type, ticketLogId = null, ticketId = null) => {
-  return new Promise((resolve, reject) => {
-    let query, params;
-
-    if (ticketLogId) {
-      // If we have a ticketLogId, use the existing structure
-      query = `
-                INSERT INTO notifications (UserID, Message, Type, TicketLogID)
-                VALUES (?, ?, ?, ?)
-            `;
-      params = [userId, message, type, ticketLogId];
-    } else if (ticketId) {
-      // If we only have a ticketId, we need to create a simple log entry first or handle it differently
-      // For these notification types, we'll create a temporary log entry
-      const createTempLogQuery = `
-                INSERT INTO ticketlog (TicketID, Type, Description, UserID, CreatedAt)
-                VALUES (?, ?, ?, ?, NOW())
-            `;
-
-      db.query(createTempLogQuery, [ticketId, type, message, userId || 1], (logErr, logResult) => {
-        if (logErr) {
-          console.error('Error creating temporary log:', logErr);
-          reject(logErr);
-          return;
-        }
-
-        // Now create the notification with the new log ID
-        const notificationQuery = `
-                    INSERT INTO notifications (UserID, Message, Type, TicketLogID)
-                    VALUES (?, ?, ?, ?)
-                `;
-        db.query(notificationQuery, [userId, message, type, logResult.insertId], (err, result) => {
-          if (err) {
-            console.error('Error creating notification:', err);
-            reject(err);
-          } else {
-            resolve(result);
-          }
-        });
-      });
-      return;
-    } else {
-      // Original structure for notifications without tickets
-      query = `
-                INSERT INTO notifications (UserID, Message, Type, TicketLogID)
-                VALUES (?, ?, ?, ?)
-            `;
-      params = [userId, message, type, null];
-    }
-
-    db.query(query, params, (err, result) => {
-      if (err) {
-        console.error('Error creating notification:', err);
-        reject(err);
-      } else {
-        resolve(result);
-      }
-    });
-  });
-};
-
-// Helper function to get users by roles
-const getUsersByRoles = async (roles) => {
-  return new Promise((resolve, reject) => {
-    const query = 'SELECT UserID FROM appuser WHERE Role IN (?)';
-    db.query(query, [roles], (err, results) => {
-      if (err) {
-        console.error('Error fetching users by roles:', err);
-        reject(err);
-      } else {
-        resolve(results);
-      }
-    });
-  });
-};
-
-// Helper function to send notifications to users by roles
-const sendNotificationsByRoles = async (roles, message, type, ticketLogId = null) => {
-  try {
-    const users = await getUsersByRoles(roles);
-    const notifications = users.map(user =>
-      createNotification(user.UserID, message, type, ticketLogId)
-    );
-    await Promise.all(notifications);
-  } catch (error) {
-    console.error('Error sending notifications by roles:', error);
-  }
-};
-
 // Invite supervisor endpoint
 app.post('/api/invite-supervisor', async (req, res) => {
   const { email, role } = req.body;

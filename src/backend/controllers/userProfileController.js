@@ -1,3 +1,5 @@
+import bcrypt from 'bcryptjs';
+
 // Get user profile data
 export const getUserProfile = async (req, res) => {
   try {
@@ -54,4 +56,77 @@ export const getUserProfile = async (req, res) => {
     console.error('Error fetching user profile:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
-}; 
+};
+
+// Get admin profile endpoint 
+export const getAdminProfile = (req, res) => {
+  const userId = req.params.id;
+  // Select all fields that the frontend profile form expects
+  const query = 'SELECT UserID, FullName, Email, Phone, Role, ProfileImagePath FROM appuser WHERE UserID = ?';
+
+  req.db.query(query, [userId], (err, results) => {
+    if (err) {
+      console.error('Error fetching user profile:', err);
+      res.status(500).json({ message: 'Server error' });
+    } else if (results.length === 0) {
+      res.status(404).json({ message: 'User not found' });
+    } else {
+      res.status(200).json(results[0]);
+    }
+  });
+};
+
+// Get admin profile update endpoint 
+export const updateAdminProfile = async (req, res) => {
+  const userId = req.params.id;
+  const { FullName, Email, Phone, CurrentPassword, NewPassword } = req.body;
+  const saltRounds = 10;
+
+  try {
+    // First get the current user data to verify password
+    const getUserQuery = 'SELECT Password FROM appuser WHERE UserID = ?';
+    const [user] = await req.db.promise().query(getUserQuery, [userId]);
+
+    if (user.length === 0) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // If password change is requested
+    if (CurrentPassword && NewPassword) {
+      // Verify current password
+      const isPasswordValid = await bcrypt.compare(CurrentPassword, user[0].Password);
+
+      if (!isPasswordValid) {
+        return res.status(400).json({ message: 'Current password is incorrect' });
+      }
+
+      // Hash new password
+      const hashedNewPassword = await bcrypt.hash(NewPassword, saltRounds);
+
+      // Update all fields including password
+      const updateQuery = 'UPDATE appuser SET FullName = ?, Email = ?, Phone = ?, Password = ? WHERE UserID = ?';
+      await req.db.promise().query(updateQuery, [FullName, Email, Phone, hashedNewPassword, userId]);
+    } else {
+      // Update only non-password fields
+      const updateQuery = 'UPDATE appuser SET FullName = ?, Email = ?, Phone = ? WHERE UserID = ?';
+      await req.db.promise().query(updateQuery, [FullName, Email, Phone, userId]);
+    }
+
+    // Get updated user data
+    const getUpdatedUserQuery = 'SELECT UserID, FullName, Email, Phone, Role, ProfileImagePath FROM appuser WHERE UserID = ?';
+    const [updatedUser] = await req.db.promise().query(getUpdatedUserQuery, [userId]);
+
+    if (updatedUser.length === 0) {
+      return res.status(404).json({ message: 'Failed to retrieve updated user data' });
+    }
+
+    res.status(200).json({
+      message: 'Profile updated successfully',
+      user: updatedUser[0]
+    });
+
+  } catch (error) {
+    console.error('Error updating profile:', error);
+    res.status(500).json({ message: 'Server error while updating profile' });
+  }
+};

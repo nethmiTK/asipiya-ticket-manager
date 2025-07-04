@@ -12,7 +12,7 @@ import {
 const router = express.Router();
 
 // Get unread notifications count
-router.get('/count/:id', getUnreadNotificationsCount);
+router.get('/count/:userId', getUnreadNotificationsCount);
 
 // Get user's notifications
 router.get('/:userId', getUserNotifications);
