@@ -44,19 +44,19 @@ const ChatUI = ({ ticketID: propTicketID }) => {
   const canvasRef = useRef(null);
 
   const markMessagesAsSeen = async () => {
-    if (!ticketID || !role) {
-      console.log("ChatUI: markMessagesAsSeen - Missing ticketID or role, skipping.", { ticketID, role });
+    if (!ticketID || !role || !userID) {
+      console.log("ChatUI: markMessagesAsSeen - Missing ticketID, role, or userID, skipping.", { ticketID, role, userID });
       return;
     }
-    console.log(`ChatUI: markMessagesAsSeen - Attempting to mark messages as seen for TicketID: ${ticketID}, Role: ${role}`);
+    console.log(`ChatUI: markMessagesAsSeen - Attempting to mark messages as seen for TicketID: ${ticketID}, Role: ${role}, UserID: ${userID}`);
     try {
-      const res = await fetch("http://localhost:5000/ticketchat/markSeen", {
+      const res = await fetch("http://localhost:5000/ticketchat/markSeen/user", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ TicketID: ticketID, Role: role }),
+        body: JSON.stringify({ TicketID: ticketID, Role: role, UserID: userID }),
       });
       if (!res.ok) throw new Error("Failed to mark messages as seen");
-      console.log(`ChatUI: markMessagesAsSeen - Successfully marked messages as seen for TicketID: ${ticketID}, Role: ${role}`);
+      console.log(`ChatUI: markMessagesAsSeen - Successfully marked messages as seen for TicketID: ${ticketID}, Role: ${role}, UserID: ${userID}`);
     } catch (err) {
       console.error("ChatUI: markMessagesAsSeen - Error marking messages as seen:", err);
     }

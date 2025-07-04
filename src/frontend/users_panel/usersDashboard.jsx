@@ -9,6 +9,7 @@ import { toast } from 'react-toastify';
 import { IoNotificationsOutline } from "react-icons/io5";
 import NotificationPanel from "../components/NotificationPanel";
 import { useNavigate } from "react-router-dom";
+import { io } from 'socket.io-client';
 
 const truncateDescription = (text, maxLength = 80) => {
     if (!text) return '';
@@ -83,6 +84,29 @@ const usersDashboard = () => {
             return () => clearInterval(interval);
         }
     }, [loggedInUser]);
+
+    // Socket listener for real-time notification updates
+    useEffect(() => {
+        if (loggedInUser?.UserID) {
+            const socket = io("http://localhost:5000");
+            
+            // Listen for new notifications
+            socket.on(`notification-${loggedInUser.UserID}`, () => {
+                fetchUnreadNotifications();
+            });
+            
+            // Listen for notification updates (like marking as read)
+            socket.on(`notification-update-${loggedInUser.UserID}`, () => {
+                fetchUnreadNotifications();
+            });
+            
+            return () => {
+                socket.off(`notification-${loggedInUser.UserID}`);
+                socket.off(`notification-update-${loggedInUser.UserID}`);
+                socket.disconnect();
+            };
+        }
+    }, [loggedInUser?.UserID]);
 
     const fetchUserTicketCounts = async () => {
         if (!loggedInUser || !loggedInUser.UserID) {
