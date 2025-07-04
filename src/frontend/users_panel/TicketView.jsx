@@ -612,6 +612,11 @@ const TicketView = () => {
                         >
                           <td className="py-3 px-6 text-left whitespace-nowrap font-medium text-gray-900 flex items-center">
                             {ticket.id}
+                            {unreadChatCounts[ticket.id] > 0 && (
+                              <span className="ml-2 bg-green-500 text-white text-xs px-2 py-1 rounded-full font-bold flex items-center shadow-md animate-bounce-custom">
+                                <MessageCircle className="w-3 h-3 mr-1" />{unreadChatCounts[ticket.id]}
+                              </span>
+                            )}
                           </td>
                           <td
                             className={`py-3 px-6 text-left font-medium ${statusColors[ticket.status?.toLowerCase()] || "text-gray-700"}`}
@@ -630,18 +635,13 @@ const TicketView = () => {
                           <td className="py-3 px-6 text-left">
                             {formatDateTime(ticket.datetime)}
                           </td>
-                          <td className="py-3 px-6 text-center relative">
+                          <td className="py-3 px-6 text-center">
                             <button
                               onClick={(e) => handleViewTicket(e, ticket.id)}
                               className="text-blue-600 hover:text-blue-900"
                             >
                               <FaEye size={20} />
                             </button>
-                            {unreadChatCounts[ticket.id] > 0 && (
-                              <span className="absolute top-[5px] right-[20px] bg-red-500 text-white text-xs px-2 py-1 rounded-full font-bold flex items-center shadow-md animate-bounce-custom z-10">
-                                <MessageCircle className="w-3 h-3 mr-1" />{unreadChatCounts[ticket.id]}
-                              </span>
-                            )}
                           </td>
                         </tr>
                       ))
