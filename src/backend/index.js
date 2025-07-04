@@ -25,6 +25,17 @@ import authLoginRoutes from './routes/authLoginRoutes.js';
 import authPasswordRoutes from './routes/authPasswordRoutes.js';
 import authResetRoutes from './routes/authResetRoutes.js';
 
+import systemRoutes from './routes/systemRoutes.js';
+import categoryRoutes from './routes/categoryRoutes.js';
+import clientRoutes from './routes/clientRoutes.js';
+import supervisorAssignRoutes from './routes/supervisorAssignRoutes.js';
+import ticketRoutes from './routes/ticketRoutes.js';
+import { sendNotificationsByRoles, createNotification, createTicketLog } from './utils/notificationUtils.js';
+import notificationRoutes from './routes/notificationRoutes.js';
+ import evidenceRoutes from './routes/evidenceRoutes.js';
+import commentRoutes from './routes/commentRoutes.js';
+import ticketUpdateRoutes from './routes/ticketUpdateRoutes.js';
+
 const app = express();
 app.use(bodyParser.json());
 app.use(cors());
