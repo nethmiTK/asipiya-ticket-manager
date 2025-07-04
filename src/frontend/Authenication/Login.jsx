@@ -20,7 +20,7 @@ const Login = ({ onLoginSuccess }) => {
         e.preventDefault();
         try {
             // Use axiosClient for POST request
-            const response = await axiosClient.post('/login', credentials);
+            const response = await axiosClient.post('/api/login', credentials);
             toast.success('Login successful!');
 
             // Pass the full user object received from the backend to onLoginSuccess

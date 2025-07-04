@@ -72,10 +72,10 @@ app.use('/api', evidenceRoutes);
 app.use('/api', commentRoutes);
 app.use('/api', ticketUpdateRoutes);
 app.use('/api', dashboardRoutes);
-app.use(authRoutes);
-app.use(authLoginRoutes);
-app.use('/', authPasswordRoutes);
-app.use('/', authResetRoutes);
+app.use('/api', authRoutes);
+app.use('/api', authLoginRoutes);
+app.use('/api', authPasswordRoutes);
+app.use('/api', authResetRoutes);
 app.use('/api/user/tickets', userDashboardRoutes);
 
 //evidence uploads
