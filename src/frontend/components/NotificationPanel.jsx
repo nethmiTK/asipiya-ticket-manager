@@ -1,5 +1,5 @@
  import React, { useState, useEffect, useRef } from 'react';
-import axios from 'axios';
+import axiosClient from "../axiosClient";
 import { formatDistanceToNow } from 'date-fns';
 import { IoClose } from 'react-icons/io5';
 import { Link } from 'react-router-dom';
@@ -331,7 +331,7 @@ const NotificationPanel = ({ userId, role, onClose, onNotificationUpdate }) => {
     const fetchNotifications = async () => {
         try {
             // Fetch ALL notifications (both read and unread)
-            const response = await axios.get(`http://localhost:5000/api/notifications/${userId}`);
+            const response = await axiosClient.get(`/api/notifications/${userId}`);
             
             // Filter to show only unread notifications initially
             const unreadNotifications = response.data.filter(notification => !notification.IsRead).map(notification => ({
@@ -408,7 +408,7 @@ const NotificationPanel = ({ userId, role, onClose, onNotificationUpdate }) => {
             ));
             
             // Then make the API call to mark as read in the backend
-            await axios.put(`http://localhost:5000/api/notifications/read`, {
+            await axiosClient.put(`/api/notifications/read`, {
                 notificationIds: [notificationId]
             });
             
@@ -493,7 +493,7 @@ const NotificationPanel = ({ userId, role, onClose, onNotificationUpdate }) => {
             })));
             
             // Then make the API call to mark all as read in the backend
-            await axios.put(`http://localhost:5000/api/notifications/read-all/${userId}`);
+            await axiosClient.put(`/api/notifications/read-all/${userId}`);
             
             // Update the parent component's notification count
             if (onNotificationUpdate) {
