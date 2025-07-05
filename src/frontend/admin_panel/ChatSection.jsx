@@ -116,8 +116,8 @@ export default function SupervisorChatSection({
     }
     console.log(`ChatSection: markMessagesAsSeen - Attempting to mark messages as seen for TicketID: ${ticketId}, Role: ${role}, UserID: ${currentUser.UserID}`);
     try {
-       await axiosClient.post("/ticketchat/markSeen", {
- 
+       await axiosClient.post("/api/ticketchat/markSeen", {
+
         TicketID: ticketId,
         Role: role,
         UserID: currentUser.UserID,
@@ -273,7 +273,7 @@ export default function SupervisorChatSection({
 
     console.log(`ChatSection: useEffect for initial fetch - Fetching messages for ticket ${ticketId}.`);
     axiosClient
-      .get(`/messages/${ticketId}`)
+      .get(`/api/messages/${ticketId}`)
       .then((res) => {
         const formattedMessages = res.data.map((msg) => ({
           ...msg,
@@ -338,7 +338,7 @@ export default function SupervisorChatSection({
       if (sendingFile) formData.append("file", sendingFile);
 
       const res = await axiosClient.post(
-        `/ticketchat`,
+        `/api/ticketchat`,
         formData,
         {
           headers: { "Content-Type": "multipart/form-data" },

@@ -21,6 +21,8 @@ const getIconUrl = (fileName) => {
     pdf: "136/136522.png",
     xls: "732/732220.png",
     xlsx: "732/732220.png",
+    xlsm: "732/732220.png",
+    xlsb: "732/732220.png",
     doc: "888/888883.png",
     docx: "888/888883.png",
     ppt: "7817/7817494.png",
@@ -39,6 +41,7 @@ const ChatUI = ({ ticketID: propTicketID }) => {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [selectedFile, setSelectedFile] = useState(null);
+  const [previewImage, setPreviewImage] = useState(null);
 
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -51,10 +54,10 @@ const ChatUI = ({ ticketID: propTicketID }) => {
     }
     console.log(`ChatUI: markMessagesAsSeen - Attempting to mark messages as seen for TicketID: ${ticketID}, Role: ${role}, UserID: ${userID}`);
     try {
-       const res = await fetch(`${axiosClient.defaults.baseURL}/ticketchat/markSeen`, {
+       const res = await fetch(`${axiosClient.defaults.baseURL}/api/ticketchat/markSeen`, {
  
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+         method: "POST",
+         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ TicketID: ticketID, Role: role, UserID: userID }),
       });
       if (!res.ok) throw new Error("Failed to mark messages as seen");
@@ -317,6 +320,7 @@ const ChatUI = ({ ticketID: propTicketID }) => {
           const isImage = msg.filePath?.match(
             /\.(jpeg|jpg|png|gif|webp|bmp|svg)$/i
           );
+          const isVideo = msg.filePath?.match(/\.(mp4|webm|mov|ogg)$/i);
 
           return (
             <React.Fragment key={msg.id || idx}>
@@ -373,13 +377,24 @@ const ChatUI = ({ ticketID: propTicketID }) => {
                             boxShadow: "0 4px 8px rgba(0,0,0,0.15)",
                             transition: "transform 0.3s ease",
                           }}
-                          onClick={() => window.open(msg.filePath, "_blank")}
+                          onClick={() => setPreviewImage(msg.filePath)}
                           onMouseOver={(e) =>
                             (e.currentTarget.style.transform = "scale(1.05)")
                           }
                           onMouseOut={(e) =>
                             (e.currentTarget.style.transform = "scale(1)")
                           }
+                        />
+                      ) : isVideo ? (
+                        <video
+                          src={msg.filePath}
+                          controls
+                          style={{
+                            maxWidth: "100%",
+                            maxHeight: 180,
+                            borderRadius: 12,
+                            marginBottom: 8,
+                          }}
                         />
                       ) : (
                         <div className="flex flex-col items-start">
@@ -456,8 +471,14 @@ const ChatUI = ({ ticketID: propTicketID }) => {
               alt="Preview"
               className="h-20 object-contain rounded cursor-pointer"
               onClick={() =>
-                window.open(URL.createObjectURL(selectedFile), "_blank")
+                setPreviewImage(URL.createObjectURL(selectedFile))
               }
+            />
+          ) : selectedFile.type.startsWith("video/") ? (
+            <video
+              src={URL.createObjectURL(selectedFile)}
+              controls
+              className="h-20 object-contain rounded"
             />
           ) : (
             <div className="flex flex-col items-start">
@@ -517,6 +538,28 @@ const ChatUI = ({ ticketID: propTicketID }) => {
           <MdSend className="text-gray-900 hover:text-gray-700 size-8 cursor-pointer" />
         </button>
       </div>
+
+      {previewImage && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50"
+          onClick={() => setPreviewImage(null)}
+        >
+          <div className="relative p-4">
+            <img
+              src={previewImage}
+              alt="Preview"
+              className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg"
+            />
+            <button
+              onClick={() => setPreviewImage(null)}
+              className="absolute top-2 right-2 text-white bg-black bg-opacity-50 rounded-full p-1 text-2xl leading-none"
+              aria-label="Close image preview"
+            >
+              &times;
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
