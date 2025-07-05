@@ -343,6 +343,77 @@ const TicketViewPage = ({ ticketId, popupMode = false, onClose }) => {
         </div>
       )}
 
+      {showRejectModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/55">
+                    <div className="bg-gray-200 p-6 rounded-lg w-full max-w-md relative">
+                        <button
+                            onClick={() => {
+                                setShowRejectModal(false);
+                                setRejectReasonDropdown('');
+                                setRejectNote('');
+                            }}
+                            className="absolute top-2 right-2 text-gray-600 hover:text-black"
+                        >
+                            <IoClose size={24} />
+                        </button>
+                        <h3 className="text-lg font-semibold mb-4">Reject Ticket</h3>
+
+                        <label className="block font-medium mb-1">Select Reason</label>
+                        <select
+                            value={rejectReasonDropdown}
+                            onChange={(e) => {
+                                setRejectReasonDropdown(e.target.value);
+                                if (e.target.value !== 'Add Note') setRejectNote('');
+                            }}
+                            className="w-full mb-4 p-3 border border-black rounded"
+                        >
+                            <option value="">-- Choose Reason --</option>
+                            <option value="Incomplete Information">Incomplete Information</option>
+                            <option value="Invalid Request">Invalid Request</option>
+                            <option value="Duplicate Ticket">Duplicate Ticket</option>
+                            <option value="Not a Bug">Not a Bug</option>
+                            <option value="Already Fixed">Already Fixed</option>
+                            <option value="Feature Request Misclassified as Bug">Feature Request Misclassified as Bug</option>
+                            <option value="Add Note">Add Note</option>
+                        </select>
+
+                        {rejectReasonDropdown === 'Add Note' && (
+                            <>
+                                <label className="block font-medium mb-1">Custom Note</label>
+                                <textarea
+                                    value={rejectNote}
+                                    onChange={(e) => setRejectNote(e.target.value)}
+                                    className="w-full mb-4 p-3 border border-black rounded"
+                                    rows={4}
+                                    placeholder="Write your custom reason here..."
+                                />
+                            </>
+                        )}
+
+                        <div className="flex justify-end gap-2">
+                            <button
+                                onClick={() => {
+                                    setShowRejectModal(false);
+                                    setRejectReasonDropdown('');
+                                    setRejectNote('');
+                                }}
+                                className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleReject}
+                                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+                                disabled={!rejectReasonDropdown || (rejectReasonDropdown === 'Add Note' && !rejectNote.trim())}
+                            >
+                                Confirm Reject
+                            </button>
+                        </div>
+                    </div>
+                </div>
+      )}
+
+
       {previewUrl && (
         <div
           className="fixed inset-0 z-50 flex bg-black/55 items-center justify-center p-4"
