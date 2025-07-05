@@ -43,6 +43,7 @@ import companyRoutes from './routes/companyRoutes.js';
 import profileRoutes from './routes/profileRoutes.js';
 import chatNotificationRoutes from './routes/chatNotificationRoutes.js';
 import commentAttachmentRoutes from './routes/commentAttachmentRoutes.js';
+import profileImageRoutes from './routes/profileImageRoutes.js';
 
 const app = express();
 app.use(bodyParser.json());
@@ -89,6 +90,7 @@ app.use('/api', companyRoutes);
 app.use('/api', profileRoutes);
 app.use('/api', chatNotificationRoutes);
 app.use('/api', commentAttachmentRoutes);
+app.use('/api/user/profile', profileImageRoutes);
 
 //evidence uploads
 app.use("/uploads", express.static("uploads"));
@@ -159,64 +161,6 @@ app.get('/api/tickets', (req, res) => {
     res.json(results);
   });
 });
-
-// Add Multer middleware for profile image uploads
-app.post(
-  "/api/user/profile/upload/:id",
-  upload.single("profileImage"),
-  async (req, res) => {
-    const userId = req.params.id;
-    if (!req.file) {
-      return res.status(400).json({ message: "No file uploaded." });
-    }
-
-    const imagePath = `profile_images/${req.file.filename}`; // Store relative path
-
-    try {
-      // Update the user's profile image path in the database
-      const updateQuery =
-        "UPDATE appuser SET ProfileImagePath = ? WHERE UserID = ?";
-      await db.promise().query(updateQuery, [imagePath, userId]);
-
-      res.status(200).json({
-        message: "Profile image uploaded successfully",
-        imagePath: imagePath, // Send back the relative path
-      });
-    } catch (error) {
-      console.error("Error updating profile image path in DB:", error);
-      res.status(500).json({ message: "Failed to update profile image." });
-    }
-  }
-);
-
-// Delete profile image endpoint
-app.delete('/api/user/profile/image/:id', async (req, res) => {
-  const userId = req.params.id;
-  try {
-    // Get the current image path to delete the file from the server
-    const [results] = await db.promise().query('SELECT ProfileImagePath FROM appuser WHERE UserID = ?', [userId]);
-    if (results.length > 0 && results[0].ProfileImagePath) {
-      const filePath = path.join(__dirname, 'uploads', results[0].ProfileImagePath);
-      fs.unlink(filePath, (err) => {
-        if (err) {
-          console.error('Error deleting old profile image file:', err);
-          // Continue even if file deletion fails, as DB update is more critical
-        }
-      });
-    }
-
-    // Update the database to remove the profile image path
-    const updateQuery = 'UPDATE appuser SET ProfileImagePath = NULL WHERE UserID = ?';
-    await db.promise().query(updateQuery, [userId]);
-
-    res.status(200).json({ message: 'Profile image removed successfully' });
-  } catch (error) {
-    console.error('Error removing profile image:', error);
-    res.status(500).json({ message: 'Failed to remove profile image.' });
-  }
-});
-
-
 
 // Socket.io connection
 io.on("connection", (socket) => {
@@ -445,7 +389,6 @@ app.get("/messages/:ticketId", (req, res) => {
     res.json(formatted);
   });
 });
-
 
 // POST message (text or file) - single endpoint for both user/admin
 app.post("/ticketchat", upload.single("file"), (req, res) => {
@@ -743,8 +686,6 @@ app.post("/ticketchat/markSeen", (req, res) => {
     res.status(200).json({ message: "Messages marked as seen." });
   });
 });
-
-
 
 /*-------------------------------Fetch Requests-----------------------------------------*/
 // Route: Get tickets assigned to a specific supervisor
