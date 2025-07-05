@@ -688,305 +688,42 @@ app.post("/ticketchat/markSeen", (req, res) => {
 });
 
 /*-------------------------------Fetch Requests-----------------------------------------*/
-// Route: Get tickets assigned to a specific supervisor
+// These routes have been moved to ticketController.js and ticketRoutes.js
+// Use the following endpoints instead:
+// GET /api/tickets - for role-based ticket fetching
+// GET /api/getting/tickets - for filtered tickets
+// PUT /api/tickets/:id - for ticket updates
+// GET /api/supervisors - for supervisors list
+// GET /api/asipiyasystems - for systems list
 
-// Get tickets assigned to a specific supervisor (by UserID in appuser)
+// Backward compatibility routes for frontend (redirect to new endpoints)
 app.get("/tickets", (req, res) => {
-  const { supervisorId, role } = req.query;
-
-  // Role is required
-  if (!role) {
-    return res.status(400).json({ error: "User role is required" });
-  }
-
-  // Admin: Return all tickets
-  if (role === "Admin") {
-    const sql = `SELECT 
-                    t.*, 
-                    asys.SystemName AS AsipiyaSystemName, 
-                    u.FullName AS UserName
-                    FROM ticket t
-                    LEFT JOIN asipiyasystem asys ON t.AsipiyaSystemID = asys.AsipiyaSystemID
-                    LEFT JOIN appuser u ON t.UserId = u.UserID`;
-
-    db.query(sql, (err, results) => {
-      if (err) {
-        console.error("Error fetching all tickets:", err);
-        return res.status(500).json({ error: "Error fetching tickets" });
-      }
-      return res.json(results);
-    });
-  }
-
-  // Supervisor: Return only their tickets
-  else if (role === "Supervisor") {
-    if (!supervisorId) {
-      return res.status(400).json({ error: "Supervisor ID is required for supervisors" });
-    }
-
-    const sql = `SELECT 
-                        t.*, 
-                        asys.SystemName AS AsipiyaSystemName, 
-                        u.FullName AS UserName
-                        FROM ticket t
-                        LEFT JOIN asipiyasystem asys ON t.AsipiyaSystemID = asys.AsipiyaSystemID
-                        LEFT JOIN appuser u ON t.UserId = u.UserID
-                        WHERE t.SupervisorID = ?`;
-
-    db.query(sql, [supervisorId], (err, results) => {
-      if (err) {
-        console.error("Error fetching supervisor's tickets:", err);
-        return res.status(500).json({ error: "Error fetching tickets" });
-      }
-      return res.json(results);
-    });
-  }
-
-  // If the role is invalid
-  else {
-    return res.status(400).json({ error: "Invalid role specified" });
-  }
+  res.redirect(307, `/api/tickets?${new URLSearchParams(req.query).toString()}`);
 });
 
 app.get("/getting/tickets", (req, res) => {
-  const { supervisorId, systemId } = req.query;
-
-  let sql = `
-    SELECT 
-      t.*, 
-      asys.SystemName AS AsipiyaSystemName, 
-      u.FullName AS UserName
-    FROM ticket t
-    LEFT JOIN asipiyasystem asys ON t.AsipiyaSystemID = asys.AsipiyaSystemID
-    LEFT JOIN appuser u ON t.UserId = u.UserID
-    WHERE 1 = 1
-  `;
-
-  const params = [];
-
-  if (supervisorId && supervisorId !== "all") {
-    const supId = parseInt(supervisorId, 10);
-    if (isNaN(supId)) {
-      return res.status(400).json({ error: "Invalid supervisor ID" });
-    }
-    sql += " AND FIND_IN_SET(?, t.SupervisorID)";
-    params.push(supId);
-  }
-
-  if (systemId && systemId !== "all") {
-    const sysId = parseInt(systemId, 10);
-    if (isNaN(sysId)) {
-      return res.status(400).json({ error: "Invalid system ID" });
-    }
-    sql += " AND t.AsipiyaSystemID = ?";
-    params.push(sysId);
-  }
-
-  db.query(sql, params, (err, results) => {
-    if (err) {
-      console.error("Error fetching tickets:", err);
-      return res.status(500).json({ error: "Error fetching tickets" });
-    }
-    res.json(results);
-  });
+  res.redirect(307, `/api/getting/tickets?${new URLSearchParams(req.query).toString()}`);
 });
 
-
-app.put('/tickets/:id', (req, res) => {
-  const { id } = req.params;
-  const { status, dueDate, resolution } = req.body;
-
-  // Build the SET clause dynamically
-  const fields = [];
-  const values = [];
-
-  if (status !== undefined) {
-    fields.push("Status = ?");
-    values.push(status);
-  }
-
-  if (dueDate !== undefined) {
-    fields.push("DueDate = ?");
-    values.push(dueDate);
-  }
-
-  if (resolution !== undefined) {
-    fields.push("Resolution = ?");
-    values.push(resolution);
-  }
-
-  if (fields.length === 0) {
-    return res.status(400).json({ message: "No fields provided to update." });
-  }
-
-  const sql = `UPDATE ticket SET ${fields.join(', ')} WHERE TicketID = ?`;
-  values.push(id); // Add id to the end of values array for WHERE clause
-
-  db.query(sql, values, (err, result) => {
-    if (err) {
-      console.error("Failed to update ticket:", err);
-      return res.status(500).json({ message: "Server error" });
-    }
-    res.json({ message: "Ticket updated successfully" });
-  });
+app.put("/tickets/:id", (req, res) => {
+  res.redirect(307, `/api/tickets/${req.params.id}`);
 });
-
-
 
 app.get("/supervisors", (req, res) => {
-  const sql = "SELECT UserID, FullName FROM appuser WHERE Role = 'Supervisor'";
-  db.query(sql, (err, results) => {
-    if (err) {
-      console.error("Error fetching supervisors:", err);
-      return res.status(500).json({ error: "Error fetching supervisors" });
-    }
-    res.json(results);
-  });
+  res.redirect(307, "/api/supervisors");
 });
 
 app.get("/asipiyasystems", (req, res) => {
-  const sql = "SELECT AsipiyaSystemID, SystemName FROM asipiyasystem";
-  db.query(sql, (err, results) => {
-    if (err) {
-      console.error("Error fetching systems:", err);
-      return res.status(500).json({ error: "Error fetching systems" });
-    }
-    res.json(results);
-  });
+  res.redirect(307, "/api/asipiyasystems");
 });
-
-//nope
-app.get("/tickets", (req, res) => {
-  const query = `
-    SELECT * 
-    FROM ticket 
-  `;
-
-  db.query(query, (err, results) => {
-    if (err) {
-      console.error("Error fetching tickets for supervisor:", err);
-      return res.status(500).json({ error: "Internal server error" });
-    }
-
-    res.json(results);
-  });
-});
-
-// Add this to your existing Node.js/Express backend
-app.put('/tickets/accept/:ticketID', (req, res) => {
-  const { ticketID } = req.params;
-
-  db.query('UPDATE ticket SET Status = "Accepted" WHERE TicketID = ?', [ticketID], (err, result) => {
-    if (err) {
-      console.error(err);
-      return res.status(500).json({ error: "Database error" });
-    }
-    return res.json({ message: "Ticket accepted successfully" });
-  });
-});
-
 /*---------------------------------------------------------------------------------------*/
 
 
 
 
 // PUT: Update supervisors for a ticket
-app.put("/update-supervisors/:id", async (req, res) => {
-  const { id } = req.params;
-  const { supervisorIds, currentUserId } = req.body; // Add currentUserId to get who is making the change
-
-  console.log("Received ticket ID:", id);
-  console.log("Received supervisor IDs:", supervisorIds);
-  console.log("Current User ID:", currentUserId);
-
-  // Validate input
-  if (!Array.isArray(supervisorIds) || supervisorIds.length === 0) {
-    return res.status(400).json({ error: "At least one supervisor is required." });
-  }
-
-  // Clean and format supervisor IDs
-  const validSupervisorIds = supervisorIds
-    .map(id => parseInt(id))
-    .filter(id => !isNaN(id) && id > 0);
-
-  if (validSupervisorIds.length === 0) {
-    return res.status(400).json({ error: "No valid supervisor IDs provided." });
-  }
-
-  try {
-    // Get current ticket data and old supervisors
-    const getTicketQuery = `
-      SELECT SupervisorID, UserId as ticketCreatorId 
-      FROM ticket 
-      WHERE TicketID = ?
-    `;
-
-    const currentTicketData = await new Promise((resolve, reject) => {
-      db.query(getTicketQuery, [id], (err, results) => {
-        if (err) reject(err);
-        else resolve(results[0]);
-      });
-    });
-
-    if (!currentTicketData) {
-      return res.status(404).json({ error: "Ticket not found." });
-    }
-
-    const oldSupervisorIds = currentTicketData.SupervisorID
-      ? currentTicketData.SupervisorID.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id))
-      : [];
-
-    const newSupervisorIds = validSupervisorIds;
-    const ticketCreatorId = currentTicketData.ticketCreatorId;
-
-    // Find added and removed supervisors
-    const addedSupervisorIds = newSupervisorIds.filter(id => !oldSupervisorIds.includes(id));
-    const removedSupervisorIds = oldSupervisorIds.filter(id => !newSupervisorIds.includes(id));
-
-    console.log("Old supervisors:", oldSupervisorIds);
-    console.log("New supervisors:", newSupervisorIds);
-    console.log("Added supervisors:", addedSupervisorIds);
-    console.log("Removed supervisors:", removedSupervisorIds);
-
-    // Get current user information
-    let currentUserName = 'System';
-    let currentUserRole = 'System';
-    if (currentUserId) {
-      const getCurrentUserQuery = `SELECT FullName, Role FROM appuser WHERE UserID = ?`;
-      const currentUserResult = await new Promise((resolve, reject) => {
-        db.query(getCurrentUserQuery, [currentUserId], (err, results) => {
-          if (err) reject(err);
-          else resolve(results[0] || null);
-        });
-      });
-
-      if (currentUserResult) {
-        currentUserName = currentUserResult.FullName;
-        currentUserRole = currentUserResult.Role;
-      }
-    }
-
-    // Update the ticket table
-    const supervisorIdString = validSupervisorIds.join(",");
-    await new Promise((resolve, reject) => {
-      db.query("UPDATE ticket SET SupervisorID = ? WHERE TicketID = ?", [supervisorIdString, id], (err, result) => {
-        if (err) reject(err);
-        else resolve(result);
-      });
-    });
-
-    // Get supervisor names for notifications
-    // This functionality has been moved to supervisorAssignController.js
-    // Use the /api/update-supervisors/:id endpoint instead
-
-    console.log("Supervisors updated successfully");
-    res.json({ message: "Supervisors updated successfully - use /api/update-supervisors/:id endpoint" });
-
-  } catch (error) {
-    console.error("Error updating supervisors:", error);
-    res.status(500).json({ error: "Failed to update supervisors." });
-  }
-});
+// This functionality has been moved to supervisorAssignController.js
+// Use the /api/update-supervisors/:id endpoint instead
 
 
 const storage = multer.diskStorage({

@@ -155,3 +155,186 @@ export const getUserTicketById = (req, res) => {
     });
   });
 };
+
+// Get tickets assigned to a specific supervisor (by UserID in appuser)
+export const getTickets = (req, res) => {
+  const { supervisorId, role } = req.query;
+
+  // Role is required
+  if (!role) {
+    return res.status(400).json({ error: "User role is required" });
+  }
+
+  // Admin: Return all tickets
+  if (role === "Admin") {
+    const sql = `SELECT 
+                    t.*, 
+                    asys.SystemName AS AsipiyaSystemName, 
+                    u.FullName AS UserName
+                    FROM ticket t
+                    LEFT JOIN asipiyasystem asys ON t.AsipiyaSystemID = asys.AsipiyaSystemID
+                    LEFT JOIN appuser u ON t.UserId = u.UserID`;
+
+    db.query(sql, (err, results) => {
+      if (err) {
+        console.error("Error fetching all tickets:", err);
+        return res.status(500).json({ error: "Error fetching tickets" });
+      }
+      return res.json(results);
+    });
+  }
+
+  // Supervisor: Return only their tickets
+  else if (role === "Supervisor") {
+    if (!supervisorId) {
+      return res.status(400).json({ error: "Supervisor ID is required for supervisors" });
+    }
+
+    const sql = `SELECT 
+                        t.*, 
+                        asys.SystemName AS AsipiyaSystemName, 
+                        u.FullName AS UserName
+                        FROM ticket t
+                        LEFT JOIN asipiyasystem asys ON t.AsipiyaSystemID = asys.AsipiyaSystemID
+                        LEFT JOIN appuser u ON t.UserId = u.UserID
+                        WHERE t.SupervisorID = ?`;
+
+    db.query(sql, [supervisorId], (err, results) => {
+      if (err) {
+        console.error("Error fetching supervisor's tickets:", err);
+        return res.status(500).json({ error: "Error fetching tickets" });
+      }
+      return res.json(results);
+    });
+  }
+
+  // If the role is invalid
+  else {
+    return res.status(400).json({ error: "Invalid role specified" });
+  }
+};
+
+// Get tickets with filtering by supervisor and system
+export const getFilteredTickets = (req, res) => {
+  const { supervisorId, systemId } = req.query;
+
+  let sql = `
+    SELECT 
+      t.*, 
+      asys.SystemName AS AsipiyaSystemName, 
+      u.FullName AS UserName
+    FROM ticket t
+    LEFT JOIN asipiyasystem asys ON t.AsipiyaSystemID = asys.AsipiyaSystemID
+    LEFT JOIN appuser u ON t.UserId = u.UserID
+    WHERE 1 = 1
+  `;
+
+  const params = [];
+
+  if (supervisorId && supervisorId !== "all") {
+    const supId = parseInt(supervisorId, 10);
+    if (isNaN(supId)) {
+      return res.status(400).json({ error: "Invalid supervisor ID" });
+    }
+    sql += " AND FIND_IN_SET(?, t.SupervisorID)";
+    params.push(supId);
+  }
+
+  if (systemId && systemId !== "all") {
+    const sysId = parseInt(systemId, 10);
+    if (isNaN(sysId)) {
+      return res.status(400).json({ error: "Invalid system ID" });
+    }
+    sql += " AND t.AsipiyaSystemID = ?";
+    params.push(sysId);
+  }
+
+  db.query(sql, params, (err, results) => {
+    if (err) {
+      console.error("Error fetching tickets:", err);
+      return res.status(500).json({ error: "Error fetching tickets" });
+    }
+    res.json(results);
+  });
+};
+
+// Update ticket
+export const updateTicket = (req, res) => {
+  const { id } = req.params;
+  const { status, dueDate, resolution } = req.body;
+
+  // Build the SET clause dynamically
+  const fields = [];
+  const values = [];
+
+  if (status !== undefined) {
+    fields.push("Status = ?");
+    values.push(status);
+  }
+
+  if (dueDate !== undefined) {
+    fields.push("DueDate = ?");
+    values.push(dueDate);
+  }
+
+  if (resolution !== undefined) {
+    fields.push("Resolution = ?");
+    values.push(resolution);
+  }
+
+  if (fields.length === 0) {
+    return res.status(400).json({ message: "No fields provided to update." });
+  }
+
+  const sql = `UPDATE ticket SET ${fields.join(', ')} WHERE TicketID = ?`;
+  values.push(id); // Add id to the end of values array for WHERE clause
+
+  db.query(sql, values, (err, result) => {
+    if (err) {
+      console.error("Failed to update ticket:", err);
+      return res.status(500).json({ message: "Server error" });
+    }
+    res.json({ message: "Ticket updated successfully" });
+  });
+};
+
+// Get all supervisors
+export const getSupervisors = (req, res) => {
+  const sql = "SELECT UserID, FullName FROM appuser WHERE Role = 'Supervisor'";
+  db.query(sql, (err, results) => {
+    if (err) {
+      console.error("Error fetching supervisors:", err);
+      return res.status(500).json({ error: "Error fetching supervisors" });
+    }
+    res.json(results);
+  });
+};
+
+// Get all Asipiya systems
+export const getAsipiyaSystems = (req, res) => {
+  const sql = "SELECT AsipiyaSystemID, SystemName FROM asipiyasystem";
+  db.query(sql, (err, results) => {
+    if (err) {
+      console.error("Error fetching systems:", err);
+      return res.status(500).json({ error: "Error fetching systems" });
+    }
+    res.json(results);
+  });
+};
+
+// Get all tickets (simple query)
+export const getAllTicketsSimple = (req, res) => {
+  const query = `
+    SELECT * 
+    FROM ticket 
+  `;
+
+  db.query(query, (err, results) => {
+    if (err) {
+      console.error("Error fetching tickets for supervisor:", err);
+      return res.status(500).json({ error: "Internal server error" });
+    }
+
+    res.json(results);
+  });
+};
