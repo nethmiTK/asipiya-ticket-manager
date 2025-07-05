@@ -3,6 +3,7 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
+import { createNotification, createTicketLog } from '../utils/notificationUtils.js';
 
 // Get __dirname equivalent for ES Modules
 const __filename = fileURLToPath(import.meta.url);
@@ -207,21 +208,14 @@ export const hasUserLikedComment = async (req, res) => {
 // Add a comment to a ticket
 export const addComment = async (req, res) => {
   const { ticketId } = req.params;
-  let { userId, comment, mentionedUserIds, replyToCommentId } = req.body;
+  let { userId, comment, mentionedUserIds, replyToCommentId } = req.body; // Added replyToCommentId
 
   try {
     // Process mentions: Extract mentioned user IDs
     let processedMentions = [];
 
     if (mentionedUserIds && typeof mentionedUserIds === 'string') {
-      try {
-        processedMentions = JSON.parse(mentionedUserIds);
-      } catch (e) {
-        console.error('Error parsing mentionedUserIds:', e);
-        processedMentions = [];
-      }
-    } else if (Array.isArray(mentionedUserIds)) {
-      processedMentions = mentionedUserIds;
+      processedMentions = mentionedUserIds.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id));
     }
 
     // IMPORTANT: Storing the original comment text (including @mentions) in CommentText for display.
@@ -231,80 +225,79 @@ export const addComment = async (req, res) => {
       INSERT INTO comments (TicketID, UserID, CommentText, Mentions, ReplyToCommentID)
       VALUES (?, ?, ?, ?, ?)
     `;
-
-    const mentionsJson = processedMentions.length > 0 ? JSON.stringify(processedMentions) : null;
-
-    const [result] = await db.promise().query(sql, [
+    const result = await db.promise().query(sql, [
       ticketId,
       userId,
-      comment,
-      mentionsJson,
+      comment.trim(), // Store original comment text
+      processedMentions.length > 0 ? processedMentions.join(',') : null, // Store only user IDs
       replyToCommentId || null
     ]);
 
-    const commentId = result.insertId;
+    const newCommentId = result[0].insertId;
 
-    // Handle file uploads if any
+    // Handle multiple file attachments
     if (req.files && req.files.length > 0) {
-      const attachmentPromises = req.files.map(file => {
+      for (const file of req.files) {
+        const attachmentFilePath = path.join('uploads', 'comment_attachments', file.filename).replace(/\\/g, '/');
+        const attachmentFileName = file.originalname;
+        const attachmentFileType = file.mimetype;
+
         const attachmentSql = `
           INSERT INTO comment_attachments (CommentID, FilePath, FileName, FileType)
           VALUES (?, ?, ?, ?)
         `;
-
-        return db.promise().query(attachmentSql, [
-          commentId,
-          file.path,
-          file.filename,
-          file.mimetype
+        await db.promise().query(attachmentSql, [
+          newCommentId,
+          attachmentFilePath,
+          attachmentFileName,
+          attachmentFileType
         ]);
-      });
-
-      await Promise.all(attachmentPromises);
-    }
-
-    // Create notifications for mentioned users
-    if (processedMentions.length > 0) {
-      const getUserDetailsQuery = `
-        SELECT u.FullName as commenterName, t.TicketID
-        FROM appuser u
-        CROSS JOIN ticket t
-        WHERE u.UserID = ? AND t.TicketID = ?
-      `;
-
-      const [userDetails] = await db.promise().query(getUserDetailsQuery, [userId, ticketId]);
-
-      if (userDetails.length > 0) {
-        const commenterName = userDetails[0].commenterName;
-
-        // Create notifications for each mentioned user
-        const notificationPromises = processedMentions.map(mentionedUserId => {
-          const notificationSql = `
-            INSERT INTO notifications (UserID, Message, Type, IsRead, CreatedAt, TicketLogID)
-            VALUES (?, ?, ?, FALSE, NOW(), ?)
-          `;
-
-          const message = `${commenterName} mentioned you in a comment on ticket #${ticketId}`;
-
-          return db.promise().query(notificationSql, [
-            mentionedUserId,
-            message,
-            'COMMENT_MENTION',
-            commentId
-          ]);
-        });
-
-        await Promise.all(notificationPromises);
       }
     }
 
+    // IMPORTANT: Log and notify asynchronously after sending success response
+    // This ensures the frontend gets a success message even if logging/notifications fail.
+    // Errors in this section will be logged on the server but won't block the frontend response.
     res.status(201).json({
       message: 'Comment added successfully',
-      commentId: commentId
+      commentId: newCommentId
     });
 
+    // Perform logging and notifications AFTER sending the response
+    try {
+      // Add to ticketlog
+      const logSql = `
+        INSERT INTO ticketlog (TicketID, DateTime, Type, Description, UserID) 
+        VALUES (?, NOW(), 'COMMENT', ?, ?)
+      `;
+      // Fetch user's name for the log description
+      const [userResult] = await db.promise().query('SELECT FullName FROM appuser WHERE UserID = ?', [userId]);
+      const userName = userResult.length > 0 ? userResult[0].FullName : 'Unknown User';
+
+      const logDescription = `added a comment: "${comment.substring(0, 100)}..."`; // Use original comment for log description
+      await createTicketLog(ticketId, 'COMMENT', logDescription, userId, null, null, null); // Use createTicketLog
+
+      // Notify mentioned users
+      if (processedMentions.length > 0) {
+        for (const mentionedUserId of processedMentions) {
+          // Exclude the user who made the comment from receiving a mention notification for their own comment
+          if (mentionedUserId !== parseInt(userId)) { // Ensure userId is compared as a number
+            await createNotification(
+              mentionedUserId,
+              `You were mentioned in a comment on ticket #${ticketId} by ${userName}`,
+              'MENTION',
+              newCommentId // Link notification to the new comment
+            );
+          }
+        }
+      }
+    } catch (logOrNotifyError) {
+      console.error('Error during post-comment logging or notification:', logOrNotifyError);
+      // Do not send an error response to frontend here, as the comment itself was saved.
+    }
+
   } catch (err) {
-    console.error('Error adding comment:', err);
+    console.error('Error adding comment (main flow):', err);
     res.status(500).json({ message: 'Failed to add comment', error: err.message });
   }
 };
