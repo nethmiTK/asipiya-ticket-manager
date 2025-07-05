@@ -104,24 +104,18 @@ app.use('/api', chatRoutes);
 app.use('/api', userTicketRoutes);
 app.use('/api/ticket-logs', ticketLogRoutes);
 app.use('/api', ticketStatusRoutes);
-
-
 app.get("/tickets", (req, res) => {
   res.redirect(307, `/api/tickets?${new URLSearchParams(req.query).toString()}`);
 });
-
 app.get("/getting/tickets", (req, res) => {
   res.redirect(307, `/api/getting/tickets?${new URLSearchParams(req.query).toString()}`);
 });
-
 app.put("/tickets/:id", (req, res) => {
   res.redirect(307, `/api/tickets/${req.params.id}`);
 });
-
 app.get("/supervisors", (req, res) => {
   res.redirect(307, "/api/supervisors");
 });
-
 app.get("/asipiyasystems", (req, res) => {
   res.redirect(307, "/api/asipiyasystems");
 });
@@ -133,49 +127,11 @@ if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir);
 }
 
-const query = util.promisify(db.query).bind(db);
-
 // Get __dirname equivalent for ES Modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const uploadPath = path.join(__dirname, 'uploads');
 app.use('/uploads', express.static(uploadPath));
-
-// --- Multer Configuration for Images ---
-const profileImageStorage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const uploadDir = path.join(__dirname, 'uploads', 'profile_images');
-    // Create the directory if it doesn't exist
-    fs.mkdirSync(uploadDir, { recursive: true });
-    cb(null, uploadDir);
-  },
-  filename: (req, file, cb) => {
-    const userId = req.params.id;
-    const fileExtension = file.originalname.split('.').pop();
-    cb(null, `${userId}-${Date.now()}.${fileExtension}`);
-  }
-});
-
-const upload = multer({ storage: profileImageStorage });
-
-// Configure nodemailer transporter
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS
-  }
-});
-
-// Helper function to validate email
-const isValidEmail = (email) => {
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(email);
-};
-
-//  Define salt rounds for bcrypt hashing.
-const saltRounds = 10;
-
 
 // Socket.io connection
 io.on("connection", (socket) => {
@@ -190,9 +146,6 @@ io.on("connection", (socket) => {
     console.log(`Socket ${socket.id} disconnected`);
   });
 });
-
-
- 
 
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
@@ -240,7 +193,6 @@ app.post("/upload_evidence", upload_evidence.array("evidenceFiles"), (req, res) 
   });
 });
 
-
 app.get("/download_evidence/:filename", (req, res) => {
   const filename = req.params.filename;
 
@@ -262,41 +214,6 @@ app.get("/download_evidence/:filename", (req, res) => {
       }
     });
   });
-});
-
-app.post('/api/invite-supervisor', async (req, res) => {
-  const { email, role } = req.body;
-
-  // Generate invitation token
-  const token = crypto.randomBytes(32).toString('hex');
-  const mailOptions = {
-    from: process.env.EMAIL_USER,
-    to: email,
-    subject: 'Invitation to Join as Supervisor',
-    html: `
-      <h2>You've been invited to join as a Supervisor</h2>
-      <p>Please click the link below to complete your registration:</p>
-      <a href="${process.env.FRONTEND_URL}/register?token=${token}&role=${role}">Complete Registration</a>
-    `
-  };
-
-  try {
-    await transporter.sendMail(mailOptions);
-
-    // If inviting a supervisor, notify admins and existing supervisors
-    if (role === 'Supervisor') {
-      await sendNotificationsByRoles(
-        ['Admin', 'Supervisor'],
-        `New supervisor invitation sent to ${email}`,
-        'NEW_SUPERVISOR_INVITED'
-      );
-    }
-
-    res.json({ message: 'Invitation email sent successfully.' });
-  } catch (mailErr) {
-    console.error('Error sending invitation email:', mailErr);
-    res.status(500).json({ message: 'Failed to send invitation email.' });
-  }
 });
 
 app.post('/api/upload_evidence', upload_evidence.array('evidenceFiles'), async (req, res) => {
@@ -333,16 +250,6 @@ app.post('/api/upload_evidence', upload_evidence.array('evidenceFiles'), async (
     res.status(500).json({ message: 'Error uploading evidence' });
   }
 });
- 
-
-
-
-
-
-
-
-
-
   
 // Start the server
 const PORT = 5000;
