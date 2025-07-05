@@ -363,39 +363,61 @@ const ChatUI = ({ ticketID: propTicketID }) => {
                   {msg.filePath ? (
                     <>
                       {isImage ? (
-                        <img
-                          src={msg.filePath}
-                          alt="Sent"
-                          loading="lazy"
-                          style={{
-                            maxWidth: "100%",
-                            maxHeight: 180,
-                            borderRadius: 12,
-                            marginBottom: 8,
-                            objectFit: "contain",
-                            cursor: "pointer",
-                            boxShadow: "0 4px 8px rgba(0,0,0,0.15)",
-                            transition: "transform 0.3s ease",
-                          }}
-                          onClick={() => setPreviewImage(msg.filePath)}
-                          onMouseOver={(e) =>
-                            (e.currentTarget.style.transform = "scale(1.05)")
-                          }
-                          onMouseOut={(e) =>
-                            (e.currentTarget.style.transform = "scale(1)")
-                          }
-                        />
+                        <div className="relative">
+                          <img
+                            src={msg.filePath}
+                            alt="Sent"
+                            loading="lazy"
+                            style={{
+                              maxWidth: "100%",
+                              maxHeight: 180,
+                              borderRadius: 12,
+                              marginBottom: 8,
+                              objectFit: "contain",
+                              cursor: "pointer",
+                              boxShadow: "0 4px 8px rgba(0,0,0,0.15)",
+                              transition: "transform 0.3s ease",
+                            }}
+                            onClick={() => setPreviewImage(msg.filePath)}
+                            onMouseOver={(e) =>
+                              (e.currentTarget.style.transform = "scale(1.05)")
+                            }
+                            onMouseOut={(e) =>
+                              (e.currentTarget.style.transform = "scale(1)")
+                            }
+                          />
+                          <button
+                            onClick={() => handleFileDownload(msg.filePath)}
+                            className="absolute bottom-4 right-2 bg-blue-700 bg-opacity-40 text-white p-1.5 rounded-full hover:bg-opacity-60 transition-opacity duration-200 cursor-pointer"
+                            title="Download Image"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                            </svg>
+                          </button>
+                        </div>
                       ) : isVideo ? (
-                        <video
-                          src={msg.filePath}
-                          controls
-                          style={{
-                            maxWidth: "100%",
-                            maxHeight: 180,
-                            borderRadius: 12,
-                            marginBottom: 8,
-                          }}
-                        />
+                        <div className="relative">
+                          <video
+                            src={msg.filePath}
+                            controls
+                            style={{
+                              maxWidth: "100%",
+                              maxHeight: 180,
+                              borderRadius: 12,
+                              marginBottom: 8,
+                            }}
+                          />
+                          <button
+                            onClick={() => handleFileDownload(msg.filePath)}
+                            className="absolute bottom-4 right-2 bg-blue-700 bg-opacity-40 text-white p-1.5 rounded-full hover:bg-opacity-60 transition-opacity duration-200 cursor-pointer"
+                            title="Download Video"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                            </svg>
+                          </button>
+                        </div>
                       ) : (
                         <div className="flex flex-col items-start">
                           <img
