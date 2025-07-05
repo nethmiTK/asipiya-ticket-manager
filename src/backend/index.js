@@ -1035,103 +1035,11 @@ app.put("/update-supervisors/:id", async (req, res) => {
     });
 
     // Get supervisor names for notifications
-    const getSupervisorNamesQuery = `
-      SELECT UserID, FullName 
-      FROM appuser 
-      WHERE UserID IN (${[...addedSupervisorIds, ...removedSupervisorIds].map(() => '?').join(',')})
-    `;
-
-    let supervisorNames = {};
-    if (addedSupervisorIds.length > 0 || removedSupervisorIds.length > 0) {
-      const nameResults = await new Promise((resolve, reject) => {
-        db.query(getSupervisorNamesQuery, [...addedSupervisorIds, ...removedSupervisorIds], (err, results) => {
-          if (err) reject(err);
-          else resolve(results);
-        });
-      });
-
-      nameResults.forEach(supervisor => {
-        supervisorNames[supervisor.UserID] = supervisor.FullName;
-      });
-    }
-
-    // Create logs and notifications for changes
-    if (addedSupervisorIds.length > 0) {
-      const addedNames = addedSupervisorIds.map(id => supervisorNames[id] || `Supervisor ${id}`);
-      const logDescription = `added supervisors: ${addedNames.join(', ')}`;
-
-      const logResult = await createTicketLog(
-        id,
-        'SUPERVISOR_ADDED',
-        logDescription,
-        currentUserId,
-        null, // No old value to display in log message
-        null, // No new value to display in log message
-        null // Let createTicketLog handle the note
-      );
-
-      // Notify ticket creator about added supervisors
-      if (ticketCreatorId) {
-        await createNotification(
-          ticketCreatorId,
-          `New supervisors added to your ticket #${id}: ${addedNames.join(', ')} by ${currentUserName}`,
-          'SUPERVISOR_ADDED',
-          logResult.insertId,
-          id
-        );
-      }
-
-      // Notify newly added supervisors
-      for (const supervisorId of addedSupervisorIds) {
-        await createNotification(
-          supervisorId,
-          `You have been assigned to ticket #${id} by ${currentUserName}`,
-          'SUPERVISOR_ASSIGNED',
-          logResult.insertId,
-          id
-        );
-      }
-    }
-
-    if (removedSupervisorIds.length > 0) {
-      const removedNames = removedSupervisorIds.map(id => supervisorNames[id] || `Supervisor ${id}`);
-      const logDescription = `removed supervisors: ${removedNames.join(', ')}`;
-
-      const logResult = await createTicketLog(
-        id,
-        'SUPERVISOR_REMOVED',
-        logDescription,
-        currentUserId,
-        null, // No old value to display in log message
-        null, // No new value to display in log message
-        null // Let createTicketLog handle the note
-      );
-
-      // Notify ticket creator about removed supervisors
-      if (ticketCreatorId) {
-        await createNotification(
-          ticketCreatorId,
-          `Supervisors removed from your ticket #${id}: ${removedNames.join(', ')} by ${currentUserName}`,
-          'SUPERVISOR_REMOVED',
-          logResult.insertId,
-          id
-        );
-      }
-
-      // Notify removed supervisors
-      for (const supervisorId of removedSupervisorIds) {
-        await createNotification(
-          supervisorId,
-          `You have been removed from ticket #${id} by ${currentUserName}`,
-          'SUPERVISOR_UNASSIGNED',
-          logResult.insertId,
-          id
-        );
-      }
-    }
+    // This functionality has been moved to supervisorAssignController.js
+    // Use the /api/update-supervisors/:id endpoint instead
 
     console.log("Supervisors updated successfully");
-    res.json({ message: "Supervisors updated successfully" });
+    res.json({ message: "Supervisors updated successfully - use /api/update-supervisors/:id endpoint" });
 
   } catch (error) {
     console.error("Error updating supervisors:", error);
