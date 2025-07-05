@@ -45,6 +45,7 @@ import chatNotificationRoutes from './routes/chatNotificationRoutes.js';
 import commentAttachmentRoutes from './routes/commentAttachmentRoutes.js';
 import profileImageRoutes from './routes/profileImageRoutes.js';
 import chatRoutes from './routes/chatRoutes.js';
+import userTicketRoutes from './routes/userTicketRoutes.js';
 
 const app = express();
 app.use(bodyParser.json());
@@ -99,6 +100,7 @@ app.use('/api', chatNotificationRoutes);
 app.use('/api', commentAttachmentRoutes);
 app.use('/api/user/profile', profileImageRoutes);
 app.use('/api', chatRoutes);
+app.use('/api', userTicketRoutes);
 
 
 app.get("/tickets", (req, res) => {
@@ -206,25 +208,7 @@ io.on("connection", (socket) => {
 });
 
 
-/*-------------------------------Fetch Requests-----------------------------------------*/
-// These routes have been moved to ticketController.js and ticketRoutes.js
-// Use the following endpoints instead:
-// GET /api/tickets - for role-based ticket fetching
-// GET /api/getting/tickets - for filtered tickets
-// PUT /api/tickets/:id - for ticket updates
-// GET /api/supervisors - for supervisors list
-// GET /api/asipiyasystems - for systems list
-
-
-/*---------------------------------------------------------------------------------------*/
-
-
-
-
-// PUT: Update supervisors for a ticket
-// This functionality has been moved to supervisorAssignController.js
-// Use the /api/update-supervisors/:id endpoint instead
-
+ 
 
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
@@ -272,97 +256,8 @@ app.post("/upload_evidence", upload_evidence.array("evidenceFiles"), (req, res) 
   });
 });
 
-// API endpoint to fetch ticket counts by system
-app.get('/api/tickets/system-distribution', (req, res) => {
-  const query = `
-        SELECT 
-            s.SystemName,
-            COUNT(t.TicketID) as TicketCount
-        FROM asipiyasystem s
-        LEFT JOIN ticket t ON s.AsipiyaSystemID = t.AsipiyaSystemID
-        GROUP BY s.SystemName
-        ORDER BY TicketCount DESC;
-    `;
-
-  db.query(query, (err, results) => {
-    if (err) {
-      console.error('Error fetching ticket system distribution:', err);
-      res.status(500).json({ error: 'Failed to fetch ticket system distribution' });
-      return;
-    }
-    res.json(results);
-  });
-});
-
-// Get user details by ID
-app.get('/api/users/:userId', (req, res) => {
-  const userId = req.params.userId;
-  const query = `
-    SELECT 
-      u.UserID,
-      u.FullName,
-      u.Email,
-      u.Phone as ContactNo,
-      u.ProfileImagePath,
-      COUNT(t.TicketID) as TotalTickets,
-      SUM(CASE WHEN t.Status = 'Closed' THEN 1 ELSE 0 END) as ClosedTickets,
-      SUM(CASE WHEN t.Priority = 'High' THEN 1 ELSE 0 END) as HighPriorityTickets
-    FROM appuser u
-    LEFT JOIN ticket t ON u.UserID = t.UserId
-    WHERE u.UserID = ?
-    GROUP BY u.UserID
-  `;
-
-  db.query(query, [userId], (err, results) => {
-    if (err) {
-      console.error('Error fetching user details:', err);
-      return res.status(500).json({ error: 'Database error' });
-    }
-    if (results.length === 0) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-    res.json(results[0]);
-  });
-});
-
-// Get user's tickets
-app.get('/api/tickets/user/:userId', (req, res) => {
-  const userId = req.params.userId;
-  const query = `
-    SELECT 
-      t.TicketID,
-      t.Description,
-      t.Status,
-      t.Priority,
-      t.DateTime,
-      t.TicketDuration as Duration,
-      s.SystemName,
-      tc.CategoryName
-    FROM ticket t
-    LEFT JOIN asipiyasystem s ON t.AsipiyaSystemID = s.AsipiyaSystemID
-    LEFT JOIN ticketcategory tc ON t.TicketCategoryID = tc.TicketCategoryID
-    WHERE t.UserId = ?
-    ORDER BY t.DateTime DESC
-  `;
-
-  db.query(query, [userId], (err, results) => {
-    if (err) {
-      console.error('Error fetching user tickets:', err);
-      return res.status(500).json({ error: 'Database error' });
-    }
-    res.json(results);
-  });
-});
-
 /* ----------------------------------------------------------------------------------------------*/
-
-// API endpoint to fetch tickets
-
-// API endpoint to update ticket status (including rejection)
-// When a ticket is rejected, this endpoint will:
-// 1. Update the ticket status to 'Rejected' with the provided reason
-// 2. Create a ticket log entry for the rejection
-// 3. Send a notification to the ticket creator with the rejection reason
+ 
 app.put('/api/ticket_status/:id', async (req, res) => {
   const { id } = req.params;
   const { status, reason, userId } = req.body; // Added userId to track who performed the action
