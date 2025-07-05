@@ -92,6 +92,27 @@ app.use('/api', chatNotificationRoutes);
 app.use('/api', commentAttachmentRoutes);
 app.use('/api/user/profile', profileImageRoutes);
 
+
+app.get("/tickets", (req, res) => {
+  res.redirect(307, `/api/tickets?${new URLSearchParams(req.query).toString()}`);
+});
+
+app.get("/getting/tickets", (req, res) => {
+  res.redirect(307, `/api/getting/tickets?${new URLSearchParams(req.query).toString()}`);
+});
+
+app.put("/tickets/:id", (req, res) => {
+  res.redirect(307, `/api/tickets/${req.params.id}`);
+});
+
+app.get("/supervisors", (req, res) => {
+  res.redirect(307, "/api/supervisors");
+});
+
+app.get("/asipiyasystems", (req, res) => {
+  res.redirect(307, "/api/asipiyasystems");
+});
+
 //evidence uploads
 app.use("/uploads", express.static("uploads"));
 const uploadDir = "uploads";
@@ -696,26 +717,7 @@ app.post("/ticketchat/markSeen", (req, res) => {
 // GET /api/supervisors - for supervisors list
 // GET /api/asipiyasystems - for systems list
 
-// Backward compatibility routes for frontend (redirect to new endpoints)
-app.get("/tickets", (req, res) => {
-  res.redirect(307, `/api/tickets?${new URLSearchParams(req.query).toString()}`);
-});
 
-app.get("/getting/tickets", (req, res) => {
-  res.redirect(307, `/api/getting/tickets?${new URLSearchParams(req.query).toString()}`);
-});
-
-app.put("/tickets/:id", (req, res) => {
-  res.redirect(307, `/api/tickets/${req.params.id}`);
-});
-
-app.get("/supervisors", (req, res) => {
-  res.redirect(307, "/api/supervisors");
-});
-
-app.get("/asipiyasystems", (req, res) => {
-  res.redirect(307, "/api/asipiyasystems");
-});
 /*---------------------------------------------------------------------------------------*/
 
 
