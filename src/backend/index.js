@@ -107,7 +107,7 @@ const __dirname = path.dirname(__filename);
 const uploadPath = path.join(__dirname, 'uploads');
 app.use('/uploads', express.static(uploadPath));
 
-// --- Multer Configuration Images ---
+// --- Multer Configuration for Chat Attachments --- 
 const profileImageStorage = multer.diskStorage({
   destination: (req, file, cb) => {
     const uploadDir = path.join(__dirname, 'uploads', 'profile_images');
