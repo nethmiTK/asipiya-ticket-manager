@@ -196,6 +196,176 @@ export const assignSupervisor = async (req, res) => {
   }
 };
 
+// Update supervisors for a ticket
+export const updateSupervisors = async (req, res) => {
+  const { id } = req.params;
+  const { supervisorIds, currentUserId } = req.body;
+
+  console.log("Received ticket ID:", id);
+  console.log("Received supervisor IDs:", supervisorIds);
+  console.log("Current User ID:", currentUserId);
+
+  // Validate input
+  if (!Array.isArray(supervisorIds) || supervisorIds.length === 0) {
+    return res.status(400).json({ error: "At least one supervisor is required." });
+  }
+
+  // Clean and format supervisor IDs
+  const validSupervisorIds = supervisorIds
+    .map(id => parseInt(id))
+    .filter(id => !isNaN(id) && id > 0);
+
+  if (validSupervisorIds.length === 0) {
+    return res.status(400).json({ error: "No valid supervisor IDs provided." });
+  }
+
+  try {
+    // Get current ticket data and old supervisors
+    const getTicketQuery = `
+      SELECT SupervisorID, UserId as ticketCreatorId 
+      FROM ticket 
+      WHERE TicketID = ?
+    `;
+
+    const currentTicketData = await query(getTicketQuery, [id]);
+
+    if (currentTicketData.length === 0) {
+      return res.status(404).json({ error: "Ticket not found." });
+    }
+
+    const oldSupervisorIds = currentTicketData[0].SupervisorID
+      ? currentTicketData[0].SupervisorID.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id))
+      : [];
+
+    const newSupervisorIds = validSupervisorIds;
+    const ticketCreatorId = currentTicketData[0].ticketCreatorId;
+
+    // Find added and removed supervisors
+    const addedSupervisorIds = newSupervisorIds.filter(id => !oldSupervisorIds.includes(id));
+    const removedSupervisorIds = oldSupervisorIds.filter(id => !newSupervisorIds.includes(id));
+
+    console.log("Old supervisors:", oldSupervisorIds);
+    console.log("New supervisors:", newSupervisorIds);
+    console.log("Added supervisors:", addedSupervisorIds);
+    console.log("Removed supervisors:", removedSupervisorIds);
+
+    // Get current user information
+    let currentUserName = 'System';
+    let currentUserRole = 'System';
+    if (currentUserId) {
+      const getCurrentUserQuery = `SELECT FullName, Role FROM appuser WHERE UserID = ?`;
+      const currentUserResult = await query(getCurrentUserQuery, [currentUserId]);
+
+      if (currentUserResult.length > 0) {
+        currentUserName = currentUserResult[0].FullName;
+        currentUserRole = currentUserResult[0].Role;
+      }
+    }
+
+    // Update the ticket table
+    const supervisorIdString = validSupervisorIds.join(",");
+    await query("UPDATE ticket SET SupervisorID = ? WHERE TicketID = ?", [supervisorIdString, id]);
+
+    // Get supervisor names for notifications
+    const getSupervisorNamesQuery = `
+      SELECT UserID, FullName 
+      FROM appuser 
+      WHERE UserID IN (${[...addedSupervisorIds, ...removedSupervisorIds].map(() => '?').join(',')})
+    `;
+
+    let supervisorNames = {};
+    if (addedSupervisorIds.length > 0 || removedSupervisorIds.length > 0) {
+      const nameResults = await query(getSupervisorNamesQuery, [...addedSupervisorIds, ...removedSupervisorIds]);
+
+      nameResults.forEach(supervisor => {
+        supervisorNames[supervisor.UserID] = supervisor.FullName;
+      });
+    }
+
+    // Create logs and notifications for changes
+    if (addedSupervisorIds.length > 0) {
+      const addedNames = addedSupervisorIds.map(id => supervisorNames[id] || `Supervisor ${id}`);
+      const logDescription = `added supervisors: ${addedNames.join(', ')}`;
+
+      const logResult = await createTicketLog(
+        id,
+        'SUPERVISOR_ADDED',
+        logDescription,
+        currentUserId,
+        null, // No old value to display in log message
+        null, // No new value to display in log message
+        null // Let createTicketLog handle the note
+      );
+
+      // Notify ticket creator about added supervisors
+      if (ticketCreatorId) {
+        await createNotification(
+          ticketCreatorId,
+          `New supervisors added to your ticket #${id}: ${addedNames.join(', ')} by ${currentUserName}`,
+          'SUPERVISOR_ADDED',
+          logResult.insertId,
+          id
+        );
+      }
+
+      // Notify newly added supervisors
+      for (const supervisorId of addedSupervisorIds) {
+        await createNotification(
+          supervisorId,
+          `You have been assigned to ticket #${id} by ${currentUserName}`,
+          'SUPERVISOR_ASSIGNED',
+          logResult.insertId,
+          id
+        );
+      }
+    }
+
+    if (removedSupervisorIds.length > 0) {
+      const removedNames = removedSupervisorIds.map(id => supervisorNames[id] || `Supervisor ${id}`);
+      const logDescription = `removed supervisors: ${removedNames.join(', ')}`;
+
+      const logResult = await createTicketLog(
+        id,
+        'SUPERVISOR_REMOVED',
+        logDescription,
+        currentUserId,
+        null, // No old value to display in log message
+        null, // No new value to display in log message
+        null // Let createTicketLog handle the note
+      );
+
+      // Notify ticket creator about removed supervisors
+      if (ticketCreatorId) {
+        await createNotification(
+          ticketCreatorId,
+          `Supervisors removed from your ticket #${id}: ${removedNames.join(', ')} by ${currentUserName}`,
+          'SUPERVISOR_REMOVED',
+          logResult.insertId,
+          id
+        );
+      }
+
+      // Notify removed supervisors
+      for (const supervisorId of removedSupervisorIds) {
+        await createNotification(
+          supervisorId,
+          `You have been removed from ticket #${id} by ${currentUserName}`,
+          'SUPERVISOR_UNASSIGNED',
+          logResult.insertId,
+          id
+        );
+      }
+    }
+
+    console.log("Supervisors updated successfully");
+    res.json({ message: "Supervisors updated successfully" });
+
+  } catch (error) {
+    console.error("Error updating supervisors:", error);
+    res.status(500).json({ error: "Failed to update supervisors." });
+  }
+};
+
 // Get all supervisors
 export const getSupervisors = (req, res) => {
   const query = `
