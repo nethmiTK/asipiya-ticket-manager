@@ -112,13 +112,6 @@ app.get("/asipiyasystems", (req, res) => {
   res.redirect(307, "/api/asipiyasystems");
 });
 
-//evidence uploads
-app.use("/uploads", express.static("uploads"));
-const uploadDir = "uploads";
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir);
-}
-
 // Get __dirname equivalent for ES Modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -139,110 +132,6 @@ io.on("connection", (socket) => {
   });
 });
 
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, "uploads/");
-  },
-  filename: function (req, file, cb) {
-    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    cb(
-      null,
-      file.fieldname + "-" + uniqueSuffix + path.extname(file.originalname)
-    );
-  },
-});
-
-const upload_evidence = multer({ storage: storage });
-
-app.post("/upload_evidence", upload_evidence.array("evidenceFiles"), (req, res) => {
-  const { ticketId, description } = req.body;
-
-  if (!req.files || req.files.length === 0) {
-    return res.status(400).json({ message: "No files uploaded" });
-  }
-
-  if (!ticketId) {
-    return res.status(400).json({ message: "Ticket ID is required" });
-  }
-
-  const values = req.files.map((file) => [ticketId, file.path, description]);
-
-  const insertEvidenceQuery = `
-    INSERT INTO evidence (ComplaintID, FilePath, Description) VALUES ?
-  `;
-
-  db.query(insertEvidenceQuery, [values], (err, result) => {
-    if (err) {
-      console.error("Error inserting evidence:", err);
-      return res.status(500).json({ message: "Error saving evidence" });
-    }
-    res
-      .status(200)
-      .json({
-        message: "Evidence files uploaded",
-        inserted: result.affectedRows,
-      });
-  });
-});
-
-app.get("/download_evidence/:filename", (req, res) => {
-  const filename = req.params.filename;
-
-  // Ensure it resolves to the correct full path (prevents path traversal attacks)
-  const filePath = path.resolve(__dirname, "../../uploads", filename);
-
-  // Check if the file exists before attempting download
-  fs.access(filePath, fs.constants.F_OK, (err) => {
-    if (err) {
-      console.error("File not found:", filePath);
-      return res.status(404).send("File not found.");
-    }
-
-    // Download the file
-    res.download(filePath, filename, (err) => {
-      if (err) {
-        console.error("Download error:", err);
-        res.status(500).send("Error downloading file.");
-      }
-    });
-  });
-});
-
-app.post('/api/upload_evidence', upload_evidence.array('evidenceFiles'), async (req, res) => {
-  const { ticketId, description } = req.body;
-
-  if (!req.files || req.files.length === 0) {
-    return res.status(400).json({ message: 'No files uploaded' });
-  }
-
-  if (!ticketId) {
-    return res.status(400).json({ message: 'Ticket ID is required' });
-  }
-
-  try {
-    const values = req.files.map(file => [
-      ticketId,
-      `uploads/${file.filename}`,
-      description
-    ]);
-
-    const insertEvidenceQuery = `
-      INSERT INTO evidence (ComplaintID, FilePath, Description)
-      VALUES ?
-    `;
-
-    await db.promise().query(insertEvidenceQuery, [values]);
-
-    res.status(200).json({
-      message: 'Evidence files uploaded successfully',
-      count: req.files.length
-    });
-  } catch (error) {
-    console.error('Error uploading evidence:', error);
-    res.status(500).json({ message: 'Error uploading evidence' });
-  }
-});
-  
 // Start the server
 const PORT = 5000;
 server.listen(PORT, () => {
