@@ -117,7 +117,7 @@ const EditSupervisors = ({ ticketId, popupMode = false, onClose }) => {
       return;
     }
     try {
-      await axiosClient.put(`/update-supervisors/${id}`, {
+      await axiosClient.put(`/api/update-supervisors/${id}`, {
         supervisorIds: selectedSupervisors.map((id) => parseInt(id)),
         currentUserId: user?.UserID,
       });
