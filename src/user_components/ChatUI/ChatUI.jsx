@@ -563,7 +563,7 @@ const ChatUI = ({ ticketID: propTicketID }) => {
 
       {previewImage && (
         <div
-          className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50"
+          className="fixed inset-0 bg-black/65 flex items-center justify-center z-50"
           onClick={() => setPreviewImage(null)}
         >
           <div className="relative p-4">

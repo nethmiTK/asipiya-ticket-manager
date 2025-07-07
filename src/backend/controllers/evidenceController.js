@@ -50,9 +50,15 @@ export const uploadEvidence = async (req, res) => {
   }
 
   try {
+    // Ensure the uploads directory exists
+    const uploadsDir = path.resolve(__dirname, '../uploads');
+    if (!fs.existsSync(uploadsDir)) {
+      fs.mkdirSync(uploadsDir, { recursive: true });
+    }
+
     const values = req.files.map(file => [
       ticketId,
-      `uploads/${file.filename}`,
+      file.filename,
       description
     ]);
 
@@ -78,7 +84,7 @@ export const downloadEvidence = (req, res) => {
   const filename = req.params.filename;
 
   // Ensure it resolves to the correct full path (prevents path traversal attacks)
-  const filePath = path.resolve(__dirname, "../../../uploads", filename);
+  const filePath = path.resolve(__dirname, "../uploads/", filename);
 
   // Check if the file exists before attempting download
   fs.access(filePath, fs.constants.F_OK, (err) => {
