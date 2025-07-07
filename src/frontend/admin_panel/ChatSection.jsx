@@ -518,6 +518,31 @@ export default function SupervisorChatSection({
     });
   };
 
+  const handleFileDownload = async (fileName) => {
+    try {
+      // For file downloads, if your backend's /download_evidence endpoint is also proxied
+      // through axiosClient's base URL, you can use axiosClient here too.
+      // Otherwise, keep it as fetch or adjust axiosClient's configuration.
+      // Assuming it's still a direct path for simplicity if axiosClient isn't configured for blobs.
+      const response = await fetch(
+        `${axiosClient.defaults.baseURL}/uploads/profile_images/${fileName}`
+      );
+      if (!response.ok) throw new Error("Download failed");
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Download error:", error);
+      alert("Download failed.");
+    }
+  };
 
   return (
     <div className="flex flex-col h-full w-6xl mx-auto border-gray-400 rounded-lg shadow-lg border">
@@ -753,28 +778,11 @@ export default function SupervisorChatSection({
                           {highlightText(msg.file.name, filterKeyword)}
                         </p>
                         <a
-                          href={msg.file.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          download={msg.file.name}
-                          className="inline-flex items-center px-2 py-0.5 bg-blue-500 text-white rounded-md text-xs hover:bg-blue-600 transition-colors duration-200"
-                        >
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            className="h-3 w-3 mr-1"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                            strokeWidth="1.5"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75v-2.25M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"
-                            />
-                          </svg>
-                          Download
-                        </a>
+                    onClick={() => handleFileDownload(msg.file.name)}
+                    className="inline-flex items-center px-3 py-1 bg-blue-500 text-white rounded-md text-xs hover:bg-blue-600 transition-colors duration-200"
+                  >
+                    Download
+                  </a>
                       </div>
                     ) : (
                       // Highlight message content
