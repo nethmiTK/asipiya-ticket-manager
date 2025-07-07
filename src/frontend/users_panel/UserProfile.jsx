@@ -520,6 +520,7 @@ const UserProfile = () => {
 
                         <h3 className="text-2xl font-semibold text-gray-800 mb-6">Account Details</h3>
                         <form onSubmit={handleSave} className="space-y-6">
+                        <input type="password" autoComplete="new-password" style={{ display: 'none' }} />
                             {/* Full Name */}
                             <div>
                                 <label htmlFor="FullName" className="block text-gray-700 text-sm font-bold mb-2">
