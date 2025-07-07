@@ -271,7 +271,7 @@ const TicketDetails = () => {
                     <div className="flex flex-wrap gap-4">
                       {evidenceFiles.map((file) => {
                         const filePath = file.FilePath || file.filepath || "";
-                        const fileUrl = `${axiosClient.defaults.baseURL}/${filePath.replace(
+                        const fileUrl = `${axiosClient.defaults.baseURL}/uploads/${filePath.replace(
                           /\\/g,
                           "/"
                         )}`;
@@ -422,7 +422,7 @@ const TicketDetails = () => {
                   <div className="flex flex-wrap gap-4">
                     {evidenceFiles.map((file) => {
                       const filePath = file.FilePath || file.filepath || "";
-                      const fileUrl = `${axiosClient.defaults.baseURL}/${filePath.replace(
+                      const fileUrl = `${axiosClient.defaults.baseURL}/uploads/${filePath.replace(
                         /\\/g,
                         "/"
                       )}`;
