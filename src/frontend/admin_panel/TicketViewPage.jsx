@@ -245,6 +245,7 @@ const TicketViewPage = ({ ticketId, popupMode = false, onClose }) => {
             <div className="flex flex-wrap gap-4">
               {evidenceList.map((evi) => {
                 const filePath = evi.FilePath.replace(/\\/g, "/");
+                const fileUrl = `${axiosClient.defaults.baseURL}/uploads/${filePath.split("/").pop()}`;
                 const fileName = filePath.split("/").pop();
                 const extension = fileName.split(".").pop().toLowerCase();
 

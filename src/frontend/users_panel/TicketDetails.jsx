@@ -271,10 +271,7 @@ const TicketDetails = () => {
                     <div className="flex flex-wrap gap-4">
                       {evidenceFiles.map((file) => {
                         const filePath = file.FilePath || file.filepath || "";
-                        const fileUrl = `${axiosClient.defaults.baseURL}/uploads/${filePath.replace(
-                          /\\/g,
-                          "/"
-                        )}`;
+                        const fileUrl = `${axiosClient.defaults.baseURL}/uploads/${filePath.replace(/\\/g, "/")}`;
                         const fileName = fileUrl.split("/").pop();
                         const lowerName = fileName.toLowerCase();
                         const isImage = /\.(jpg|jpeg|png|gif|bmp|webp)$/i.test(
@@ -422,10 +419,7 @@ const TicketDetails = () => {
                   <div className="flex flex-wrap gap-4">
                     {evidenceFiles.map((file) => {
                       const filePath = file.FilePath || file.filepath || "";
-                      const fileUrl = `${axiosClient.defaults.baseURL}/uploads/${filePath.replace(
-                        /\\/g,
-                        "/"
-                      )}`;
+                      const fileUrl = `${axiosClient.defaults.baseURL}/uploads/${filePath.replace(/\\/g, "/")}`;
                       const fileName = fileUrl.split("/").pop();
                       const lowerName = fileName.toLowerCase();
 
