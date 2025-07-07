@@ -104,7 +104,7 @@ const TicketTable = ({
                   #{ticket.TicketID}
                 </td>
                 <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {ticket.CompanyName || "N/A"}
+                  {ticket.CompanyName || "-"}
                 </td>
                 <td className="px-4 sm:px-6 py-4 text-sm text-gray-500 max-w-xs truncate">
                   {ticket.Description}

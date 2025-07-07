@@ -112,6 +112,7 @@ export default function TicketManage() {
   });
   const [filteredMentions, setFilteredMentions] = useState([]);
   const textareaRef = useRef(null);
+  const mentionDropdownRef = useRef(null);
   const [replyingTo, setReplyingTo] = useState(null);
   const [userLikedComments, setUserLikedComments] = useState({});
   const [showAllComments, setShowAllComments] = useState(false);
@@ -1147,6 +1148,64 @@ export default function TicketManage() {
     }
   }, [activeTab, selectedTicket?.id, user?.UserID, fetchUnreadNotifications]); // Added fetchUnreadNotifications to dependencies
 
+  // Close mention dropdown when overlays or modals appear
+  useEffect(() => {
+    const closeMentionDropdown = () => {
+      if (showMentionDropdown) {
+        setShowMentionDropdown(false);
+        setMentionQuery("");
+        setFilteredMentions([]);
+      }
+    };
+
+    // Close mention dropdown when notifications panel opens
+    if (showNotifications) {
+      closeMentionDropdown();
+    }
+
+    // Close mention dropdown when window loses focus (like when a modal appears)
+    const handleWindowBlur = () => {
+      closeMentionDropdown();
+    };
+
+    // Close mention dropdown when clicking outside or pressing escape
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        closeMentionDropdown();
+      }
+    };
+
+    // Close mention dropdown when clicking outside
+    const handleClickOutside = (e) => {
+      if (mentionDropdownRef.current && !mentionDropdownRef.current.contains(e.target) && 
+          textareaRef.current && !textareaRef.current.contains(e.target)) {
+        closeMentionDropdown();
+      }
+    };
+
+    // Close mention dropdown when modal or overlay appears
+    const handleModalOpen = () => {
+      closeMentionDropdown();
+    };
+
+    // Add event listeners
+    window.addEventListener('blur', handleWindowBlur);
+    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('mousedown', handleClickOutside);
+    
+    // Listen for custom modal events (if any components dispatch them)
+    document.addEventListener('modal-open', handleModalOpen);
+    document.addEventListener('overlay-open', handleModalOpen);
+
+    return () => {
+      window.removeEventListener('blur', handleWindowBlur);
+      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('modal-open', handleModalOpen);
+      document.removeEventListener('overlay-open', handleModalOpen);
+    };
+  }, [showNotifications, showMentionDropdown]);
+
   return (
     <div className="flex">
       <AdminSideBar open={isSidebarOpen} setOpen={setIsSidebarOpen} />
@@ -1324,6 +1383,13 @@ export default function TicketManage() {
                               }
                               alt={user?.FullName || 'User'}
                               className="w-12 h-12 rounded-full object-cover ring-3 ring-blue-100 shadow-md"
+                              onError={(e) => {
+                                console.log('Profile image load error for user:', user?.FullName, 'Path:', user?.ProfileImagePath);
+                                e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.FullName || 'User')}&background=random&color=fff`;
+                              }}
+                              onLoad={(e) => {
+                                console.log('Profile image loaded successfully for user:', user?.FullName);
+                              }}
                             />
                             <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white"></div>
                           </div>
@@ -1677,6 +1743,7 @@ export default function TicketManage() {
 
                         {showMentionDropdown && filteredMentions.length > 0 && (
                           <div
+                            ref={mentionDropdownRef}
                             className="absolute z-50 bg-white border border-gray-200 rounded-2xl shadow-2xl mt-2 max-h-64 overflow-y-auto backdrop-blur-sm"
                             style={{
                               top: mentionDropdownPos.top + 10,
