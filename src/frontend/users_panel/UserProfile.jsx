@@ -582,6 +582,7 @@ const UserProfile = () => {
                                     name="CurrentPassword"
                                     value={formData.CurrentPassword}
                                     onChange={handleChange}
+                                    autoComplete="new-password"
                                     className={`shadow appearance-none border rounded w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.CurrentPassword ? 'border-red-500' : 'border-gray-300'}`}
                                 />
                                 {errors.CurrentPassword && <p className="text-red-500 text-xs italic mt-1">{errors.CurrentPassword}</p>}
