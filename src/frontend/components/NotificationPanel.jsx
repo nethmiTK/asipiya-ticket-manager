@@ -1,4 +1,4 @@
- import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axiosClient from "../axiosClient";
 import { formatDistanceToNow } from 'date-fns';
 import { IoClose } from 'react-icons/io5';
@@ -329,29 +329,39 @@ const NotificationPanel = ({ userId, role, onClose, onNotificationUpdate }) => {
     };
 
     const fetchNotifications = async () => {
+        if (!userId) return;
+        
         try {
-            // Fetch ALL notifications (both read and unread)
-            const response = await axiosClient.get(`/api/notifications/${userId}`);
+            setLoading(true);
+            setError(null);
             
-            // Filter to show only unread notifications initially
-            const unreadNotifications = response.data.filter(notification => !notification.IsRead).map(notification => ({
-                ...notification,
-                justMarkedRead: false
-            }));
+            // On initial load, only fetch unread notifications
+            const includeRead = !loading; // If loading is true, it's initial load
+            const response = await axiosClient.get(`/api/notifications/${userId}?includeRead=${includeRead}`);
             
-            setNotifications(unreadNotifications);
-            setLoading(false);
-        } catch (error) {
-            console.error('Error fetching notifications:', error);
+            if (response.data) {
+                setNotifications(response.data);
+                // Update the notification count in the parent component
+                if (onNotificationUpdate) {
+                    const unreadCount = response.data.filter(n => !n.IsRead).length;
+                    onNotificationUpdate(unreadCount);
+                }
+            }
+        } catch (err) {
+            console.error('Error fetching notifications:', err);
             setError('Failed to load notifications');
+        } finally {
             setLoading(false);
         }
     };
 
+    // Initial fetch
+    useEffect(() => {
+        fetchNotifications();
+    }, [userId]);
+
     useEffect(() => {
         if (userId) {
-            fetchNotifications();
-            
             // Setup socket connection for real-time notifications
             socketRef.current = io(`${axiosClient.defaults.baseURL}`);
             

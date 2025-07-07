@@ -24,6 +24,13 @@ export const getUnreadNotificationsCount = async (req, res) => {
 // Get user's notifications
 export const getUserNotifications = async (req, res) => {
   const { userId } = req.params;
+  const { includeRead = 'true' } = req.query; // New parameter to control read notifications
+  
+  let whereClause = 'n.UserID = ?';
+  if (includeRead === 'false') {
+    whereClause += ' AND n.IsRead = FALSE';
+  }
+  
   const query = `
         SELECT
             n.NotificationID,
@@ -46,7 +53,7 @@ export const getUserNotifications = async (req, res) => {
         LEFT JOIN
             appuser au ON tl.UserID = au.UserID
         WHERE
-            n.UserID = ?
+            ${whereClause}
         ORDER BY
             n.CreatedAt DESC;
     `;
