@@ -264,10 +264,19 @@ const NotificationPanel = ({ userId, role, onClose, onNotificationUpdate }) => {
         
         // Priority 1: Check if notification has source user information (for personalized notifications)
         if (notification.SourceUserProfileImagePath) {
-            // Use the source user's profile picture
+            // Check if the path already includes the full URL
+            const imagePath = notification.SourceUserProfileImagePath.startsWith('http') 
+                ? notification.SourceUserProfileImagePath 
+                : `${axiosClient.defaults.baseURL}/uploads/profile_images/${notification.SourceUserProfileImagePath}`;
+                
             return {
-                imgSrc: `${axiosClient.defaults.baseURL}/uploads/profile_images/${notification.SourceUserProfileImagePath}`,
+                imgSrc: imagePath,
                 altText: notification.SourceUserFullName || 'User',
+                onError: (e) => {
+                    // If image fails to load, fallback to UI-avatars
+                    e.target.onerror = null; // Prevent infinite loop
+                    e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(notification.SourceUserFullName || 'User')}&background=random&color=fff`;
+                }
             };
         } else if (notification.SourceUserFullName) {
              // Fallback to UI-avatars if path is missing but name exists
@@ -670,6 +679,10 @@ const NotificationPanel = ({ userId, role, onClose, onNotificationUpdate }) => {
                                                 src={imgSrc}
                                                 alt={altText}
                                                 className="w-12 h-12 rounded-full mr-4 object-cover shadow-md ring-2 ring-white group-hover:ring-blue-200 transition-all duration-300"
+                                                onError={(e) => {
+                                                    e.target.onerror = null;
+                                                    e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(notification.SourceUserFullName || 'User')}&background=random&color=fff`;
+                                                }}
                                             />
                                         </div>
                                     ) : (
