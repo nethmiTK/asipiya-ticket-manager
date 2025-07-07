@@ -121,7 +121,7 @@ const TicketDetails = () => {
       // Otherwise, keep it as fetch or adjust axiosClient's configuration.
       // Assuming it's still a direct path for simplicity if axiosClient isn't configured for blobs.
       const response = await fetch(
-        `${axiosClient.defaults.baseURL}/download_evidence/${fileName}`
+        `${axiosClient.defaults.baseURL}/api/download_evidence/${fileName}`
       );
       if (!response.ok) throw new Error("Download failed");
       const blob = await response.blob();
