@@ -121,7 +121,7 @@ const TicketDetails = () => {
       // Otherwise, keep it as fetch or adjust axiosClient's configuration.
       // Assuming it's still a direct path for simplicity if axiosClient isn't configured for blobs.
       const response = await fetch(
-        `${axiosClient.defaults.baseURL}/download_evidence/${fileName}`
+        `${axiosClient.defaults.baseURL}/api/download_evidence/${fileName}`
       );
       if (!response.ok) throw new Error("Download failed");
       const blob = await response.blob();
@@ -271,10 +271,7 @@ const TicketDetails = () => {
                     <div className="flex flex-wrap gap-4">
                       {evidenceFiles.map((file) => {
                         const filePath = file.FilePath || file.filepath || "";
-                        const fileUrl = `${axiosClient.defaults.baseURL}/uploads/${filePath.replace(
-                          /\\/g,
-                          "/"
-                        )}`;
+                        const fileUrl = `${axiosClient.defaults.baseURL}/uploads/${filePath.replace(/\\/g, "/")}`;
                         const fileName = fileUrl.split("/").pop();
                         const lowerName = fileName.toLowerCase();
                         const isImage = /\.(jpg|jpeg|png|gif|bmp|webp)$/i.test(
@@ -422,10 +419,7 @@ const TicketDetails = () => {
                   <div className="flex flex-wrap gap-4">
                     {evidenceFiles.map((file) => {
                       const filePath = file.FilePath || file.filepath || "";
-                      const fileUrl = `${axiosClient.defaults.baseURL}/uploads/${filePath.replace(
-                        /\\/g,
-                        "/"
-                      )}`;
+                      const fileUrl = `${axiosClient.defaults.baseURL}/uploads/${filePath.replace(/\\/g, "/")}`;
                       const fileName = fileUrl.split("/").pop();
                       const lowerName = fileName.toLowerCase();
 

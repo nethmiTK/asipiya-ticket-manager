@@ -83,7 +83,7 @@ const TicketViewPage = ({ ticketId, popupMode = false, onClose }) => {
 
   const handleFileDownload = async (fileName) => {
     try {
-      const response = await axiosClient.get(`/download_evidence/${fileName}`, {
+      const response = await axiosClient.get(`/api/download_evidence/${fileName}`, {
         responseType: "blob",
       });
 
@@ -103,7 +103,7 @@ const TicketViewPage = ({ ticketId, popupMode = false, onClose }) => {
 
   const handlePreview = async (fileName, type) => {
     try {
-      const response = await axiosClient.get(`/download_evidence/${fileName}`, {
+      const response = await axiosClient.get(`/api/download_evidence/${fileName}`, {
         responseType: "blob",
       });
       const blob = new Blob([response.data]);
@@ -245,6 +245,7 @@ const TicketViewPage = ({ ticketId, popupMode = false, onClose }) => {
             <div className="flex flex-wrap gap-4">
               {evidenceList.map((evi) => {
                 const filePath = evi.FilePath.replace(/\\/g, "/");
+                const fileUrl = `${axiosClient.defaults.baseURL}/uploads/${filePath.split("/").pop()}`;
                 const fileName = filePath.split("/").pop();
                 const extension = fileName.split(".").pop().toLowerCase();
 
