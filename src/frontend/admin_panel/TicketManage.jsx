@@ -445,16 +445,11 @@ export default function TicketManage() {
     const safeUsers = Array.isArray(mentionableUsers) ? mentionableUsers : [];
     const sortedMentionableUsers = [...safeUsers].sort((a, b) => b.FullName.length - a.FullName.length);
 
-    for (const mentionUser of sortedMentionableUsers) {
-      const lowerCaseFullName = mentionUser.FullName.toLowerCase().trim();
+    for (const user of sortedMentionableUsers) {
+      const lowerCaseFullName = user.FullName.toLowerCase().trim();
       // Check if "@full name" is present in the lowercased comment
       if (lowerCaseComment.includes(`@${lowerCaseFullName}`)) {
-        mentionedUserIds.push(mentionUser.UserID);
-        
-        // Special handling for "All Admins" mention
-        if (mentionUser.UserID === 'all-admins') {
-          console.log("All Admins mentioned - will notify all admin users");
-        }
+        mentionedUserIds.push(user.UserID);
       }
     }
 
@@ -1770,45 +1765,31 @@ export default function TicketManage() {
                                 }}
                               >
                                 <div className="relative">
-                                  {user.UserID === 'all-admins' ? (
-                                    // Special icon for "All Admins"
-                                    <div className="w-10 h-10 rounded-full bg-gradient-to-r from-red-500 to-purple-600 flex items-center justify-center ring-2 ring-red-200">
-                                      <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
-                                        <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z"/>
-                                      </svg>
-                                      <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-orange-500 rounded-full border border-white"></div>
-                                    </div>
-                                  ) : (
-                                    <>
-                                      <img
-                                        src={
-                                          user.ProfileImagePath
-                                            ? `${axiosClient.defaults.baseURL}/uploads/${user.ProfileImagePath}`
-                                            : `https://ui-avatars.com/api/?name=${encodeURIComponent(user.FullName)}&background=random&color=fff`
-                                        }
-                                        alt={user.FullName}
-                                        className="w-10 h-10 rounded-full object-cover ring-2 ring-gray-100"
-                                      />
-                                      <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 rounded-full border border-white"></div>
-                                    </>
-                                  )}
+                                  <img
+                                    src={
+                                      user.ProfileImagePath
+                                        ? `${axiosClient.defaults.baseURL}/uploads/${user.ProfileImagePath}`
+                                        : `https://ui-avatars.com/api/?name=${encodeURIComponent(user.FullName)}&background=random&color=fff`
+                                    }
+                                    alt={user.FullName}
+                                    className="w-10 h-10 rounded-full object-cover ring-2 ring-gray-100"
+                                  />
+                                  <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 rounded-full border border-white"></div>
                                 </div>
                                 <div className="flex-1">
                                   <div className="flex items-center gap-2">
-                                    <span className={`font-semibold ${user.UserID === 'all-admins' ? 'text-purple-700' : 'text-blue-700'}`}>
+                                    <span className="font-semibold text-blue-700">
                                       @{user.FullName}
                                     </span>
-                                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${
-                                      user.UserID === 'all-admins' ? 'bg-gradient-to-r from-red-100 to-purple-100 text-purple-700 font-bold' :
-                                      user.Role === 'Admin' ? 'bg-red-100 text-red-700' :
+                                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${user.Role === 'Admin' ? 'bg-red-100 text-red-700' :
                                       user.Role === 'Supervisor' ? 'bg-yellow-100 text-yellow-700' :
                                         'bg-green-100 text-green-700'
                                       }`}>
-                                      {user.UserID === 'all-admins' ? 'All Admins' : user.Role}
+                                      {user.Role}
                                     </span>
                                   </div>
                                   <span className="text-sm text-gray-500">
-                                    {user.UserID === 'all-admins' ? 'Notify all administrators' : 'Click to mention'}
+                                    Click to mention
                                   </span>
                                 </div>
                               </div>

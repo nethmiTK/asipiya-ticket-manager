@@ -215,33 +215,7 @@ export const addComment = async (req, res) => {
     let processedMentions = [];
 
     if (mentionedUserIds && typeof mentionedUserIds === 'string') {
-      const mentionedIds = mentionedUserIds.split(',').map(id => id.trim());
-      
-      for (const id of mentionedIds) {
-        if (id === 'all-admins') {
-          // Special case: "All Admins" mention - get all admin user IDs
-          try {
-            const [adminUsers] = await db.promise().query(
-              'SELECT UserID FROM appuser WHERE Role = ?', 
-              ['Admin']
-            );
-            const adminIds = adminUsers.map(admin => admin.UserID);
-            processedMentions.push(...adminIds);
-            console.log('All Admins mentioned - notifying admin users:', adminIds);
-          } catch (adminQueryError) {
-            console.error('Error fetching admin users for "All Admins" mention:', adminQueryError);
-          }
-        } else {
-          // Regular user mention
-          const numericId = parseInt(id);
-          if (!isNaN(numericId)) {
-            processedMentions.push(numericId);
-          }
-        }
-      }
-      
-      // Remove duplicates
-      processedMentions = [...new Set(processedMentions)];
+      processedMentions = mentionedUserIds.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id));
     }
 
     // IMPORTANT: Storing the original comment text (including @mentions) in CommentText for display.
@@ -305,18 +279,12 @@ export const addComment = async (req, res) => {
 
       // Notify mentioned users
       if (processedMentions.length > 0) {
-        const wasAllAdminsMentioned = mentionedUserIds && mentionedUserIds.includes('all-admins');
-        
         for (const mentionedUserId of processedMentions) {
           // Exclude the user who made the comment from receiving a mention notification for their own comment
           if (mentionedUserId !== parseInt(userId)) { // Ensure userId is compared as a number
-            const notificationMessage = wasAllAdminsMentioned && mentionedUserId !== parseInt(userId) 
-              ? `All Admins were mentioned in a comment on ticket #${ticketId} by ${userName}`
-              : `You were mentioned in a comment on ticket #${ticketId} by ${userName}`;
-              
             await createNotification(
               mentionedUserId,
-              notificationMessage,
+              `You were mentioned in a comment on ticket #${ticketId} by ${userName}`,
               'MENTION',
               newCommentId // Link notification to the new comment
             );
